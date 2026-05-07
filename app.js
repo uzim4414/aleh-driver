@@ -634,13 +634,14 @@ async function viewDoc(link, title) {
     loading.style.display = 'none';
     pages.style.display   = 'flex';
 
+    const dpr = window.devicePixelRatio || 1;
     for (let p = 1; p <= pdf.numPages; p++) {
-      const page     = await pdf.getPage(p);
-      const scale    = (window.innerWidth - 24) / page.getViewport({ scale: 1 }).width;
-      const viewport = page.getViewport({ scale });
-      const canvas   = document.createElement('canvas');
-      canvas.width   = viewport.width;
-      canvas.height  = viewport.height;
+      const page        = await pdf.getPage(p);
+      const baseScale   = (window.innerWidth - 24) / page.getViewport({ scale: 1 }).width;
+      const viewport    = page.getViewport({ scale: baseScale * dpr });
+      const canvas      = document.createElement('canvas');
+      canvas.width      = viewport.width;
+      canvas.height     = viewport.height;
       canvas.style.cssText = 'width:100%;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.4)';
       pages.appendChild(canvas);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
