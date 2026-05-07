@@ -448,12 +448,9 @@ function renderVehicleScreen(tab) {
     } else {
       content.innerHTML = STATE.documents.map(function(d, i) {
         const warn = daysLeftWarn(d.date, 30);
-        const proxyUrl = d.link
-          ? GAS_URL + '?action=view_doc&idToken=' + encodeURIComponent(STATE.idToken || '') + '&fileId=' + encodeURIComponent(d.link)
-          : '';
-        const onclick = proxyUrl
-          ? 'window.open(\'' + proxyUrl + '\',\'_blank\')'
-          : 'showToast(\'לא קיים קישור — פנה למשרד\')';
+        const safeLink  = (d.link  || '').replace(/'/g, "\\'");
+        const safeTitle = (d.type || 'מסמך').replace(/'/g, "\\'");
+        const onclick   = 'viewDoc(\'' + safeLink + '\',\'' + safeTitle + '\')';
         return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's" onclick="' + onclick + '">' +
           '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#E8000D"/></svg></div>' +
           '<div class="dr-body">' +
@@ -603,6 +600,54 @@ function daysLeftWarn(dateStr, threshold) {
 
 function showLoader()  { document.getElementById('loader').classList.remove('hidden'); }
 function hideLoader()  { document.getElementById('loader').classList.add('hidden'); }
+
+/* ══ Doc Viewer ══ */
+let _docBlobUrl = null;
+
+async function viewDoc(link, title) {
+  if (!link) { showToast('לא קיים קישור — פנה למשרד'); return; }
+  const overlay = document.getElementById('doc-viewer');
+  const loading = document.getElementById('doc-viewer-loading');
+  const frame   = document.getElementById('doc-viewer-frame');
+  const errDiv  = document.getElementById('doc-viewer-error');
+  const errMsg  = document.getElementById('doc-viewer-error-msg');
+  const ttl     = document.getElementById('doc-viewer-title');
+
+  /* פתח overlay */
+  overlay.style.display = 'flex';
+  loading.style.display = 'flex';
+  frame.style.display   = 'none';
+  errDiv.style.display  = 'none';
+  ttl.textContent = title || 'מסמך';
+
+  /* נקה blob קודם */
+  if (_docBlobUrl) { URL.revokeObjectURL(_docBlobUrl); _docBlobUrl = null; }
+
+  try {
+    const result = await gasPost('view_doc_b64', { fileId: link });
+    const binary = atob(result.b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob   = new Blob([bytes], { type: result.mime || 'application/pdf' });
+    _docBlobUrl  = URL.createObjectURL(blob);
+
+    frame.src            = _docBlobUrl;
+    loading.style.display = 'none';
+    frame.style.display   = 'flex';
+  } catch(e) {
+    loading.style.display = 'none';
+    errDiv.style.display  = 'flex';
+    errMsg.textContent    = e.message || 'שגיאה בטעינת המסמך';
+  }
+}
+
+function closeDocViewer() {
+  document.getElementById('doc-viewer').style.display = 'none';
+  const frame = document.getElementById('doc-viewer-frame');
+  frame.src = '';
+  frame.style.display = 'none';
+  if (_docBlobUrl) { URL.revokeObjectURL(_docBlobUrl); _docBlobUrl = null; }
+}
 
 function showToast(msg) {
   const t = document.getElementById('toast');
