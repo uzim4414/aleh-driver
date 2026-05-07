@@ -675,7 +675,17 @@ function showLoginError(msg) {
 /* ══ Boot ══ */
 document.addEventListener('DOMContentLoaded', async function() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(function(e) {
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+      /* בדוק עדכון בכל טעינה */
+      reg.update();
+      reg.addEventListener('updatefound', function() {
+        const sw = reg.installing;
+        if (!navigator.serviceWorker.controller) return; /* התקנה ראשונה — לא reload */
+        sw.addEventListener('statechange', function() {
+          if (sw.state === 'activated') window.location.reload();
+        });
+      });
+    }).catch(function(e) {
       console.warn('SW:', e.message);
     });
   }
