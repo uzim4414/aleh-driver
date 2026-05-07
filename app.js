@@ -620,37 +620,17 @@ async function viewDoc(link, title) {
 
   try {
     const result = await gasPost('view_doc_b64', { fileId: link });
-    const binary = atob(result.b64);
-    const bytes  = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-    /* PDF.js */
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-    const pdf = await pdfjsLib.getDocument({
-      data: bytes,
-      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-      cMapPacked: true,
-      standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/'
-    }).promise;
+    /* iframe עם Google Drive preview — רינדור native מושלם לעברית */
+    const iframe = document.createElement('iframe');
+    iframe.src = result.previewUrl;
+    iframe.style.cssText = 'width:100%;flex:1;border:none;background:#525659';
+    iframe.allow = 'autoplay';
 
     loading.style.display = 'none';
     pages.style.display   = 'flex';
-
-    const dpr = window.devicePixelRatio || 1;
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const page        = await pdf.getPage(p);
-      const baseScale   = (window.innerWidth - 24) / page.getViewport({ scale: 1 }).width;
-      const viewport    = page.getViewport({ scale: baseScale * dpr });
-      const canvas      = document.createElement('canvas');
-      canvas.width      = viewport.width;
-      canvas.height     = viewport.height;
-      canvas.style.cssText = 'width:100%;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.4)';
-      pages.appendChild(canvas);
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    }
+    pages.style.padding   = '0';
+    pages.appendChild(iframe);
   } catch(e) {
     loading.style.display = 'none';
     errDiv.style.display  = 'flex';
