@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aleh-driver-v5';
+const CACHE_NAME = 'aleh-driver-v6';
 const STATIC = [
   './',
   './index.html',
@@ -25,6 +25,8 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Don't intercept cross-origin requests (GAS, Google APIs, fonts)
+  if (!e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('./index.html')))
   );
