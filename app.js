@@ -601,39 +601,50 @@ function daysLeftWarn(dateStr, threshold) {
 function showLoader()  { document.getElementById('loader').classList.remove('hidden'); }
 function hideLoader()  { document.getElementById('loader').classList.add('hidden'); }
 
-/* ══ Doc Viewer ══ */
-let _docBlobUrl = null;
-
+/* ══ Doc Viewer (PDF.js) ══ */
 async function viewDoc(link, title) {
   if (!link) { showToast('לא קיים קישור — פנה למשרד'); return; }
-  const overlay = document.getElementById('doc-viewer');
-  const loading = document.getElementById('doc-viewer-loading');
-  const frame   = document.getElementById('doc-viewer-frame');
-  const errDiv  = document.getElementById('doc-viewer-error');
-  const errMsg  = document.getElementById('doc-viewer-error-msg');
-  const ttl     = document.getElementById('doc-viewer-title');
+  const overlay  = document.getElementById('doc-viewer');
+  const loading  = document.getElementById('doc-viewer-loading');
+  const pages    = document.getElementById('doc-viewer-pages');
+  const errDiv   = document.getElementById('doc-viewer-error');
+  const errMsg   = document.getElementById('doc-viewer-error-msg');
+  const ttl      = document.getElementById('doc-viewer-title');
 
-  /* פתח overlay */
-  overlay.style.display = 'flex';
-  loading.style.display = 'flex';
-  frame.style.display   = 'none';
-  errDiv.style.display  = 'none';
-  ttl.textContent = title || 'מסמך';
-
-  /* נקה blob קודם */
-  if (_docBlobUrl) { URL.revokeObjectURL(_docBlobUrl); _docBlobUrl = null; }
+  overlay.style.display  = 'flex';
+  loading.style.display  = 'flex';
+  pages.style.display    = 'none';
+  errDiv.style.display   = 'none';
+  pages.innerHTML        = '';
+  ttl.textContent        = title || 'מסמך';
 
   try {
     const result = await gasPost('view_doc_b64', { fileId: link });
     const binary = atob(result.b64);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob   = new Blob([bytes], { type: result.mime || 'application/pdf' });
-    _docBlobUrl  = URL.createObjectURL(blob);
 
-    frame.src            = _docBlobUrl;
+    /* PDF.js */
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+
     loading.style.display = 'none';
-    frame.style.display   = 'flex';
+    pages.style.display   = 'flex';
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page     = await pdf.getPage(p);
+      const scale    = (window.innerWidth - 24) / page.getViewport({ scale: 1 }).width;
+      const viewport = page.getViewport({ scale });
+      const canvas   = document.createElement('canvas');
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      canvas.style.cssText = 'width:100%;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.4)';
+      pages.appendChild(canvas);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    }
   } catch(e) {
     loading.style.display = 'none';
     errDiv.style.display  = 'flex';
@@ -643,10 +654,7 @@ async function viewDoc(link, title) {
 
 function closeDocViewer() {
   document.getElementById('doc-viewer').style.display = 'none';
-  const frame = document.getElementById('doc-viewer-frame');
-  frame.src = '';
-  frame.style.display = 'none';
-  if (_docBlobUrl) { URL.revokeObjectURL(_docBlobUrl); _docBlobUrl = null; }
+  document.getElementById('doc-viewer-pages').innerHTML = '';
 }
 
 function showToast(msg) {
