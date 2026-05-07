@@ -31,13 +31,9 @@ async function gasPost(action, extra) {
     // Demo mode — return mock data
     return mockResponse(action, extra);
   }
-  const body = Object.assign({ action, idToken: STATE.idToken }, extra);
-  const resp = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(body),
-    redirect: 'follow'
-  });
+  const params = Object.assign({ action, idToken: STATE.idToken }, extra);
+  const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+  const resp = await fetch(url, { method: 'GET' });
   const data = await resp.json();
   if (!data.ok) throw new Error(data.error || 'שגיאת שרת');
   return data;
