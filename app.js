@@ -448,8 +448,11 @@ function renderVehicleScreen(tab) {
     } else {
       content.innerHTML = STATE.documents.map(function(d, i) {
         const warn = daysLeftWarn(d.date, 30);
-        const onclick = d.link
-          ? 'window.open(\'' + d.link + '\',\'_blank\')'
+        const proxyUrl = d.link
+          ? GAS_URL + '?action=view_doc&idToken=' + encodeURIComponent(STATE.idToken || '') + '&fileId=' + encodeURIComponent(d.link)
+          : '';
+        const onclick = proxyUrl
+          ? 'window.open(\'' + proxyUrl + '\',\'_blank\')'
           : 'showToast(\'לא קיים קישור — פנה למשרד\')';
         return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's" onclick="' + onclick + '">' +
           '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#E8000D"/></svg></div>' +
