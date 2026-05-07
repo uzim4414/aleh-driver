@@ -183,7 +183,7 @@ function buildAlerts(v) {
     return Math.round((new Date(dateStr) - today) / 86400000);
   }
 
-  // טסט — רלוונטי לנהג (60 ימים)
+  // טסט — רלוונטי לנהג (60 ימים מראש)
   if (!v.testDone && v.testDue) {
     const d = daysLeft(v.testDue);
     if (d !== null && d <= 60) {
@@ -192,21 +192,16 @@ function buildAlerts(v) {
     }
   }
 
-  // טיפול לפי ק"מ
-  if (v.lastServiceKm && v.nextServiceKm) {
-    const kmLeft = parseInt(v.nextServiceKm) - parseInt(v.lastServiceKm);
-    if (kmLeft < 0) {
+  // טיפול לפי ק"מ — הגנה מפני ערכים לא תקינים
+  const lastKm = parseInt(v.lastServiceKm) || 0;
+  const nextKm = parseInt(v.nextServiceKm) || 0;
+  if (lastKm > 0 && nextKm > 0) {
+    const kmLeft = nextKm - lastKm;
+    if (kmLeft < -1000) {
+      // רק אם עבר ב-1000+ ק"מ — לא עבור שגיאות נתונים
       alerts.push({ type: 'red', title: 'טיפול באיחור!', sub: 'עבר ב-' + Math.abs(kmLeft).toLocaleString('he') + ' ק"מ', days: null, label: 'דחוף' });
     } else if (kmLeft < 3000) {
-      alerts.push({ type: 'warn', title: 'טיפול קרוב', sub: 'נותרו ' + kmLeft.toLocaleString('he') + ' ק"מ', days: null, label: 'להתייחסות' });
-    }
-  }
-
-  // קילומטראז חריג — לא עודכן זמן רב
-  if (v.lastServiceDate) {
-    const daysSince = Math.round((today - new Date(v.lastServiceDate)) / 86400000);
-    if (daysSince > 45) {
-      alerts.push({ type: 'warn', title: 'עדכן ק"מ', sub: 'לא עודכן ' + daysSince + ' ימים', days: null, label: 'להתייחסות' });
+      alerts.push({ type: 'warn', title: kmLeft < 0 ? 'עבר מועד טיפול' : 'טיפול קרוב', sub: kmLeft < 0 ? 'עבר ב-' + Math.abs(kmLeft).toLocaleString('he') + ' ק"מ' : 'נותרו ' + kmLeft.toLocaleString('he') + ' ק"מ', days: null, label: 'להתייחסות' });
     }
   }
 
@@ -276,16 +271,14 @@ function startApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   renderAll();
-  updateClock();
-  setInterval(updateClock, 30000);
   initSwipe();
   if ('serviceWorker' in navigator && GAS_URL) registerFcm();
 }
 
-function updateClock() {
-  const now = new Date();
-  document.getElementById('sb-time').textContent =
-    now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+function logout() {
+  if (!confirm('להתנתק מהחשבון?')) return;
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
 }
 
 /* ══ Render ══ */
@@ -308,10 +301,12 @@ function renderTopBar() {
   }
 
   const badge = document.getElementById('alert-badge');
-  const urgentCount = STATE.alerts.filter(function(a) { return a.type === 'red'; }).length;
-  if (urgentCount > 0) {
-    badge.textContent = urgentCount;
+  const total = STATE.alerts.length;
+  if (total > 0) {
+    badge.textContent = total;
     badge.classList.remove('hidden');
+    const hasRed = STATE.alerts.some(function(a) { return a.type === 'red'; });
+    badge.style.background = hasRed ? 'var(--red)' : 'var(--warn)';
   } else {
     badge.classList.add('hidden');
   }
@@ -333,12 +328,15 @@ function renderHomeScreen() {
   }
 
   const homeAlert = document.getElementById('home-alert');
-  const urgent = STATE.alerts.find(function(a) { return a.type === 'red'; });
-  if (urgent) {
-    document.getElementById('home-alert-title').textContent = urgent.title;
+  const topAlert = STATE.alerts.find(function(a) { return a.type === 'red'; }) || STATE.alerts[0];
+  if (topAlert) {
+    document.getElementById('home-alert-title').textContent = topAlert.title;
     document.getElementById('home-alert-sub').textContent =
-      urgent.days !== null ? urgent.days + ' ימים' : urgent.sub;
+      topAlert.days !== null ? topAlert.days + ' ימים' : topAlert.sub;
+    homeAlert.style.borderRightColor = topAlert.type === 'red' ? 'var(--red)' : 'var(--warn)';
     homeAlert.classList.remove('hidden');
+  } else {
+    homeAlert.classList.add('hidden');
   }
 }
 
@@ -449,14 +447,20 @@ function renderVehicleScreen(tab) {
       content.innerHTML = '<div class="empty">אין מסמכים</div>';
     } else {
       content.innerHTML = STATE.documents.map(function(d, i) {
-        return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's"' +
-          (d.link ? ' onclick="window.open(\'' + d.link + '\',\'_blank\')"' : '') + '>' +
+        const warn = daysLeftWarn(d.date, 30);
+        const onclick = d.link
+          ? 'window.open(\'' + d.link + '\',\'_blank\')'
+          : 'showToast(\'לא קיים קישור — פנה למשרד\')';
+        return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's" onclick="' + onclick + '">' +
           '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#E8000D"/></svg></div>' +
           '<div class="dr-body">' +
             '<div class="dr-title">' + (d.type || 'מסמך') + '</div>' +
-            '<div class="dr-sub' + (daysLeftWarn(d.date, 30) ? ' warn' : '') + '">' + formatDate(d.date) + '</div>' +
+            '<div class="dr-sub' + (warn ? ' warn' : '') + '">' + formatDate(d.date) + '</div>' +
           '</div>' +
-          (d.link ? '<svg width="16" height="16"><use href="#ic-pin" color="#8A8A8E"/></svg>' : '') +
+          '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+            '<span style="font-size:11px;font-weight:600;color:' + (d.link ? '#30D158' : '#6e6e73') + '">' + (d.link ? 'פתח' : 'אין קישור') + '</span>' +
+            '<svg width="14" height="14" fill="none" stroke="' + (d.link ? '#30D158' : '#4e4e53') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+          '</div>' +
         '</div>';
       }).join('');
     }
