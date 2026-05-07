@@ -1,10 +1,10 @@
-const CACHE_NAME = 'aleh-driver-v6';
+const CACHE_NAME = 'aleh-driver-v7';
 const STATIC = [
   './',
   './index.html',
   './app.js',
   './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'
+  'https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&display=swap'
 ];
 
 self.addEventListener('install', e => {

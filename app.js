@@ -161,7 +161,9 @@ async function loadFullData() {
   try {
     const result = await gasPost('driver_vehicle');
     STATE.vehicle   = result.vehicle;
-    STATE.documents = result.documents || [];
+    STATE.documents = (result.documents && result.documents.length)
+      ? result.documents
+      : buildDocumentsFromVehicle(result.vehicle);
     STATE.insurance = result.insurance || [];
     STATE.history   = result.history   || [];
     STATE.alerts    = buildAlerts(STATE.vehicle);
@@ -181,35 +183,92 @@ function buildAlerts(v) {
     return Math.round((new Date(dateStr) - today) / 86400000);
   }
 
-  const checks = [
-    { label: 'טסט רכב',      date: v.testDue,     skip: !!v.testDone, threshold: 30 },
-    { label: 'רישיון רכב',   date: v.licExp,      skip: false,        threshold: 30 },
-    { label: 'ביטוח חובה',   date: v.insCompExp,  skip: false,        threshold: 30 },
-    { label: 'ביטוח מקיף',   date: v.insFullExp,  skip: false,        threshold: 30 }
-  ];
+  // טסט — רלוונטי לנהג (60 ימים)
+  if (!v.testDone && v.testDue) {
+    const d = daysLeft(v.testDue);
+    if (d !== null && d <= 60) {
+      const type = d <= 7 ? 'red' : 'warn';
+      alerts.push({ type, title: 'טסט רכב', sub: formatDate(v.testDue), days: d, label: type === 'red' ? 'דחוף' : 'להתייחסות' });
+    }
+  }
 
-  checks.forEach(function(c) {
-    if (c.skip) return;
-    const d = daysLeft(c.date);
-    if (d === null || d > c.threshold) return;
-    const type = d <= 7 ? 'red' : 'warn';
-    alerts.push({
-      type,
-      title: c.label,
-      sub: formatDate(c.date),
-      days: d,
-      label: type === 'red' ? 'דחוף' : 'להתייחסות'
-    });
-  });
-
+  // טיפול לפי ק"מ
   if (v.lastServiceKm && v.nextServiceKm) {
     const kmLeft = parseInt(v.nextServiceKm) - parseInt(v.lastServiceKm);
-    if (kmLeft < 2000 && kmLeft >= 0) {
+    if (kmLeft < 0) {
+      alerts.push({ type: 'red', title: 'טיפול באיחור!', sub: 'עבר ב-' + Math.abs(kmLeft).toLocaleString('he') + ' ק"מ', days: null, label: 'דחוף' });
+    } else if (kmLeft < 3000) {
       alerts.push({ type: 'warn', title: 'טיפול קרוב', sub: 'נותרו ' + kmLeft.toLocaleString('he') + ' ק"מ', days: null, label: 'להתייחסות' });
     }
   }
 
+  // קילומטראז חריג — לא עודכן זמן רב
+  if (v.lastServiceDate) {
+    const daysSince = Math.round((today - new Date(v.lastServiceDate)) / 86400000);
+    if (daysSince > 45) {
+      alerts.push({ type: 'warn', title: 'עדכן ק"מ', sub: 'לא עודכן ' + daysSince + ' ימים', days: null, label: 'להתייחסות' });
+    }
+  }
+
   return alerts;
+}
+
+/* ══ Documents fallback ══ */
+function buildDocumentsFromVehicle(v) {
+  if (!v) return [];
+  const docs = [];
+  if (v.licExp)     docs.push({ id: 'lic',  type: 'רישיון רכב',  date: v.licExp,    link: v.licLink    || '' });
+  if (v.insCompExp) docs.push({ id: 'comp', type: 'ביטוח חובה',  date: v.insCompExp, link: v.insCompLink || '' });
+  if (v.insFullExp) docs.push({ id: 'full', type: 'ביטוח מקיף',  date: v.insFullExp, link: v.insFullLink || '' });
+  return docs;
+}
+
+/* ══ Car image lookup ══ */
+const CAR_IMAGE_MAP = {
+  'toyota highlander':    'https://toyota-select.co.il/wp-content/uploads/2025/04/MODELS-SELECT-8.png',
+  'toyota sienna':        'https://di-uploads-pod42.dealerinspire.com/toyotaofmurfreesboro/uploads/2022/06/2023-Toyota-Sienna-XSE-scaled.jpg',
+  'toyota rav4':          'https://www.motortrend.com/uploads/2022/09/2023-Toyota-RAV4-1.jpg',
+  'toyota camry':         'https://www.motortrend.com/uploads/2022/09/2023-Toyota-Camry-1.jpg',
+  'toyota corolla':       'https://www.motortrend.com/uploads/2022/09/2023-Toyota-Corolla-1.jpg',
+  'toyota corolla cross': 'https://di-uploads-pod42.dealerinspire.com/toyotaofmurfreesboro/uploads/2022/06/2023-Toyota-Corolla-Cross-scaled.jpg',
+  'toyota yaris':         'https://www.motortrend.com/uploads/2022/09/2023-Toyota-Yaris-1.jpg',
+  'toyota land cruiser':  'https://www.motortrend.com/uploads/2023/03/2024-Toyota-Land-Cruiser-1.jpg',
+  'volkswagen transporter': 'https://www.motortrend.com/uploads/2022/01/2022-VW-Transporter-1.jpg',
+  'ford transit':         'https://www.motortrend.com/uploads/2021/11/2022-Ford-Transit-1.jpg',
+};
+
+function getCarImageUrl(make, model) {
+  const key = [make, model].filter(Boolean).join(' ').toLowerCase().trim();
+  if (CAR_IMAGE_MAP[key]) return CAR_IMAGE_MAP[key];
+  const makeOnly = (make || '').toLowerCase().trim();
+  for (const k of Object.keys(CAR_IMAGE_MAP)) {
+    if (k.startsWith(makeOnly + ' ')) return CAR_IMAGE_MAP[k];
+  }
+  return null;
+}
+
+/* ══ Swipe navigation ══ */
+function initSwipe() {
+  const SCREENS = ['home', 'alerts', 'vehicle', 'history'];
+  let startX = 0, startY = 0;
+
+  document.getElementById('app').addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.getElementById('app').addEventListener('touchend', function(e) {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    // Skip swipe when interacting with inputs
+    if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+    const idx = SCREENS.indexOf(STATE.currentScreen);
+    if (idx === -1) return;
+    // RTL: swipe left (dx<0) = go deeper left = higher index
+    if (dx < 0 && idx < SCREENS.length - 1) APP.nav(SCREENS[idx + 1]);
+    else if (dx > 0 && idx > 0) APP.nav(SCREENS[idx - 1]);
+  }, { passive: true });
 }
 
 /* ══ Start App ══ */
@@ -219,6 +278,7 @@ function startApp() {
   renderAll();
   updateClock();
   setInterval(updateClock, 30000);
+  initSwipe();
   if ('serviceWorker' in navigator && GAS_URL) registerFcm();
 }
 
@@ -264,9 +324,12 @@ function renderHomeScreen() {
   document.getElementById('car-name').textContent = ((v.make || '') + ' ' + (v.model || '')).trim();
   document.getElementById('car-plate').textContent = v.num || '—';
 
-  if (v.photoLink) {
-    const photo = document.getElementById('car-photo');
-    photo.src = v.photoLink;
+  const photo = document.getElementById('car-photo');
+  const imgUrl = v.photoLink || getCarImageUrl(v.make, v.model);
+  if (imgUrl) {
+    photo.src = imgUrl;
+  } else {
+    document.querySelector('.hero-img-area').style.display = 'none';
   }
 
   const homeAlert = document.getElementById('home-alert');
