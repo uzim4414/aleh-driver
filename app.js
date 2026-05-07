@@ -34,8 +34,9 @@ async function gasPost(action, extra) {
   const body = Object.assign({ action, idToken: STATE.idToken }, extra);
   const resp = await fetch(GAS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(body),
+    redirect: 'follow'
   });
   const data = await resp.json();
   if (!data.ok) throw new Error(data.error || 'שגיאת שרת');
