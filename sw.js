@@ -1,15 +1,13 @@
-const CACHE_NAME = 'aleh-driver-v7';
-const STATIC = [
-  './',
-  './index.html',
-  './app.js',
-  './manifest.json',
+const CACHE_NAME = 'aleh-driver-v8';
+
+/* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
+const PRECACHE = [
   'https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&display=swap'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(c => c.addAll(STATIC).catch(() => {}))
+    caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE).catch(() => {}))
   );
   self.skipWaiting();
 });
@@ -25,10 +23,31 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Don't intercept cross-origin requests (GAS, Google APIs, fonts)
-  if (!e.request.url.startsWith(self.location.origin)) return;
+
+  const url = e.request.url;
+
+  /* cross-origin (GAS, Google APIs) — תמיד רשת, ללא התערבות */
+  if (!url.startsWith(self.location.origin)) return;
+
+  /* index.html + app.js — network-first: תמיד מנסה רשת, fallback לcache */
+  const isAppFile = url.endsWith('/') || url.includes('index.html') || url.includes('app.js') || url.includes('manifest.json');
+  if (isAppFile) {
+    e.respondWith(
+      fetch(e.request)
+        .then(resp => {
+          /* שמור גרסה טרייה בcache */
+          const clone = resp.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          return resp;
+        })
+        .catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  /* שאר קבצים (icons וכו') — cache-first */
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('./index.html')))
+    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => {}))
   );
 });
 
