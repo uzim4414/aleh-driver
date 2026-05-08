@@ -21,7 +21,9 @@ let STATE = {
   alerts: [],
   currentScreen: 'home',
   currentTab: 'info',
-  idToken: null
+  idToken: null,
+  govData: undefined,   // undefined=טרם נטען | null=שגיאה/לא נמצא | object=נטען
+  govLoading: false
 };
 
 /* ══ GAS API ══ */
@@ -159,6 +161,31 @@ async function demoLogin() {
   }
 }
 
+async function fetchGovData() {
+  const v = STATE.vehicle;
+  if (!v || !v.num) return;
+  const plate = String(v.num).replace(/\D/g, '');
+  if (!plate) return;
+  STATE.govLoading = true;
+  try {
+    const filters = encodeURIComponent(JSON.stringify({ mispar_rechev: plate }));
+    const url = 'https://data.gov.il/api/3/action/datastore_search' +
+                '?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&filters=' + filters;
+    const res  = await fetch(url);
+    const json = await res.json();
+    const recs = json && json.result && json.result.records;
+    STATE.govData = (recs && recs.length) ? recs[0] : null;
+  } catch(e) {
+    STATE.govData = null;
+    console.warn('fetchGovData error:', e);
+  }
+  STATE.govLoading = false;
+  // עדכן תצוגה אם כבר פתוח על טאב הרכב
+  if (STATE.currentTab === 'info' && STATE.currentScreen === 'vehicle') {
+    renderVehicleScreen('info');
+  }
+}
+
 async function loadFullData() {
   try {
     const result = await gasPost('driver_vehicle');
@@ -172,6 +199,8 @@ async function loadFullData() {
   } catch(e) {
     console.warn('loadFullData error:', e.message);
   }
+  // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
+  fetchGovData();
 }
 
 /* ══ Alerts ══ */
@@ -446,6 +475,53 @@ function renderHistory() {
   }).join('');
 }
 
+function renderGovSection() {
+  if (STATE.govLoading || STATE.govData === undefined) {
+    // סקלטון — מציג בזמן טעינה
+    return '<div class="tech-section">' +
+      '<div class="tech-sec-hdr"><span class="tech-sec-title">פרטים טכניים</span>' +
+      '<span class="tech-sec-badge">טוען...</span></div>' +
+      '<div class="igrid">' +
+        [1,2,3,4,5,6].map(function() {
+          return '<div class="ig-card ig-skel"><div class="ig-skel-line" style="width:40%;height:8px;margin-bottom:8px"></div>' +
+                 '<div class="ig-skel-line" style="width:70%;height:14px"></div></div>';
+        }).join('') +
+      '</div></div>';
+  }
+  if (!STATE.govData) return '';
+
+  var g = STATE.govData;
+  var rows = [
+    { icon:'ic-fuel',   label:'סוג דלק',       val: g.sug_delek_nm },
+    { icon:'ic-engine', label:'דגם מנוע',       val: g.degem_manoa },
+    { icon:'ic-wheel',  label:'צמיג קדמי',      val: g.zmig_kidmi },
+    { icon:'ic-wheel',  label:'צמיג אחורי',     val: g.zmig_ahori },
+    { icon:'ic-shield', label:'רמת גימור',       val: g.ramat_gimur },
+    { icon:'ic-leaf',   label:'קבוצת זיהום',    val: g.kvutzat_zihum },
+    { icon:'ic-user',   label:'בעלות',           val: g.baalut },
+    { icon:'ic-hash',   label:'מספר שלדה',      val: g.misgeret },
+    { icon:'ic-car',    label:'גרסה',            val: g.kinuy_mishari },
+    { icon:'ic-tag',    label:'דגם',             val: g.degem_nm }
+  ].filter(function(r) { return r.val && r.val.toString().trim(); });
+
+  if (!rows.length) return '';
+
+  return '<div class="tech-section">' +
+    '<div class="tech-sec-hdr">' +
+      '<span class="tech-sec-title">פרטים טכניים</span>' +
+      '<span class="tech-sec-badge">משרד התחבורה</span>' +
+    '</div>' +
+    '<div class="igrid">' +
+      rows.map(function(r, i) {
+        return '<div class="ig-card" style="animation-delay:' + (i * 0.04) + 's">' +
+          '<div class="ig-icon"><svg width="20" height="20"><use href="#' + r.icon + '" color="#E8000D"/></svg></div>' +
+          '<div class="ig-lbl">' + r.label + '</div>' +
+          '<div class="ig-val" style="font-size:14px">' + r.val + '</div>' +
+        '</div>';
+      }).join('') +
+    '</div></div>';
+}
+
 function renderVehicleScreen(tab) {
   const v = STATE.vehicle;
   if (!v) return;
@@ -476,7 +552,7 @@ function renderVehicleScreen(tab) {
         '<div class="ig-lbl">' + f.label + '</div>' +
         '<div class="ig-val' + (f.warn ? ' warn' : '') + '">' + f.val + '</div>' +
       '</div>';
-    }).join('') + '</div>';
+    }).join('') + '</div>' + renderGovSection();
 
   } else if (tab === 'docs') {
     if (!STATE.documents.length) {
