@@ -220,6 +220,15 @@ function buildDocumentsFromVehicle(v) {
   return docs;
 }
 
+/* ══ Drive URL → image URL ══ */
+function driveToImgUrl(link) {
+  if (!link) return null;
+  const m = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w800';
+  if (link.startsWith('http')) return link;
+  return null;
+}
+
 /* ══ Car image lookup ══ */
 const CAR_IMAGE_MAP = {
   'toyota highlander':    'https://toyota-select.co.il/wp-content/uploads/2025/04/MODELS-SELECT-8.png',
@@ -325,7 +334,7 @@ function renderHomeScreen() {
   document.getElementById('car-plate').textContent = v.num || '—';
 
   const photo = document.getElementById('car-photo');
-  const imgUrl = v.photoLink || getCarImageUrl(v.make, v.model);
+  const imgUrl = driveToImgUrl(v.photoLink) || getCarImageUrl(v.make, v.model);
   if (imgUrl) {
     photo.src = imgUrl;
   } else {
