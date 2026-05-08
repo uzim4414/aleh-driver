@@ -519,22 +519,31 @@ function techCat(title, html) {
 }
 
 function renderGovSection() {
-  if (STATE.govLoading || STATE.govData === undefined) {
-    return '<div class="tech-section">' +
-      '<div class="tech-sec-hdr"><span class="tech-sec-title">פרטים טכניים</span>' +
-      '<span class="tech-sec-badge">טוען...</span></div>' +
-      '<div class="tspec-skel">' +
-        [1,2,3,4,5,6,7,8].map(function() {
-          return '<div class="tspec-skel-item"><div class="sk-line" style="width:36px;height:36px;border-radius:12px;margin-bottom:8px"></div>' +
-                 '<div class="sk-line" style="width:50px;height:10px;margin-bottom:6px"></div>' +
-                 '<div class="sk-line" style="width:38px;height:8px"></div></div>';
-        }).join('') +
-      '</div></div>';
-  }
-  if (!STATE.govData) return '';
+  var veh = STATE.vehicle || {};
+  var hasManual = veh.fuelConsumptionL100 || veh.fuelTankCapacityL || veh.trunkVolumeL;
 
-  var g = STATE.govData;
-  var w = STATE.govWLTP || {};
+  if (STATE.govLoading || STATE.govData === undefined) {
+    // בזמן טעינה — הצג סקלטון רק אם אין גם נתונים ידניים
+    if (!hasManual) {
+      return '<div class="tech-section">' +
+        '<div class="tech-sec-hdr"><span class="tech-sec-title">פרטים טכניים</span>' +
+        '<span class="tech-sec-badge">טוען...</span></div>' +
+        '<div class="tspec-skel">' +
+          [1,2,3,4,5,6,7,8].map(function() {
+            return '<div class="tspec-skel-item"><div class="sk-line" style="width:36px;height:36px;border-radius:12px;margin-bottom:8px"></div>' +
+                   '<div class="sk-line" style="width:50px;height:10px;margin-bottom:6px"></div>' +
+                   '<div class="sk-line" style="width:38px;height:8px"></div></div>';
+          }).join('') +
+        '</div></div>';
+    }
+    // יש נתונים ידניים — המשך לרנדר אותם בזמן שממתינים לgov
+  }
+
+  // אם gov נכשל ואין נתונים ידניים — הסתר
+  if (!STATE.govData && !hasManual) return '';
+
+  var g = STATE.govData   || {};
+  var w = STATE.govWLTP   || {};
   var veh = STATE.vehicle || {};  // שדות שהוזנו ידנית ע"י מנהל
 
   // ── מנוע ──
