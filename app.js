@@ -140,7 +140,6 @@ async function handleGoogleCredential(response) {
     startApp();
   } catch(err) {
     console.error('[auth] error:', err.message);
-    hideLoader();
     showLoginError(err.message);
   }
 }
@@ -326,7 +325,7 @@ function initSwipe() {
 
 /* ══ Start App ══ */
 function startApp() {
-  document.getElementById('login-screen').classList.add('hidden');
+  hideLoader();
   document.getElementById('app').classList.remove('hidden');
   renderAll();
   initSwipe();
@@ -802,8 +801,8 @@ function daysLeftWarn(dateStr, threshold) {
   return Math.round((new Date(dateStr) - new Date()) / 86400000) <= threshold;
 }
 
-function showLoader()  { document.getElementById('loader').classList.remove('hidden'); }
-function hideLoader()  { document.getElementById('loader').classList.add('hidden'); }
+function showLoader()  { document.getElementById('splash-screen').classList.remove('hidden'); }
+function hideLoader()  { document.getElementById('splash-screen').classList.add('hidden'); }
 
 /* ══ Doc Viewer (PDF.js) ══ */
 async function viewDoc(link, title) {
@@ -878,10 +877,7 @@ function getInitials(name) {
 }
 
 function showGreeting(holderName) {
-  // Hide spinner immediately — greeting is the loading indicator
-  const loader = document.getElementById('loader');
-  loader.style.transition = 'none';
-  loader.classList.add('hidden');
+  hideLoader();
 
   document.getElementById('gr-time').textContent = getGreeting();
   document.getElementById('gr-name').textContent = holderName || '';
@@ -943,8 +939,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     localStorage.removeItem(SESSION_KEY);
   }
 
-  hideLoader();
-  document.getElementById('login-screen').classList.remove('hidden');
+  // splash-screen stays visible — login button appears via CSS at ~4s
 
   if (!GOOGLE_CLIENT_ID) {
     // Demo mode — login button goes straight in

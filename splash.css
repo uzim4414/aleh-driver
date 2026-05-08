@@ -1,0 +1,230 @@
+/* ALEH DRIVE splash — choreography v3.
+   270° dial, mark inside the dial face above the hub, needle sweeps the
+   full 270° aggressively. CSS rotate convention: 0deg = needle pointing
+   right (+x). svg_up_cw_angle → css = svg − 90°. */
+
+:root { --accent: #FF2D2D; }
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: #000;
+  color: #fff;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Outfit', 'Manrope', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.stage {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 55%),
+    radial-gradient(ellipse at 50% 88%, rgba(255, 45, 45, 0.05) 0%, rgba(0,0,0,0) 50%),
+    #000;
+}
+.stage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(0deg,
+    rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+  mix-blend-mode: screen;
+}
+
+/* Login chrome */
+.login-chrome {
+  position: absolute; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 32px 28px 36px;
+  font-family: inherit;
+}
+.login-chrome .top {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10px; letter-spacing: 0.42em; color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  opacity: 0; animation: fadeIn 0.8s ease 3.6s forwards;
+}
+.login-chrome .bottom {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  pointer-events: auto;
+  opacity: 0; animation: fadeIn 0.8s ease 4.0s forwards;
+}
+.signin-btn {
+  pointer-events: auto;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.55);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px; letter-spacing: 0.5em; font-weight: 500;
+  padding: 16px 56px 16px 60px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+}
+.signin-btn:hover { background: #fff; color: #000; border-color: #fff; }
+.signin-hint {
+  font-size: 9px; letter-spacing: 0.45em;
+  color: rgba(255,255,255,0.32); text-transform: uppercase;
+}
+
+/* Splash logo wrapper — viewport-constrained */
+.splash-logo {
+  --logo-scale: 1;
+  display: flex; align-items: center; justify-content: center;
+  /* viewBox aspect 600:720 = 5:6 */
+  width:  min(calc(500px * var(--logo-scale)), calc(100vw - 60px));
+  height: min(calc(600px * var(--logo-scale)), calc(100vh - 240px));
+  filter: drop-shadow(0 0 30px rgba(255,255,255,0.04));
+}
+.splash-logo svg { width: 100%; height: 100%; display: block; }
+
+/* ── PHASE 1 — frame fade-in ──────────────────────────────── */
+.halo {
+  opacity: 0; transform-origin: center;
+  animation: haloIn 1.2s ease-out 0.2s forwards, haloPulse 5s ease-in-out 4.4s infinite;
+}
+@keyframes haloIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes haloPulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+
+.ring-outer, .ring-inner, .arc-bg {
+  opacity: 0;
+  animation: fadeIn 0.8s ease forwards;
+}
+.ring-outer { animation-delay: 0.0s; }
+.ring-inner { animation-delay: 0.2s; }
+.arc-bg     { animation-delay: 0.3s; }
+
+/* ── PHASE 2 — main arc draw ──────────────────────────────── */
+.arc-main {
+  /* path length for 270° at r=200 ≈ 942 */
+  stroke-dasharray: 970;
+  stroke-dashoffset: 970;
+  animation: arcDraw 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.5s forwards;
+}
+@keyframes arcDraw { to { stroke-dashoffset: 0; } }
+
+/* ── PHASE 3 — ticks materialize ──────────────────────────── */
+.tick {
+  opacity: 0;
+  animation: tickIn 0.32s ease-out forwards;
+}
+@keyframes tickIn { from { opacity: 0; transform: translateZ(0); } to { opacity: 1; } }
+
+.scale-label {
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+}
+
+/* ── PHASE 4 — red zone illuminate ────────────────────────── */
+.redzone {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation:
+    arcDraw 0.7s cubic-bezier(0.7, 0, 0.3, 1) 1.5s forwards,
+    redzonePulse 2.5s ease-in-out 5s infinite;
+}
+.redzone-glow {
+  opacity: 0;
+  animation: fadeIn 0.6s ease 1.7s forwards, redzonePulse 2.5s ease-in-out 5s infinite;
+}
+@keyframes redzonePulse {
+  0%, 100% { stroke-opacity: 0.9; }
+  50%      { stroke-opacity: 0.55; }
+}
+
+/* ── PHASE 5 — needle sweep (single blade) ──────────────────
+   Starts AFTER the dial is fully drawn (arc finishes ~1.9s, ticks
+   complete ~2.0s). Pivot is the SVG local origin (0,0) which the
+   parent <g class="speedo"> translate puts at the hub center. */
+
+.needle-group {
+  transform-origin: 0 0;
+  transform: rotate(-225deg);
+  opacity: 0;
+  animation:
+    needleAppear 0.2s ease 2.1s forwards,
+    needleSweep 1.6s cubic-bezier(0.65, 0.05, 0.2, 1) 2.2s forwards,
+    needleIdle 6s ease-in-out 4.2s infinite;
+}
+@keyframes needleAppear { to { opacity: 1; } }
+@keyframes needleSweep {
+  0%   { transform: rotate(-225deg); opacity: 1; }
+  60%  { transform: rotate(65deg);   }
+  78%  { transform: rotate(25deg);   }
+  90%  { transform: rotate(40deg);   }
+  100% { transform: rotate(35deg);   }
+}
+@keyframes needleIdle {
+  0%, 100% { transform: rotate(35deg); }
+  50%      { transform: rotate(41deg); }
+}
+
+/* hub */
+.hub-ring  { opacity: 0; animation: fadeIn 0.5s ease 1.4s forwards; }
+.hub-outer { opacity: 0; animation: fadeIn 0.5s ease 1.5s forwards; }
+.hub-inner {
+  opacity: 0;
+  animation: fadeIn 0.5s ease 1.6s forwards, hubGlow 2.6s ease-in-out 4s infinite;
+}
+@keyframes hubGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px var(--accent)); }
+  50%      { filter: drop-shadow(0 0 12px var(--accent)); }
+}
+
+/* ── PHASE 6 — mark holographic reveal ────────────────────── */
+.mark-group {
+  opacity: 0;
+  animation: fadeIn 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 2.6s forwards;
+}
+.scan-line {
+  opacity: 0;
+  animation: scanLine 0.9s cubic-bezier(0.5, 0, 0.5, 1) 2.6s forwards;
+}
+@keyframes scanLine {
+  0%   { opacity: 0; transform: translateY(-30px); }
+  20%  { opacity: 0.95; }
+  80%  { opacity: 0.95; transform: translateY(75px); }
+  100% { opacity: 0; transform: translateY(80px); }
+}
+
+/* ── PHASE 7 — wordmark resolve ───────────────────────────── */
+.wordmark-group {
+  opacity: 0;
+  animation: wordIn 1.0s cubic-bezier(0.2, 0.7, 0.2, 1) 3.0s forwards;
+}
+.wordmark-group text:first-of-type {
+  animation: trackTighten 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) 3.0s both;
+}
+@keyframes wordIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes trackTighten {
+  from { letter-spacing: 0.65em; opacity: 0; }
+  to   { letter-spacing: 0.32em; opacity: 1; }
+}
+.rule-group { opacity: 0; animation: fadeIn 0.7s ease 3.4s forwards; }
+.rule {
+  stroke-dasharray: 110; stroke-dashoffset: 110;
+  animation: arcDraw 0.8s cubic-bezier(0.65, 0, 0.35, 1) 3.4s forwards;
+}
+.rule-diamond { opacity: 0; animation: fadeIn 0.5s ease 3.7s forwards; }
+
+/* ── shared ───────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Replay pill */
+.replay-btn {
+  position: absolute; bottom: 18px; right: 18px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+  font-family: 'Outfit', 'Manrope', sans-serif;
+  font-size: 10px; letter-spacing: 0.4em; font-weight: 500;
+  padding: 10px 18px; cursor: pointer; text-transform: uppercase;
+  transition: background 0.2s, border-color 0.2s;
+  z-index: 5;
+}
+.replay-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+}
