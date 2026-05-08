@@ -22,7 +22,8 @@ let STATE = {
   currentScreen: 'home',
   currentTab: 'info',
   idToken: null,
-  govData: undefined,   // undefined=טרם נטען | null=שגיאה/לא נמצא | object=נטען
+  govData:    undefined,  // undefined=טרם נטען | null=שגיאה/לא נמצא | object=נטען
+  govWLTP:    undefined,
   govLoading: false
 };
 
@@ -167,20 +168,37 @@ async function fetchGovData() {
   const plate = String(v.num).replace(/\D/g, '');
   if (!plate) return;
   STATE.govLoading = true;
+  STATE.govData  = undefined;
+  STATE.govWLTP  = undefined;
   try {
-    const filters = encodeURIComponent(JSON.stringify({ mispar_rechev: plate }));
-    const url = 'https://data.gov.il/api/3/action/datastore_search' +
-                '?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&filters=' + filters;
-    const res  = await fetch(url);
-    const json = await res.json();
-    const recs = json && json.result && json.result.records;
-    STATE.govData = (recs && recs.length) ? recs[0] : null;
+    // שלב 1: נתוני רישוי לפי לוחית
+    const f1  = encodeURIComponent(JSON.stringify({ mispar_rechev: plate }));
+    const r1  = await fetch('https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&filters=' + f1);
+    const j1  = await r1.json();
+    const reg = (j1.result && j1.result.records && j1.result.records[0]) || null;
+    STATE.govData = reg;
+
+    // שלב 2: נתונים טכניים WLTP לפי degem_cd + tozeret_cd
+    if (reg && reg.degem_cd && reg.tozeret_cd) {
+      const f2 = encodeURIComponent(JSON.stringify({
+        degem_cd:   String(reg.degem_cd),
+        tozeret_cd: String(reg.tozeret_cd)
+      }));
+      const r2 = await fetch('https://data.gov.il/api/3/action/datastore_search?resource_id=142afde2-6228-49f9-8a29-9b6c3a0cbe40&filters=' + f2 + '&limit=5');
+      const j2 = await r2.json();
+      const wRecs = (j2.result && j2.result.records) || [];
+      // העדף רשומה שתואמת ramat_gimur, אחרת ראשונה
+      const gimur = reg.ramat_gimur;
+      STATE.govWLTP = wRecs.find(function(r) { return r.ramat_gimur === gimur; }) || wRecs[0] || null;
+    } else {
+      STATE.govWLTP = null;
+    }
   } catch(e) {
     STATE.govData = null;
+    STATE.govWLTP = null;
     console.warn('fetchGovData error:', e);
   }
   STATE.govLoading = false;
-  // עדכן תצוגה אם כבר פתוח על טאב הרכב
   if (STATE.currentTab === 'info' && STATE.currentScreen === 'vehicle') {
     renderVehicleScreen('info');
   }
@@ -475,51 +493,113 @@ function renderHistory() {
   }).join('');
 }
 
+function techItem(icon, label, val, delay) {
+  if (!val && val !== 0) return '';
+  return '<div class="tspec-item" style="animation-delay:' + (delay||0) + 's">' +
+    '<div class="tspec-icon"><svg width="18" height="18"><use href="#' + icon + '" color="#E8000D"/></svg></div>' +
+    '<div class="tspec-val">' + val + '</div>' +
+    '<div class="tspec-lbl">' + label + '</div>' +
+  '</div>';
+}
+
+function techBool(icon, label, val) {
+  var on = val === 1 || val === '1' || val === true;
+  return '<div class="tspec-bool' + (on ? ' on' : '') + '">' +
+    '<svg width="14" height="14"><use href="#' + icon + '" color="' + (on ? '#30D158' : '#3a3a3c') + '"/></svg>' +
+    '<span>' + label + '</span>' +
+  '</div>';
+}
+
+function techCat(title, html) {
+  if (!html || !html.trim()) return '';
+  return '<div class="tspec-cat">' +
+    '<div class="tspec-cat-title">' + title + '</div>' +
+    html +
+  '</div>';
+}
+
 function renderGovSection() {
   if (STATE.govLoading || STATE.govData === undefined) {
-    // סקלטון — מציג בזמן טעינה
     return '<div class="tech-section">' +
       '<div class="tech-sec-hdr"><span class="tech-sec-title">פרטים טכניים</span>' +
       '<span class="tech-sec-badge">טוען...</span></div>' +
-      '<div class="igrid">' +
-        [1,2,3,4,5,6].map(function() {
-          return '<div class="ig-card ig-skel"><div class="ig-skel-line" style="width:40%;height:8px;margin-bottom:8px"></div>' +
-                 '<div class="ig-skel-line" style="width:70%;height:14px"></div></div>';
+      '<div class="tspec-skel">' +
+        [1,2,3,4,5,6,7,8].map(function() {
+          return '<div class="tspec-skel-item"><div class="sk-line" style="width:36px;height:36px;border-radius:12px;margin-bottom:8px"></div>' +
+                 '<div class="sk-line" style="width:50px;height:10px;margin-bottom:6px"></div>' +
+                 '<div class="sk-line" style="width:38px;height:8px"></div></div>';
         }).join('') +
       '</div></div>';
   }
   if (!STATE.govData) return '';
 
   var g = STATE.govData;
-  var rows = [
-    { icon:'ic-fuel',   label:'סוג דלק',       val: g.sug_delek_nm },
-    { icon:'ic-engine', label:'דגם מנוע',       val: g.degem_manoa },
-    { icon:'ic-wheel',  label:'צמיג קדמי',      val: g.zmig_kidmi },
-    { icon:'ic-wheel',  label:'צמיג אחורי',     val: g.zmig_ahori },
-    { icon:'ic-shield', label:'רמת גימור',       val: g.ramat_gimur },
-    { icon:'ic-leaf',   label:'קבוצת זיהום',    val: g.kvutzat_zihum },
-    { icon:'ic-user',   label:'בעלות',           val: g.baalut },
-    { icon:'ic-hash',   label:'מספר שלדה',      val: g.misgeret },
-    { icon:'ic-car',    label:'גרסה',            val: g.kinuy_mishari },
-    { icon:'ic-tag',    label:'דגם',             val: g.degem_nm }
-  ].filter(function(r) { return r.val && r.val.toString().trim(); });
+  var w = STATE.govWLTP || {};
 
-  if (!rows.length) return '';
+  // ── מנוע ──
+  var engine =
+    techItem('ic-cylinder', 'נפח מנוע',   w.nefah_manoa  ? Number(w.nefah_manoa).toLocaleString('he') + ' סמ"ק' : null, 0.04) +
+    techItem('ic-power',    'הספק',        w.koah_sus     ? w.koah_sus + ' כ"ס'   : null, 0.06) +
+    techItem('ic-fuel',     'סוג דלק',     w.delek_nm     || g.sug_delek_nm || null, 0.08) +
+    techItem('ic-drive',    'הנעה',        w.hanaa_nm     && w.hanaa_nm !== 'לא ידוע קוד' ? w.hanaa_nm : null, 0.10) +
+    techItem('ic-gear',     'תיבת הילוכים', w.automatic_ind === 1 ? 'אוטומטית' : (w.automatic_ind === 0 ? 'ידנית' : null), 0.12) +
+    techItem('ic-engine',   'דגם מנוע',    g.degem_manoa  || null, 0.14);
+
+  // ── מרכב ──
+  var body =
+    techItem('ic-car',      'סוג רכב',    w.merkav       || null, 0.04) +
+    techItem('ic-door',     'דלתות',      w.mispar_dlatot|| null, 0.06) +
+    techItem('ic-seat',     'מושבים',     w.mispar_moshavim || null, 0.08) +
+    techItem('ic-weight',   'משקל כולל',  w.mishkal_kolel ? Number(w.mishkal_kolel).toLocaleString('he') + ' ק"ג' : null, 0.10) +
+    techItem('ic-hook',     'כושר גרירה', w.kosher_grira_im_blamim ? Number(w.kosher_grira_im_blamim).toLocaleString('he') + ' ק"ג' : null, 0.12) +
+    techItem('ic-wheel',    'צמיג קדמי',  g.zmig_kidmi   || null, 0.14) +
+    techItem('ic-wheel',    'צמיג אחורי', g.zmig_ahori   || null, 0.16) +
+    techItem('ic-tag',      'רמת גימור',  w.ramat_gimur  || g.ramat_gimur || null, 0.18);
+
+  // ── בטיחות — תכונות בוליאניות ──
+  var safetyGrid =
+    techItem('ic-airbag',   'כריות אוויר', w.mispar_kariot_avir ? w.mispar_kariot_avir + ' כריות' : null, 0.04) +
+    techItem('ic-star',     'ציון בטיחות', w.nikud_betihut ? '★ ' + w.nikud_betihut : null, 0.06);
+
+  var safetyBools =
+    techBool('ic-check', 'ABS',              w.abs_ind) +
+    techBool('ic-check', 'הגה כוח',          w.hege_koah_ind) +
+    techBool('ic-check', 'מצלמת אחורה',     w.matzlemat_reverse_ind) +
+    techBool('ic-check', 'בקרת יציבות',      w.bakarat_yatzivut_ind) +
+    techBool('ic-check', 'חיישני עייפות',    w.zihuy_matzav_hitkarvut_mesukenet_ind) +
+    techBool('ic-check', 'בלימת חירום',       w.teura_automatit_benesiya_kadima_ind) +
+    techBool('ic-check', 'שמירת נתיב',       w.bakarat_stiya_menativ_ind) +
+    techBool('ic-check', 'חיישני חניה',      w.nitur_merhak_milfanim_ind) +
+    techBool('ic-check', 'זיהוי הולכי רגל',  w.zihuy_holchey_regel_ind) +
+    techBool('ic-check', 'מזגן',             w.mazgan_ind) +
+    techBool('ic-check', 'חלונות חשמל',      w.mispar_halonot_hashmal);
+
+  var safety = safetyGrid +
+    (safetyBools.trim() ? '<div class="tspec-bools">' + safetyBools + '</div>' : '');
+
+  // ── סביבה ──
+  var env =
+    techItem('ic-cloud',  'פליטת CO₂ (WLTP)', w.CO2_WLTP ? w.CO2_WLTP + ' גר\'/ק"מ' : null, 0.04) +
+    techItem('ic-leaf',   'מדד ירוק',           w.madad_yarok || null, 0.06) +
+    techItem('ic-leaf',   'קבוצת זיהום',        w.kvutzat_zihum || g.kvutzat_zihum || null, 0.08) +
+    techItem('ic-filter', 'סוג ממיר',            w.sug_mamir_nm || null, 0.10);
+
+  var html =
+    techCat('🔧 מנוע',    '<div class="tspec-grid">' + engine  + '</div>') +
+    techCat('🚗 מרכב',    '<div class="tspec-grid">' + body    + '</div>') +
+    techCat('🛡️ בטיחות',  safety) +
+    techCat('🌿 סביבה',   '<div class="tspec-grid">' + env     + '</div>');
+
+  if (!html.trim()) return '';
 
   return '<div class="tech-section">' +
     '<div class="tech-sec-hdr">' +
       '<span class="tech-sec-title">פרטים טכניים</span>' +
       '<span class="tech-sec-badge">משרד התחבורה</span>' +
     '</div>' +
-    '<div class="igrid">' +
-      rows.map(function(r, i) {
-        return '<div class="ig-card" style="animation-delay:' + (i * 0.04) + 's">' +
-          '<div class="ig-icon"><svg width="20" height="20"><use href="#' + r.icon + '" color="#E8000D"/></svg></div>' +
-          '<div class="ig-lbl">' + r.label + '</div>' +
-          '<div class="ig-val" style="font-size:14px">' + r.val + '</div>' +
-        '</div>';
-      }).join('') +
-    '</div></div>';
+    html +
+    '<div style="height:8px"></div>' +
+  '</div>';
 }
 
 function renderVehicleScreen(tab) {
