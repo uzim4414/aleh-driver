@@ -263,6 +263,17 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 
 <div id="toast"></div>
 
+<!-- ── Confirm Modal ── -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:400;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);">
+  <div style="background:#1c1c1e;border-radius:22px 22px 0 0;padding:32px 24px 40px;width:100%;max-width:430px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);">
+    <div id="cm-icon" style="font-size:38px;margin-bottom:12px;">👤</div>
+    <div id="cm-title" style="font-size:18px;font-weight:700;color:#fff;margin-bottom:8px;letter-spacing:-0.3px;"></div>
+    <div id="cm-sub" style="font-size:14px;color:#8A8A8E;margin-bottom:28px;line-height:1.5;"></div>
+    <button id="cm-confirm" style="width:100%;background:#E8000D;border:none;border-radius:14px;padding:15px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;letter-spacing:-0.2px;"></button>
+    <button id="cm-cancel" onclick="closeConfirmModal()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:15px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:-0.2px;">ביטול</button>
+  </div>
+</div>
+
 <div id="app" class="hidden">
   <!-- HOME -->
   <div class="screen active" id="screen-home">

@@ -287,9 +287,31 @@ function startApp() {
 }
 
 function logout() {
-  if (!confirm('להתנתק מהחשבון?')) return;
-  localStorage.removeItem(SESSION_KEY);
-  location.reload();
+  showConfirmModal({
+    icon: '👤',
+    title: 'התנתקות מהחשבון',
+    sub: 'האם תרצה להתנתק?',
+    confirmText: 'התנתק',
+    onConfirm: () => {
+      localStorage.removeItem(SESSION_KEY);
+      location.reload();
+    }
+  });
+}
+
+function showConfirmModal({ icon='❓', title='', sub='', confirmText='אישור', onConfirm }) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('cm-icon').textContent = icon;
+  document.getElementById('cm-title').textContent = title;
+  document.getElementById('cm-sub').textContent = sub;
+  const btn = document.getElementById('cm-confirm');
+  btn.textContent = confirmText;
+  btn.onclick = () => { closeConfirmModal(); onConfirm(); };
+  modal.style.display = 'flex';
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').style.display = 'none';
 }
 
 /* ══ Render ══ */
