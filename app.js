@@ -535,6 +535,7 @@ function renderGovSection() {
 
   var g = STATE.govData;
   var w = STATE.govWLTP || {};
+  var veh = STATE.vehicle || {};  // שדות שהוזנו ידנית ע"י מנהל
 
   // ── מנוע ──
   var engine =
@@ -543,6 +544,7 @@ function renderGovSection() {
     techItem('ic-fuel',     'סוג דלק',     w.delek_nm     || g.sug_delek_nm || null, 0.08) +
     techItem('ic-drive',    'הנעה',        w.hanaa_nm     && w.hanaa_nm !== 'לא ידוע קוד' ? w.hanaa_nm : null, 0.10) +
     techItem('ic-gear',     'תיבת הילוכים', w.automatic_ind === 1 ? 'אוטומטית' : (w.automatic_ind === 0 ? 'ידנית' : null), 0.12) +
+    techItem('ic-fuel',     'צריכה ממוצעת', veh.fuelConsumptionL100 ? veh.fuelConsumptionL100 + ' ל׳/100' : null, 0.13) +
     techItem('ic-engine',   'דגם מנוע',    g.degem_manoa  || null, 0.14);
 
   // ── מרכב ──
@@ -552,7 +554,9 @@ function renderGovSection() {
     techItem('ic-seat',     'מושבים',     w.mispar_moshavim || null, 0.08) +
     techItem('ic-weight',   'משקל כולל',  w.mishkal_kolel ? Number(w.mishkal_kolel).toLocaleString('he') + ' ק"ג' : null, 0.10) +
     techItem('ic-hook',     'כושר גרירה', w.kosher_grira_im_blamim ? Number(w.kosher_grira_im_blamim).toLocaleString('he') + ' ק"ג' : null, 0.12) +
-    techItem('ic-wheel',    'צמיג קדמי',  g.zmig_kidmi   || null, 0.14) +
+    techItem('ic-trunk',    'תא מטען',    veh.trunkVolumeL      ? veh.trunkVolumeL + ' ליטר'      : null, 0.13) +
+    techItem('ic-fuel',     'מיכל דלק',   veh.fuelTankCapacityL ? veh.fuelTankCapacityL + ' ליטר'  : null, 0.14) +
+    techItem('ic-wheel',    'צמיג קדמי',  g.zmig_kidmi   || null, 0.15) +
     techItem('ic-wheel',    'צמיג אחורי', g.zmig_ahori   || null, 0.16) +
     techItem('ic-tag',      'רמת גימור',  w.ramat_gimur  || g.ramat_gimur || null, 0.18);
 
