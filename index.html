@@ -174,13 +174,29 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .dr-sub{font-size:12px;color:var(--t2);margin-top:2px}
 .dr-sub.warn{color:var(--warn)}
 
-#login-screen { position:fixed; inset:0; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; }
+#login-screen { position:fixed; inset:0; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:80px 24px 60px; z-index:100; }
 #login-screen.hidden { display:none; }
+.login-top { display:flex; flex-direction:column; align-items:center; }
 .login-logo { font-size:36px; font-weight:900; letter-spacing:8px; margin-bottom:8px; }
 .login-mark { width:72px; height:72px; background:var(--red); border-radius:20px; display:flex; align-items:center; justify-content:center; margin-bottom:24px; }
-.login-sub { font-size:13px; color:var(--t2); margin-bottom:48px; }
-.login-btn { background:#fff; color:#000; border:none; border-radius:100px; padding:14px 28px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; }
+.login-sub { font-size:13px; color:var(--t2); }
+.login-bottom { width:100%; display:flex; flex-direction:column; align-items:center; gap:12px; }
+.login-btn { background:#fff; color:#000; border:none; border-radius:100px; padding:14px 28px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; width:100%; justify-content:center; max-width:320px; }
 .login-btn:active { transform:scale(0.97); }
+
+/* ── Greeting overlay ── */
+#greeting { position:fixed; inset:0; background:#000; z-index:150; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+#greeting.hidden { display:none; }
+.gr-time { font-size:22px; font-weight:300; color:var(--t2); opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s ease; }
+.gr-name { font-size:34px; font-weight:800; color:#fff; opacity:0; transform:translateY(16px); transition:opacity .6s ease .3s, transform .6s ease .3s; }
+.gr-bar-wrap { margin-top:40px; width:200px; }
+.gr-bar-label { font-size:12px; color:var(--t2); text-align:center; margin-bottom:8px; opacity:0; transition:opacity .4s ease .6s; }
+.gr-bar-bg { height:3px; background:rgba(255,255,255,.1); border-radius:2px; overflow:hidden; }
+.gr-bar-fill { height:100%; width:0; background:var(--red); border-radius:2px; transition:width 2s cubic-bezier(.4,0,.2,1) .7s; }
+.gr-show .gr-time { opacity:1; transform:translateY(0); }
+.gr-show .gr-name { opacity:1; transform:translateY(0); }
+.gr-show .gr-bar-label { opacity:1; }
+.gr-show .gr-bar-fill { width:100%; }
 .login-err { color:var(--red); font-size:13px; margin-top:16px; text-align:center; max-width:280px; line-height:1.5; }
 .login-err.hidden { display:none; }
 
@@ -218,17 +234,29 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 <div id="loader"><div class="loader-ring"></div></div>
 
 <div id="login-screen" class="hidden">
-  <div class="login-mark">
-    <svg width="36" height="36"><use href="#ic-car" color="#fff"/></svg>
+  <div class="login-top">
+    <div class="login-mark">
+      <svg width="36" height="36"><use href="#ic-car" color="#fff"/></svg>
+    </div>
+    <div class="login-logo">עלה</div>
+    <div class="login-sub">מערכת ניהול צי רכבים</div>
   </div>
-  <div class="login-logo">עלה</div>
-  <div class="login-sub">מערכת ניהול צי רכבים</div>
-  <button class="login-btn" id="login-btn">
-    <svg width="20" height="20"><use href="#ic-google"/></svg>
-    כניסה עם Google
-  </button>
-  <div class="login-err hidden" id="login-err"></div>
-  <button onclick="demoLogin()" style="margin-top:16px;background:transparent;border:1px solid #333;color:#666;border-radius:100px;padding:10px 24px;font-size:13px;cursor:pointer;font-family:inherit;">כניסה דמו (בדיקה בלבד)</button>
+  <div class="login-bottom">
+    <button class="login-btn" id="login-btn">
+      <svg width="20" height="20"><use href="#ic-google"/></svg>
+      כניסה עם Google
+    </button>
+    <div class="login-err hidden" id="login-err"></div>
+  </div>
+</div>
+
+<div id="greeting" class="hidden">
+  <div class="gr-time" id="gr-time">בוקר טוב</div>
+  <div class="gr-name" id="gr-name"></div>
+  <div class="gr-bar-wrap">
+    <div class="gr-bar-label">טוען נתונים...</div>
+    <div class="gr-bar-bg"><div class="gr-bar-fill" id="gr-bar-fill"></div></div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -250,7 +278,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
           <div class="tb-greet-name" id="user-name">—</div>
         </div>
         <div class="tb-avatar" id="user-avatar" onclick="logout()" style="cursor:pointer" title="התנתק">
-          <svg width="22" height="22"><use href="#ic-user" color="#8A8A8E"/></svg>
+          <span id="user-initials" style="font-size:14px;font-weight:700;color:#8A8A8E;letter-spacing:-0.5px"></span>
         </div>
       </div>
     </div>

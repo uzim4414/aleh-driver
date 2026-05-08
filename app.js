@@ -130,8 +130,10 @@ async function handleGoogleCredential(response) {
     STATE.vehicle = result.vehicle;
 
     saveSession(STATE.idToken, STATE.vehicle, STATE.user);
-    await loadFullData();
     hideLoader();
+    showGreeting((result.vehicle && result.vehicle.holder) || STATE.user.name);
+    await loadFullData();
+    hideGreeting();
     startApp();
   } catch(err) {
     console.error('[auth] error:', err.message);
@@ -292,12 +294,15 @@ function renderAll() {
 
 function renderTopBar() {
   if (!STATE.user) return;
-  const firstName = STATE.user.name.split(' ')[0];
+
+  const holderName = (STATE.vehicle && STATE.vehicle.holder) || STATE.user.name;
+  const firstName = holderName.split(' ')[0];
   document.getElementById('user-name').textContent = firstName;
 
-  if (STATE.user.picture) {
-    document.getElementById('user-avatar').innerHTML =
-      '<img src="' + STATE.user.picture + '" alt="">';
+  const initialsEl = document.getElementById('user-initials');
+  if (initialsEl) {
+    initialsEl.textContent = getInitials(holderName);
+    initialsEl.style.color = '#fff';
   }
 
   const badge = document.getElementById('alert-badge');
@@ -657,6 +662,44 @@ function showLoginError(msg) {
   el.classList.remove('hidden');
 }
 
+/* ══ Greeting ══ */
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 12) return 'בוקר טוב,';
+  if (h >= 12 && h < 17) return 'צהריים טובים,';
+  if (h >= 17 && h < 21) return 'ערב טוב,';
+  return 'לילה טוב,';
+}
+
+function getInitials(name) {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0);
+  return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
+}
+
+function showGreeting(holderName) {
+  document.getElementById('gr-time').textContent = getGreeting();
+  document.getElementById('gr-name').textContent = holderName || '';
+  const el = document.getElementById('greeting');
+  el.classList.remove('hidden');
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() { el.classList.add('gr-show'); });
+  });
+}
+
+function hideGreeting() {
+  const el = document.getElementById('greeting');
+  el.style.transition = 'opacity .4s ease';
+  el.style.opacity = '0';
+  setTimeout(function() {
+    el.classList.add('hidden');
+    el.classList.remove('gr-show');
+    el.style.opacity = '';
+    el.style.transition = '';
+  }, 420);
+}
+
 /* ══ Boot ══ */
 document.addEventListener('DOMContentLoaded', async function() {
   if ('serviceWorker' in navigator) {
@@ -682,12 +725,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     STATE.vehicle = session.vehicleData;
     STATE.user    = session.userInfo;
     try {
-      await loadFullData();
       hideLoader();
+      showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name));
+      await loadFullData();
+      hideGreeting();
       startApp();
       return;
     } catch(e) {
-      // Session expired or invalid — clear and show login
+      hideGreeting();
       localStorage.removeItem(SESSION_KEY);
     }
   } else if (session && session.token === 'demo_token') {
