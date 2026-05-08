@@ -331,7 +331,7 @@ function renderHomeScreen() {
   if (!v) return;
 
   document.getElementById('car-name').textContent = ((v.make || '') + ' ' + (v.model || '')).trim();
-  document.getElementById('car-plate').textContent = v.num || '—';
+  document.getElementById('car-plate').textContent = formatPlate(v.num);
 
   const photo = document.getElementById('car-photo');
   const imgUrl = driveToImgUrl(v.appPhotoLink) || getCarImageUrl(v.make, v.model);
@@ -600,6 +600,14 @@ async function registerFcm() {
 }
 
 /* ══ Utils ══ */
+function formatPlate(num) {
+  if (!num) return '—';
+  var d = String(num).replace(/\D/g, '');
+  if (d.length === 8) return d.slice(0,3) + '-' + d.slice(3,6) + '-' + d.slice(6);
+  if (d.length === 7) return d.slice(0,2) + '-' + d.slice(2,5) + '-' + d.slice(5);
+  return num;
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   try {
