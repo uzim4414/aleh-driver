@@ -24,7 +24,8 @@ let STATE = {
   idToken: null,
   govData:    undefined,  // undefined=טרם נטען | null=שגיאה/לא נמצא | object=נטען
   govWLTP:    undefined,
-  govLoading: false
+  govLoading: false,
+  carSpecs:   null        // נתוני CarQuery (מיכל דלק, צריכה...) מה-GAS
 };
 
 /* ══ GAS API ══ */
@@ -208,6 +209,7 @@ async function loadFullData() {
   try {
     const result = await gasPost('driver_vehicle');
     STATE.vehicle   = result.vehicle;
+    STATE.carSpecs  = result.carSpecs  || null;
     STATE.documents = (result.documents && result.documents.length)
       ? result.documents
       : buildDocumentsFromVehicle(result.vehicle);
@@ -520,7 +522,7 @@ function techCat(title, html) {
 
 function renderGovSection() {
   var veh = STATE.vehicle || {};
-  var hasManual = veh.fuelConsumptionL100 || veh.fuelTankCapacityL || veh.trunkVolumeL;
+  var hasManual = cq.fuelCapL || cq.consumMixed;
 
   if (STATE.govLoading || STATE.govData === undefined) {
     // בזמן טעינה — הצג סקלטון רק אם אין גם נתונים ידניים
@@ -542,29 +544,28 @@ function renderGovSection() {
   // אם gov נכשל ואין נתונים ידניים — הסתר
   if (!STATE.govData && !hasManual) return '';
 
-  var g = STATE.govData   || {};
-  var w = STATE.govWLTP   || {};
-  var veh = STATE.vehicle || {};  // שדות שהוזנו ידנית ע"י מנהל
+  var g  = STATE.govData   || {};
+  var w  = STATE.govWLTP   || {};
+  var cq = STATE.carSpecs  || {};  // נתוני CarQuery מה-GAS
 
   // ── מנוע ──
   var engine =
     techItem('ic-cylinder', 'נפח מנוע',   w.nefah_manoa  ? Number(w.nefah_manoa).toLocaleString('he') + ' סמ"ק' : null, 0.04) +
     techItem('ic-power',    'הספק',        w.koah_sus     ? w.koah_sus + ' כ"ס'   : null, 0.06) +
-    techItem('ic-fuel',     'סוג דלק',     w.delek_nm     || g.sug_delek_nm || null, 0.08) +
-    techItem('ic-drive',    'הנעה',        w.hanaa_nm     && w.hanaa_nm !== 'לא ידוע קוד' ? w.hanaa_nm : null, 0.10) +
-    techItem('ic-gear',     'תיבת הילוכים', w.automatic_ind === 1 ? 'אוטומטית' : (w.automatic_ind === 0 ? 'ידנית' : null), 0.12) +
-    techItem('ic-fuel',     'צריכה ממוצעת', veh.fuelConsumptionL100 ? veh.fuelConsumptionL100 + ' ל׳/100' : null, 0.13) +
-    techItem('ic-engine',   'דגם מנוע',    g.degem_manoa  || null, 0.14);
+    techItem('ic-fuel',     'סוג דלק',      w.delek_nm || g.sug_delek_nm || cq.fuelType || null, 0.08) +
+    techItem('ic-drive',    'הנעה',         w.hanaa_nm && w.hanaa_nm !== 'לא ידוע קוד' ? w.hanaa_nm : (cq.driveType || null), 0.10) +
+    techItem('ic-gear',     'תיבת הילוכים', w.automatic_ind === 1 ? 'אוטומטית' : (w.automatic_ind === 0 ? 'ידנית' : (cq.transmission || null)), 0.12) +
+    techItem('ic-fuel',     'צריכה ממוצעת', cq.consumMixed ? cq.consumMixed + ' ל׳/100 ק"מ' : null, 0.13) +
+    techItem('ic-engine',   'דגם מנוע',     g.degem_manoa || null, 0.14);
 
   // ── מרכב ──
   var body =
     techItem('ic-car',      'סוג רכב',    w.merkav       || null, 0.04) +
-    techItem('ic-door',     'דלתות',      w.mispar_dlatot|| null, 0.06) +
-    techItem('ic-seat',     'מושבים',     w.mispar_moshavim || null, 0.08) +
+    techItem('ic-door',     'דלתות',      w.mispar_dlatot   || cq.doors    || null, 0.06) +
+    techItem('ic-seat',     'מושבים',     w.mispar_moshavim || cq.seats    || null, 0.08) +
     techItem('ic-weight',   'משקל כולל',  w.mishkal_kolel ? Number(w.mishkal_kolel).toLocaleString('he') + ' ק"ג' : null, 0.10) +
     techItem('ic-hook',     'כושר גרירה', w.kosher_grira_im_blamim ? Number(w.kosher_grira_im_blamim).toLocaleString('he') + ' ק"ג' : null, 0.12) +
-    techItem('ic-trunk',    'תא מטען',    veh.trunkVolumeL      ? veh.trunkVolumeL + ' ליטר'      : null, 0.13) +
-    techItem('ic-fuel',     'מיכל דלק',   veh.fuelTankCapacityL ? veh.fuelTankCapacityL + ' ליטר'  : null, 0.14) +
+    techItem('ic-fuel',     'מיכל דלק',   cq.fuelCapL ? cq.fuelCapL + ' ליטר' : null, 0.14) +
     techItem('ic-wheel',    'צמיג קדמי',  g.zmig_kidmi   || null, 0.15) +
     techItem('ic-wheel',    'צמיג אחורי', g.zmig_ahori   || null, 0.16) +
     techItem('ic-tag',      'רמת גימור',  w.ramat_gimur  || g.ramat_gimur || null, 0.18);
