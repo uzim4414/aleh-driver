@@ -334,7 +334,7 @@ function renderHomeScreen() {
   document.getElementById('car-plate').textContent = v.num || '—';
 
   const photo = document.getElementById('car-photo');
-  const imgUrl = driveToImgUrl(v.photoLink) || getCarImageUrl(v.make, v.model);
+  const imgUrl = driveToImgUrl(v.appPhotoLink) || getCarImageUrl(v.make, v.model);
   if (imgUrl) {
     photo.src = imgUrl;
   } else {
