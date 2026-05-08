@@ -679,6 +679,11 @@ function getInitials(name) {
 }
 
 function showGreeting(holderName) {
+  // Hide spinner immediately — greeting is the loading indicator
+  const loader = document.getElementById('loader');
+  loader.style.transition = 'none';
+  loader.classList.add('hidden');
+
   document.getElementById('gr-time').textContent = getGreeting();
   document.getElementById('gr-name').textContent = holderName || '';
   const el = document.getElementById('greeting');
