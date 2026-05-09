@@ -915,11 +915,29 @@ const APP = {
   updateKm: async function() {
     const val = document.getElementById('km-input').value;
     const km = parseInt(val, 10);
-    if (!km || km < 0) { showToast('הכנס ק"מ תקין'); return; }
+    if (!km || isNaN(km) || km <= 0) { showToast('הכנס ק"מ תקין (מספר חיובי)'); return; }
+    if (km > 2000000) { showToast('ק"מ לא תקין — ערך גבוה מדי'); return; }
+    // Client-side: must not go backwards vs known KM (currentKm = latest report; lastServiceKm = floor)
+    const v = STATE.vehicle || {};
+    const knownKm = Math.max(
+      parseInt(v.currentKm, 10) || 0,
+      parseInt(v.lastServiceKm, 10) || 0
+    );
+    if (knownKm > 0 && km < knownKm) {
+      showToast('ק"מ לא תקין — לא ניתן להזין ערך נמוך מהדיווח האחרון (' + knownKm.toLocaleString('he') + ')');
+      return;
+    }
+    if (knownKm > 0 && km > knownKm + 80000) {
+      showToast('ק"מ לא תקין — קפיצה לא סבירה (יותר מ-80,000 ק"מ מעל ' + knownKm.toLocaleString('he') + ')');
+      return;
+    }
     showLoader();
     try {
       await gasPost('driver_update_km', { km: km });
-      if (STATE.vehicle) STATE.vehicle.lastServiceKm = km;
+      if (STATE.vehicle) {
+        STATE.vehicle.lastServiceKm = km;
+        STATE.vehicle.currentKm = km;  // refresh progress bar
+      }
       renderService();
       showToast('ק"מ עודכן בהצלחה ✓');
     } catch(e) {
