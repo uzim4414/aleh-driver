@@ -489,10 +489,6 @@ function renderServiceProgress() {
           '<div class="svc-stat-lbl">ק"מ אחרון</div>' +
           '<div class="svc-stat-val">' + reportedKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
         '</div>' +
-        '<div class="svc-stat mid">' +
-          '<div class="svc-stat-lbl">ק"מ מוערך</div>' +
-          '<div class="svc-stat-val">~' + estKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
-        '</div>' +
         '<div class="svc-stat right">' +
           '<div class="svc-stat-lbl">טיפול הבא</div>' +
           '<div class="svc-stat-val">' + nextKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
@@ -504,7 +500,7 @@ function renderServiceProgress() {
             '<div class="svc-bar-shine"></div>' +
           '</div>' +
         '</div>' +
-        (showTick ? '<div class="svc-bar-tick" style="left:' + tickLeft + '%"></div>' : '') +
+        (showTick ? '<div class="svc-bar-marker" style="left:' + tickLeft + '%" title="אומדן: ' + estKm.toLocaleString('he') + ' ק&quot;מ"><div class="stem"></div><div class="tri"></div></div>' : '') +
       '</div>' +
       '<div class="svc-foot">' +
         '<div class="svc-foot-txt">' + footTxt + '</div>' +
