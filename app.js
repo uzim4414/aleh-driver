@@ -440,41 +440,40 @@ function renderServiceProgress() {
   const v = STATE.vehicle;
   if (!v) { mount.innerHTML = ''; return; }
 
-  // השתמש בנתוני האלגוריתם מהשרת אם קיימים, אחרת fallback לשדות הגולמיים
-  const lastKm = parseInt(v.calcLastServiceKm || v.lastServiceKm, 10) || 0;
-  const nextKm = parseInt(v.calcNextServiceKm || v.nextServiceKm, 10) || 0;
-  const curKm  = parseInt(v.estKm || v.currentKm, 10) || 0;
+  const lastKm     = parseInt(v.calcLastServiceKm || v.lastServiceKm, 10) || 0;
+  const nextKm     = parseInt(v.calcNextServiceKm || v.nextServiceKm, 10) || 0;
+  const reportedKm = parseInt(v.currentKm, 10) || 0;   // דיווח אחרון של נהג
+  const estKm      = parseInt(v.estKm, 10) || reportedKm; // אומדן אלגוריתם
 
   if (!nextKm || !lastKm || nextKm <= lastKm) { mount.innerHTML = ''; return; }
 
-  const totalSpan = nextKm - lastKm;
-  const driven    = Math.max(0, curKm - lastKm);
-  const remaining = nextKm - curKm;
-  let pct = Math.min(100, Math.max(0, Math.round((driven / totalSpan) * 100)));
+  const totalSpan  = nextKm - lastKm;
+  const remaining  = nextKm - estKm;  // נשאר לפי אומדן
+  let reportedPct  = Math.min(100, Math.max(0, Math.round(((reportedKm - lastKm) / totalSpan) * 100)));
+  let estPct       = Math.min(100, Math.max(0, Math.round(((estKm     - lastKm) / totalSpan) * 100)));
 
   let level, label, footTxt, footCls;
   if (remaining < 0) {
-    level = 'red';
-    label = 'עבר מועד';
-    pct   = 100;
+    level = 'red';  label = 'עבר מועד';  reportedPct = 100;  estPct = 100;
     footTxt = 'עבר ב-' + Math.abs(remaining).toLocaleString('he') + ' ק"מ';
     footCls = 'red';
   } else if (remaining < 500) {
-    level = 'red';
-    label = 'דחוף';
+    level = 'red';  label = 'דחוף';
     footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
     footCls = 'red';
   } else if (remaining < 1500) {
-    level = 'warn';
-    label = 'מתקרב';
+    level = 'warn';  label = 'מתקרב';
     footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
     footCls = 'warn';
   } else {
-    level = 'ok';
-    label = 'תקין';
+    level = 'ok';  label = 'תקין';
     footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
     footCls = 'ok';
   }
+
+  // tick position: bar fills RTL (right=start), so tick left = (100 - estPct)%
+  const tickLeft = (100 - estPct);
+  const showTick = estKm > reportedKm && estPct > reportedPct && estPct < 100;
 
   mount.innerHTML =
     '<div class="svc-card">' +
@@ -488,21 +487,28 @@ function renderServiceProgress() {
       '<div class="svc-stats">' +
         '<div class="svc-stat">' +
           '<div class="svc-stat-lbl">ק"מ אחרון</div>' +
-          '<div class="svc-stat-val">' + curKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
+          '<div class="svc-stat-val">' + reportedKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
+        '</div>' +
+        '<div class="svc-stat mid">' +
+          '<div class="svc-stat-lbl">ק"מ מוערך</div>' +
+          '<div class="svc-stat-val">~' + estKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
         '</div>' +
         '<div class="svc-stat right">' +
           '<div class="svc-stat-lbl">טיפול הבא</div>' +
           '<div class="svc-stat-val">' + nextKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
         '</div>' +
       '</div>' +
-      '<div class="svc-bar-bg">' +
-        '<div class="svc-bar-fill ' + level + '" style="width:' + pct + '%">' +
-          '<div class="svc-bar-shine"></div>' +
+      '<div class="svc-bar-wrap">' +
+        '<div class="svc-bar-bg">' +
+          '<div class="svc-bar-fill ' + level + '" style="width:' + reportedPct + '%">' +
+            '<div class="svc-bar-shine"></div>' +
+          '</div>' +
         '</div>' +
+        (showTick ? '<div class="svc-bar-tick" style="left:' + tickLeft + '%"></div>' : '') +
       '</div>' +
       '<div class="svc-foot">' +
         '<div class="svc-foot-txt">' + footTxt + '</div>' +
-        '<div class="svc-foot-val ' + footCls + '">' + pct + '%</div>' +
+        '<div class="svc-foot-val ' + footCls + '">' + estPct + '%</div>' +
       '</div>' +
     '</div>';
 }
