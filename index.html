@@ -264,17 +264,23 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .svc-stat.mid .svc-stat-lbl { color:rgba(255,255,255,0.35); }
 .svc-stat.right { text-align:left; }
 .svc-stat.right .svc-stat-val { text-align:left; }
-.svc-bar-wrap { position:relative; margin-bottom:10px; }
-.svc-bar-bg { position:relative; height:10px; background:rgba(255,255,255,0.06); border-radius:100px; overflow:hidden; border:1px solid rgba(255,255,255,0.04); }
-.svc-bar-fill { position:absolute; inset:0; right:0; height:100%; border-radius:100px; transition:width 1.4s cubic-bezier(.16,1,.3,1); animation:barFill 1.4s cubic-bezier(.16,1,.3,1); }
-.svc-bar-tick { position:absolute; top:-3px; bottom:-3px; width:2px; background:rgba(255,255,255,0.55); border-radius:2px; pointer-events:none; }
-.svc-bar-marker { position:absolute; top:50%; transform:translate(-50%,-50%); pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:2px; z-index:2; }
-.svc-bar-marker .tri { width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:7px solid #fff; filter:drop-shadow(0 0 3px rgba(255,255,255,0.6)); }
-.svc-bar-marker .stem { width:2px; height:14px; background:#fff; border-radius:2px; box-shadow:0 0 4px rgba(255,255,255,0.55); }
-.svc-bar-fill.ok   { background:linear-gradient(90deg,#1F8A3D 0%,#30D158 100%); box-shadow:0 0 12px rgba(48,209,88,0.35); }
-.svc-bar-fill.warn { background:linear-gradient(90deg,#FF9F0A 0%,#FFB938 100%); box-shadow:0 0 12px rgba(255,159,10,0.4); }
-.svc-bar-fill.red  { background:linear-gradient(90deg,#C8102E 0%,#FF3B30 100%); box-shadow:0 0 14px rgba(255,59,48,0.45); }
-.svc-bar-shine { position:absolute; top:0; bottom:0; width:40%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.28),transparent); animation:barShine 2.8s ease-in-out infinite 1.4s; }
+.svc-bar-wrap { position:relative; margin-bottom:4px; }
+.svc-bar-wrap.with-marker { padding-bottom:38px; }
+.svc-bar-bg { position:relative; height:12px; background:rgba(255,255,255,0.06); border-radius:100px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); }
+.svc-bar-fill { position:absolute; inset:0; right:0; height:100%; border-radius:100px; background-size:200% 100%; animation:barFill 1.6s cubic-bezier(.16,1,.3,1) both; }
+.svc-bar-fill.ok   { background:linear-gradient(90deg,#1a7a35 0%,#30D158 55%,#6ef08a 100%); box-shadow:0 0 14px rgba(48,209,88,0.4); animation:barFill 1.6s cubic-bezier(.16,1,.3,1) both, barGlowOk 2.8s ease-in-out infinite 1.6s, gradientDrift 4s ease-in-out infinite 1.6s; }
+.svc-bar-fill.warn { background:linear-gradient(90deg,#d4830a 0%,#FF9F0A 55%,#ffc84a 100%); box-shadow:0 0 14px rgba(255,159,10,0.45); animation:barFill 1.6s cubic-bezier(.16,1,.3,1) both, barGlowWarn 2.8s ease-in-out infinite 1.6s; }
+.svc-bar-fill.red  { background:linear-gradient(90deg,#a00e25 0%,#FF3B30 55%,#ff6b63 100%); box-shadow:0 0 16px rgba(255,59,48,0.5); animation:barFill 1.6s cubic-bezier(.16,1,.3,1) both, barGlowRed 1.8s ease-in-out infinite 1.6s; }
+.svc-bar-shine { position:absolute; top:0; bottom:0; width:55%; background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.32) 50%,transparent 100%); animation:barShine 2.4s ease-in-out infinite 1.6s; }
+.svc-bar-marker { position:absolute; top:12px; transform:translateX(-50%); pointer-events:none; display:flex; flex-direction:column; align-items:center; z-index:3; animation:markerFloat 3s ease-in-out infinite; }
+.svc-bar-marker .tri { width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:8px solid rgba(255,255,255,0.92); filter:drop-shadow(0 0 5px rgba(255,255,255,0.7)); }
+.svc-bar-marker .stem { width:2px; height:12px; background:linear-gradient(to bottom,rgba(255,255,255,0.8),rgba(255,255,255,0.2)); border-radius:2px; }
+.svc-bar-marker .est-lbl { font-size:9.5px; font-weight:700; color:rgba(255,255,255,0.55); margin-top:3px; white-space:nowrap; letter-spacing:-0.3px; }
+@keyframes markerFloat { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-3px)} }
+@keyframes barGlowOk   { 0%,100%{box-shadow:0 0 10px rgba(48,209,88,0.3)} 50%{box-shadow:0 0 24px rgba(48,209,88,0.7),0 0 48px rgba(48,209,88,0.2)} }
+@keyframes barGlowWarn { 0%,100%{box-shadow:0 0 10px rgba(255,159,10,0.3)} 50%{box-shadow:0 0 24px rgba(255,159,10,0.7),0 0 48px rgba(255,159,10,0.2)} }
+@keyframes barGlowRed  { 0%,100%{box-shadow:0 0 12px rgba(255,59,48,0.4)} 50%{box-shadow:0 0 28px rgba(255,59,48,0.8),0 0 56px rgba(255,59,48,0.3)} }
+@keyframes gradientDrift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
 .svc-foot { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
 .svc-foot-txt { font-size:11.5px; color:var(--t2); font-weight:500; }
 .svc-foot-val { font-size:12px; font-weight:700; }
@@ -564,7 +570,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   </div>
 </div>
 
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 <script src="aleh-logo-data.js?v=1"></script>
 <script type="text/babel" src="splash-logo.jsx?v=1"></script>
 <script type="text/babel">
