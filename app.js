@@ -487,7 +487,7 @@ function renderServiceProgress() {
       '</div>' +
       '<div class="svc-stats">' +
         '<div class="svc-stat">' +
-          '<div class="svc-stat-lbl">ק"מ מוערך</div>' +
+          '<div class="svc-stat-lbl">ק"מ אחרון</div>' +
           '<div class="svc-stat-val">' + curKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
         '</div>' +
         '<div class="svc-stat right">' +
