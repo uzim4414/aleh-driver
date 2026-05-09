@@ -31,6 +31,11 @@
   --t3: #2c2c2e;
   --warn: #FF9F0A;
   --ok: #30D158;
+  --fuel-excellent: #30D158;
+  --fuel-good:      #34C759;
+  --fuel-warn:      #FF9F0A;
+  --fuel-over:      #FF453A;
+  --fuel-nodata:    #8A8A8E;
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { height:100%; overflow:hidden; }
@@ -47,7 +52,14 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 @keyframes slideInRight{ from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
 @keyframes dotPing   { 0%{transform:scale(1);opacity:1} 75%,100%{transform:scale(2.2);opacity:0} }
 @keyframes heroReveal{ from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
-@keyframes spin      { to{transform:rotate(360deg)} }
+@keyframes spin          { to{transform:rotate(360deg)} }
+@keyframes barRise       { from{width:0} to{width:var(--fw-bar-w,50%)} }
+@keyframes modalRise     { from{transform:translateY(100%)} to{transform:translateY(0)} }
+@keyframes scrimFade     { from{opacity:0} to{opacity:1} }
+@keyframes auroraGlow    { 0%,100%{opacity:0.4;transform:scale(1)} 50%{opacity:0.9;transform:scale(1.08)} }
+@keyframes barRiseUp     { from{height:0;opacity:0} to{height:var(--fm-bar-h,40%);opacity:1} }
+@keyframes curBarPulse   { 0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,0.5)} 60%{box-shadow:0 0 0 8px rgba(48,209,88,0)} }
+@keyframes insightShimmer{ 0%{transform:translateX(110%)} 100%{transform:translateX(-110%)} }
 
 #app { width:100%; height:100%; display:flex; flex-direction:column; max-width:430px; margin:0 auto; position:relative; }
 
@@ -313,6 +325,80 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .gar-cta-btn.ghost { background:rgba(255,255,255,0.05); color:#fff; border:1px solid var(--border); }
 .gar-empty { padding:40px 24px; text-align:center; color:var(--t2); font-size:14px; background:var(--card); border-radius:22px; border:1px solid var(--border); margin:16px; }
 .gar-empty-ic { font-size:42px; margin-bottom:10px; opacity:0.7; }
+
+/* ── Fuel Widget ── */
+.fuel-widget { margin:12px 16px 0; background:var(--card); border-radius:22px; padding:16px 18px 18px; border:1px solid var(--border); animation:fadeUp .55s cubic-bezier(.16,1,.3,1) .25s both; cursor:pointer; transition:transform .15s,background .15s; -webkit-tap-highlight-color:transparent; }
+.fuel-widget:active { transform:scale(0.98); background:var(--card2); }
+.fw-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.fw-title-wrap { display:flex; align-items:center; gap:8px; }
+.fw-icn { width:32px; height:32px; border-radius:10px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; }
+.fw-title { font-size:13px; font-weight:700; color:var(--t1); letter-spacing:-0.2px; }
+.fw-pill { font-size:11px; font-weight:700; padding:4px 10px; border-radius:30px; letter-spacing:0.2px; }
+.fw-metric-row { display:flex; align-items:center; justify-content:space-around; margin-bottom:14px; }
+.fw-metric { text-align:center; }
+.fw-metric-val { font-size:22px; font-weight:800; letter-spacing:-0.5px; font-variant-numeric:tabular-nums; }
+.fw-metric-lbl { font-size:10px; color:var(--t2); margin-top:2px; font-weight:500; }
+.fw-metric-sep { width:1px; height:32px; background:var(--border); }
+.fw-savings { color:var(--fuel-excellent); }
+.fw-over    { color:var(--fuel-over); }
+.fw-bar-bg { height:6px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden; margin-bottom:6px; }
+.fw-bar-fill { height:100%; border-radius:4px; width:var(--fw-bar-w,50%); animation:barRise .8s cubic-bezier(.16,1,.3,1) .4s both; }
+.fw-bar-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--t2); }
+.fw-cta { text-align:center; font-size:11px; color:var(--t2); margin-top:10px; letter-spacing:0.2px; }
+
+/* ── Fuel Modal ── */
+.fuel-modal { position:fixed; inset:0; z-index:300; display:flex; align-items:flex-end; justify-content:center; pointer-events:none; }
+.fuel-modal.open { pointer-events:all; }
+.fuel-modal.open .fm-scrim { animation:scrimFade .3s forwards; pointer-events:all; }
+.fuel-modal.open .fm-sheet { animation:modalRise .4s cubic-bezier(.16,1,.3,1) forwards; }
+.fm-scrim { position:absolute; inset:0; background:rgba(0,0,0,0.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); opacity:0; pointer-events:none; }
+.fm-sheet { position:relative; width:100%; max-width:430px; max-height:92vh; background:#0d0d0d; border-radius:26px 26px 0 0; border-top:1px solid rgba(255,255,255,0.1); transform:translateY(100%); display:flex; flex-direction:column; }
+.fm-drag-handle { width:38px; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; margin:12px auto 0; flex-shrink:0; }
+.fm-content { overflow-y:auto; flex:1; scrollbar-width:none; padding-bottom:env(safe-area-inset-bottom,20px); }
+.fm-content::-webkit-scrollbar { display:none; }
+.fm-hero { padding:24px 22px 20px; text-align:center; }
+.fm-hero-val { font-size:64px; font-weight:800; letter-spacing:-2px; line-height:1; }
+.fm-hero-unit { font-size:16px; font-weight:500; color:var(--t2); margin-top:4px; }
+.fm-hero-status { display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:6px 16px; border-radius:30px; font-size:13px; font-weight:700; }
+.fm-hero-status-dot { width:8px; height:8px; border-radius:50%; }
+.fm-month-label { font-size:13px; color:var(--t2); margin-top:8px; }
+.fm-section { padding:0 16px 16px; }
+.fm-sec-title { font-size:11px; font-weight:700; color:var(--t2); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; padding-right:4px; }
+.fm-savings-card { background:linear-gradient(135deg,rgba(48,209,88,0.12) 0%,rgba(48,209,88,0.04) 100%); border:1px solid rgba(48,209,88,0.2); border-radius:18px; padding:18px 20px; position:relative; overflow:hidden; }
+.fm-savings-card::after { content:''; position:absolute; top:-20px; right:-20px; width:100px; height:100px; background:radial-gradient(circle,rgba(48,209,88,0.2) 0%,transparent 70%); pointer-events:none; animation:auroraGlow 4s ease-in-out infinite; }
+.fm-savings-card.over { background:linear-gradient(135deg,rgba(255,69,58,0.12) 0%,rgba(255,69,58,0.04) 100%); border-color:rgba(255,69,58,0.2); }
+.fm-savings-card.over::after { background:radial-gradient(circle,rgba(255,69,58,0.2) 0%,transparent 70%); }
+.fm-savings-nis { font-size:42px; font-weight:800; letter-spacing:-1px; }
+.fm-savings-nis.positive { color:var(--fuel-excellent); }
+.fm-savings-nis.negative { color:var(--fuel-over); }
+.fm-savings-desc { font-size:13px; color:var(--t2); margin-top:6px; line-height:1.5; }
+.fm-savings-sub { font-size:12px; color:var(--t2); margin-top:4px; }
+.fm-insight-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:18px; padding:18px 20px; position:relative; overflow:hidden; }
+.fm-insight-shimmer { position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent); animation:insightShimmer 3s ease-in-out infinite; pointer-events:none; }
+.fm-insight-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.fm-insight-icon { font-size:18px; }
+.fm-insight-label { font-size:11px; font-weight:700; color:var(--t2); letter-spacing:0.8px; text-transform:uppercase; }
+.fm-insight-text { font-size:14px; line-height:1.7; color:var(--t1); }
+.fm-insight-footer { font-size:10px; color:var(--t2); margin-top:8px; }
+.fm-chart { display:flex; align-items:flex-end; justify-content:space-between; gap:6px; height:100px; padding:0 4px; }
+.fm-chart-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; }
+.fm-bar-wrap { flex:1; display:flex; align-items:flex-end; width:100%; }
+.fm-bar { width:100%; border-radius:6px 6px 0 0; min-height:4px; height:var(--fm-bar-h,20%); animation:barRiseUp .7s cubic-bezier(.16,1,.3,1) both; }
+.fm-bar.current { animation:barRiseUp .7s cubic-bezier(.16,1,.3,1) both, curBarPulse 2s ease-in-out 1s infinite; }
+.fm-chart-val { font-size:9.5px; font-weight:700; color:var(--t2); }
+.fm-chart-label { font-size:10px; color:var(--t2); text-align:center; }
+.fm-chart-label.current { color:var(--t1); font-weight:700; }
+.fm-tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.fm-tile { background:var(--card2); border-radius:16px; padding:14px 16px; border:1px solid var(--border); }
+.fm-tile-lbl { font-size:10px; color:var(--t2); font-weight:600; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:6px; }
+.fm-tile-val { font-size:20px; font-weight:800; letter-spacing:-0.5px; }
+.fm-tile-unit { font-size:11px; color:var(--t2); margin-top:2px; }
+.fm-annual { display:flex; gap:10px; flex-wrap:wrap; }
+.fm-annual-item { flex:1; min-width:80px; background:var(--card2); border-radius:14px; padding:12px 14px; border:1px solid var(--border); text-align:center; }
+.fm-annual-val { font-size:18px; font-weight:800; letter-spacing:-0.3px; }
+.fm-annual-lbl { font-size:10px; color:var(--t2); margin-top:3px; }
+.fm-close-btn { width:calc(100% - 32px); margin:16px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:14px; padding:14px; color:var(--t1); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; letter-spacing:-0.2px; display:block; }
+.fm-close-btn:active { background:rgba(255,255,255,0.1); }
 </style>
 </head>
 <body>
@@ -397,6 +483,16 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 </div>
 
 <div id="app" class="hidden">
+
+  <!-- ── Fuel Modal ── -->
+  <div id="fuel-modal" class="fuel-modal">
+    <div class="fm-scrim" onclick="closeFuelModal()"></div>
+    <div class="fm-sheet">
+      <div class="fm-drag-handle"></div>
+      <div class="fm-content" id="fuel-modal-content"></div>
+    </div>
+  </div>
+
   <!-- HOME -->
   <div class="screen active" id="screen-home">
     <div class="topbar">
@@ -435,6 +531,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
             <button class="hero-btn" onclick="APP.nav('vehicle');APP.switchTab('garage')">המוסך שלך</button>
           </div>
           <div id="svc-progress-mount"></div>
+          <div id="fuel-widget-mount"></div>
           <div class="hero-alert hidden" id="home-alert">
             <div>
               <div class="ha-title" id="home-alert-title">התראה</div>

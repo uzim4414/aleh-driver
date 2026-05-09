@@ -19,6 +19,7 @@ let STATE = {
   insurance: [],
   history: [],
   alerts: [],
+  fuelData: null,
   currentScreen: 'home',
   currentTab: 'info',
   idToken: null,
@@ -71,6 +72,32 @@ function mockResponse(action) {
     return {
       ok: true,
       vehicle: mockVehicle,
+      fuelData: {
+        hasData: true,
+        monthKey: '2026-05',
+        actualL100: 9.2,
+        standardL100: 10.0,
+        status: 'excellent',
+        statusLabel: 'מצוין',
+        kmThisMonth: 1240,
+        litersThisMonth: 114.1,
+        costThisMonth: 851,
+        savingsL: 9.9,
+        savingsNIS: 68,
+        months: [
+          {key:'2025-12',label:"דצ'",l100:10.4,km:1050,liters:109.2,cost:815,fills:6,status:'warn',statusLabel:'גבוה'},
+          {key:'2026-01',label:"ינו'",l100:9.8,km:980,liters:96.0,cost:717,fills:5,status:'good',statusLabel:'תקין'},
+          {key:'2026-02',label:"פבר'",l100:9.5,km:1180,liters:112.1,cost:837,fills:6,status:'good',statusLabel:'תקין'},
+          {key:'2026-03',label:'מרץ',l100:9.1,km:1320,liters:120.1,cost:896,fills:7,status:'excellent',statusLabel:'מצוין'},
+          {key:'2026-04',label:"אפר'",l100:9.3,km:1210,liters:112.5,cost:839,fills:6,status:'excellent',statusLabel:'מצוין'},
+          {key:'2026-05',label:'מאי',l100:9.2,km:1240,liters:114.1,cost:851,fills:6,status:'excellent',statusLabel:'מצוין'}
+        ],
+        fuelInsight: {
+          text: 'החודש נסעת ביעילות מרשימה — חסכת 68 ₪ בדלק. החיסכון הזה מממן שעתיים של ריפוי בדיבור לנועה בת 5, שכל שעה כזו שווה לה עולם.',
+          generatedAt: '2026-05-01T03:02:15',
+          monthKey: '2026-05'
+        }
+      },
       documents: [
         { id: 'D1', type: 'רישיון רכב', date: '2026-08-15', link: '', notes: '' },
         { id: 'D2', type: 'ביטוח חובה', date: '2025-06-10', link: '', notes: '' },
@@ -217,6 +244,7 @@ async function loadFullData() {
   try {
     const result = await gasPost('driver_vehicle');
     STATE.vehicle   = result.vehicle;
+    STATE.fuelData  = result.fuelData  || null;
     STATE.documents = (result.documents && result.documents.length)
       ? result.documents
       : buildDocumentsFromVehicle(result.vehicle);
@@ -420,6 +448,7 @@ function renderHomeScreen() {
   }
 
   renderServiceProgress();
+  renderFuelWidget();
 
   const homeAlert = document.getElementById('home-alert');
   const topAlert = STATE.alerts.find(function(a) { return a.type === 'red'; }) || STATE.alerts[0];
@@ -432,6 +461,223 @@ function renderHomeScreen() {
   } else {
     homeAlert.classList.add('hidden');
   }
+}
+
+function renderFuelWidget() {
+  var mount = document.getElementById('fuel-widget-mount');
+  if (!mount) return;
+  var fd = STATE.fuelData;
+  if (!fd || !fd.hasData) { mount.innerHTML = ''; return; }
+
+  var colorMap = {excellent:'var(--fuel-excellent)',good:'var(--fuel-good)',warn:'var(--fuel-warn)',over:'var(--fuel-over)',nodata:'var(--fuel-nodata)'};
+  var c = colorMap[fd.status] || 'var(--fuel-nodata)';
+  var std = fd.standardL100 || 10;
+  var act = fd.actualL100   || std;
+  var barPct = Math.max(4, Math.min(100, Math.round((act / std) * 100)));
+  var savingsStr = fd.savingsNIS > 0
+    ? '+' + fd.savingsNIS.toLocaleString('he') + '₪'
+    : fd.savingsNIS < 0 ? fd.savingsNIS.toLocaleString('he') + '₪' : '—';
+
+  mount.innerHTML =
+    '<div class="fuel-widget" onclick="openFuelModal()" role="button" tabindex="0" aria-label="פרטי צריכת דלק">' +
+      '<div class="fw-hdr">' +
+        '<div class="fw-title-wrap">' +
+          '<div class="fw-icn"><svg width="16" height="16"><use href="#ic-fuel" style="color:' + c + '"/></svg></div>' +
+          '<div class="fw-title">צריכת דלק</div>' +
+        '</div>' +
+        '<div class="fw-pill" style="background:' + c + '1a;color:' + c + '">' + fd.statusLabel + '</div>' +
+      '</div>' +
+      '<div class="fw-metric-row">' +
+        '<div class="fw-metric">' +
+          '<div class="fw-metric-val" style="color:' + c + '">' + (fd.actualL100 || '—') + '</div>' +
+          '<div class="fw-metric-lbl">ל/100ק"מ</div>' +
+        '</div>' +
+        '<div class="fw-metric-sep"></div>' +
+        '<div class="fw-metric">' +
+          '<div class="fw-metric-val">' + (fd.kmThisMonth ? fd.kmThisMonth.toLocaleString('he') : '—') + '</div>' +
+          '<div class="fw-metric-lbl">ק"מ החודש</div>' +
+        '</div>' +
+        '<div class="fw-metric-sep"></div>' +
+        '<div class="fw-metric">' +
+          '<div class="fw-metric-val ' + (fd.savingsNIS > 0 ? 'fw-savings' : fd.savingsNIS < 0 ? 'fw-over' : '') + '">' + savingsStr + '</div>' +
+          '<div class="fw-metric-lbl">חיסכון</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="fw-bar-bg">' +
+        '<div class="fw-bar-fill" style="background:' + c + ';--fw-bar-w:' + barPct + '%"></div>' +
+      '</div>' +
+      '<div class="fw-bar-labels">' +
+        '<span>בפועל: ' + (fd.actualL100 || '—') + '</span>' +
+        '<span>תקן: ' + (fd.standardL100 || '—') + '</span>' +
+      '</div>' +
+      '<div class="fw-cta">לפרטים נוספים ›</div>' +
+    '</div>';
+}
+
+function _heMonthLabel(monthKey) {
+  var labels = {'01':'ינואר','02':'פברואר','03':'מרץ','04':'אפריל','05':'מאי','06':'יוני','07':'יולי','08':'אוגוסט','09':'ספטמבר','10':'אוקטובר','11':'נובמבר','12':'דצמבר'};
+  return labels[(monthKey + '').slice(5,7)] || monthKey;
+}
+
+function openFuelModal() {
+  var fd = STATE.fuelData;
+  if (!fd || !fd.hasData) return;
+  renderFuelModal();
+  var el = document.getElementById('fuel-modal');
+  el.style.display = 'flex';
+  requestAnimationFrame(function() { el.classList.add('open'); });
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFuelModal() {
+  var el = document.getElementById('fuel-modal');
+  el.classList.remove('open');
+  document.body.style.overflow = '';
+  setTimeout(function() { el.style.display = 'none'; }, 380);
+}
+
+function renderFuelModal() {
+  var fd = STATE.fuelData;
+  if (!fd || !fd.hasData) return;
+  var content = document.getElementById('fuel-modal-content');
+  if (!content) return;
+
+  var colorMap = {excellent:'var(--fuel-excellent)',good:'var(--fuel-good)',warn:'var(--fuel-warn)',over:'var(--fuel-over)',nodata:'var(--fuel-nodata)'};
+  var c = colorMap[fd.status] || 'var(--fuel-nodata)';
+
+  // Hero
+  var heroHtml =
+    '<div class="fm-hero">' +
+      '<div class="fm-hero-val" style="color:' + c + '">' + (fd.actualL100 || '—') + '</div>' +
+      '<div class="fm-hero-unit">ליטר ל-100 ק"מ</div>' +
+      '<div class="fm-hero-status" style="background:' + c + '1a">' +
+        '<div class="fm-hero-status-dot" style="background:' + c + '"></div>' +
+        '<span style="color:' + c + '">' + fd.statusLabel + '</span>' +
+      '</div>' +
+      '<div class="fm-month-label">חודש ' + _heMonthLabel(fd.monthKey) + '</div>' +
+    '</div>';
+
+  // Savings
+  var savingsClass = fd.savingsNIS >= 0 ? 'positive' : 'negative';
+  var savingsCardClass = fd.savingsNIS < 0 ? 'over' : '';
+  var savingsSign = fd.savingsNIS > 0 ? '+' : '';
+  var savingsDesc = fd.savingsNIS > 0
+    ? 'בהשוואה לצריכת התקן של הרכב (' + fd.standardL100 + ' ל/100ק"מ)'
+    : fd.savingsNIS < 0 ? 'חריגה מצריכת התקן של הרכב (' + fd.standardL100 + ' ל/100ק"מ)'
+    : 'צריכה תואמת את תקן הרכב';
+  var savingsLDesc = fd.savingsL !== 0
+    ? (fd.savingsL > 0 ? 'חסכת ' : 'צרכת ') + Math.abs(fd.savingsL) + ' ליטרים ' + (fd.savingsL > 0 ? 'פחות' : 'יותר') + ' מהתקן'
+    : '';
+  var savingsHtml =
+    '<div class="fm-section">' +
+      '<div class="fm-sec-title">חיסכון החודש</div>' +
+      '<div class="fm-savings-card ' + savingsCardClass + '">' +
+        '<div class="fm-savings-nis ' + savingsClass + '">' + savingsSign + (fd.savingsNIS ? fd.savingsNIS.toLocaleString('he') + '₪' : '0₪') + '</div>' +
+        '<div class="fm-savings-desc">' + savingsDesc + '</div>' +
+        (savingsLDesc ? '<div class="fm-savings-sub">' + savingsLDesc + '</div>' : '') +
+      '</div>' +
+    '</div>';
+
+  // AI Insight
+  var insightHtml = '';
+  if (fd.fuelInsight && fd.fuelInsight.text) {
+    var genDate = fd.fuelInsight.generatedAt ? fd.fuelInsight.generatedAt.slice(0,10) : '';
+    insightHtml =
+      '<div class="fm-section">' +
+        '<div class="fm-sec-title">תובנת AI</div>' +
+        '<div class="fm-insight-card">' +
+          '<div class="fm-insight-shimmer"></div>' +
+          '<div class="fm-insight-head">' +
+            '<div class="fm-insight-icon">✨</div>' +
+            '<div class="fm-insight-label">עלה Intelligence</div>' +
+          '</div>' +
+          '<div class="fm-insight-text">' + fd.fuelInsight.text + '</div>' +
+          (genDate ? '<div class="fm-insight-footer">נוצר ' + genDate + ' · GPT-4o</div>' : '') +
+        '</div>' +
+      '</div>';
+  }
+
+  // 6-month chart
+  var months = fd.months || [];
+  var maxL100 = 0;
+  for (var i = 0; i < months.length; i++) { if (months[i].l100 > maxL100) maxL100 = months[i].l100; }
+  if (maxL100 === 0) maxL100 = fd.standardL100 || 10;
+  var chartCols = '';
+  for (var j = 0; j < months.length; j++) {
+    var m = months[j];
+    var isCur = (m.key === fd.monthKey);
+    var barH = m.l100 > 0 ? Math.max(6, Math.round((m.l100 / maxL100) * 100)) : 4;
+    var mColor = colorMap[m.status] || 'var(--fuel-nodata)';
+    var delay = (j * 0.08).toFixed(2) + 's';
+    chartCols +=
+      '<div class="fm-chart-col">' +
+        '<div class="fm-bar-wrap">' +
+          '<div class="fm-bar' + (isCur ? ' current' : '') + '" ' +
+               'style="background:' + mColor + ';--fm-bar-h:' + barH + '%;animation-delay:' + delay + '"></div>' +
+        '</div>' +
+        '<div class="fm-chart-val">' + (m.l100 > 0 ? m.l100 : '') + '</div>' +
+        '<div class="fm-chart-label' + (isCur ? ' current' : '') + '">' + m.label + '</div>' +
+      '</div>';
+  }
+  var chartHtml =
+    '<div class="fm-section">' +
+      '<div class="fm-sec-title">6 חודשים אחרונים</div>' +
+      '<div class="fm-chart">' + chartCols + '</div>' +
+    '</div>';
+
+  // Monthly tiles
+  var tilesHtml =
+    '<div class="fm-section">' +
+      '<div class="fm-sec-title">פרטי חודש נוכחי</div>' +
+      '<div class="fm-tiles">' +
+        '<div class="fm-tile">' +
+          '<div class="fm-tile-lbl">ק"מ שנסעת</div>' +
+          '<div class="fm-tile-val">' + (fd.kmThisMonth ? fd.kmThisMonth.toLocaleString('he') : '—') + '</div>' +
+          '<div class="fm-tile-unit">קילומטר</div>' +
+        '</div>' +
+        '<div class="fm-tile">' +
+          '<div class="fm-tile-lbl">ליטרים</div>' +
+          '<div class="fm-tile-val">' + (fd.litersThisMonth || '—') + '</div>' +
+          '<div class="fm-tile-unit">ליטר</div>' +
+        '</div>' +
+        '<div class="fm-tile">' +
+          '<div class="fm-tile-lbl">עלות דלק</div>' +
+          '<div class="fm-tile-val">' + (fd.costThisMonth ? fd.costThisMonth.toLocaleString('he') : '—') + '</div>' +
+          '<div class="fm-tile-unit">₪</div>' +
+        '</div>' +
+        '<div class="fm-tile">' +
+          '<div class="fm-tile-lbl">תקן הרכב</div>' +
+          '<div class="fm-tile-val">' + (fd.standardL100 || '—') + '</div>' +
+          '<div class="fm-tile-unit">ל/100ק"מ</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // Annual summary
+  var annKm = 0, annL = 0, annCost = 0, annSave = 0;
+  for (var k = 0; k < months.length; k++) {
+    annKm   += months[k].km    || 0;
+    annL    += months[k].liters|| 0;
+    annCost += months[k].cost  || 0;
+    if (fd.standardL100 > 0 && months[k].l100 > 0 && months[k].km > 0) {
+      var price = (months[k].cost > 0 && months[k].liters > 0) ? months[k].cost / months[k].liters : 7;
+      annSave += ((fd.standardL100 - months[k].l100) / 100) * months[k].km * price;
+    }
+  }
+  var annSaveColor = annSave >= 0 ? 'var(--fuel-excellent)' : 'var(--fuel-over)';
+  var annualHtml =
+    '<div class="fm-section">' +
+      '<div class="fm-sec-title">סיכום 6 חודשים</div>' +
+      '<div class="fm-annual">' +
+        '<div class="fm-annual-item"><div class="fm-annual-val">' + Math.round(annKm).toLocaleString('he') + '</div><div class="fm-annual-lbl">ק"מ</div></div>' +
+        '<div class="fm-annual-item"><div class="fm-annual-val">' + Math.round(annL).toLocaleString('he') + '</div><div class="fm-annual-lbl">ליטרים</div></div>' +
+        '<div class="fm-annual-item"><div class="fm-annual-val">' + Math.round(annCost).toLocaleString('he') + '₪</div><div class="fm-annual-lbl">עלות</div></div>' +
+        '<div class="fm-annual-item" style="color:' + annSaveColor + '"><div class="fm-annual-val">' + (annSave > 0 ? '+' : '') + Math.round(annSave).toLocaleString('he') + '₪</div><div class="fm-annual-lbl">חיסכון</div></div>' +
+      '</div>' +
+    '</div>';
+
+  content.innerHTML = heroHtml + savingsHtml + (insightHtml || '') + chartHtml + tilesHtml + annualHtml +
+    '<button class="fm-close-btn" onclick="closeFuelModal()">סגור</button>';
 }
 
 function renderServiceProgress() {
