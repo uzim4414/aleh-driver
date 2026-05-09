@@ -579,23 +579,30 @@ function renderFuelModal() {
     '</div>';
 
   // AI Insight
-  var insightHtml = '';
+  var insightHtml = '<div class="fm-section"><div class="fm-sec-title">תובנת AI</div>';
   if (fd.fuelInsight && fd.fuelInsight.text) {
     var genDate = fd.fuelInsight.generatedAt ? fd.fuelInsight.generatedAt.slice(0,10) : '';
-    insightHtml =
-      '<div class="fm-section">' +
-        '<div class="fm-sec-title">תובנת AI</div>' +
-        '<div class="fm-insight-card">' +
-          '<div class="fm-insight-shimmer"></div>' +
-          '<div class="fm-insight-head">' +
-            '<div class="fm-insight-icon">✨</div>' +
-            '<div class="fm-insight-label">עלה Intelligence</div>' +
-          '</div>' +
-          '<div class="fm-insight-text">' + fd.fuelInsight.text + '</div>' +
-          (genDate ? '<div class="fm-insight-footer">נוצר ' + genDate + ' · GPT-4o</div>' : '') +
+    insightHtml +=
+      '<div class="fm-insight-card">' +
+        '<div class="fm-insight-shimmer"></div>' +
+        '<div class="fm-insight-head">' +
+          '<div class="fm-insight-icon">✨</div>' +
+          '<div class="fm-insight-label">עלה Intelligence</div>' +
         '</div>' +
+        '<div class="fm-insight-text">' + fd.fuelInsight.text + '</div>' +
+        (genDate ? '<div class="fm-insight-footer">נוצר ' + genDate + ' · GPT-4o</div>' : '') +
+      '</div>';
+  } else {
+    insightHtml +=
+      '<div class="fm-insight-card fm-insight-empty">' +
+        '<div class="fm-insight-head">' +
+          '<div class="fm-insight-icon">✨</div>' +
+          '<div class="fm-insight-label">עלה Intelligence</div>' +
+        '</div>' +
+        '<div class="fm-insight-text" style="color:var(--t2)">תובנת AI תיווצר ב-1 לחודש הבא.<br>המערכת מנתחת את דפוסי הנסיעה שלך ומחשבת את ההשפעה על ילדי עלה.</div>' +
       '</div>';
   }
+  insightHtml += '</div>';
 
   // 6-month chart
   var months = fd.months || [];
