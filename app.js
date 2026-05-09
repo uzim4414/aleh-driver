@@ -495,7 +495,7 @@ function renderHistory() {
 function techItem(icon, label, val, delay) {
   if (!val && val !== 0) return '';
   return '<div class="tspec-item" style="animation-delay:' + (delay||0) + 's">' +
-    '<div class="tspec-icon"><svg width="18" height="18"><use href="#' + icon + '" color="#E8000D"/></svg></div>' +
+    '<div class="tspec-icon"><svg width="18" height="18"><use href="#' + icon + '" color="#1F8A3D"/></svg></div>' +
     '<div class="tspec-val">' + val + '</div>' +
     '<div class="tspec-lbl">' + label + '</div>' +
   '</div>';
@@ -631,7 +631,7 @@ function renderVehicleScreen(tab) {
     ];
     content.innerHTML = '<div class="igrid">' + fields.map(function(f, i) {
       return '<div class="ig-card" style="animation-delay:' + (i * 0.05) + 's">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#' + f.icon + '" color="#E8000D"/></svg></div>' +
+        '<div class="ig-icon"><svg width="20" height="20"><use href="#' + f.icon + '" color="#1F8A3D"/></svg></div>' +
         '<div class="ig-lbl">' + f.label + '</div>' +
         '<div class="ig-val' + (f.warn ? ' warn' : '') + '">' + f.val + '</div>' +
       '</div>';
@@ -647,7 +647,7 @@ function renderVehicleScreen(tab) {
         const safeTitle = (d.type || 'מסמך').replace(/'/g, "\\'");
         const onclick   = 'viewDoc(\'' + safeLink + '\',\'' + safeTitle + '\')';
         return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's" onclick="' + onclick + '">' +
-          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#E8000D"/></svg></div>' +
+          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#1F8A3D"/></svg></div>' +
           '<div class="dr-body">' +
             '<div class="dr-title">' + (d.type || 'מסמך') + '</div>' +
             '<div class="dr-sub' + (warn ? ' warn' : '') + '">' + formatDate(d.date) + '</div>' +
@@ -666,7 +666,7 @@ function renderVehicleScreen(tab) {
     } else {
       content.innerHTML = STATE.insurance.map(function(ins, i) {
         return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's">' +
-          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-shield" color="#E8000D"/></svg></div>' +
+          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-shield" color="#1F8A3D"/></svg></div>' +
           '<div class="dr-body">' +
             '<div class="dr-title">ביטוח ' + (ins.year || '') + ' — ' + (ins.company || '') + '</div>' +
             '<div class="dr-sub">חובה: ₪' + Number(ins.compCost || 0).toLocaleString('he') + ' | מקיף: ₪' + Number(ins.fullCost || 0).toLocaleString('he') + '</div>' +
@@ -683,17 +683,17 @@ function renderVehicleScreen(tab) {
   } else if (tab === 'agency') {
     content.innerHTML = '<div class="igrid">' +
       '<div class="ig-card">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-pin" color="#E8000D"/></svg></div>' +
+        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-pin" color="#1F8A3D"/></svg></div>' +
         '<div class="ig-lbl">אגף</div>' +
         '<div class="ig-val">' + (v.dept || '—') + '</div>' +
       '</div>' +
       '<div class="ig-card">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-user" color="#E8000D"/></svg></div>' +
+        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-user" color="#1F8A3D"/></svg></div>' +
         '<div class="ig-lbl">מחזיק</div>' +
         '<div class="ig-val">' + (v.holder || '—') + '</div>' +
       '</div>' +
       '<div class="ig-card">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-cal" color="#E8000D"/></svg></div>' +
+        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-cal" color="#1F8A3D"/></svg></div>' +
         '<div class="ig-lbl">טלפון</div>' +
         '<div class="ig-val" style="font-size:14px;direction:ltr">' + (v.phone || '—') + '</div>' +
       '</div>' +
