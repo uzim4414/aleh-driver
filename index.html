@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&family=Outfit:wght@200;300;400;500;600;700&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700&family=Manrope:wght@200;300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="splash.css?v=16">
+<link rel="stylesheet" href="splash.css?v=20">
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -240,6 +240,65 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .tspec-skel-item::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.04) 50%,transparent 100%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; }
 .sk-line { background:rgba(255,255,255,0.08); border-radius:4px; }
 @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+@keyframes barFill { from { width:0% } }
+@keyframes barShine { 0% { transform:translateX(-120%) } 100% { transform:translateX(220%) } }
+@keyframes pulseGlow { 0%,100%{ box-shadow:0 0 0 0 rgba(48,209,88,0) } 50%{ box-shadow:0 0 14px 2px rgba(48,209,88,0.35) } }
+
+/* ── Service Progress Card ── */
+.svc-card { margin:14px 16px 0; background:var(--card); border-radius:22px; padding:16px 18px 18px; border:1px solid var(--border); animation:fadeUp .55s cubic-bezier(.16,1,.3,1) .25s both; position:relative; overflow:hidden; }
+.svc-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.svc-title-wrap { display:flex; align-items:center; gap:10px; }
+.svc-icn { width:34px; height:34px; border-radius:11px; background:var(--red-dim); display:flex; align-items:center; justify-content:center; }
+.svc-title { font-size:14px; font-weight:700; letter-spacing:-0.2px; }
+.svc-pill { font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:100px; letter-spacing:0.2px; }
+.svc-pill.ok   { background:rgba(48,209,88,0.12); color:var(--ok); }
+.svc-pill.warn { background:rgba(255,159,10,0.12); color:var(--warn); }
+.svc-pill.red  { background:rgba(31,138,61,0.18); color:var(--red); animation:pillGlow 2s ease-in-out infinite; }
+.svc-stats { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:10px; gap:12px; }
+.svc-stat { flex:1; }
+.svc-stat-lbl { font-size:10px; font-weight:600; color:var(--t2); letter-spacing:0.4px; text-transform:uppercase; }
+.svc-stat-val { font-size:20px; font-weight:800; letter-spacing:-0.5px; margin-top:3px; direction:ltr; text-align:start; }
+.svc-stat-val .unit { font-size:11px; font-weight:600; color:var(--t2); margin-inline-start:4px; }
+.svc-stat.right { text-align:end; }
+.svc-stat.right .svc-stat-val { text-align:end; }
+.svc-bar-bg { position:relative; height:10px; background:rgba(255,255,255,0.06); border-radius:100px; overflow:hidden; border:1px solid rgba(255,255,255,0.04); }
+.svc-bar-fill { position:absolute; inset:0; right:0; height:100%; border-radius:100px; transition:width 1.4s cubic-bezier(.16,1,.3,1); animation:barFill 1.4s cubic-bezier(.16,1,.3,1); }
+.svc-bar-fill.ok   { background:linear-gradient(90deg,#1F8A3D 0%,#30D158 100%); box-shadow:0 0 12px rgba(48,209,88,0.35); }
+.svc-bar-fill.warn { background:linear-gradient(90deg,#FF9F0A 0%,#FFB938 100%); box-shadow:0 0 12px rgba(255,159,10,0.4); }
+.svc-bar-fill.red  { background:linear-gradient(90deg,#C8102E 0%,#FF3B30 100%); box-shadow:0 0 14px rgba(255,59,48,0.45); }
+.svc-bar-shine { position:absolute; top:0; bottom:0; width:40%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.28),transparent); animation:barShine 2.8s ease-in-out infinite 1.4s; }
+.svc-foot { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+.svc-foot-txt { font-size:11.5px; color:var(--t2); font-weight:500; }
+.svc-foot-val { font-size:12px; font-weight:700; }
+.svc-foot-val.ok { color:var(--ok); } .svc-foot-val.warn { color:var(--warn); } .svc-foot-val.red { color:var(--red); }
+
+/* ── Garage Card ── */
+.gar-wrap { padding:16px; display:flex; flex-direction:column; gap:12px; }
+.gar-card { background:var(--card); border-radius:22px; border:1px solid var(--border); overflow:hidden; animation:fadeUp .5s ease both; }
+.gar-head { padding:18px 18px 14px; display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border); background:linear-gradient(135deg,rgba(31,138,61,0.08) 0%,transparent 60%); }
+.gar-logo { width:56px; height:56px; border-radius:18px; background:var(--red-dim); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(31,138,61,0.2); }
+.gar-name { font-size:18px; font-weight:800; letter-spacing:-0.4px; line-height:1.25; }
+.gar-tag { font-size:11px; color:var(--t2); margin-top:2px; font-weight:500; }
+.gar-row { display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid var(--border); }
+.gar-row:last-child { border-bottom:none; }
+.gar-row-icn { width:34px; height:34px; border-radius:11px; background:var(--card2); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.gar-row-body { flex:1; min-width:0; }
+.gar-row-lbl { font-size:10.5px; color:var(--t2); font-weight:600; letter-spacing:0.3px; text-transform:uppercase; }
+.gar-row-val { font-size:14px; font-weight:600; margin-top:2px; letter-spacing:-0.2px; word-break:break-word; }
+.gar-row-val.ltr { direction:ltr; text-align:start; }
+.gar-row-btns { display:flex; gap:8px; flex-shrink:0; }
+.gar-mini-btn { width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; transition:transform .15s; text-decoration:none; }
+.gar-mini-btn:active { transform:scale(0.92); }
+.gar-mini-btn.waze { background:#33CCFF; }
+.gar-mini-btn.wa   { background:#25D366; }
+.gar-mini-btn.tel  { background:var(--red); }
+.gar-cta { display:flex; gap:10px; padding:14px 18px; }
+.gar-cta-btn { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:13px 14px; border-radius:14px; font-size:13.5px; font-weight:700; cursor:pointer; border:none; font-family:inherit; letter-spacing:-0.2px; text-decoration:none; transition:transform .15s; }
+.gar-cta-btn:active { transform:scale(0.97); }
+.gar-cta-btn.primary { background:var(--red); color:#fff; animation:pulseGlow 2.6s ease-in-out infinite; }
+.gar-cta-btn.ghost { background:rgba(255,255,255,0.05); color:#fff; border:1px solid var(--border); }
+.gar-empty { padding:40px 24px; text-align:center; color:var(--t2); font-size:14px; background:var(--card); border-radius:22px; border:1px solid var(--border); margin:16px; }
+.gar-empty-ic { font-size:42px; margin-bottom:10px; opacity:0.7; }
 </style>
 </head>
 <body>
@@ -279,6 +338,11 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 <symbol id="ic-cloud"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></symbol>
 <symbol id="ic-filter"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>
 <symbol id="ic-trunk"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="20" height="12" rx="2"/><path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></symbol>
+<symbol id="ic-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+<symbol id="ic-whatsapp" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413"/></symbol>
+<symbol id="ic-waze" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63c.69 1.32 1.04 2.79 1.04 4.37 0 5.84-5.06 10.5-11.07 10.32-.42.79-1.26 1.31-2.21 1.31-1.41 0-2.5-1.13-2.5-2.5 0-.13.01-.26.03-.38C2.51 18.16 1 15.62 1 12.7c0-1.27.27-2.49.78-3.61.16-.34.55-.49.89-.34.34.16.49.55.34.89-.43.96-.66 2-.66 3.06 0 2.45 1.27 4.59 3.42 5.79.17-.18.36-.34.58-.47C5.4 16.86 4.66 15 4.66 13c0-4.41 3.59-8 8-8 .55 0 1 .45 1 1s-.45 1-1 1c-3.31 0-6 2.69-6 6 0 1.64.66 3.13 1.74 4.21l.04.04c.32-.13.66-.21 1.02-.21 1.06 0 1.99.66 2.36 1.62 3.66-.21 6.55-3.24 6.55-6.95 0-3.86-3.14-7-7-7s-7 3.14-7 7c0 .55-.45 1-1 1s-1-.45-1-1c0-4.96 4.04-9 9-9 3.43 0 6.42 1.93 7.93 4.76.16.31.04.7-.27.86-.31.16-.7.04-.86-.27zM10.3 19.13c0-.61-.49-1.1-1.1-1.1s-1.1.49-1.1 1.1.49 1.1 1.1 1.1 1.1-.49 1.1-1.1zM9 11.5c0 .55.45 1 1 1s1-.45 1-1-.45-1-1-1-1 .45-1 1zm5 0c0 .55.45 1 1 1s1-.45 1-1-.45-1-1-1-1 .45-1 1zm-5.62 3.05c.36.7 1.07 1.18 1.9 1.36 1.81.39 3.61-.76 4-2.57.07-.32-.13-.63-.45-.7-.32-.07-.63.13-.7.45-.26 1.18-1.43 1.92-2.61 1.66-.54-.12-1-.43-1.24-.88-.15-.29-.5-.4-.79-.25-.29.16-.4.51-.25.8z"/></symbol>
+<symbol id="ic-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></symbol>
+<symbol id="ic-cal-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></symbol>
 <symbol id="ic-google" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></symbol>
 </defs>
 </svg>
@@ -354,8 +418,9 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
           <div class="hero-plate-wrap"><div class="hero-plate" id="car-plate">—</div></div>
           <div class="hero-btns">
             <button class="hero-btn" onclick="APP.nav('vehicle');APP.switchTab('docs')">מסמכי הרכב</button>
-            <button class="hero-btn" onclick="APP.nav('vehicle');APP.switchTab('agency')">סוכנות שלך</button>
+            <button class="hero-btn" onclick="APP.nav('vehicle');APP.switchTab('garage')">המוסך שלך</button>
           </div>
+          <div id="svc-progress-mount"></div>
           <div class="hero-alert hidden" id="home-alert">
             <div>
               <div class="ha-title" id="home-alert-title">התראה</div>
@@ -391,7 +456,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
       <div class="tab"        data-tab="history"   onclick="APP.switchTab('history')">היסטוריה</div>
       <div class="tab"        data-tab="docs"      onclick="APP.switchTab('docs')">מסמכים</div>
       <div class="tab"        data-tab="insurance" onclick="APP.switchTab('insurance')">ביטוח</div>
-      <div class="tab"        data-tab="agency"    onclick="APP.switchTab('agency')">סוכנות</div>
+      <div class="tab"        data-tab="garage"    onclick="APP.switchTab('garage')">המוסך</div>
     </div>
     <div class="content" id="veh-content"></div>
   </div>
@@ -491,7 +556,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   </div>
 </div>
 
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 <script src="aleh-logo-data.js?v=1"></script>
 <script type="text/babel" src="splash-logo.jsx?v=1"></script>
 <script type="text/babel">

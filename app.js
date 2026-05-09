@@ -50,9 +50,19 @@ function mockResponse(action) {
     email: 'demo@aleh.org', phone: '052-1234567',
     licExp: '2026-08-15', insCompExp: '2025-06-10', insFullExp: '2026-01-20',
     lastServiceDate: '2025-01-10', lastServiceKm: '45000', nextServiceKm: '50000',
+    currentKm: 47850,
     testDue: '2026-08-15', testDone: '',
     photoLink: 'https://toyota-select.co.il/wp-content/uploads/2025/04/MODELS-SELECT-8.png',
-    notes: ''
+    notes: '',
+    garage: {
+      id: 'G001',
+      name: 'מוסך טויוטה תל אביב',
+      address: 'רחוב הברזל 12, תל אביב',
+      phone: '03-6789012',
+      contactName: 'יוסי כהן',
+      contactPhone: '052-9876543',
+      bookingUrl: 'https://toyota.co.il/service/booking'
+    }
   };
   if (action === 'driver_auth') {
     return { ok: true, email: 'demo@aleh.org', vehicle: mockVehicle, orgName: 'עלה' };
@@ -409,6 +419,8 @@ function renderHomeScreen() {
     document.querySelector('.hero-img-area').style.display = 'none';
   }
 
+  renderServiceProgress();
+
   const homeAlert = document.getElementById('home-alert');
   const topAlert = STATE.alerts.find(function(a) { return a.type === 'red'; }) || STATE.alerts[0];
   if (topAlert) {
@@ -420,6 +432,186 @@ function renderHomeScreen() {
   } else {
     homeAlert.classList.add('hidden');
   }
+}
+
+function renderServiceProgress() {
+  const mount = document.getElementById('svc-progress-mount');
+  if (!mount) return;
+  const v = STATE.vehicle;
+  if (!v) { mount.innerHTML = ''; return; }
+
+  const lastKm = parseInt(v.lastServiceKm, 10) || 0;
+  const nextKm = parseInt(v.nextServiceKm, 10) || 0;
+  const curKm  = Math.max(parseInt(v.currentKm, 10) || 0, lastKm);
+
+  if (!nextKm || !lastKm || nextKm <= lastKm) { mount.innerHTML = ''; return; }
+
+  const totalSpan = nextKm - lastKm;
+  const driven    = Math.max(0, curKm - lastKm);
+  const remaining = nextKm - curKm;
+  let pct = Math.min(100, Math.max(0, Math.round((driven / totalSpan) * 100)));
+
+  let level, label, footTxt, footCls;
+  if (remaining < 0) {
+    level = 'red';
+    label = 'עבר מועד';
+    pct   = 100;
+    footTxt = 'עבר ב-' + Math.abs(remaining).toLocaleString('he') + ' ק"מ';
+    footCls = 'red';
+  } else if (remaining < 500) {
+    level = 'red';
+    label = 'דחוף';
+    footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
+    footCls = 'red';
+  } else if (remaining < 1500) {
+    level = 'warn';
+    label = 'מתקרב';
+    footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
+    footCls = 'warn';
+  } else {
+    level = 'ok';
+    label = 'תקין';
+    footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
+    footCls = 'ok';
+  }
+
+  mount.innerHTML =
+    '<div class="svc-card">' +
+      '<div class="svc-hdr">' +
+        '<div class="svc-title-wrap">' +
+          '<div class="svc-icn"><svg width="18" height="18"><use href="#ic-tool" color="#1F8A3D"/></svg></div>' +
+          '<div class="svc-title">טיפול הבא</div>' +
+        '</div>' +
+        '<div class="svc-pill ' + level + '">' + label + '</div>' +
+      '</div>' +
+      '<div class="svc-stats">' +
+        '<div class="svc-stat">' +
+          '<div class="svc-stat-lbl">ק"מ נוכחיים</div>' +
+          '<div class="svc-stat-val">' + curKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
+        '</div>' +
+        '<div class="svc-stat right">' +
+          '<div class="svc-stat-lbl">טיפול הבא</div>' +
+          '<div class="svc-stat-val">' + nextKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="svc-bar-bg">' +
+        '<div class="svc-bar-fill ' + level + '" style="width:' + pct + '%">' +
+          '<div class="svc-bar-shine"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="svc-foot">' +
+        '<div class="svc-foot-txt">' + footTxt + '</div>' +
+        '<div class="svc-foot-val ' + footCls + '">' + pct + '%</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function normalizePhone(p) {
+  if (!p) return '';
+  return String(p).replace(/\D/g, '');
+}
+
+function phoneToWa(p) {
+  var d = normalizePhone(p);
+  if (!d) return '';
+  if (d.charAt(0) === '0') d = '972' + d.substring(1);
+  else if (d.indexOf('972') !== 0) d = '972' + d;
+  return d;
+}
+
+function renderGarageTab() {
+  const v = STATE.vehicle || {};
+  const g = v.garage;
+  if (!g || (!g.name && !g.address && !g.phone && !g.contactPhone && !g.bookingUrl)) {
+    return '<div class="gar-empty"><div class="gar-empty-ic">🔧</div>טרם שויך מוסך לרכב.<br>פנה למנהל הצי לקבלת פרטים.</div>';
+  }
+
+  let rows = '';
+
+  if (g.address) {
+    const wazeUrl = 'https://waze.com/ul?q=' + encodeURIComponent(g.address) + '&navigate=yes';
+    rows +=
+      '<div class="gar-row">' +
+        '<div class="gar-row-icn"><svg width="18" height="18"><use href="#ic-pin" color="#1F8A3D"/></svg></div>' +
+        '<div class="gar-row-body">' +
+          '<div class="gar-row-lbl">כתובת</div>' +
+          '<div class="gar-row-val">' + g.address + '</div>' +
+        '</div>' +
+        '<div class="gar-row-btns">' +
+          '<a class="gar-mini-btn waze" href="' + wazeUrl + '" target="_blank" rel="noopener" title="נווט בוויז">' +
+            '<svg width="20" height="20"><use href="#ic-waze" color="#fff"/></svg>' +
+          '</a>' +
+        '</div>' +
+      '</div>';
+  }
+
+  if (g.contactName || g.contactPhone) {
+    const waBtn = g.contactPhone
+      ? '<a class="gar-mini-btn wa" href="https://wa.me/' + phoneToWa(g.contactPhone) + '?text=' + encodeURIComponent('שלום, אני נהג של עמותת עלה ברכב ' + (v.num || '') + '. אשמח לעזרה.') + '" target="_blank" rel="noopener" title="WhatsApp">' +
+          '<svg width="20" height="20"><use href="#ic-whatsapp" color="#fff"/></svg></a>'
+      : '';
+    const telBtn = g.contactPhone
+      ? '<a class="gar-mini-btn tel" href="tel:' + normalizePhone(g.contactPhone) + '" title="חייג">' +
+          '<svg width="18" height="18"><use href="#ic-phone" color="#fff"/></svg></a>'
+      : '';
+    rows +=
+      '<div class="gar-row">' +
+        '<div class="gar-row-icn"><svg width="18" height="18"><use href="#ic-user" color="#1F8A3D"/></svg></div>' +
+        '<div class="gar-row-body">' +
+          '<div class="gar-row-lbl">איש קשר</div>' +
+          '<div class="gar-row-val">' + (g.contactName || '—') +
+            (g.contactPhone ? ' <span style="font-size:12px;color:var(--t2);direction:ltr;display:inline-block">· ' + g.contactPhone + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="gar-row-btns">' + waBtn + telBtn + '</div>' +
+      '</div>';
+  }
+
+  if (g.phone) {
+    rows +=
+      '<div class="gar-row">' +
+        '<div class="gar-row-icn"><svg width="18" height="18"><use href="#ic-phone" color="#1F8A3D"/></svg></div>' +
+        '<div class="gar-row-body">' +
+          '<div class="gar-row-lbl">טלפון מוסך</div>' +
+          '<div class="gar-row-val ltr">' + g.phone + '</div>' +
+        '</div>' +
+        '<div class="gar-row-btns">' +
+          '<a class="gar-mini-btn tel" href="tel:' + normalizePhone(g.phone) + '" title="חייג">' +
+            '<svg width="18" height="18"><use href="#ic-phone" color="#fff"/></svg></a>' +
+        '</div>' +
+      '</div>';
+  }
+
+  let cta = '';
+  if (g.bookingUrl) {
+    cta +=
+      '<a class="gar-cta-btn primary" href="' + g.bookingUrl + '" target="_blank" rel="noopener">' +
+        '<svg width="17" height="17"><use href="#ic-cal-plus" color="#fff"/></svg>' +
+        'קביעת תור אונליין' +
+      '</a>';
+  }
+  if (g.address) {
+    const wazeUrl = 'https://waze.com/ul?q=' + encodeURIComponent(g.address) + '&navigate=yes';
+    cta +=
+      '<a class="gar-cta-btn ghost" href="' + wazeUrl + '" target="_blank" rel="noopener">' +
+        '<svg width="17" height="17"><use href="#ic-map" color="#fff"/></svg>' +
+        'נווט' +
+      '</a>';
+  }
+
+  return '<div class="gar-wrap">' +
+    '<div class="gar-card">' +
+      '<div class="gar-head">' +
+        '<div class="gar-logo"><svg width="28" height="28"><use href="#ic-tool" color="#1F8A3D"/></svg></div>' +
+        '<div>' +
+          '<div class="gar-name">' + (g.name || 'המוסך שלך') + '</div>' +
+          '<div class="gar-tag">המוסך המשויך לרכב</div>' +
+        '</div>' +
+      '</div>' +
+      rows +
+      (cta ? '<div class="gar-cta">' + cta + '</div>' : '') +
+    '</div>' +
+  '</div>';
 }
 
 function renderAlerts() {
@@ -680,24 +872,8 @@ function renderVehicleScreen(tab) {
     const histEl = document.getElementById('history-timeline');
     content.innerHTML = '<div class="timeline">' + (histEl ? histEl.innerHTML : '') + '</div>';
 
-  } else if (tab === 'agency') {
-    content.innerHTML = '<div class="igrid">' +
-      '<div class="ig-card">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-pin" color="#1F8A3D"/></svg></div>' +
-        '<div class="ig-lbl">אגף</div>' +
-        '<div class="ig-val">' + (v.dept || '—') + '</div>' +
-      '</div>' +
-      '<div class="ig-card">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-user" color="#1F8A3D"/></svg></div>' +
-        '<div class="ig-lbl">מחזיק</div>' +
-        '<div class="ig-val">' + (v.holder || '—') + '</div>' +
-      '</div>' +
-      '<div class="ig-card">' +
-        '<div class="ig-icon"><svg width="20" height="20"><use href="#ic-cal" color="#1F8A3D"/></svg></div>' +
-        '<div class="ig-lbl">טלפון</div>' +
-        '<div class="ig-val" style="font-size:14px;direction:ltr">' + (v.phone || '—') + '</div>' +
-      '</div>' +
-    '</div>';
+  } else if (tab === 'garage') {
+    content.innerHTML = renderGarageTab();
   }
 }
 
