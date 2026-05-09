@@ -440,9 +440,10 @@ function renderServiceProgress() {
   const v = STATE.vehicle;
   if (!v) { mount.innerHTML = ''; return; }
 
-  const lastKm = parseInt(v.lastServiceKm, 10) || 0;
-  const nextKm = parseInt(v.nextServiceKm, 10) || 0;
-  const curKm  = Math.max(parseInt(v.currentKm, 10) || 0, lastKm);
+  // השתמש בנתוני האלגוריתם מהשרת אם קיימים, אחרת fallback לשדות הגולמיים
+  const lastKm = parseInt(v.calcLastServiceKm || v.lastServiceKm, 10) || 0;
+  const nextKm = parseInt(v.calcNextServiceKm || v.nextServiceKm, 10) || 0;
+  const curKm  = parseInt(v.estKm || v.currentKm, 10) || 0;
 
   if (!nextKm || !lastKm || nextKm <= lastKm) { mount.innerHTML = ''; return; }
 
@@ -486,7 +487,7 @@ function renderServiceProgress() {
       '</div>' +
       '<div class="svc-stats">' +
         '<div class="svc-stat">' +
-          '<div class="svc-stat-lbl">ק"מ נוכחיים</div>' +
+          '<div class="svc-stat-lbl">ק"מ מוערך</div>' +
           '<div class="svc-stat-val">' + curKm.toLocaleString('he') + '<span class="unit">ק"מ</span></div>' +
         '</div>' +
         '<div class="svc-stat right">' +
