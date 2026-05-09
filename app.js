@@ -74,28 +74,28 @@ function mockResponse(action) {
       vehicle: mockVehicle,
       fuelData: {
         hasData: true,
-        monthKey: '2026-05',
-        actualL100: 9.2,
+        monthKey: '2026-04',
+        actualL100: 9.3,
         standardL100: 10.0,
         status: 'excellent',
         statusLabel: 'מצוין',
-        kmThisMonth: 1240,
-        litersThisMonth: 114.1,
-        costThisMonth: 851,
-        savingsL: 9.9,
-        savingsNIS: 68,
+        kmThisMonth: 1210,
+        litersThisMonth: 112.5,
+        costThisMonth: 839,
+        savingsL: 8.5,
+        savingsNIS: 63,
         months: [
+          {key:'2025-11',label:"נוב'",l100:10.6,km:990,liters:104.9,cost:783,fills:5,status:'warn',statusLabel:'גבוה'},
           {key:'2025-12',label:"דצ'",l100:10.4,km:1050,liters:109.2,cost:815,fills:6,status:'warn',statusLabel:'גבוה'},
           {key:'2026-01',label:"ינו'",l100:9.8,km:980,liters:96.0,cost:717,fills:5,status:'good',statusLabel:'תקין'},
           {key:'2026-02',label:"פבר'",l100:9.5,km:1180,liters:112.1,cost:837,fills:6,status:'good',statusLabel:'תקין'},
           {key:'2026-03',label:'מרץ',l100:9.1,km:1320,liters:120.1,cost:896,fills:7,status:'excellent',statusLabel:'מצוין'},
-          {key:'2026-04',label:"אפר'",l100:9.3,km:1210,liters:112.5,cost:839,fills:6,status:'excellent',statusLabel:'מצוין'},
-          {key:'2026-05',label:'מאי',l100:9.2,km:1240,liters:114.1,cost:851,fills:6,status:'excellent',statusLabel:'מצוין'}
+          {key:'2026-04',label:"אפר'",l100:9.3,km:1210,liters:112.5,cost:839,fills:6,status:'excellent',statusLabel:'מצוין'}
         ],
         fuelInsight: {
-          text: 'החודש נסעת ביעילות מרשימה — חסכת 68 ₪ בדלק. החיסכון הזה מממן שעתיים של ריפוי בדיבור לנועה בת 5, שכל שעה כזו שווה לה עולם.',
+          text: 'באפריל נסעת ביעילות מרשימה — חסכת 63 ₪ בדלק. החיסכון הזה מממן שעתיים של ריפוי בדיבור לנועה בת 5, שכל שעה כזו שווה לה עולם.',
           generatedAt: '2026-05-01T03:02:15',
-          monthKey: '2026-05'
+          monthKey: '2026-04'
         }
       },
       documents: [
@@ -469,47 +469,48 @@ function renderFuelWidget() {
   var fd = STATE.fuelData;
   if (!fd || !fd.hasData) { mount.innerHTML = ''; return; }
 
-  var colorMap = {excellent:'var(--fuel-excellent)',good:'var(--fuel-good)',warn:'var(--fuel-warn)',over:'var(--fuel-over)',nodata:'var(--fuel-nodata)'};
+  var colorMap = {excellent:'var(--fuel-excellent)',good:'var(--fuel-good)',warn:'var(--fuel-warn)',over:'var(--fuel-over)'};
   var c = colorMap[fd.status] || 'var(--fuel-nodata)';
-  var std = fd.standardL100 || 10;
-  var act = fd.actualL100   || std;
-  var barPct = Math.max(4, Math.min(100, Math.round((act / std) * 100)));
-  var savingsStr = fd.savingsNIS > 0
-    ? '+' + fd.savingsNIS.toLocaleString('he') + '₪'
-    : fd.savingsNIS < 0 ? fd.savingsNIS.toLocaleString('he') + '₪' : '—';
+
+  var monthLabel = _heMonthLabel(fd.monthKey) + ' ' + (fd.monthKey + '').slice(0, 4);
+
+  var nis = fd.savingsNIS || 0;
+  var heroHtml;
+  if (nis > 0) {
+    heroHtml = '<span class="fw-hero-amt fw-savings">חסכת ' + nis.toLocaleString('he') + '₪</span>';
+  } else if (nis < 0) {
+    heroHtml = '<span class="fw-hero-amt fw-over">חריגה ' + Math.abs(nis).toLocaleString('he') + '₪</span>';
+  } else {
+    heroHtml = '<span class="fw-hero-amt" style="color:var(--t2)">ביצוע תקין</span>';
+  }
+
+  var trendArrow = '';
+  var trendColor = 'var(--t2)';
+  if (fd.months && fd.months.length >= 2) {
+    var curIdx = fd.months.length - 1;
+    for (var i = 0; i < fd.months.length; i++) { if (fd.months[i].key === fd.monthKey) { curIdx = i; break; } }
+    var prevIdx = curIdx - 1;
+    if (prevIdx >= 0) {
+      var diff = fd.months[prevIdx].l100 - fd.months[curIdx].l100;
+      if (diff > 0.3)       { trendArrow = '↑'; trendColor = 'var(--fuel-excellent)'; }
+      else if (diff < -0.3) { trendArrow = '↓'; trendColor = 'var(--fuel-over)'; }
+      else                  { trendArrow = '→'; trendColor = 'var(--t2)'; }
+    }
+  }
+
+  var kmStr = fd.kmThisMonth ? fd.kmThisMonth.toLocaleString('he') + ' ק"מ' : '';
 
   mount.innerHTML =
-    '<div class="fuel-widget" onclick="openFuelModal()" role="button" tabindex="0" aria-label="פרטי צריכת דלק">' +
+    '<div class="fuel-widget" onclick="openFuelModal()" role="button" tabindex="0" aria-label="ביצועי דלק">' +
       '<div class="fw-hdr">' +
-        '<div class="fw-title-wrap">' +
-          '<div class="fw-icn"><svg width="16" height="16"><use href="#ic-fuel" style="color:' + c + '"/></svg></div>' +
-          '<div class="fw-title">צריכת דלק</div>' +
-        '</div>' +
+        '<div class="fw-label">ביצועי דלק · ' + monthLabel + '</div>' +
         '<div class="fw-pill" style="background:' + c + '1a;color:' + c + '">' + fd.statusLabel + '</div>' +
       '</div>' +
-      '<div class="fw-metric-row">' +
-        '<div class="fw-metric">' +
-          '<div class="fw-metric-val" style="color:' + c + '">' + (fd.actualL100 || '—') + '</div>' +
-          '<div class="fw-metric-lbl">ל/100ק"מ</div>' +
-        '</div>' +
-        '<div class="fw-metric-sep"></div>' +
-        '<div class="fw-metric">' +
-          '<div class="fw-metric-val">' + (fd.kmThisMonth ? fd.kmThisMonth.toLocaleString('he') : '—') + '</div>' +
-          '<div class="fw-metric-lbl">ק"מ החודש</div>' +
-        '</div>' +
-        '<div class="fw-metric-sep"></div>' +
-        '<div class="fw-metric">' +
-          '<div class="fw-metric-val ' + (fd.savingsNIS > 0 ? 'fw-savings' : fd.savingsNIS < 0 ? 'fw-over' : '') + '">' + savingsStr + '</div>' +
-          '<div class="fw-metric-lbl">חיסכון</div>' +
-        '</div>' +
+      '<div class="fw-hero-row">' +
+        heroHtml +
+        (trendArrow ? '<span class="fw-trend" style="color:' + trendColor + '">' + trendArrow + '</span>' : '') +
       '</div>' +
-      '<div class="fw-bar-bg">' +
-        '<div class="fw-bar-fill" style="background:' + c + ';--fw-bar-w:' + barPct + '%"></div>' +
-      '</div>' +
-      '<div class="fw-bar-labels">' +
-        '<span>בפועל: ' + (fd.actualL100 || '—') + '</span>' +
-        '<span>תקן: ' + (fd.standardL100 || '—') + '</span>' +
-      '</div>' +
+      (kmStr ? '<div class="fw-sub">לעמותה · ' + kmStr + '</div>' : '<div class="fw-sub">לעמותה</div>') +
       '<div class="fw-cta">לפרטים נוספים ›</div>' +
     '</div>';
 }
