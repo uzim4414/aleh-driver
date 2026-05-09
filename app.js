@@ -1408,3 +1408,20 @@ document.addEventListener('DOMContentLoaded', async function() {
   };
   document.head.appendChild(script);
 });
+
+/* ══ רענון נתונים בחזרה לאפליקציה ══ */
+var _lastRefresh = 0;
+var _REFRESH_MIN = 5 * 60 * 1000; // 5 דקות מינימום בין רענונים
+
+document.addEventListener('visibilitychange', async function() {
+  if (document.visibilityState !== 'visible') return;
+  if (!STATE.idToken || !STATE.vehicle) return;
+  if (Date.now() - _lastRefresh < _REFRESH_MIN) return;
+  try {
+    await loadFullData();
+    renderAll();
+    _lastRefresh = Date.now();
+  } catch(e) {
+    console.warn('visibilitychange refresh error:', e.message);
+  }
+});
