@@ -40,9 +40,9 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 @keyframes carFloat  { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-7px) scale(1.01)} }
 @keyframes groundGlow{ 0%,100%{opacity:0.25;transform:scaleX(1)} 50%{opacity:0.55;transform:scaleX(1.08)} }
 @keyframes headlightPulse{ 0%,100%{opacity:0.5;filter:blur(3px)} 50%{opacity:1;filter:blur(5px)} }
-@keyframes fabPulse  { 0%,100%{box-shadow:0 6px 28px var(--red-glow)} 50%{box-shadow:0 6px 48px rgba(232,0,13,0.6)} }
+@keyframes fabPulse  { 0%,100%{box-shadow:0 6px 28px var(--red-glow)} 50%{box-shadow:0 6px 48px rgba(31,138,61,0.6)} }
 @keyframes badgeBeat { 0%,100%{transform:scale(1)} 40%{transform:scale(1.25)} }
-@keyframes pillGlow  { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 10px rgba(232,0,13,0.4)} }
+@keyframes pillGlow  { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 10px rgba(31,138,61,0.4)} }
 @keyframes scanLine  { 0%{transform:translateY(-100%);opacity:0} 15%{opacity:0.4} 85%{opacity:0.4} 100%{transform:translateY(400%);opacity:0} }
 @keyframes slideInRight{ from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
 @keyframes dotPing   { 0%{transform:scale(1);opacity:1} 75%,100%{transform:scale(2.2);opacity:0} }
@@ -152,7 +152,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .tl-row { display:flex; gap:16px; margin-bottom:10px; }
 .tl-left { display:flex; flex-direction:column; align-items:center; padding-top:16px; width:14px; flex-shrink:0; }
 .tl-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
-.tl-dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(232,0,13,0.15)}
+.tl-dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(31,138,61,0.15)}
 .tl-dot.gray{background:#2c2c2e}
 .tl-line-v { width:1.5px; flex:1; background:var(--t3); margin-top:4px; }
 .tl-card { flex:1; background:var(--card); border-radius:18px; padding:14px 16px; border:1px solid var(--border); animation:fadeUp .4s ease both; }
@@ -169,7 +169,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .km-input-row { display:flex; gap:10px; margin-top:12px; }
 .km-input { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(48,209,88,0.3); border-radius:12px; padding:12px 14px; color:#fff; font-size:18px; font-weight:700; direction:ltr; text-align:center; font-family:inherit; outline:none; }
 .km-btn { background:var(--ok); border:none; border-radius:12px; padding:12px 18px; color:#000; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; }
-.fault-card { margin:12px 16px; background:var(--card); border-radius:18px; padding:16px; border:1px solid rgba(232,0,13,0.12); animation:fadeUp .4s ease .25s both; }
+.fault-card { margin:12px 16px; background:var(--card); border-radius:18px; padding:16px; border:1px solid rgba(31,138,61,0.12); animation:fadeUp .4s ease .25s both; }
 .fault-label { font-size:12px; color:var(--red); font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:10px; }
 .fault-textarea { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; padding:12px; color:var(--t2); font-size:13px; min-height:80px; font-family:inherit; resize:none; outline:none; }
 .fault-btn { margin-top:10px; width:100%; background:var(--red); border:none; border-radius:12px; padding:12px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; animation:fabPulse 2.5s ease-in-out infinite; }
@@ -184,7 +184,12 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 #splash-screen { position:fixed; inset:0; z-index:200; }
 #splash-screen.hidden { display:none !important; }
 .splash-dev-credit { position:absolute; bottom:18px; left:0; right:0; text-align:center; font-size:10px; letter-spacing:0.32em; color:rgba(255,255,255,0.28); font-family:'Outfit','Manrope',sans-serif; text-transform:uppercase; pointer-events:none; }
-.login-chrome { justify-content:flex-end !important; }
+.login-chrome .bottom { position:absolute !important; bottom:80px; left:28px; right:28px; }
+.signin-btn { border:1.5px solid rgba(31,138,61,0.6) !important; animation: signinGlow 2.5s ease-in-out infinite !important; }
+@keyframes signinGlow {
+  0%,100% { box-shadow:0 0 0 0 rgba(31,138,61,0); border-color:rgba(31,138,61,0.45); }
+  50%     { box-shadow:0 0 22px 6px rgba(31,138,61,0.28); border-color:rgba(31,138,61,1); }
+}
 
 /* ── Greeting overlay ── */
 #greeting { position:fixed; inset:0; background:#000; z-index:150; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
@@ -308,7 +313,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     <div id="cm-icon" style="font-size:38px;margin-bottom:12px;">👤</div>
     <div id="cm-title" style="font-size:18px;font-weight:700;color:#fff;margin-bottom:8px;letter-spacing:-0.3px;"></div>
     <div id="cm-sub" style="font-size:14px;color:#8A8A8E;margin-bottom:28px;line-height:1.5;"></div>
-    <button id="cm-confirm" style="width:100%;background:#E8000D;border:none;border-radius:14px;padding:15px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;letter-spacing:-0.2px;"></button>
+    <button id="cm-confirm" style="width:100%;background:#1F8A3D;border:none;border-radius:14px;padding:15px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;letter-spacing:-0.2px;"></button>
     <button id="cm-cancel" onclick="closeConfirmModal()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:15px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:-0.2px;">ביטול</button>
   </div>
 </div>
@@ -364,11 +369,11 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
       <div class="sec">לשירותך</div>
       <div class="qa">
         <div class="qa-card" onclick="APP.nav('service')">
-          <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-gauge" color="#E8000D"/></svg></div>
+          <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-gauge" color="#1F8A3D"/></svg></div>
           <div class="qa-lbl">עדכון<br>ק"מ</div>
         </div>
         <div class="qa-card" onclick="APP.nav('service');setTimeout(()=>document.getElementById('fault-section').scrollIntoView({behavior:'smooth'}),100)">
-          <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-tool" color="#E8000D"/></svg></div>
+          <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-tool" color="#1F8A3D"/></svg></div>
           <div class="qa-lbl">דיווח<br>תקלה</div>
         </div>
       </div>
