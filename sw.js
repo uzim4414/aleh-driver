@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aleh-driver-v16';
+const CACHE_NAME = 'aleh-driver-v17';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -33,9 +33,8 @@ self.addEventListener('fetch', e => {
   const isAppFile = url.endsWith('/') || url.includes('index.html') || url.includes('app.js') || url.includes('manifest.json');
   if (isAppFile) {
     e.respondWith(
-      fetch(e.request)
+      fetch(new Request(e.request.url, { cache: 'no-cache' }))
         .then(resp => {
-          /* שמור גרסה טרייה בcache */
           const clone = resp.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
           return resp;
