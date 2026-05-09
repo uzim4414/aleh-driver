@@ -183,6 +183,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 
 #splash-screen { position:fixed; inset:0; z-index:200; }
 #splash-screen.hidden { display:none !important; }
+.splash-dev-credit { position:absolute; bottom:18px; left:0; right:0; text-align:center; font-size:10px; letter-spacing:0.32em; color:rgba(255,255,255,0.28); font-family:'Outfit','Manrope',sans-serif; text-transform:uppercase; pointer-events:none; }
 
 /* ── Greeting overlay ── */
 #greeting { position:fixed; inset:0; background:#000; z-index:150; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
@@ -280,17 +281,13 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   <div class="stage">
     <div id="splash-react-root"></div>
     <div class="login-chrome">
-      <div class="top">
-        <span>FLEET MANAGER</span>
-        <span>V2</span>
-      </div>
       <div class="bottom">
         <button class="signin-btn" id="login-btn">כניסה עם Google</button>
-        <span class="login-hint">לנהגי עמותת עלה בלבד</span>
         <div class="login-err hidden" id="login-err"></div>
       </div>
     </div>
   </div>
+  <div class="splash-dev-credit">Developed by Uzi Mosh &nbsp;·&nbsp; v2.0</div>
 </div>
 
 <div id="greeting" class="hidden">
@@ -494,15 +491,9 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 <script type="text/babel" src="splash-logo.jsx"></script>
 <script type="text/babel">
 (function() {
-  const { useState, useEffect } = React;
   function SplashApp() {
-    const [replay, setReplay] = useState(0);
-    useEffect(() => {
-      const id = setInterval(() => setReplay(n => n + 1), 14000);
-      return () => clearInterval(id);
-    }, []);
     const Logo = window.SplashLogo;
-    return <Logo accent="#1F8A3D" font="jakarta" scale={0.9} replay={replay}
+    return <Logo accent="#1F8A3D" font="jakarta" scale={0.9} replay={0}
       taglineLines={['עלה עזר לילד המיוחד', 'נוהגים נכון']} />;
   }
   const screen = document.getElementById('splash-screen');
