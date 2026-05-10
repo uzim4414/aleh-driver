@@ -1378,6 +1378,11 @@ function hideGreeting() {
 
 /* ══ Boot ══ */
 document.addEventListener('DOMContentLoaded', async function() {
+  /* פתח נעילת orientation — עוקף manifest ישן ומאפשר סיבוב */
+  try {
+    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+  } catch(e) {}
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(function(reg) {
       /* בדוק עדכון בכל טעינה */
