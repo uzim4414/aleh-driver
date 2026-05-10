@@ -531,26 +531,28 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     </div>
   </div>
 
-  <!-- HOME -->
-  <div class="screen active" id="screen-home">
-    <div class="topbar">
-      <div style="display:flex;gap:8px">
-        <div class="tb-btn" onclick="APP.nav('alerts')">
-          <svg width="20" height="20"><use href="#ic-bell" color="#fff"/></svg>
-          <div class="tb-badge hidden" id="alert-badge">0</div>
-        </div>
-      </div>
-      <div class="tb-logo">עלה</div>
-      <div class="tb-user">
-        <div>
-          <div class="tb-greet-hi">שלום,</div>
-          <div class="tb-greet-name" id="user-name">—</div>
-        </div>
-        <div class="tb-avatar" id="user-avatar" onclick="logout()" style="cursor:pointer" title="התנתק">
-          <span id="user-initials" style="font-size:14px;font-weight:700;color:#8A8A8E;letter-spacing:-0.5px"></span>
-        </div>
+  <!-- ── Global Top Bar (always visible) ── -->
+  <div class="topbar" id="global-topbar">
+    <div style="display:flex;gap:8px">
+      <div class="tb-btn" onclick="APP.nav('alerts')">
+        <svg width="20" height="20"><use href="#ic-bell" color="#fff"/></svg>
+        <div class="tb-badge hidden" id="alert-badge">0</div>
       </div>
     </div>
+    <div class="tb-logo">עלה</div>
+    <div class="tb-user">
+      <div>
+        <div class="tb-greet-hi">שלום,</div>
+        <div class="tb-greet-name" id="user-name">—</div>
+      </div>
+      <div class="tb-avatar" id="user-avatar" onclick="logout()" style="cursor:pointer" title="התנתק">
+        <span id="user-initials" style="font-size:14px;font-weight:700;color:#8A8A8E;letter-spacing:-0.5px"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <div class="screen active" id="screen-home">
     <div class="content">
       <div class="hero-card">
         <div class="hero-img-area">
