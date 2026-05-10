@@ -444,124 +444,97 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .fm-close-btn:active { background:rgba(255,255,255,0.1); }
 
 /* ══════════════════════════════════════════════════════════════
-   LANDSCAPE — מסכי רכב רוחביים
+   LANDSCAPE — מסכי רכב רוחביים (CSS Grid)
 ══════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
 
-  /* ── App shell: topbar full-width + (sidebar | content) ── */
+  /* ── Grid: topbar שורה ראשונה, nav + תוכן שורה שנייה ── */
   #app {
     max-width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: stretch;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 66px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "nav    content";
   }
 
-  /* ── Topbar: full width, compact height ── */
   #global-topbar {
-    width: 100%;
-    order: 0;
+    grid-area: topbar;
     padding: 5px 16px 6px;
-    flex-shrink: 0;
   }
+
+  .bnav {
+    grid-area: nav;
+    flex-direction: column;
+    width: auto;
+    margin: 6px 0 6px 6px;
+    border-radius: 18px;
+    justify-content: center;
+    padding: 8px 4px;
+    gap: 2px;
+    align-self: stretch;
+  }
+
+  /* כל screen נכנס לאזור content */
+  .screen         { grid-area: content; display: none; }
+  .screen.active  { display: flex; flex-direction: column; overflow: hidden; }
+
+  /* FAB בתוך אזור ה-content */
+  .fab { left: 80px; bottom: 14px; }
+
+  /* ── Nav items ── */
+  .bn-item        { flex: 0 0 auto; padding: 9px 4px; border-radius: 13px; }
+  .bn-item.active { flex-direction: column; flex: 0 0 auto; padding: 9px 4px; gap: 3px; }
+  .bn-lbl         { font-size: 8px; }
+  .bn-item.active .bn-lbl { font-size: 8.5px; }
+
+  /* ── Topbar compact ── */
   .tb-logo-name { font-size: 11px; }
-  .tb-logo-sub  { font-size: 6.5px; }
+  .tb-logo-sub  { font-size: 6px; }
   .tb-btn, .tb-avatar { width: 34px; height: 34px; border-radius: 10px; }
   .tb-greet-hi   { font-size: 10px; }
   .tb-greet-name { font-size: 12px; }
 
-  /* ── Bottom nav → Left sidebar ── */
-  .bnav {
-    order: 1;
-    flex-direction: column;
-    flex: 0 0 64px;
-    width: 64px;
-    margin: 6px 0 6px 8px;
-    border-radius: 20px;
-    justify-content: center;
-    align-self: stretch;
-    padding: 8px 4px;
-    gap: 2px;
-  }
-  .bn-item {
-    flex: 0 0 auto;
-    padding: 10px 4px;
-    border-radius: 14px;
-  }
-  .bn-item.active {
-    flex-direction: column;
-    flex: 0 0 auto;
-    padding: 10px 4px;
-    gap: 3px;
-  }
-  .bn-lbl { font-size: 8px; }
-  .bn-item.active .bn-lbl { font-size: 9px; }
-
-  /* ── Screens: fill remaining space ── */
-  .screen.active {
-    order: 2;
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  /* ── FAB: reposition for sidebar ── */
-  .fab { left: 80px; bottom: 16px; }
-
-  /* ── phead: compact ── */
+  /* ── phead compact ── */
   .phead { padding: 6px 16px 8px; }
   .ph-title { font-size: 15px; }
 
-  /* ── Hero card: horizontal layout ── */
-  .hero-card { margin: 8px 12px; display: flex; flex-direction: row; min-height: 0; }
-  .hero-img-area { width: 40%; min-height: 120px; flex-shrink: 0; padding-top: 8px; }
-  .hero-body { flex: 1; padding: 12px 16px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto; }
-  .hero-name { font-size: 17px; }
-  .hero-plate { font-size: 16px; padding: 5px 14px; }
-  .hero-btns { margin-top: 8px; }
-  .hero-btn { font-size: 12px; padding: 8px 0; }
+  /* ── Hero card: אופקי ── */
+  .hero-card     { margin: 8px 10px; display: flex; flex-direction: row; min-height: 0; }
+  .hero-img-area { width: 38%; min-height: 110px; flex-shrink: 0; padding-top: 8px; }
+  .hero-body     { flex: 1; padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto; }
+  .hero-name     { font-size: 16px; }
+  .hero-plate    { font-size: 15px; padding: 4px 12px; }
+  .hero-btns     { margin-top: 8px; }
+  .hero-btn      { font-size: 11px; padding: 7px 0; }
 
-  /* ── Home content: no long spacer ── */
-  .content > div[style*="height:120px"] { height: 20px !important; }
-  .sec { padding: 10px 16px 6px; font-size: 15px; }
-  .qa { gap: 8px; padding: 0 12px; }
-  .qa-card { padding: 10px 8px 8px; border-radius: 14px; }
-  .qa-icon-box { width: 36px; height: 36px; border-radius: 10px; }
-  .qa-lbl { font-size: 10px; }
+  /* ── תוכן בית ── */
+  .sec { padding: 8px 14px 6px; font-size: 14px; }
+  .qa  { gap: 8px; padding: 0 10px; }
+  .qa-card    { padding: 10px 8px 8px; border-radius: 14px; }
+  .qa-icon-box{ width: 36px; height: 36px; border-radius: 10px; }
+  .qa-lbl     { font-size: 10px; }
 
-  /* ── Fuel modal: centered, not full bottom sheet ── */
+  /* ── Fuel modal: מרכזי ── */
   .fuel-modal { align-items: center; }
-  .fm-sheet {
-    max-width: min(600px, 90vw);
-    max-height: 90vh;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-  @keyframes modalRise { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }
-
-  /* ── Fuel chart: shorter bars ── */
-  .fm-chart { height: 70px; }
-
-  /* ── Tiles: 4-column on wide screens ── */
-  .fm-tiles { grid-template-columns: repeat(4, 1fr); }
-
-  /* ── Service/history screens: two columns ── */
-  #screen-service .content > * { max-width: 500px; margin-left: auto; margin-right: auto; }
-
+  .fm-sheet   { max-width: min(580px, 88vw); max-height: 88vh; border-radius: 20px; }
+  @keyframes modalRise { from{opacity:0;transform:scale(0.93)} to{opacity:1;transform:scale(1)} }
+  .fm-chart   { height: 68px; }
+  .fm-tiles   { grid-template-columns: repeat(4,1fr); }
 }
 
-/* ── Landscape + truly narrow height (car dashboards 480px tall) ── */
-@media (orientation: landscape) and (max-height: 520px) {
+/* ── מסכים קטנים מאוד (לוחות רכב 480px גובה) ── */
+@media (orientation: landscape) and (max-height: 500px) {
   .tb-logo-sub { display: none; }
-  #global-topbar { padding: 3px 14px 4px; }
-  .hero-img-area { min-height: 90px; }
-  .bnav { flex: 0 0 54px; width: 54px; }
+  #global-topbar { padding: 3px 12px 4px; }
+  #app { grid-template-columns: 54px 1fr; }
+  .bnav { margin: 4px 0 4px 4px; padding: 6px 3px; }
   .bn-lbl { display: none; }
-  .bn-item.active .bn-lbl { display: block; font-size: 8px; }
-  .fm-chart { height: 55px; }
-  .fm-tile-val { font-size: 16px; }
-  .phead { padding: 4px 14px 6px; }
-  .ph-title { font-size: 14px; }
+  .bn-item.active .bn-lbl { display: block; font-size: 7.5px; }
+  .hero-img-area { min-height: 80px; }
+  .fm-chart  { height: 50px; }
+  .fm-tile-val { font-size: 15px; }
 }
 </style>
 </head>
