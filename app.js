@@ -474,6 +474,7 @@ function renderFuelWidget() {
 
   var monthLabel = _heMonthLabel(fd.monthKey) + ' ' + (fd.monthKey + '').slice(0, 4);
 
+  // hero: savings or overage in ₪
   var nis = fd.savingsNIS || 0;
   var heroHtml;
   if (nis > 0) {
@@ -484,13 +485,16 @@ function renderFuelWidget() {
     heroHtml = '<span class="fw-hero-amt" style="color:var(--t2)">ביצוע תקין</span>';
   }
 
+  // trend arrow vs previous month
   var trendArrow = '';
   var trendColor = 'var(--t2)';
   if (fd.months && fd.months.length >= 2) {
     var curIdx = fd.months.length - 1;
     for (var i = 0; i < fd.months.length; i++) { if (fd.months[i].key === fd.monthKey) { curIdx = i; break; } }
     var prevIdx = curIdx - 1;
-    if (prevIdx >= 0) {
+    // find previous month that also has data
+    while (prevIdx >= 0 && fd.months[prevIdx].liters === 0) prevIdx--;
+    if (prevIdx >= 0 && fd.months[prevIdx].l100 > 0) {
       var diff = fd.months[prevIdx].l100 - fd.months[curIdx].l100;
       if (diff > 0.3)       { trendArrow = '↑'; trendColor = 'var(--fuel-excellent)'; }
       else if (diff < -0.3) { trendArrow = '↓'; trendColor = 'var(--fuel-over)'; }
@@ -498,7 +502,10 @@ function renderFuelWidget() {
     }
   }
 
-  var kmStr = fd.kmThisMonth ? fd.kmThisMonth.toLocaleString('he') + ' ק"מ' : '';
+  // progress bar: actual / standard ratio (lower = better)
+  var std = fd.standardL100 || 10;
+  var act = fd.actualL100   || std;
+  var barPct = Math.max(4, Math.min(100, Math.round((act / std) * 100)));
 
   mount.innerHTML =
     '<div class="fuel-widget" onclick="openFuelModal()" role="button" tabindex="0" aria-label="ביצועי דלק">' +
@@ -510,7 +517,14 @@ function renderFuelWidget() {
         heroHtml +
         (trendArrow ? '<span class="fw-trend" style="color:' + trendColor + '">' + trendArrow + '</span>' : '') +
       '</div>' +
-      (kmStr ? '<div class="fw-sub">לעמותה · ' + kmStr + '</div>' : '<div class="fw-sub">לעמותה</div>') +
+      '<div class="fw-sub">לעמותה' + (fd.kmThisMonth ? ' · ' + fd.kmThisMonth.toLocaleString('he') + ' ק"מ' : '') + '</div>' +
+      '<div class="fw-bar-bg">' +
+        '<div class="fw-bar-fill" style="background:' + c + ';--fw-bar-w:' + barPct + '%"></div>' +
+      '</div>' +
+      '<div class="fw-bar-labels">' +
+        '<span>בפועל: ' + act + ' ל/100</span>' +
+        '<span>תקן: ' + std + ' ל/100</span>' +
+      '</div>' +
       '<div class="fw-cta">לפרטים נוספים ›</div>' +
     '</div>';
 }
