@@ -233,11 +233,10 @@ html, body {
    LANDSCAPE — מסך התחברות רוחבי
 ══════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
-  /* לוגו קטן יותר שמתאים לגובה המופחת */
+  /* לוגו מוקטן — !important כדי לנצח את ה-inline style של React */
   .splash-logo {
-    --logo-scale: 0.55;
-    width:  min(calc(500px * var(--logo-scale)), calc(100vw - 60px));
-    height: min(calc(600px * var(--logo-scale)), calc(100vh - 80px));
+    width:  min(220px, calc(50vw)) !important;
+    height: min(220px, calc(100vh - 140px)) !important;
   }
 
   /* רקע מותאם לפורמט רוחבי */

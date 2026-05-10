@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&family=Outfit:wght@200;300;400;500;600;700&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700&family=Manrope:wght@200;300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="splash.css?v=20">
+<link rel="stylesheet" href="splash.css?v=21">
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -548,8 +548,8 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     opacity: 0 !important;
     display: none !important;
   }
-  .car-wrap { padding: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
-  .car-img  { max-height: 34vh; width: auto; max-width: 100%; object-fit: contain; }
+  .car-wrap { padding: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .car-img  { height: 30vh; width: auto; max-width: 90%; object-fit: contain; }
   .car-glow { width: 55%; bottom: 4px; height: 14px; }
   .hl-glow  { top: 25%; }
   .hero-body {
@@ -671,7 +671,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 
   /* ── FAB: מרחף מעל ה-bnav ── */
   .fab {
-    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
     left: 18px;
     right: auto;
     padding: 10px 16px;
@@ -760,9 +760,9 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .bn-item.active .bn-lbl { font-size: 8px; }
   .bn-ic   { width: 16px; height: 16px; }
 
-  /* FAB מעל ה-bnav — גובה bnav ~46px + margin ~4px = bottom: 52px */
+  /* FAB מעל ה-bnav — bnav top ~49px מהתחתית, gap 14px = 63px */
   .fab {
-    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(63px + env(safe-area-inset-bottom, 0px));
     left: 14px;
     right: auto;
     padding: 8px 14px;
@@ -797,8 +797,8 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     opacity: 0 !important;
     display: none !important;
   }
-  .car-wrap { width: 100%; display: flex; align-items: center; justify-content: center; }
-  .car-img  { max-height: 130px; width: auto; max-width: 100%; object-fit: contain; }
+  .car-wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .car-img  { height: 120px; width: auto; max-width: 90%; object-fit: contain; }
   .hero-body { padding: 6px 12px 8px; align-items: center; }
   .hero-name    { font-size: 14px; text-align: center; }
   .hero-plate   { font-size: 13px; padding: 4px 11px; }
