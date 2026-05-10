@@ -470,65 +470,62 @@ function renderFuelWidget() {
   var fd = STATE.fuelData;
   if (!fd || !fd.hasData) { mount.innerHTML = ''; return; }
 
-  var colorMap = {excellent:'var(--fuel-excellent)',good:'var(--fuel-good)',warn:'var(--fuel-warn)',over:'var(--fuel-over)'};
-  var c = colorMap[fd.status] || 'var(--fuel-nodata)';
+  // find last month with actual data
+  var months = fd.months || [];
+  var cur = null, curIdx = -1;
+  for (var i = months.length - 1; i >= 0; i--) {
+    if (months[i].liters > 0) { cur = months[i]; curIdx = i; break; }
+  }
+  if (!cur) { mount.innerHTML = ''; return; }
 
-  var monthLabel = _heMonthLabel(fd.monthKey) + ' ' + (fd.monthKey + '').slice(0, 4);
-
-  // hero: savings or overage in ₪
-  var nis = fd.savingsNIS || 0;
-  var heroHtml;
-  if (nis > 0) {
-    heroHtml = '<span class="fw-hero-amt fw-savings">חסכת ' + nis.toLocaleString('he') + '₪</span>';
-  } else if (nis < 0) {
-    heroHtml = '<span class="fw-hero-amt fw-over">חריגה ' + Math.abs(nis).toLocaleString('he') + '₪</span>';
-  } else {
-    heroHtml = '<span class="fw-hero-amt" style="color:var(--t2)">ביצוע תקין</span>';
+  // find previous month with data
+  var prev = null;
+  for (var j = curIdx - 1; j >= 0; j--) {
+    if (months[j].liters > 0) { prev = months[j]; break; }
   }
 
-  // trend arrow vs previous month
-  var trendArrow = '';
-  var trendColor = 'var(--t2)';
-  if (fd.months && fd.months.length >= 2) {
-    var curIdx = fd.months.length - 1;
-    for (var i = 0; i < fd.months.length; i++) { if (fd.months[i].key === fd.monthKey) { curIdx = i; break; } }
-    var prevIdx = curIdx - 1;
-    // find previous month that also has data
-    while (prevIdx >= 0 && fd.months[prevIdx].liters === 0) prevIdx--;
-    if (prevIdx >= 0 && fd.months[prevIdx].l100 > 0) {
-      var diff = fd.months[prevIdx].l100 - fd.months[curIdx].l100;
-      if (diff > 0.3)       { trendArrow = '↑'; trendColor = 'var(--fuel-excellent)'; }
-      else if (diff < -0.3) { trendArrow = '↓'; trendColor = 'var(--fuel-over)'; }
-      else                  { trendArrow = '→'; trendColor = 'var(--t2)'; }
-    }
+  // average liters across all months with data
+  var avgLiters = 0, cnt = 0;
+  for (var k = 0; k < months.length; k++) {
+    if (months[k].liters > 0) { avgLiters += months[k].liters; cnt++; }
+  }
+  if (cnt > 0) avgLiters = Math.round(avgLiters / cnt * 10) / 10;
+
+  // trend vs previous month (fewer liters = better)
+  var trendArrow = '', trendColor = 'var(--t2)';
+  var badgeClass = 'fw-badge-good', badgeIcon = '⭐';
+  if (prev && prev.liters > 0) {
+    var pct = (cur.liters - prev.liters) / prev.liters;
+    if      (pct < -0.05) { trendArrow = '↓'; trendColor = 'var(--fuel-excellent)'; badgeClass = 'fw-badge-excellent'; badgeIcon = '🏆'; }
+    else if (pct >  0.10) { trendArrow = '↑'; trendColor = 'var(--fuel-over)';      badgeClass = 'fw-badge-over';      badgeIcon = '🚨'; }
+    else if (pct >  0.05) { trendArrow = '↑'; trendColor = 'var(--fuel-warn)';      badgeClass = 'fw-badge-warn';      badgeIcon = '⚡'; }
+    else                  { trendArrow = '→'; trendColor = 'var(--t2)'; }
   }
 
-  // progress bar: actual / standard ratio (lower = better)
-  var std = fd.standardL100 || 10;
-  var act = fd.actualL100   || std;
-  var barPct = Math.max(4, Math.min(100, Math.round((act / std) * 100)));
+  // bar: cur liters vs average (100% = average)
+  var barPct = avgLiters > 0 ? Math.max(4, Math.min(100, Math.round((cur.liters / avgLiters) * 100))) : 50;
+  var barColor = barPct > 110 ? 'var(--fuel-over)' : barPct > 105 ? 'var(--fuel-warn)' : 'var(--fuel-excellent)';
+
+  var monthLabel = _heMonthLabel(cur.key) + ' ' + (cur.key + '').slice(0, 4);
 
   mount.innerHTML =
     '<div class="fuel-widget" onclick="openFuelModal()" role="button" tabindex="0" aria-label="ביצועי דלק">' +
       '<div class="fw-hdr">' +
         '<div class="fw-label">ביצועי דלק · ' + monthLabel + '</div>' +
-        '<div class="fw-pill" style="background:' + c + '1a;color:' + c + '">' + fd.statusLabel + '</div>' +
+        '<div class="fw-pill" style="background:' + barColor + '1a;color:' + barColor + '">' + cur.liters + ' ל׳</div>' +
       '</div>' +
       '<div class="fw-hero-row">' +
-        (fd.status === 'excellent' ? '<span class="fw-badge fw-badge-excellent">🏆</span>' :
-         fd.status === 'good'      ? '<span class="fw-badge fw-badge-good">⭐</span>' :
-         fd.status === 'warn'      ? '<span class="fw-badge fw-badge-warn">⚡</span>' :
-                                     '<span class="fw-badge fw-badge-over">🚨</span>') +
-        heroHtml +
+        '<span class="fw-badge ' + badgeClass + '">' + badgeIcon + '</span>' +
+        '<span class="fw-hero-amt">₪' + (cur.cost ? cur.cost.toLocaleString('he') : '—') + '</span>' +
         (trendArrow ? '<span class="fw-trend" style="color:' + trendColor + '">' + trendArrow + '</span>' : '') +
       '</div>' +
-      '<div class="fw-sub">לעמותה' + (fd.kmThisMonth ? ' · ' + fd.kmThisMonth.toLocaleString('he') + ' ק"מ' : '') + '</div>' +
+      '<div class="fw-sub">לעמותה' + (cur.km ? ' · ' + cur.km.toLocaleString('he') + ' ק"מ' : '') + '</div>' +
       '<div class="fw-bar-bg">' +
-        '<div class="fw-bar-fill" style="background:' + c + ';--fw-bar-w:' + barPct + '%"></div>' +
+        '<div class="fw-bar-fill" style="background:' + barColor + ';--fw-bar-w:' + barPct + '%"></div>' +
       '</div>' +
       '<div class="fw-bar-labels">' +
-        '<span>בפועל: ' + act + ' ל/100</span>' +
-        '<span>תקן: ' + std + ' ל/100</span>' +
+        '<span>חודש זה: ' + cur.liters + ' ל׳</span>' +
+        '<span>ממוצע: ' + (avgLiters > 0 ? avgLiters : '—') + ' ל׳</span>' +
       '</div>' +
       '<div class="fw-cta">לפרטים נוספים ›</div>' +
     '</div>';
