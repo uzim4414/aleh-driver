@@ -515,6 +515,10 @@ function renderFuelWidget() {
         '<div class="fw-pill" style="background:' + c + '1a;color:' + c + '">' + fd.statusLabel + '</div>' +
       '</div>' +
       '<div class="fw-hero-row">' +
+        (fd.status === 'excellent' ? '<span class="fw-badge fw-badge-excellent">🏆</span>' :
+         fd.status === 'good'      ? '<span class="fw-badge fw-badge-good">⭐</span>' :
+         fd.status === 'warn'      ? '<span class="fw-badge fw-badge-warn">⚡</span>' :
+                                     '<span class="fw-badge fw-badge-over">🚨</span>') +
         heroHtml +
         (trendArrow ? '<span class="fw-trend" style="color:' + trendColor + '">' + trendArrow + '</span>' : '') +
       '</div>' +
@@ -701,31 +705,41 @@ function renderFuelModal() {
       '</div>' +
     '</div>';
 
-  // Stations section
+  // Stations section — creative card design
   var stationsHtml = '';
   var stations = fd.stations || [];
   if (stations.length > 0) {
     var maxStL = stations[0].liters || 1;
-    var stRows = '';
+    var rankClass = ['r1','r2','r3'];
+    var stCards = '';
     for (var si = 0; si < stations.length; si++) {
-      var st = stations[si];
+      var st    = stations[si];
       var stPct = Math.round((st.liters / maxStL) * 100);
-      stRows +=
-        '<div class="fm-station-row">' +
-          '<div class="fm-station-name">' + st.name + '</div>' +
-          '<div class="fm-station-bar-wrap">' +
-            '<div class="fm-station-bar" style="--st-w:' + stPct + '%"></div>' +
+      var rc    = si < 3 ? rankClass[si] : 'rn';
+      var delay = (si * 0.1).toFixed(1) + 's';
+      stCards +=
+        '<div class="fm-station-card" style="animation-delay:' + delay + '">' +
+          '<div class="fm-station-rank ' + rc + '">' + (si + 1) + '</div>' +
+          '<div class="fm-station-body">' +
+            '<div class="fm-station-name">' + st.name + '</div>' +
+            '<div class="fm-station-bar-bg">' +
+              '<div class="fm-station-bar" style="--st-w:' + stPct + '%;animation-delay:' + delay + '"></div>' +
+            '</div>' +
+            '<div class="fm-station-meta">' +
+              '<span>' + st.liters + ' ל׳</span>' +
+              '<span>' + st.fills + ' תדלוקים</span>' +
+            '</div>' +
           '</div>' +
-          '<div class="fm-station-stats">' +
-            '<span>' + st.liters + ' ל׳</span>' +
-            '<span>' + (st.pricePerL ? st.pricePerL.toFixed(2) + ' ₪/ל' : '') + '</span>' +
+          '<div class="fm-station-right">' +
+            '<div class="fm-station-cost">' + st.cost.toLocaleString('he') + '₪</div>' +
+            (st.pricePerL ? '<div class="fm-station-ppl">' + st.pricePerL.toFixed(2) + ' ₪/ל׳</div>' : '') +
           '</div>' +
         '</div>';
     }
     stationsHtml =
       '<div class="fm-section">' +
-        '<div class="fm-sec-title">תחנות דלק</div>' +
-        '<div class="fm-stations">' + stRows + '</div>' +
+        '<div class="fm-sec-title">תחנות דלק מובילות</div>' +
+        '<div class="fm-stations">' + stCards + '</div>' +
       '</div>';
   }
 
@@ -741,6 +755,14 @@ function renderFuelModal() {
     }
   }
   var annSaveColor = annSave >= 0 ? 'var(--fuel-excellent)' : 'var(--fuel-over)';
+  // פירוט עלות לפי חודש לשקיפות
+  var costBreakdown = '';
+  for (var cb = 0; cb < months.length; cb++) {
+    if (months[cb].cost > 0) {
+      costBreakdown += '<span style="color:var(--t2);font-size:10px">' + months[cb].label + ' ' + months[cb].cost.toLocaleString('he') + '₪</span>';
+      if (cb < months.length - 1) costBreakdown += '<span style="color:var(--t2);font-size:10px"> · </span>';
+    }
+  }
   var annualHtml =
     '<div class="fm-section">' +
       '<div class="fm-sec-title">סיכום 6 חודשים</div>' +
@@ -750,6 +772,7 @@ function renderFuelModal() {
         '<div class="fm-annual-item"><div class="fm-annual-val">' + Math.round(annCost).toLocaleString('he') + '₪</div><div class="fm-annual-lbl">עלות</div></div>' +
         '<div class="fm-annual-item" style="color:' + annSaveColor + '"><div class="fm-annual-val">' + (annSave > 0 ? '+' : '') + Math.round(annSave).toLocaleString('he') + '₪</div><div class="fm-annual-lbl">חיסכון</div></div>' +
       '</div>' +
+      (costBreakdown ? '<div style="margin-top:8px;line-height:1.8;direction:rtl">' + costBreakdown + '</div>' : '') +
     '</div>';
 
   content.innerHTML = heroHtml + savingsHtml + insightHtml + chartHtml + tilesHtml + stationsHtml + annualHtml +
