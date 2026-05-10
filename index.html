@@ -521,7 +521,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tabs { padding: 0 14px; }
   .tab  { padding: 9px 12px; font-size: 12px; }
 
-  /* ── Hero card: עמודה אחת, רוחב מלא, תמונה גדולה ── */
+  /* ── Hero card: עמודה אחת, רוחב מלא ── */
   .hero-card {
     margin: 6px 10px;
     align-self: stretch;
@@ -532,73 +532,73 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   }
   .hero-img-area {
     width: 100% !important;
-    height: 38vh;
-    min-height: 130px;
-    max-height: 42vh;
+    height: 25vh;
+    min-height: 140px;
+    max-height: 200px;
     flex-shrink: 0;
-    padding-top: 8px;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  /* ביטול מוחלט של הפס הרץ */
   .hero-img-area::before {
     animation: none !important;
     opacity: 0 !important;
     display: none !important;
   }
   .car-wrap { padding: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-  .car-img  { height: 30vh; width: auto; max-width: 90%; object-fit: contain; }
+  .car-img  { height: 22vh; max-height: 180px; width: auto; max-width: 90%; object-fit: contain; }
   .car-glow { width: 55%; bottom: 4px; height: 14px; }
-  .hl-glow  { top: 25%; }
+  .hl-glow  { display: none; }
   .hero-body {
-    padding: 8px 16px 10px;
+    padding: 10px 18px 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     min-width: 0;
     width: 100%;
   }
-  .hero-name      { font-size: 16px; text-align: center; }
-  .hero-plate-wrap{ text-align: center; margin-top: 6px; }
-  .hero-plate     { font-size: 15px; padding: 4px 14px; letter-spacing: 3px; border-width: 2px; }
-  .hero-btns      { margin-top: 8px; gap: 8px; width: 100%; }
-  .hero-btn       { font-size: 11px; padding: 7px 0; }
+  .hero-name      { font-size: clamp(18px, 2vw, 28px); text-align: center; font-weight: 700; }
+  .hero-plate-wrap{ text-align: center; margin-top: 8px; }
+  .hero-plate     { font-size: clamp(16px, 1.8vw, 24px); padding: 6px 20px; letter-spacing: 3px; border-width: 2px; }
+  .hero-btns      { margin-top: 10px; gap: 10px; width: 100%; }
+  .hero-btn       { font-size: 13px; padding: 14px 0; }
   .hero-alert     { padding: 8px 12px; margin-top: 8px; width: 100%; }
-  .ha-title       { font-size: 12px; }
-  .ha-sub         { font-size: 10px; }
+  .ha-title       { font-size: 13px; }
+  .ha-sub         { font-size: 11px; }
 
-  /* ── Quick actions: רוחב מלא ── */
+  /* ── Quick actions ── */
   .sec { padding: 10px 14px 6px; font-size: 14px; }
   .qa  { gap: 8px; padding: 0 12px; grid-template-columns: 1fr 1fr 1fr; width: 100%; }
   .qa-card    { padding: 10px 6px 8px; border-radius: 14px; gap: 6px; }
   .qa-icon-box{ width: 36px; height: 36px; border-radius: 10px; }
   .qa-lbl     { font-size: 10px; }
 
-  /* ── Service progress + fuel widget: רוחב מלא ── */
-  .svc-card    { margin: 8px 10px 0; align-self: stretch; padding: 12px 14px 14px; border-radius: 16px; }
+  /* ── Widgets: mount points + cards רוחב מלא ── */
+  #svc-progress-mount,
+  #fuel-widget-mount { width: 100%; }
+  .svc-card    { margin: 8px 0 0; width: 100%; box-sizing: border-box; padding: 14px 16px 16px; border-radius: 16px; }
   .svc-hdr     { margin-bottom: 10px; }
   .svc-icn     { width: 28px; height: 28px; border-radius: 9px; }
-  .svc-title   { font-size: 12px; }
-  .svc-pill    { font-size: 9.5px; padding: 3px 8px; }
-  .svc-stat-lbl{ font-size: 9px; }
-  .svc-stat-val{ font-size: 14px; }
-  .svc-stat-val .unit { font-size: 9px; }
+  .svc-title   { font-size: 13px; }
+  .svc-pill    { font-size: 10px; padding: 3px 8px; }
+  .svc-stat-lbl{ font-size: 10px; }
+  .svc-stat-val{ font-size: 16px; }
+  .svc-stat-val .unit { font-size: 10px; }
   .svc-bar-bg  { height: 9px; }
   .svc-bar-wrap.with-marker { padding-bottom: 32px; }
-  .svc-foot-txt{ font-size: 10.5px; }
-  .svc-foot-val{ font-size: 11px; }
+  .svc-foot-txt{ font-size: 11px; }
+  .svc-foot-val{ font-size: 12px; }
 
-  .fuel-widget { margin: 8px 10px 0; align-self: stretch; padding: 12px 14px 12px; border-radius: 16px; }
-  .fw-label    { font-size: 11px; }
-  .fw-pill     { font-size: 10px; padding: 3px 8px; }
-  .fw-badge    { font-size: 22px; }
-  .fw-headline { font-size: 13px; }
-  .fw-sub      { font-size: 10px; margin-bottom: 8px; }
-  .fw-bar-bg   { height: 5px; }
-  .fw-bar-labels { font-size: 9.5px; }
-  .fw-cta      { font-size: 10px; padding-top: 6px; }
+  .fuel-widget { margin: 8px 0 0; width: 100%; box-sizing: border-box; padding: 14px 16px 14px; border-radius: 16px; }
+  .fw-label    { font-size: 12px; }
+  .fw-pill     { font-size: 11px; padding: 3px 8px; }
+  .fw-badge    { font-size: 26px; }
+  .fw-headline { font-size: 15px; }
+  .fw-sub      { font-size: 11px; margin-bottom: 8px; }
+  .fw-bar-bg   { height: 6px; }
+  .fw-bar-labels { font-size: 10px; }
+  .fw-cta      { font-size: 11px; padding-top: 6px; }
 
   /* ── Info grid (vehicle screen) — 4 עמודות ── */
   .igrid { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 14px; }
