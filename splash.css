@@ -228,3 +228,49 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01s !important; animation-delay: 0s !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   LANDSCAPE — מסך התחברות רוחבי
+══════════════════════════════════════════════════════════════ */
+@media (orientation: landscape) {
+  /* לוגו קטן יותר שמתאים לגובה המופחת */
+  .splash-logo {
+    --logo-scale: 0.55;
+    width:  min(calc(500px * var(--logo-scale)), calc(100vw - 60px));
+    height: min(calc(600px * var(--logo-scale)), calc(100vh - 80px));
+  }
+
+  /* רקע מותאם לפורמט רוחבי */
+  .stage {
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 55%),
+      radial-gradient(ellipse at 70% 85%, rgba(255,45,45,0.05) 0%, rgba(0,0,0,0) 50%),
+      #000;
+  }
+
+  /* chrome עליון: קומפקטי */
+  .login-chrome {
+    padding: 14px 24px 18px;
+  }
+  .login-chrome .top {
+    font-size: 9px;
+    letter-spacing: 0.38em;
+  }
+
+  /* כפתור כניסה: דק יותר */
+  .signin-btn {
+    padding: 13px 44px 13px 48px;
+    font-size: 11px;
+  }
+  .signin-hint {
+    font-size: 8px;
+  }
+
+  /* replay pill */
+  .replay-btn {
+    bottom: 12px;
+    right: 12px;
+    padding: 8px 14px;
+    font-size: 9px;
+  }
+}

@@ -210,6 +210,14 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   0%,100% { box-shadow:0 0 0 0 rgba(31,138,61,0); border-color:rgba(31,138,61,0.45); }
   50%     { box-shadow:0 0 22px 6px rgba(31,138,61,0.28); border-color:rgba(31,138,61,1); }
 }
+@media (orientation: landscape) {
+  .login-chrome .bottom { bottom:14px !important; left:50% !important; right:auto !important; transform:translateX(-50%); width:max-content; }
+  .splash-dev-credit { bottom:8px; font-size:9px; }
+  #greeting { flex-direction:row; gap:32px; justify-content:center; align-items:center; }
+  .gr-time { font-size:16px; }
+  .gr-name { font-size:26px; }
+  .gr-bar-wrap { margin-top:0; width:160px; }
+}
 
 /* ── Greeting overlay ── */
 #greeting { position:fixed; inset:0; background:#000; z-index:150; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
