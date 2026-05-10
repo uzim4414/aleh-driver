@@ -530,42 +530,41 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tabs { padding: 0 14px; }
   .tab  { padding: 9px 12px; font-size: 12px; }
 
-  /* ── Hero card: שורה אופקית ── */
+  /* ── Hero card: עמודה אחת מלאה (כמו portrait, רק קומפקטי) ── */
   .hero-card {
-    margin: 8px 12px;
-    display: flex;
-    flex-direction: row-reverse; /* תמונה משמאל ב-RTL = end */
-    min-height: 0;
-    border-radius: 18px;
-    align-items: stretch;
-  }
-  .hero-img-area {
-    width: 38%;
-    min-height: 0;
-    height: auto;
-    max-height: 220px;
-    flex-shrink: 0;
-    padding-top: 6px;
-    border-radius: 0;
-  }
-  .hero-img-area::after { display: none; } /* בטל gradient תחתון */
-  .car-glow { width: 60%; bottom: 6px; }
-  .hl-glow  { top: 30%; }
-  .hero-body {
-    flex: 1;
-    padding: 10px 14px 12px;
+    margin: 6px 10px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    min-width: 0;
-    overflow: hidden;
+    min-height: 0;
+    border-radius: 18px;
   }
-  .hero-name      { font-size: 16px; text-align: start; }
-  .hero-plate-wrap{ text-align: start; margin-top: 6px; }
-  .hero-plate     { font-size: 15px; padding: 5px 14px; letter-spacing: 3px; border-width: 2px; }
-  .hero-btns      { margin-top: 8px; gap: 8px; }
+  .hero-img-area {
+    width: 100%;
+    min-height: 100px;
+    max-height: 28vh;
+    height: 28vh;
+    flex-shrink: 0;
+    padding-top: 6px;
+  }
+  /* בטל את הפס הרץ בllandscape */
+  .hero-img-area::before { display: none; }
+  .car-wrap { padding: 0; }
+  .car-img  { max-height: 22vh; object-fit: contain; }
+  .car-glow { width: 55%; bottom: 4px; height: 14px; }
+  .hl-glow  { top: 25%; }
+  .hero-body {
+    padding: 8px 16px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+  }
+  .hero-name      { font-size: 16px; text-align: center; }
+  .hero-plate-wrap{ text-align: center; margin-top: 6px; }
+  .hero-plate     { font-size: 15px; padding: 4px 14px; letter-spacing: 3px; border-width: 2px; }
+  .hero-btns      { margin-top: 8px; gap: 8px; width: 100%; }
   .hero-btn       { font-size: 11px; padding: 7px 0; }
-  .hero-alert     { padding: 8px 12px; margin-top: 8px; }
+  .hero-alert     { padding: 8px 12px; margin-top: 8px; width: 100%; }
   .ha-title       { font-size: 12px; }
   .ha-sub         { font-size: 10px; }
 
