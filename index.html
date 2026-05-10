@@ -444,32 +444,26 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .fm-close-btn:active { background:rgba(255,255,255,0.1); }
 
 /* ══════════════════════════════════════════════════════════════
-   LANDSCAPE — מסכי רכב רוחביים (CSS Grid)
-   topbar רוחב מלא · sidebar שמאלי (ב-RTL בצד ימין הוויזואלי) · content
+   LANDSCAPE — רוחבי: flex-column, bnav למטה, תוכן רוחב מלא
 ══════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
 
-  /* ── App grid ── */
+  /* ── App: עמודה אחת, רוחב מלא, ללא grid ── */
   #app {
-    max-width: 100%;
-    width: 100%;
+    max-width: 100% !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
     height: 100vh;
     height: 100dvh;
-    display: grid;
-    grid-template-rows: auto 1fr;
-    grid-template-columns: 64px 1fr;
-    grid-template-areas:
-      "topbar topbar"
-      "nav    content";
-    margin: 0;
+    margin: 0 !important;
   }
 
-  /* ── Topbar: רוחב מלא, קומפקטי ── */
+  /* ── Topbar: קומפקטי ── */
   #global-topbar {
-    grid-area: topbar;
-    grid-column: 1 / -1;
     padding: 4px 16px 6px;
     min-height: 44px;
+    flex-shrink: 0;
   }
   .tb-btn, .tb-avatar { width: 34px; height: 34px; border-radius: 10px; }
   .tb-badge { width: 14px; height: 14px; font-size: 8px; border-width: 2px; top: -3px; right: -3px; }
@@ -479,77 +473,71 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tb-greet-name { font-size: 12px; }
   .tb-user { gap: 6px; }
 
-  /* ── Sidebar nav (שמאל מבחינת CSS = ימין ב-RTL) ── */
-  .bnav {
-    grid-area: nav;
-    flex-direction: column;
-    width: auto;
-    margin: 6px 6px 6px 6px;
-    border-radius: 16px;
-    justify-content: flex-start;
-    align-items: stretch;
-    padding: 6px 4px;
-    gap: 4px;
-    align-self: stretch;
-    max-height: 100%;
-    overflow-y: auto;
-    scrollbar-width: none;
-  }
-  .bnav::-webkit-scrollbar { display: none; }
-
-  .bn-item {
-    flex: 0 0 auto;
-    flex-direction: column;
-    padding: 8px 2px;
-    border-radius: 12px;
-    gap: 2px;
-    width: 100%;
-    min-height: 50px;
-  }
-  .bn-item.active {
-    flex-direction: column;
-    flex: 0 0 auto;
-    padding: 8px 2px;
-    gap: 2px;
-  }
-  .bn-lbl                 { font-size: 8.5px; line-height: 1.1; }
-  .bn-item.active .bn-lbl { font-size: 9px; }
-  .bn-ic                  { width: 18px; height: 18px; }
-
-  /* ── Screens slot into content area ── */
-  .screen        { grid-area: content; grid-column: 2; grid-row: 2; display: none; min-width: 0; min-height: 0; }
-  .screen.active { display: flex; flex-direction: column; overflow: hidden; }
+  /* ── Screens: flex-column, תופסים את כל השטח הפנוי ── */
+  .screen        { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+  .screen.active { display: flex; }
   .content       { flex: 1; overflow-y: auto; min-height: 0; }
+
+  /* ── Bottom nav: נשאר למטה, כפתורים גדולים יותר ── */
+  .bnav {
+    flex-direction: row !important;
+    flex-shrink: 0;
+    width: 100% !important;
+    margin: 4px 10px;
+    border-radius: 16px;
+    padding: 6px 8px;
+    gap: 0;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .bn-item {
+    flex: 1;
+    flex-direction: column;
+    padding: 10px 4px;
+    border-radius: 12px;
+    gap: 3px;
+    min-height: 54px;
+  }
+  .bn-item.active { flex: 1.4; }
+  .bn-lbl                 { font-size: 9px; }
+  .bn-item.active .bn-lbl { font-size: 9.5px; }
+  .bn-ic                  { width: 22px; height: 22px; }
 
   /* ── phead קומפקטי ── */
   .phead { padding: 6px 16px 8px; }
   .ph-title { font-size: 15px; }
   .ph-sub   { font-size: 11px; }
 
-  /* ── Tabs דקות ── */
+  /* ── Tabs ── */
   .tabs { padding: 0 14px; }
   .tab  { padding: 9px 12px; font-size: 12px; }
 
-  /* ── Hero card: עמודה אחת מלאה (כמו portrait, רק קומפקטי) ── */
+  /* ── Hero card: עמודה אחת, רוחב מלא, תמונה גדולה ── */
   .hero-card {
     margin: 6px 10px;
     display: flex;
-    flex-direction: column;
+    flex-direction: column !important;
     min-height: 0;
     border-radius: 18px;
+    width: calc(100% - 20px);
   }
   .hero-img-area {
     width: 100%;
-    min-height: 100px;
-    max-height: 28vh;
-    height: 28vh;
+    height: 38vh;
+    min-height: 130px;
+    max-height: 42vh;
     flex-shrink: 0;
-    padding-top: 6px;
+    padding-top: 8px;
+    overflow: hidden;
   }
-  /* בטל את הפס הרץ בllandscape */
-  .hero-img-area::before { display: none; }
+  /* ביטול מוחלט של הפס הרץ */
+  .hero-img-area::before {
+    animation: none !important;
+    opacity: 0 !important;
+    display: none !important;
+  }
   .car-wrap { padding: 0; }
-  .car-img  { max-height: 22vh; object-fit: contain; }
+  .car-img  { max-height: 34vh; object-fit: contain; }
   .car-glow { width: 55%; bottom: 4px; height: 14px; }
   .hl-glow  { top: 25%; }
   .hero-body {
@@ -558,6 +546,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     flex-direction: column;
     align-items: center;
     min-width: 0;
+    width: 100%;
   }
   .hero-name      { font-size: 16px; text-align: center; }
   .hero-plate-wrap{ text-align: center; margin-top: 6px; }
@@ -568,15 +557,15 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .ha-title       { font-size: 12px; }
   .ha-sub         { font-size: 10px; }
 
-  /* ── Quick actions ── */
+  /* ── Quick actions: רוחב מלא ── */
   .sec { padding: 10px 14px 6px; font-size: 14px; }
-  .qa  { gap: 8px; padding: 0 12px; grid-template-columns: 1fr 1fr 1fr; }
+  .qa  { gap: 8px; padding: 0 12px; grid-template-columns: 1fr 1fr 1fr; width: 100%; }
   .qa-card    { padding: 10px 6px 8px; border-radius: 14px; gap: 6px; }
   .qa-icon-box{ width: 36px; height: 36px; border-radius: 10px; }
   .qa-lbl     { font-size: 10px; }
 
-  /* ── Service progress + fuel widget קומפקטיים ── */
-  .svc-card    { margin: 8px 0 0; padding: 12px 14px 14px; border-radius: 16px; }
+  /* ── Service progress + fuel widget: רוחב מלא ── */
+  .svc-card    { margin: 8px 10px 0; padding: 12px 14px 14px; border-radius: 16px; width: calc(100% - 20px); box-sizing: border-box; }
   .svc-hdr     { margin-bottom: 10px; }
   .svc-icn     { width: 28px; height: 28px; border-radius: 9px; }
   .svc-title   { font-size: 12px; }
@@ -589,7 +578,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .svc-foot-txt{ font-size: 10.5px; }
   .svc-foot-val{ font-size: 11px; }
 
-  .fuel-widget { margin: 8px 0 0; padding: 12px 14px 12px; border-radius: 16px; }
+  .fuel-widget { margin: 8px 10px 0; padding: 12px 14px 12px; border-radius: 16px; width: calc(100% - 20px); box-sizing: border-box; }
   .fw-label    { font-size: 11px; }
   .fw-pill     { font-size: 10px; padding: 3px 8px; }
   .fw-badge    { font-size: 22px; }
@@ -599,7 +588,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .fw-bar-labels { font-size: 9.5px; }
   .fw-cta      { font-size: 10px; padding-top: 6px; }
 
-  /* ── Info grid (vehicle screen) — 4 עמודות במקום 2 ── */
+  /* ── Info grid (vehicle screen) — 4 עמודות ── */
   .igrid { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 14px; }
   .ig-card { padding: 10px 12px; border-radius: 14px; }
   .ig-icon { margin-bottom: 6px; }
@@ -618,7 +607,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tspec-lbl      { font-size: 8.5px; }
   .tspec-bool     { font-size: 10px; padding: 5px 10px; }
 
-  /* ── Alerts קומפקטיים ── */
+  /* ── Alerts ── */
   .ssec       { padding: 8px 16px 4px; }
   .ss-lbl     { font-size: 13px; }
   .ss-count   { font-size: 11px; }
@@ -642,7 +631,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tc-lbl     { font-size: 11px; }
   .tc-tag     { font-size: 11px; padding: 4px 12px; margin-top: 8px; }
 
-  /* ── Service screen (km + fault) ── */
+  /* ── Service screen ── */
   .km-card    { margin: 10px 14px 0; padding: 14px; border-radius: 14px; }
   .km-label   { font-size: 11px; }
   .km-prev    { font-size: 11px; }
@@ -668,9 +657,9 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .gar-cta     { padding: 10px 14px; gap: 8px; }
   .gar-cta-btn { padding: 10px 12px; font-size: 12px; border-radius: 12px; }
 
-  /* ── FAB: פינה ימנית-תחתית, לא מתנגש עם sidebar (שיושב בצד הוויזואלי הימני ב-RTL) ── */
+  /* ── FAB ── */
   .fab {
-    bottom: 14px;
+    bottom: 80px;
     left: 18px;
     right: auto;
     padding: 10px 16px;
@@ -725,7 +714,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .fm-annual-lbl  { font-size: 9px; }
   .fm-close-btn   { margin: 12px; padding: 11px; font-size: 13px; border-radius: 12px; width: calc(100% - 24px); }
 
-  /* ── Confirm modal — ממורכז (לא bottom sheet) ── */
+  /* ── Confirm modal — ממורכז ── */
   #confirm-modal { align-items: center !important; }
   #confirm-modal > div { border-radius: 18px !important; padding: 24px 22px 28px !important; max-width: 420px !important; }
 }
