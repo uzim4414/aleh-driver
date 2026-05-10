@@ -71,11 +71,12 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .tb-btn { width:40px; height:40px; background:var(--card); border-radius:13px; display:flex; align-items:center; justify-content:center; position:relative; border:1px solid var(--border); cursor:pointer; }
 .tb-badge { position:absolute; top:-4px; right:-4px; width:16px; height:16px; background:var(--red); border-radius:50%; border:2.5px solid #000; font-size:9px; font-weight:800; display:flex; align-items:center; justify-content:center; animation:badgeBeat 2s ease-in-out infinite; }
 .tb-badge.hidden { display:none; }
-.tb-logo { display:flex; flex-direction:column; align-items:center; gap:1px; position:relative; overflow:hidden; }
-.tb-logo-name { font-size:14px; font-weight:900; letter-spacing:3px; color:#fff; font-family:'Outfit','Manrope',sans-serif; text-transform:uppercase; line-height:1; }
-.tb-logo-sub { font-size:8px; font-weight:400; color:rgba(255,255,255,0.32); letter-spacing:1.5px; text-transform:lowercase; font-family:'Outfit','Manrope',sans-serif; line-height:1; }
-.tb-logo-spark { position:absolute; inset:0; background:linear-gradient(105deg,transparent 30%,rgba(141,182,0,0.55) 48%,rgba(180,220,20,0.35) 54%,transparent 68%); animation:logoSpark 5s ease-in-out infinite; pointer-events:none; border-radius:4px; }
-@keyframes logoSpark { 0%,70%{transform:translateX(-200%) skewX(-15deg)} 75%{transform:translateX(-200%) skewX(-15deg)} 100%{transform:translateX(300%) skewX(-15deg)} }
+.tb-logo { display:flex; flex-direction:column; align-items:center; gap:4px; }
+.tb-logo-name { font-family:'Outfit','Manrope',sans-serif; font-size:12px; font-weight:600; letter-spacing:0.38em; text-transform:uppercase; color:#fff; line-height:1; position:relative; overflow:hidden; padding-right:0.38em; }
+.tb-logo-name::after { content:''; position:absolute; top:0; left:-120%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(141,182,0,0.65) 50%,transparent); animation:logoSpark 7s ease-in-out infinite; animation-delay:1s; }
+.tb-logo-sub { font-family:'Outfit','Manrope',sans-serif; font-size:7px; font-weight:400; letter-spacing:0.35em; text-transform:uppercase; color:rgba(255,255,255,0.28); line-height:1; position:relative; overflow:hidden; padding-right:0.35em; }
+.tb-logo-sub::after { content:''; position:absolute; top:0; left:-120%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(141,182,0,0.4) 50%,transparent); animation:logoSpark 7s ease-in-out infinite; animation-delay:1.2s; }
+@keyframes logoSpark { 0%,55%{left:-120%;opacity:0} 58%{opacity:1} 80%{left:160%;opacity:0} 100%{left:160%;opacity:0} }
 .tb-user { display:flex; align-items:center; gap:8px; }
 .tb-greet-hi { font-size:11px; color:var(--t2); text-align:left; }
 .tb-greet-name { font-size:13px; font-weight:700; letter-spacing:-0.2px; text-align:left; }
@@ -544,9 +545,8 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
       </div>
     </div>
     <div class="tb-logo">
-      <div class="tb-logo-spark"></div>
       <div class="tb-logo-name">ALEH DRIVE</div>
-      <div class="tb-logo-sub">developed by uzi mosh</div>
+      <div class="tb-logo-sub">Developed by Uzi Mosh</div>
     </div>
     <div class="tb-user">
       <div>
