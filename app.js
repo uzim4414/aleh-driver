@@ -478,33 +478,47 @@ function renderFuelWidget() {
   }
   if (!cur) { mount.innerHTML = ''; return; }
 
-  // find previous month with data
-  var prev = null;
-  for (var j = curIdx - 1; j >= 0; j--) {
-    if (months[j].liters > 0) { prev = months[j]; break; }
-  }
-
-  // average liters across all months with data
+  // average liters (exclude current month from avg so comparison is fair)
   var avgLiters = 0, cnt = 0;
-  for (var k = 0; k < months.length; k++) {
+  for (var k = 0; k < curIdx; k++) {
     if (months[k].liters > 0) { avgLiters += months[k].liters; cnt++; }
   }
   if (cnt > 0) avgLiters = Math.round(avgLiters / cnt * 10) / 10;
 
-  // trend vs previous month (fewer liters = better)
-  var trendArrow = '', trendColor = 'var(--t2)';
-  var badgeClass = 'fw-badge-good', badgeIcon = '⭐';
-  if (prev && prev.liters > 0) {
-    var pct = (cur.liters - prev.liters) / prev.liters;
-    if      (pct < -0.05) { trendArrow = '↓'; trendColor = 'var(--fuel-excellent)'; badgeClass = 'fw-badge-excellent'; badgeIcon = '🏆'; }
-    else if (pct >  0.10) { trendArrow = '↑'; trendColor = 'var(--fuel-over)';      badgeClass = 'fw-badge-over';      badgeIcon = '🚨'; }
-    else if (pct >  0.05) { trendArrow = '↑'; trendColor = 'var(--fuel-warn)';      badgeClass = 'fw-badge-warn';      badgeIcon = '⚡'; }
-    else                  { trendArrow = '→'; trendColor = 'var(--t2)'; }
+  // vs-average comparison (the core message)
+  var diffPct = 0, diffLiters = 0;
+  if (avgLiters > 0) {
+    diffLiters = Math.round((cur.liters - avgLiters) * 10) / 10;
+    diffPct    = Math.round((cur.liters - avgLiters) / avgLiters * 100);
   }
 
-  // bar: cur liters vs average (100% = average)
-  var barPct = avgLiters > 0 ? Math.max(4, Math.min(100, Math.round((cur.liters / avgLiters) * 100))) : 50;
-  var barColor = barPct > 110 ? 'var(--fuel-over)' : barPct > 105 ? 'var(--fuel-warn)' : 'var(--fuel-excellent)';
+  // derive badge + color + headline sentence
+  var badgeClass, badgeIcon, msgColor, headline, subline;
+  if (avgLiters === 0) {
+    // no history to compare
+    badgeClass = 'fw-badge-good'; badgeIcon = '⭐'; msgColor = 'var(--t2)';
+    headline = cur.liters + ' ל׳ תודלקו החודש';
+    subline  = 'אין עדיין היסטוריה להשוואה';
+  } else if (diffPct <= -5) {
+    badgeClass = 'fw-badge-excellent'; badgeIcon = '🏆'; msgColor = 'var(--fuel-excellent)';
+    headline = 'צריכה נמוכה ב־' + Math.abs(diffPct) + '% מהממוצע';
+    subline  = 'חסכת ' + Math.abs(diffLiters) + ' ל׳ לעומת הממוצע שלך (' + avgLiters + ' ל׳)';
+  } else if (diffPct < 5) {
+    badgeClass = 'fw-badge-good'; badgeIcon = '⭐'; msgColor = 'var(--fuel-good)';
+    headline = 'צריכה תקינה — קרוב לממוצע';
+    subline  = 'החודש: ' + cur.liters + ' ל׳ · ממוצע: ' + avgLiters + ' ל׳';
+  } else if (diffPct < 12) {
+    badgeClass = 'fw-badge-warn'; badgeIcon = '⚡'; msgColor = 'var(--fuel-warn)';
+    headline = 'צריכה גבוהה ב־' + diffPct + '% מהממוצע';
+    subline  = 'תדלקת ' + diffLiters + ' ל׳ יותר מהממוצע שלך (' + avgLiters + ' ל׳)';
+  } else {
+    badgeClass = 'fw-badge-over'; badgeIcon = '🚨'; msgColor = 'var(--fuel-over)';
+    headline = 'צריכה גבוהה ב־' + diffPct + '% מהממוצע';
+    subline  = 'תדלקת ' + diffLiters + ' ל׳ יותר מהממוצע שלך (' + avgLiters + ' ל׳)';
+  }
+
+  // bar: cur vs average
+  var barPct = avgLiters > 0 ? Math.max(4, Math.min(100, Math.round((cur.liters / avgLiters) * 100))) : 60;
 
   var monthLabel = _heMonthLabel(cur.key) + ' ' + (cur.key + '').slice(0, 4);
 
@@ -512,20 +526,19 @@ function renderFuelWidget() {
     '<div class="fuel-widget" onclick="openFuelModal()" role="button" tabindex="0" aria-label="ביצועי דלק">' +
       '<div class="fw-hdr">' +
         '<div class="fw-label">ביצועי דלק · ' + monthLabel + '</div>' +
-        '<div class="fw-pill" style="background:' + barColor + '1a;color:' + barColor + '">' + cur.liters + ' ל׳</div>' +
+        '<div class="fw-pill" style="background:' + msgColor + '1a;color:' + msgColor + '">' + cur.liters + ' ל׳</div>' +
       '</div>' +
       '<div class="fw-hero-row">' +
         '<span class="fw-badge ' + badgeClass + '">' + badgeIcon + '</span>' +
-        '<span class="fw-hero-amt">₪' + (cur.cost ? cur.cost.toLocaleString('he') : '—') + '</span>' +
-        (trendArrow ? '<span class="fw-trend" style="color:' + trendColor + '">' + trendArrow + '</span>' : '') +
+        '<span class="fw-headline" style="color:' + msgColor + '">' + headline + '</span>' +
       '</div>' +
-      '<div class="fw-sub">לעמותה' + (cur.km ? ' · ' + cur.km.toLocaleString('he') + ' ק"מ' : '') + '</div>' +
+      '<div class="fw-sub">' + subline + '</div>' +
       '<div class="fw-bar-bg">' +
-        '<div class="fw-bar-fill" style="background:' + barColor + ';--fw-bar-w:' + barPct + '%"></div>' +
+        '<div class="fw-bar-fill" style="background:' + msgColor + ';--fw-bar-w:' + barPct + '%"></div>' +
       '</div>' +
       '<div class="fw-bar-labels">' +
-        '<span>חודש זה: ' + cur.liters + ' ל׳</span>' +
-        '<span>ממוצע: ' + (avgLiters > 0 ? avgLiters : '—') + ' ל׳</span>' +
+        '<span>עלות: ₪' + (cur.cost ? cur.cost.toLocaleString('he') : '—') + '</span>' +
+        '<span>' + (cur.km ? cur.km.toLocaleString('he') + ' ק"מ' : '') + '</span>' +
       '</div>' +
       '<div class="fw-cta">לפרטים נוספים ›</div>' +
     '</div>';
