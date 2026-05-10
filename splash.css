@@ -248,6 +248,9 @@ html, body {
       #000;
   }
 
+  /* מסתיר את ה-scan-lines שגורמים לפס אפור בנוף */
+  .stage::before { display: none; }
+
   /* chrome עליון: קומפקטי */
   .login-chrome {
     padding: 14px 24px 18px;

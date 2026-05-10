@@ -490,13 +490,14 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .bnav {
     flex-direction: row !important;
     flex-shrink: 0;
-    width: 100% !important;
+    align-self: stretch;
     margin: 4px 10px;
     border-radius: 16px;
     padding: 6px 8px;
     gap: 0;
     justify-content: space-around;
     align-items: center;
+    box-sizing: border-box;
   }
   .bn-item {
     flex: 1;
@@ -523,20 +524,23 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   /* ── Hero card: עמודה אחת, רוחב מלא, תמונה גדולה ── */
   .hero-card {
     margin: 6px 10px;
+    align-self: stretch;
     display: flex;
     flex-direction: column !important;
     min-height: 0;
     border-radius: 18px;
-    width: calc(100% - 20px);
   }
   .hero-img-area {
-    width: 100%;
+    width: 100% !important;
     height: 38vh;
     min-height: 130px;
     max-height: 42vh;
     flex-shrink: 0;
     padding-top: 8px;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   /* ביטול מוחלט של הפס הרץ */
   .hero-img-area::before {
@@ -544,8 +548,8 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     opacity: 0 !important;
     display: none !important;
   }
-  .car-wrap { padding: 0; }
-  .car-img  { max-height: 34vh; object-fit: contain; }
+  .car-wrap { padding: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+  .car-img  { max-height: 34vh; width: auto; max-width: 100%; object-fit: contain; }
   .car-glow { width: 55%; bottom: 4px; height: 14px; }
   .hl-glow  { top: 25%; }
   .hero-body {
@@ -573,7 +577,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .qa-lbl     { font-size: 10px; }
 
   /* ── Service progress + fuel widget: רוחב מלא ── */
-  .svc-card    { margin: 8px 10px 0; padding: 12px 14px 14px; border-radius: 16px; width: calc(100% - 20px); box-sizing: border-box; }
+  .svc-card    { margin: 8px 10px 0; align-self: stretch; padding: 12px 14px 14px; border-radius: 16px; }
   .svc-hdr     { margin-bottom: 10px; }
   .svc-icn     { width: 28px; height: 28px; border-radius: 9px; }
   .svc-title   { font-size: 12px; }
@@ -586,7 +590,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .svc-foot-txt{ font-size: 10.5px; }
   .svc-foot-val{ font-size: 11px; }
 
-  .fuel-widget { margin: 8px 10px 0; padding: 12px 14px 12px; border-radius: 16px; width: calc(100% - 20px); box-sizing: border-box; }
+  .fuel-widget { margin: 8px 10px 0; align-self: stretch; padding: 12px 14px 12px; border-radius: 16px; }
   .fw-label    { font-size: 11px; }
   .fw-pill     { font-size: 10px; padding: 3px 8px; }
   .fw-badge    { font-size: 22px; }
@@ -665,9 +669,9 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .gar-cta     { padding: 10px 14px; gap: 8px; }
   .gar-cta-btn { padding: 10px 12px; font-size: 12px; border-radius: 12px; }
 
-  /* ── FAB ── */
+  /* ── FAB: מרחף מעל ה-bnav ── */
   .fab {
-    bottom: 80px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     left: 18px;
     right: auto;
     padding: 10px 16px;
@@ -728,54 +732,104 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   מסכי רכב נמוכים (≤ 500px גובה) — לוחות רכב קטנים
+   ULTRA-COMPACT — סמסונג וטלפונים עם גובה ≤ 500px בנוף
+   כל סמסונג נפילה לכאן (360-414px גובה)
 ══════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) and (max-height: 500px) {
-  #app { grid-template-columns: 54px 1fr; }
+
+  /* Topbar קומפקטי ביותר */
   #global-topbar { padding: 2px 12px 3px; min-height: 38px; }
-  .tb-logo-sub { display: none; }
+  .tb-logo-sub  { display: none; }
   .tb-btn, .tb-avatar { width: 30px; height: 30px; border-radius: 9px; }
-  .tb-greet-hi { display: none; }
-  .tb-greet-name { font-size: 11px; }
+  .tb-greet-hi  { display: none; }
+  .tb-greet-name{ font-size: 11px; }
   .tb-logo-name { font-size: 10px; }
 
-  .bnav { margin: 3px 3px 3px 3px; padding: 4px 2px; gap: 2px; border-radius: 12px; }
-  .bn-item { padding: 6px 2px; min-height: 40px; }
+  /* bnav: שורה תחתונה, ממוקם נכון */
+  .bnav {
+    margin: 2px 8px;
+    padding: 3px 4px;
+    gap: 0;
+    border-radius: 12px;
+    min-height: unset;
+    align-self: stretch;
+    box-sizing: border-box;
+  }
+  .bn-item { padding: 5px 2px; min-height: 38px; }
   .bn-lbl  { font-size: 7.5px; }
   .bn-item.active .bn-lbl { font-size: 8px; }
   .bn-ic   { width: 16px; height: 16px; }
 
+  /* FAB מעל ה-bnav — גובה bnav ~46px + margin ~4px = bottom: 52px */
+  .fab {
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+    left: 14px;
+    right: auto;
+    padding: 8px 14px;
+    font-size: 11px;
+    animation: none;
+  }
+
+  /* phead ו-tabs */
   .phead { padding: 4px 12px 6px; }
   .ph-title { font-size: 13px; }
   .ph-sub   { font-size: 10px; }
-
   .tabs { padding: 0 10px; }
   .tab  { padding: 7px 10px; font-size: 11px; }
 
-  .hero-card    { margin: 6px 10px; }
-  .hero-img-area{ width: 36%; max-height: 150px; }
-  .hero-body    { padding: 8px 12px; }
-  .hero-name    { font-size: 14px; }
+  /* Hero card: עמודה אחת, רוחב מלא — תמונה גדולה ← FIXED */
+  .hero-card {
+    margin: 4px 8px;
+    align-self: stretch;
+    flex-direction: column !important;
+  }
+  .hero-img-area {
+    width: 100% !important;
+    height: 140px;
+    max-height: 140px;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero-img-area::before {
+    animation: none !important;
+    opacity: 0 !important;
+    display: none !important;
+  }
+  .car-wrap { width: 100%; display: flex; align-items: center; justify-content: center; }
+  .car-img  { max-height: 130px; width: auto; max-width: 100%; object-fit: contain; }
+  .hero-body { padding: 6px 12px 8px; align-items: center; }
+  .hero-name    { font-size: 14px; text-align: center; }
   .hero-plate   { font-size: 13px; padding: 4px 11px; }
   .hero-btn     { font-size: 10px; padding: 6px 0; }
+  .hero-btns    { gap: 6px; margin-top: 6px; }
 
+  /* Widgets: רוחב מלא */
+  .svc-card    { margin: 4px 8px 0; align-self: stretch; padding: 10px 12px 12px; border-radius: 14px; }
+  .fuel-widget { margin: 4px 8px 0; align-self: stretch; padding: 10px 12px 10px; border-radius: 14px; }
+
+  /* Quick actions */
   .sec        { padding: 6px 12px 4px; font-size: 12px; }
   .qa         { padding: 0 10px; gap: 6px; }
   .qa-card    { padding: 8px 4px 6px; border-radius: 12px; }
   .qa-icon-box{ width: 32px; height: 32px; }
   .qa-lbl     { font-size: 9px; }
 
+  /* Info grid */
   .igrid { grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px 12px; }
   .ig-card { padding: 8px 10px; }
   .ig-val  { font-size: 13px; }
   .ig-lbl  { font-size: 9px; }
 
+  /* Tech specs */
   .tspec-grid { grid-template-columns: repeat(8, 1fr); gap: 5px; }
   .tspec-item { padding: 7px 3px 5px; }
   .tspec-icon { width: 24px; height: 24px; border-radius: 7px; }
   .tspec-val  { font-size: 10px; }
   .tspec-lbl  { font-size: 8px; }
 
+  /* Fuel modal */
   .fm-sheet     { max-height: 92vh; max-width: min(620px, 92vw); width: min(620px, 92vw); }
   .fm-hero      { padding: 10px 14px 8px; }
   .fm-hero-val  { font-size: 28px; }
@@ -783,8 +837,6 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .fm-chart     { height: 50px; }
   .fm-tile-val  { font-size: 14px; }
   .fm-tile      { padding: 8px 10px; }
-
-  .fab { padding: 8px 14px; font-size: 11px; bottom: 10px; left: 14px; }
 }
 </style>
 </head>
