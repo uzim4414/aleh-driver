@@ -1531,7 +1531,14 @@ APP.helpPuncture = async function() {
         '<div class="prov-card">' +
         '<div class="prov-card-name">&#x1F527; ' + (p.name||'') + '</div>' +
         statusHtml +
-        (p.address ? '<div class="prov-card-row"><span class="prov-card-icon">&#x1F4CD;</span><span>' + p.address + '</span></div>' : '') +
+        (p.address ? (function() {
+          var cleanAddr = p.address.replace(/,?\s*\d[A-Z0-9]{3}\+[A-Z0-9]{2,}\s*/g, '').trim().replace(/,\s*$/, '');
+          var wazUrl = 'https://waze.com/ul?q=' + encodeURIComponent(cleanAddr) + '&navigate=yes';
+          return '<div class="prov-card-row"><span class="prov-card-icon">&#x1F4CD;</span>' +
+            '<span style="flex:1">' + cleanAddr + '</span>' +
+            '<a href="' + wazUrl + '" target="_blank" style="background:#05c8f7;color:#000;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;text-decoration:none;white-space:nowrap;flex-shrink:0">Waze &#x1F6A6;</a>' +
+            '</div>';
+        })() : '') +
         (p.contactName ? '<div class="prov-card-row"><span class="prov-card-icon">&#x1F464;</span><span>' + p.contactName + '</span></div>' : '') +
         (hoursHtml
           ? '<details class="prov-hours-details"><summary>&#x1F551; שעות פתיחה</summary>' + hoursHtml + '</details>'
