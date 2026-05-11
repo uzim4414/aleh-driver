@@ -32,17 +32,56 @@ let STATE = {
 };
 
 /* ══ GAS API ══ */
+function _isTokenExpired(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return !payload.exp || (payload.exp * 1000) < Date.now();
+  } catch(e) { return true; }
+}
+
+function _sessionExpired() {
+  localStorage.removeItem(SESSION_KEY);
+  STATE.idToken = null;
+  STATE.vehicle = null;
+  STATE.user = null;
+  // Show re-login overlay
+  var el = document.getElementById('session-expired-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'session-expired-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(15,41,66,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;direction:rtl';
+    el.innerHTML =
+      '<div style="font-size:40px">🔒</div>' +
+      '<div style="color:#fff;font-size:18px;font-weight:700">פג תוקף ההתחברות</div>' +
+      '<div style="color:#94a3b8;font-size:14px">יש להתחבר מחדש להמשך</div>' +
+      '<button onclick="window.location.reload()" style="background:#2563eb;color:#fff;border:none;border-radius:12px;padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px">🔄 התחבר מחדש</button>';
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+}
+
 async function gasPost(action, extra) {
   extra = extra || {};
-  if (!GAS_URL) {
-    // Demo mode — return mock data
-    return mockResponse(action, extra);
+  if (!GAS_URL) return mockResponse(action, extra);
+
+  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken)) {
+    _sessionExpired();
+    throw new Error('session_expired');
   }
+
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
   const url = GAS_URL + '?' + new URLSearchParams(params).toString();
   const resp = await fetch(url, { method: 'GET' });
   const data = await resp.json();
-  if (!data.ok) throw new Error(data.error || 'שגיאת שרת');
+  if (!data.ok) {
+    if (data.error && (data.error.includes('idToken') || data.error === 'unauthorized')) {
+      _sessionExpired();
+      throw new Error('session_expired');
+    }
+    throw new Error(data.error || 'שגיאת שרת');
+  }
   return data;
 }
 
