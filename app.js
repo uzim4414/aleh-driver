@@ -1721,33 +1721,107 @@ APP.helpTowing = async function() {
     var res = await gasPost('get_vehicle_insurance_details', {});
     var ins = res.insurance;
     var garage = res.garage;
+
     if (!ins || !ins.hasComprehensive) {
       var mgrPhone = (STATE.vehicle && STATE.vehicle.fleetManagerPhone) ? STATE.vehicle.fleetManagerPhone : '';
+      window._towMgrPhone = mgrPhone ? mgrPhone.replace(/[^0-9+]/g,'') : '';
       _showHelpCard(
+        '<style>' +
+        '.tw-no-ins{background:#1e293b;border-radius:20px;padding:24px 18px;text-align:center;animation:tw-fade .35s ease}' +
+        '@keyframes tw-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+        '.tw-no-ins-icon{font-size:44px;margin-bottom:12px}' +
+        '.tw-no-ins-title{font-size:18px;font-weight:800;color:#f8fafc;margin-bottom:8px}' +
+        '.tw-no-ins-sub{font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:20px}' +
+        '.tw-btn-mgr{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:16px;font-weight:800;border:none;border-radius:14px;cursor:pointer}' +
+        '</style>' +
         '<div class="help-card">' +
         '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-        '<div class="help-card-title">&#x26A0;&#xFE0F; אין ביטוח מקיף</div>' +
-        '<div class="help-card-sub">לא נמצא ביטוח מקיף פעיל לרכב זה.</div>' +
-        '<hr class="help-card-divider">' +
-        '<div style="font-size:14px;color:#94a3b8;text-align:center;padding:8px">פנה למנהל הצי לסיוע.</div>' +
-        (mgrPhone ? '<button class="help-action-btn" onclick="window.open(\'tel:\' + mgrPhone.replace(/[^0-9+]/g,\'\') + \'\')">&#x1F4DE; התקשר למנהל הצי</button>' : '') +
-        '</div>'
+        '<div class="tw-no-ins">' +
+          '<div class="tw-no-ins-icon">🚫</div>' +
+          '<div class="tw-no-ins-title">לא נמצא ביטוח מקיף</div>' +
+          '<div class="tw-no-ins-sub">לרכב זה אין ביטוח מקיף פעיל במערכת. לסיוע פנה למנהל הצי.</div>' +
+          (window._towMgrPhone ? '<button class="tw-btn-mgr" onclick="window.open(\'tel:\'+window._towMgrPhone)"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg> התקשר למנהל הצי</button>' : '') +
+        '</div></div>'
       );
-    } else {
-      _showHelpCard(
-        '<div class="help-card">' +
-        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-        '<div class="help-card-title">&#x1F69B; גרירה &#x2014; ביטוח מקיף</div>' +
-        '<div class="help-card-sub">' + (ins.company||'') + ' | פוליסה: ' + (ins.policyNumber||'') + '</div>' +
-        '<hr class="help-card-divider">' +
-        (ins.emergencyPhone ? '<button class="help-action-btn" onclick="window.open(\'tel:\' + ins.emergencyPhone.replace(/[^0-9+]/g,\'\') + \'\')">&#x1F4DE; מוקד חירום 24/7 &#x2014; ' + ins.emergencyPhone + '</button>' : '') +
-        (ins.towingCoverageKm ? '<div class="help-card-row"><span class="help-card-label">כיסוי גרירה:</span><span class="help-card-value">עד ' + ins.towingCoverageKm + ' ק"מ</span></div>' : '') +
-        '<div class="help-card-row"><span class="help-card-label">רכב חלופי:</span><span class="help-card-value">' + (ins.includesRentalCar ? '&#x2705; כלול' : '&#x274C; לא כלול') + '</span></div>' +
-        (ins.expiryDate ? '<div class="help-card-row"><span class="help-card-label">בתוקף עד:</span><span class="help-card-value">' + ins.expiryDate + '</span></div>' : '') +
-        (garage ? '<hr class="help-card-divider"><div class="help-card-title" style="font-size:14px">&#x1F527; יעד גרירה מומלץ</div><div class="help-card-row">' + (garage.name||'') + '</div>' + (garage.address ? '<div class="help-card-row">&#x1F4CD; ' + garage.address + '</div>' : '') : '') +
-        '</div>'
-      );
+      return;
     }
+
+    /* שמירה על window למניעת בעיות scope ב-onclick */
+    window._towPhone = (ins.emergencyPhone || '').replace(/[^0-9+]/g,'');
+    window._towGaragePhone = (garage && garage.phone) ? (garage.phone).replace(/[^0-9+]/g,'') : '';
+
+    _showHelpCard(
+      '<style>' +
+      '@keyframes tw-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+      '.tw-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;font-size:11px;font-weight:800;letter-spacing:.8px;padding:5px 16px;border-radius:20px;margin-bottom:12px;box-shadow:0 2px 8px rgba(37,99,235,.35)}' +
+      '.tw-card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);animation:tw-fade .35s ease}' +
+      '.tw-header{background:linear-gradient(135deg,#0f2942,#1e3a5f,#1d4ed8);padding:20px 18px 18px;display:flex;align-items:center;gap:14px}' +
+      '.tw-icon-wrap{width:56px;height:56px;flex-shrink:0;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px}' +
+      '.tw-company{font-size:20px;font-weight:900;color:#fff;line-height:1.2}' +
+      '.tw-policy{font-size:11px;color:rgba(255,255,255,.7);margin-top:4px}' +
+      '.tw-active-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(34,197,94,.25);color:#86efac;font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;margin-top:6px;border:1px solid rgba(34,197,94,.3)}' +
+      '.tw-provider-box{margin:14px 16px 0;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:14px;padding:14px 16px}' +
+      '.tw-provider-label{font-size:11px;color:#0369a1;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}' +
+      '.tw-provider-name{font-size:17px;font-weight:800;color:#0c4a6e}' +
+      '.tw-provider-phone{font-size:14px;color:#0369a1;margin-top:3px;font-weight:600}' +
+      '.tw-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px}' +
+      '.tw-info-cell{background:#f8fafc;border-radius:12px;padding:12px 14px}' +
+      '.tw-info-label{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}' +
+      '.tw-info-val{font-size:15px;font-weight:800;color:#1e293b}' +
+      '.tw-btns{display:flex;flex-direction:column;gap:10px;padding:4px 16px 18px}' +
+      '.tw-btn-call{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:17px;background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;font-size:17px;font-weight:900;border:none;border-radius:16px;cursor:pointer;box-shadow:0 5px 20px rgba(21,128,61,.4)}' +
+      '.tw-btn-call:active{transform:scale(.97)}' +
+      '.tw-btn-call-inner{display:flex;flex-direction:column;align-items:flex-start}' +
+      '.tw-btn-call-main{font-size:17px;font-weight:900;line-height:1.2}' +
+      '.tw-btn-call-sub{font-size:11px;font-weight:500;opacity:.8;margin-top:2px}' +
+      '.tw-garage-box{margin:0 16px 18px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px}' +
+      '.tw-garage-label{font-size:11px;color:#64748b;font-weight:700;margin-bottom:6px}' +
+      '.tw-garage-name{font-size:15px;font-weight:800;color:#1e293b}' +
+      '.tw-garage-addr{font-size:12px;color:#64748b;margin-top:3px}' +
+      '.tw-btn-garage{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:14px;font-weight:700;border:none;border-radius:12px;cursor:pointer;margin-top:10px}' +
+      '</style>' +
+      '<div class="help-card">' +
+      '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+      '<div class="tw-badge">🛡️ ביטוח מקיף</div>' +
+      '<div class="tw-card">' +
+        '<div class="tw-header">' +
+          '<div class="tw-icon-wrap">🚛</div>' +
+          '<div>' +
+            '<div class="tw-company">' + (ins.company||'') + '</div>' +
+            (ins.policyNumber ? '<div class="tw-policy">פוליסה: ' + ins.policyNumber + '</div>' : '') +
+            '<div class="tw-active-badge">✅ ביטוח מקיף פעיל</div>' +
+          '</div>' +
+        '</div>' +
+        (ins.towingProvider || ins.emergencyPhone ?
+          '<div class="tw-provider-box">' +
+            '<div class="tw-provider-label">🔗 ספק גרירה ושירותי דרך</div>' +
+            (ins.towingProvider ? '<div class="tw-provider-name">' + ins.towingProvider + '</div>' : '') +
+            (ins.emergencyPhone ? '<div class="tw-provider-phone">📞 ' + ins.emergencyPhone + '</div>' : '') +
+          '</div>' : '') +
+        '<div class="tw-info-grid">' +
+          '<div class="tw-info-cell"><div class="tw-info-label">רכב חלופי</div><div class="tw-info-val">' + (ins.includesRentalCar ? '✅ כלול' : '❌ לא כלול') + '</div></div>' +
+          (ins.expiryDate ? '<div class="tw-info-cell"><div class="tw-info-label">בתוקף עד</div><div class="tw-info-val" style="font-size:13px">' + ins.expiryDate + '</div></div>' : '<div class="tw-info-cell"><div class="tw-info-label">סוג ביטוח</div><div class="tw-info-val" style="font-size:12px">מקיף מלא</div></div>') +
+        '</div>' +
+        (window._towPhone ?
+          '<div class="tw-btns">' +
+            '<button class="tw-btn-call" onclick="window.open(\'tel:\'+window._towPhone)">' +
+              '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
+              '<div class="tw-btn-call-inner">' +
+                '<div class="tw-btn-call-main">חייג לספק גרירה</div>' +
+                '<div class="tw-btn-call-sub">' + (ins.emergencyPhone||'') + ' · מוקד 24/7</div>' +
+              '</div>' +
+            '</button>' +
+          '</div>' : '') +
+        (garage ?
+          '<div class="tw-garage-box">' +
+            '<div class="tw-garage-label">🔧 יעד גרירה מומלץ</div>' +
+            '<div class="tw-garage-name">' + (garage.name||'') + '</div>' +
+            (garage.address ? '<div class="tw-garage-addr">📍 ' + garage.address + '</div>' : '') +
+            (window._towGaragePhone ? '<button class="tw-btn-garage" onclick="window.open(\'tel:\'+window._towGaragePhone)"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg> התקשר למוסך</button>' : '') +
+          '</div>' : '') +
+      '</div>' +
+      '</div>'
+    );
   } catch(e) {
     _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-error">שגיאה בטעינת נתונים.</div></div>');
   }
