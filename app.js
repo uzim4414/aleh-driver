@@ -1628,17 +1628,80 @@ APP.helpPuncture = async function() {
 /* ── מצבר / תקוע ── */
 APP.helpBattery = function() {
   _fireFieldEvent('battery', { actionTaken: 'none', locationShared: false });
-  var gps = STATE.helpGps;
-  var waText = encodeURIComponent('שלום, אני נהג של עמותת עלה וצריך עזרה עם הרכב.' + (gps && gps.lat ? ' המיקום שלי: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng : ''));
-  var waUrl = 'https://wa.me/972772021230?text=' + waText;
+  window._yadWaMsg = encodeURIComponent('שלום, אני נהג עמותת עלה וצריך עזרה עם הרכב.');
+
   _showHelpCard(
+    '<style>' +
+    '@keyframes yd-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+    '@keyframes yd-pulse{0%,100%{box-shadow:0 5px 20px rgba(21,128,61,.45)}60%{box-shadow:0 5px 28px rgba(21,128,61,.75)}}' +
+    '.yd-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#7c2d12,#c2410c);color:#fff;font-size:11px;font-weight:800;letter-spacing:.8px;padding:5px 16px;border-radius:20px;margin-bottom:12px;box-shadow:0 2px 8px rgba(194,65,12,.4)}' +
+    '.yd-card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);animation:yd-fade .35s ease}' +
+    '.yd-header{background:linear-gradient(135deg,#7c2d12,#b91c1c,#dc2626);padding:20px 18px 18px;display:flex;align-items:center;gap:14px}' +
+    '.yd-logo-wrap{width:58px;height:58px;flex-shrink:0;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center}' +
+    '.yd-title-wrap{flex:1}' +
+    '.yd-org-name{font-size:24px;font-weight:900;color:#fff;letter-spacing:-.4px;line-height:1.1}' +
+    '.yd-org-sub{font-size:11px;color:rgba(255,255,255,.8);margin-top:4px;line-height:1.4}' +
+    '.yd-services{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap}' +
+    '.yd-svc-tag{background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px}' +
+    '.yd-vol-notice{margin:14px 16px 0;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1.5px solid #fed7aa;border-radius:14px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px}' +
+    '.yd-vol-icon{font-size:22px;flex-shrink:0}' +
+    '.yd-vol-text{font-size:12.5px;color:#7c2d12;font-weight:500;line-height:1.6}' +
+    '.yd-vol-text strong{font-weight:800}' +
+    '.yd-vol-free{display:inline-block;background:#dc2626;color:#fff;font-size:10px;font-weight:800;padding:2px 9px;border-radius:8px;margin-top:5px}' +
+    '.yd-btns{display:flex;flex-direction:column;gap:10px;padding:14px 16px 18px}' +
+    '.yd-btn-call{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:17px 14px;background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;font-size:18px;font-weight:900;border:none;border-radius:16px;cursor:pointer;animation:yd-pulse 2.2s ease-in-out infinite}' +
+    '.yd-btn-call:active{transform:scale(.97);animation:none}' +
+    '.yd-btn-call-inner{display:flex;flex-direction:column;align-items:flex-start}' +
+    '.yd-btn-call-main{font-size:18px;font-weight:900;line-height:1.2}' +
+    '.yd-btn-call-sub{font-size:11px;font-weight:500;opacity:.85;margin-top:2px}' +
+    '.yd-btn-wa{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;background:linear-gradient(135deg,#25D366,#1da851);color:#fff;font-size:15px;font-weight:700;border:none;border-radius:14px;cursor:pointer;box-shadow:0 3px 14px rgba(37,211,102,.3)}' +
+    '.yd-btn-wa:active{transform:scale(.97)}' +
+    '</style>' +
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-    '<div class="help-card-title">&#x1F50B; ידידים &#x2014; סיוע בדרכים</div>' +
-    '<div class="help-card-sub" style="line-height:1.5">ארגון מתנדבים לאומי לסיוע בדרכים.<br>פנצ\'ר, מצבר, רכב תקוע &#x2014; חינם, 24/6</div>' +
-    '<hr class="help-card-divider">' +
-    '<button class="help-action-btn" onclick="window.open(\'tel:1230\');APP._batteryCall()">&#x1F4DE; 1230 &#x2014; התקשר עכשיו</button>' +
-    '<button class="help-action-btn secondary" onclick="APP._batteryWa(\'' + waUrl + '\')">&#x1F4AC; וואטסאפ + מיקום</button>' +
+    '<div class="yd-badge">🛟 סיוע בדרכים</div>' +
+    '<div class="yd-card">' +
+      '<div class="yd-header">' +
+        '<div class="yd-logo-wrap">' +
+          /* Yadidim heart+hands logo */
+          '<svg width="42" height="42" viewBox="0 0 42 42" fill="none">' +
+            '<path d="M21 34C21 34 7 25.5 7 17C7 12.6 10.6 9 15 9C17.6 9 19.9 10.3 21 12.4C22.1 10.3 24.4 9 27 9C31.4 9 35 12.6 35 17C35 25.5 21 34 21 34Z" fill="white"/>' +
+            '<path d="M10 38 C14 35 19 33.5 21 33.5 C23 33.5 28 35 32 38" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.65"/>' +
+            '<circle cx="21" cy="17" r="3.5" fill="#dc2626"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="yd-title-wrap">' +
+          '<div class="yd-org-name">ידידים</div>' +
+          '<div class="yd-org-sub">ארגון מתנדבים לאומי לסיוע בדרכים</div>' +
+          '<div class="yd-services">' +
+            '<span class="yd-svc-tag">🔋 מצבר</span>' +
+            '<span class="yd-svc-tag">🔧 פנצר</span>' +
+            '<span class="yd-svc-tag">🚗 רכב תקוע</span>' +
+            '<span class="yd-svc-tag">24/6</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="yd-vol-notice">' +
+        '<div class="yd-vol-icon">🤝</div>' +
+        '<div class="yd-vol-text">' +
+          'שירות זה ניתן <strong>על בסיס התנדבותי בלבד</strong>. מתנדבי ידידים מגיעים לסייע ללא תשלום כלשהו — בהתאם לזמינות המתנדבים באזורך.' +
+          '<br><span class="yd-vol-free">חינם לחלוטין</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="yd-btns">' +
+        '<button class="yd-btn-call" onclick="window.open(\'tel:1230\');APP._batteryCall()">' +
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
+          '<div class="yd-btn-call-inner">' +
+            '<div class="yd-btn-call-main">📞 1230 — מוקד ידידים</div>' +
+            '<div class="yd-btn-call-sub">שירות התנדבותי · חייג עכשיו</div>' +
+          '</div>' +
+        '</button>' +
+        '<button class="yd-btn-wa" onclick="window.open(\'https://wa.me/972772021230?text=\'+window._yadWaMsg,\'_blank\')">' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>' +
+          ' וואטסאפ — ידידים' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
     '</div>'
   );
 };
