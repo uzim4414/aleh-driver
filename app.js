@@ -1213,7 +1213,12 @@ const APP = {
   },
 
   closeKmModal: function() {
-    document.getElementById('km-modal').classList.add('hidden');
+    var overlay = document.getElementById('km-modal');
+    overlay.classList.add('closing');
+    setTimeout(function() {
+      overlay.classList.add('hidden');
+      overlay.classList.remove('closing');
+    }, 560);
   },
 
   submitKm: async function() {
@@ -1241,6 +1246,10 @@ const APP = {
       kmErr('לא ניתן להזין ק"מ נמוך מהדיווח האחרון — ' + knownKm.toLocaleString('he') + ' ק"מ');
       return;
     }
+    if (knownKm > 0 && km === knownKm) {
+      kmErr('ק"מ זה כבר דווח — הזן ערך חדש');
+      return;
+    }
     if (knownKm > 0 && km > knownKm + 80000) {
       kmErr('קפיצה לא סבירה — מעל 80,000 ק"מ מהדיווח האחרון');
       return;
@@ -1261,7 +1270,7 @@ const APP = {
       document.getElementById('km-success-val').textContent = km.toLocaleString('he') + ' ק"מ';
       document.getElementById('km-modal-form').classList.add('hidden');
       document.getElementById('km-modal-success').classList.remove('hidden');
-      setTimeout(function() { APP.closeKmModal(); }, 3000);
+      setTimeout(function() { APP.closeKmModal(); }, 4200);
     } catch(e) {
       btn.disabled = false;
       document.getElementById('km-modal-btn-text').textContent = 'עדכן ק"מ';
