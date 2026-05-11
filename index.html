@@ -183,6 +183,39 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .tc-lbl { font-size:12px; color:var(--t2); }
 .tc-tag { display:inline-block; border:1.5px solid rgba(255,255,255,0.18); border-radius:100px; padding:5px 14px; font-size:12px; font-weight:600; margin-top:10px; }
 
+/* KM MODAL */
+#km-modal-form.hidden, #km-modal-success.hidden { display:none !important; }
+.km-modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.8); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:flex; align-items:center; justify-content:center; padding:20px; }
+.km-modal-overlay.hidden { display:none; }
+.km-modal-card { background:#111; border:1px solid rgba(255,255,255,0.1); border-radius:28px; padding:32px 26px 28px; width:100%; max-width:360px; position:relative; animation:kmModalIn .35s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes kmModalIn { from{transform:translateY(48px) scale(0.94);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+.km-modal-icon-wrap { width:64px; height:64px; border-radius:20px; background:rgba(31,138,61,0.12); border:1px solid rgba(31,138,61,0.28); display:flex; align-items:center; justify-content:center; margin:0 auto 20px; }
+.km-modal-title { text-align:center; font-size:22px; font-weight:800; letter-spacing:-0.5px; color:#fff; margin-bottom:4px; }
+.km-modal-prev { text-align:center; font-size:13px; color:var(--t2); margin-bottom:22px; }
+.km-modal-input { width:100%; background:rgba(255,255,255,0.05); border:1.5px solid rgba(31,138,61,0.35); border-radius:16px; padding:16px; color:#fff; font-size:28px; font-weight:800; direction:ltr; text-align:center; font-family:inherit; outline:none; margin-bottom:18px; transition:border-color .2s; }
+.km-modal-input:focus { border-color:rgba(31,138,61,0.75); box-shadow:0 0 0 3px rgba(31,138,61,0.12); }
+.km-modal-submit { width:100%; background:var(--red); border:none; border-radius:16px; padding:16px; color:#fff; font-size:16px; font-weight:800; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:10px; transition:background .2s, transform .1s; margin-bottom:10px; }
+.km-modal-submit:active { transform:scale(0.97); }
+.km-modal-submit:disabled { opacity:.55; cursor:not-allowed; }
+.km-modal-cancel { width:100%; background:transparent; border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:14px; color:var(--t2); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; transition:border-color .2s; }
+.km-modal-cancel:hover { border-color:rgba(255,255,255,0.28); }
+.km-modal-spinner { width:22px; height:22px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+.km-modal-spinner.hidden { display:none; }
+@keyframes spin { to{transform:rotate(360deg)} }
+/* Success state */
+.km-modal-success { text-align:center; padding:8px 0 4px; }
+.km-modal-success.hidden { display:none; }
+.km-success-ring { width:96px; height:96px; margin:0 auto 22px; }
+.km-check-circle { fill:none; stroke:#1F8A3D; stroke-width:2; stroke-dasharray:166; stroke-dashoffset:166; animation:strokeDraw .65s cubic-bezier(.65,0,.45,1) forwards; }
+.km-check-mark { fill:none; stroke:#fff; stroke-width:3.5; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:50; stroke-dashoffset:50; animation:strokeDraw .42s .55s cubic-bezier(.65,0,.45,1) forwards; }
+@keyframes strokeDraw { to{stroke-dashoffset:0} }
+.km-success-glow { position:absolute; inset:0; border-radius:28px; box-shadow:0 0 60px rgba(31,138,61,0.25); animation:glowPulse 1.5s ease-in-out infinite; pointer-events:none; }
+@keyframes glowPulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+.km-success-title { font-size:24px; font-weight:800; letter-spacing:-0.5px; color:#fff; animation:fadeInUp .4s .72s ease both; }
+.km-success-val { font-size:15px; color:#1F8A3D; font-weight:700; margin-top:6px; animation:fadeInUp .4s .85s ease both; }
+.km-success-sub { font-size:12px; color:var(--t2); margin-top:4px; animation:fadeInUp .4s .95s ease both; }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+/* legacy km-card kept for service screen */
 .km-card { margin:16px 16px 0; background:var(--card); border-radius:18px; padding:18px; border:1px solid rgba(48,209,88,0.15); animation:fadeUp .4s ease .1s both; }
 .km-label { font-size:12px; color:var(--ok); font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
 .km-prev { font-size:12px; color:var(--t2); margin-top:4px; }
@@ -591,7 +624,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
       </div>
       <div class="sec">לשירותך</div>
       <div class="qa">
-        <div class="qa-card" onclick="APP.nav('service')">
+        <div class="qa-card" onclick="APP.openKmModal()">
           <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-gauge" color="#1F8A3D"/></svg></div>
           <div class="qa-lbl">עדכון<br>ק"מ</div>
         </div>
@@ -649,14 +682,6 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
       <div class="ph-row"><div class="ph-title">שירות</div></div>
     </div>
     <div class="content">
-      <div class="km-card">
-        <div class="km-label">עדכון ק"מ</div>
-        <div class="km-prev" id="km-prev">ק"מ אחרון: —</div>
-        <div class="km-input-row">
-          <input class="km-input" id="km-input" type="number" placeholder='הכנס ק"מ' inputmode="numeric">
-          <button class="km-btn" onclick="APP.updateKm()">עדכן</button>
-        </div>
-      </div>
       <div class="fault-card" id="fault-section">
         <div class="fault-label">דיווח תקלה</div>
         <textarea class="fault-textarea" id="fault-text" placeholder="תאר את התקלה..."></textarea>
@@ -717,6 +742,40 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 
 <script src="app.js?v=27"></script>
 <script src="aleh-logo-data.js?v=1"></script>
+<!-- KM UPDATE MODAL -->
+<div class="km-modal-overlay hidden" id="km-modal" onclick="if(event.target===this)APP.closeKmModal()">
+  <div class="km-modal-card" id="km-modal-card">
+    <div id="km-modal-form">
+      <div class="km-modal-icon-wrap">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <div class="km-modal-title">עדכון ק"מ</div>
+      <div class="km-modal-prev" id="km-modal-prev">ק"מ אחרון: —</div>
+      <input class="km-modal-input" id="km-modal-input" type="number" placeholder="הכנס ק״מ נוכחי" inputmode="numeric">
+      <button class="km-modal-submit" id="km-modal-submit" onclick="APP.submitKm()">
+        <span id="km-modal-btn-text">עדכן ק"מ</span>
+        <div class="km-modal-spinner hidden" id="km-modal-spinner"></div>
+      </button>
+      <button class="km-modal-cancel" onclick="APP.closeKmModal()">ביטול</button>
+    </div>
+    <div class="km-modal-success hidden" id="km-modal-success">
+      <div class="km-success-ring">
+        <svg viewBox="0 0 52 52" width="96" height="96">
+          <circle class="km-check-circle" cx="26" cy="26" r="25"/>
+          <path class="km-check-mark" d="M14 26 L22 34 L38 18"/>
+        </svg>
+      </div>
+      <div class="km-success-glow"></div>
+      <div class="km-success-title">ק"מ עודכן!</div>
+      <div class="km-success-val" id="km-success-val"></div>
+      <div class="km-success-sub">הנסיעות שלך מסייעות לילדים מיוחדים ❤️</div>
+    </div>
+  </div>
+</div>
+
 <script type="text/babel" src="splash-logo.jsx?v=1"></script>
 <script type="text/babel">
 (function() {

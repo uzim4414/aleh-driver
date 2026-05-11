@@ -1161,11 +1161,7 @@ function renderVehicleScreen(tab) {
 }
 
 function renderService() {
-  const v = STATE.vehicle;
-  if (!v) return;
-  const prev = v.lastServiceKm ? Number(v.lastServiceKm).toLocaleString('he') : '—';
-  document.getElementById('km-prev').textContent = 'ק"מ אחרון: ' + prev;
-  if (v.lastServiceKm) document.getElementById('km-input').value = v.lastServiceKm;
+  // km display lives in the modal now; nothing else to render here
 }
 
 /* ══ Navigation ══ */
@@ -1192,39 +1188,74 @@ const APP = {
     renderVehicleScreen(tab);
   },
 
-  updateKm: async function() {
-    const val = document.getElementById('km-input').value;
+  openKmModal: function() {
+    const v = STATE.vehicle || {};
+    const prev = v.currentKm
+      ? Number(v.currentKm).toLocaleString('he') + ' ק"מ'
+      : (v.lastServiceKm ? Number(v.lastServiceKm).toLocaleString('he') + ' ק"מ' : '—');
+    document.getElementById('km-modal-prev').textContent = 'ק"מ אחרון: ' + prev;
+    const inp = document.getElementById('km-modal-input');
+    inp.value = '';
+    // reset to form state
+    document.getElementById('km-modal-form').classList.remove('hidden');
+    document.getElementById('km-modal-success').classList.add('hidden');
+    document.getElementById('km-modal-submit').disabled = false;
+    document.getElementById('km-modal-btn-text').textContent = 'עדכן ק"מ';
+    document.getElementById('km-modal-spinner').classList.add('hidden');
+    document.getElementById('km-modal').classList.remove('hidden');
+    setTimeout(function() { inp.focus(); }, 120);
+  },
+
+  closeKmModal: function() {
+    document.getElementById('km-modal').classList.add('hidden');
+  },
+
+  submitKm: async function() {
+    const val = document.getElementById('km-modal-input').value;
     const km = parseInt(val, 10);
-    if (!km || isNaN(km) || km <= 0) { showToast('הכנס ק"מ תקין (מספר חיובי)'); return; }
-    if (km > 2000000) { showToast('ק"מ לא תקין — ערך גבוה מדי'); return; }
-    // Client-side: must not go backwards vs known KM (currentKm = latest report; lastServiceKm = floor)
     const v = STATE.vehicle || {};
     const knownKm = Math.max(
       parseInt(v.currentKm, 10) || 0,
       parseInt(v.lastServiceKm, 10) || 0
     );
+    if (!km || isNaN(km) || km <= 0) { showToast('הכנס ק"מ תקין (מספר חיובי)'); return; }
+    if (km > 2000000) { showToast('ק"מ לא תקין — ערך גבוה מדי'); return; }
     if (knownKm > 0 && km < knownKm) {
-      showToast('ק"מ לא תקין — לא ניתן להזין ערך נמוך מהדיווח האחרון (' + knownKm.toLocaleString('he') + ')');
+      showToast('ק"מ נמוך מהדיווח האחרון (' + knownKm.toLocaleString('he') + ')');
       return;
     }
     if (knownKm > 0 && km > knownKm + 80000) {
-      showToast('ק"מ לא תקין — קפיצה לא סבירה (יותר מ-80,000 ק"מ מעל ' + knownKm.toLocaleString('he') + ')');
+      showToast('קפיצה לא סבירה — מעל 80,000 ק"מ');
       return;
     }
-    showLoader();
+    const btn = document.getElementById('km-modal-submit');
+    btn.disabled = true;
+    document.getElementById('km-modal-btn-text').textContent = 'שולח...';
+    document.getElementById('km-modal-spinner').classList.remove('hidden');
     try {
       await gasPost('driver_update_km', { km: km });
       if (STATE.vehicle) {
         STATE.vehicle.lastServiceKm = km;
-        STATE.vehicle.currentKm = km;  // refresh progress bar
+        STATE.vehicle.currentKm = km;
       }
       renderService();
-      showToast('ק"מ עודכן בהצלחה ✓');
+      renderServiceProgress();
+      // show success state
+      document.getElementById('km-success-val').textContent = km.toLocaleString('he') + ' ק"מ';
+      document.getElementById('km-modal-form').classList.add('hidden');
+      document.getElementById('km-modal-success').classList.remove('hidden');
+      setTimeout(function() { APP.closeKmModal(); }, 3000);
     } catch(e) {
+      btn.disabled = false;
+      document.getElementById('km-modal-btn-text').textContent = 'עדכן ק"מ';
+      document.getElementById('km-modal-spinner').classList.add('hidden');
       showToast('שגיאה: ' + e.message);
-    } finally {
-      hideLoader();
     }
+  },
+
+  updateKm: async function() {
+    // legacy — redirect to modal
+    APP.openKmModal();
   },
 
   reportFault: async function() {
