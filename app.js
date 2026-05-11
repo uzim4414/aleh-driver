@@ -1582,49 +1582,45 @@ APP.helpPuncture = async function() {
   }
 
   /* ── נתוני צמיגים ── */
-  var tireHtml = '';
-  try {
-    var _gd  = STATE.govData  || {};
-    var _veh = STATE.vehicle  || {};
-    var _tFrontSize = _gd.zmig_kidmi || '';
-    var _tRearSize  = _gd.zmig_ahori || '';
-    var _pFront = parseFloat(_veh.tirePressureFront) || 0;
-    var _pRear  = parseFloat(_veh.tirePressureRear)  || 0;
-    var _pNote  = _veh.tirePressureNote || '';
-    if (_tFrontSize || _tRearSize || _pFront || _pRear) {
-      function _tireBar(bar, label) {
-        if (!bar) return '';
-        var pct = Math.min(100, Math.round(((bar - 1.5) / (3.5 - 1.5)) * 100));
-        var color = bar < 2.0 ? '#ef4444' : bar > 2.8 ? '#f59e0b' : '#10b981';
-        return '<div class="tr-pres-item">' +
-          '<div class="tr-pres-label">' + label + '</div>' +
-          '<div class="tr-pres-val" style="color:' + color + '">' + bar.toFixed(1) + ' bar</div>' +
-          '<div class="tr-gauge-bg"><div class="tr-gauge-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
-        '</div>';
-      }
-      tireHtml =
-        '<div class="tire-card">' +
-          '<div class="tire-header">' +
-            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>' +
-            '<span>נתוני צמיגים — רכב זה</span>' +
+  var _tireBarFn = function(bar, label) {
+    if (!bar) return '';
+    var pct = Math.min(100, Math.round(((bar - 1.5) / (3.5 - 1.5)) * 100));
+    var color = bar < 2.0 ? '#ef4444' : bar > 2.8 ? '#f59e0b' : '#10b981';
+    return '<div class="tr-pres-item">' +
+      '<div class="tr-pres-label">' + label + '</div>' +
+      '<div class="tr-pres-val" style="color:' + color + '">' + bar.toFixed(1) + ' bar</div>' +
+      '<div class="tr-gauge-bg"><div class="tr-gauge-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+    '</div>';
+  };
+  var _gd  = STATE.govData  || {};
+  var _veh = STATE.vehicle  || {};
+  var _tFrontSize = _gd.zmig_kidmi || '';
+  var _tRearSize  = _gd.zmig_ahori || '';
+  var _pFront = parseFloat(_veh.tirePressureFront) || 0;
+  var _pRear  = parseFloat(_veh.tirePressureRear)  || 0;
+  var _pNote  = _veh.tirePressureNote || '';
+  var tireHtml = (_tFrontSize || _tRearSize || _pFront || _pRear) ?
+    '<div class="tire-card">' +
+      '<div class="tire-header">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>' +
+        '<span>נתוני צמיגים — רכב זה</span>' +
+      '</div>' +
+      (_tFrontSize || _tRearSize ?
+        '<div class="tire-sizes">' +
+          (_tFrontSize ? '<div class="tire-sz-box"><div class="tire-sz-label">🔵 קדמי</div><div class="tire-sz-val">' + _tFrontSize + '</div></div>' : '') +
+          (_tRearSize  ? '<div class="tire-sz-box"><div class="tire-sz-label">🟢 אחורי</div><div class="tire-sz-val">' + _tRearSize  + '</div></div>' : '') +
+        '</div>' : '') +
+      (_pFront || _pRear ?
+        '<div class="tire-pres-wrap">' +
+          '<div class="tire-pres-title">לחץ אוויר מומלץ (יצרן)</div>' +
+          '<div class="tr-pres-row">' +
+            _tireBarFn(_pFront, 'קדמי') +
+            _tireBarFn(_pRear,  'אחורי') +
           '</div>' +
-          (_tFrontSize || _tRearSize ?
-            '<div class="tire-sizes">' +
-              (_tFrontSize ? '<div class="tire-sz-box"><div class="tire-sz-label">🔵 קדמי</div><div class="tire-sz-val">' + _tFrontSize + '</div></div>' : '') +
-              (_tRearSize  ? '<div class="tire-sz-box"><div class="tire-sz-label">🟢 אחורי</div><div class="tire-sz-val">' + _tRearSize  + '</div></div>' : '') +
-            '</div>' : '') +
-          (_pFront || _pRear ?
-            '<div class="tire-pres-wrap">' +
-              '<div class="tire-pres-title">לחץ אוויר מומלץ (יצרן)</div>' +
-              '<div class="tr-pres-row">' +
-                _tireBar(_pFront, 'קדמי') +
-                _tireBar(_pRear,  'אחורי') +
-              '</div>' +
-              (_pNote ? '<div class="tire-note">💡 ' + _pNote + '</div>' : '') +
-            '</div>' : '') +
-        '</div>';
-    }
-  } catch(_te) {}
+          (_pNote ? '<div class="tire-note">💡 ' + _pNote + '</div>' : '') +
+        '</div>' : '') +
+    '</div>'
+  : '';
 
   _showHelpCard(
     '<style>' +
