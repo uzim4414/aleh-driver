@@ -1581,6 +1581,51 @@ APP.helpPuncture = async function() {
       '</div>';
   }
 
+  /* ── נתוני צמיגים ── */
+  var tireHtml = '';
+  try {
+    var _gd  = STATE.govData  || {};
+    var _veh = STATE.vehicle  || {};
+    var _tFrontSize = _gd.zmig_kidmi || '';
+    var _tRearSize  = _gd.zmig_ahori || '';
+    var _pFront = parseFloat(_veh.tirePressureFront) || 0;
+    var _pRear  = parseFloat(_veh.tirePressureRear)  || 0;
+    var _pNote  = _veh.tirePressureNote || '';
+    if (_tFrontSize || _tRearSize || _pFront || _pRear) {
+      function _tireBar(bar, label) {
+        if (!bar) return '';
+        var pct = Math.min(100, Math.round(((bar - 1.5) / (3.5 - 1.5)) * 100));
+        var color = bar < 2.0 ? '#ef4444' : bar > 2.8 ? '#f59e0b' : '#10b981';
+        return '<div class="tr-pres-item">' +
+          '<div class="tr-pres-label">' + label + '</div>' +
+          '<div class="tr-pres-val" style="color:' + color + '">' + bar.toFixed(1) + ' bar</div>' +
+          '<div class="tr-gauge-bg"><div class="tr-gauge-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+        '</div>';
+      }
+      tireHtml =
+        '<div class="tire-card">' +
+          '<div class="tire-header">' +
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>' +
+            '<span>נתוני צמיגים — רכב זה</span>' +
+          '</div>' +
+          (_tFrontSize || _tRearSize ?
+            '<div class="tire-sizes">' +
+              (_tFrontSize ? '<div class="tire-sz-box"><div class="tire-sz-label">🔵 קדמי</div><div class="tire-sz-val">' + _tFrontSize + '</div></div>' : '') +
+              (_tRearSize  ? '<div class="tire-sz-box"><div class="tire-sz-label">🟢 אחורי</div><div class="tire-sz-val">' + _tRearSize  + '</div></div>' : '') +
+            '</div>' : '') +
+          (_pFront || _pRear ?
+            '<div class="tire-pres-wrap">' +
+              '<div class="tire-pres-title">לחץ אוויר מומלץ (יצרן)</div>' +
+              '<div class="tr-pres-row">' +
+                _tireBar(_pFront, 'קדמי') +
+                _tireBar(_pRear,  'אחורי') +
+              '</div>' +
+              (_pNote ? '<div class="tire-note">💡 ' + _pNote + '</div>' : '') +
+            '</div>' : '') +
+        '</div>';
+    }
+  } catch(_te) {}
+
   _showHelpCard(
     '<style>' +
     '@keyframes blink-warn{0%,100%{opacity:1}50%{opacity:.45}}' +
@@ -1613,9 +1658,25 @@ APP.helpPuncture = async function() {
     '.pc-emergency-body{font-size:13px;color:#78350f;line-height:1.65;margin-bottom:12px}' +
     '.pc-btn-search{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:14px;font-weight:700;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 12px rgba(245,158,11,.4)}' +
     '.pc-no-prov{text-align:center;padding:20px 0 10px;color:#64748b;font-size:14px}' +
+    '.tire-card{background:linear-gradient(135deg,#0f2942,#1e3a5f);border-radius:20px;overflow:hidden;margin-bottom:14px;box-shadow:0 4px 20px rgba(15,41,66,.4);animation:fade-in .3s ease}' +
+    '.tire-header{display:flex;align-items:center;gap:10px;padding:14px 18px 10px;color:#fff;font-size:15px;font-weight:800;letter-spacing:-.2px;border-bottom:1px solid rgba(255,255,255,.12)}' +
+    '.tire-sizes{display:flex;gap:10px;padding:14px 18px}' +
+    '.tire-sz-box{flex:1;background:rgba(255,255,255,.1);border-radius:14px;padding:12px;text-align:center}' +
+    '.tire-sz-label{font-size:11px;color:#93c5fd;font-weight:700;margin-bottom:6px}' +
+    '.tire-sz-val{font-size:15px;font-weight:900;color:#fff;letter-spacing:.5px;font-family:monospace}' +
+    '.tire-pres-wrap{padding:14px 18px 16px}' +
+    '.tire-pres-title{font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:.5px;margin-bottom:10px}' +
+    '.tr-pres-row{display:flex;gap:12px}' +
+    '.tr-pres-item{flex:1}' +
+    '.tr-pres-label{font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:4px}' +
+    '.tr-pres-val{font-size:22px;font-weight:900;line-height:1;margin-bottom:6px}' +
+    '.tr-gauge-bg{background:rgba(255,255,255,.15);border-radius:4px;height:6px;overflow:hidden}' +
+    '.tr-gauge-fill{height:100%;border-radius:4px;transition:width .6s ease}' +
+    '.tire-note{margin-top:10px;font-size:12px;color:#cbd5e1;line-height:1.5;background:rgba(255,255,255,.07);border-radius:10px;padding:8px 12px}' +
     '</style>' +
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+    (tireHtml || '') +
     (providerHtml || '<div class="pc-no-prov">לא הוגדר ספק מורשה במערכת</div>') +
     (emergencyHtml || (!providerHtml
       ? '<button class="pc-btn-search" style="margin-top:8px" onclick="window.open(\''+mapsUrl+'\')">🔍 חיפוש פנצריות פתוחות 24/7 קרוב אליי</button>'
