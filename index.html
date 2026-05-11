@@ -185,6 +185,8 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 
 /* KM MODAL */
 #km-modal-form.hidden, #km-modal-success.hidden { display:none !important; }
+.km-modal-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.3); border-radius:10px; padding:10px 14px; font-size:13px; color:#ff3b30; text-align:center; margin-bottom:12px; animation:kmModalIn .25s ease; }
+.km-modal-error.hidden { display:none !important; }
 .km-modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.8); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:flex; align-items:center; justify-content:center; padding:20px; }
 .km-modal-overlay.hidden { display:none; }
 .km-modal-card { background:#111; border:1px solid rgba(255,255,255,0.1); border-radius:28px; padding:32px 26px 28px; width:100%; max-width:360px; position:relative; animation:kmModalIn .35s cubic-bezier(0.34,1.56,0.64,1); }
@@ -755,6 +757,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
       <div class="km-modal-title">עדכון ק"מ</div>
       <div class="km-modal-prev" id="km-modal-prev">ק"מ אחרון: —</div>
       <input class="km-modal-input" id="km-modal-input" type="number" placeholder="הכנס ק״מ נוכחי" inputmode="numeric">
+      <div class="km-modal-error hidden" id="km-modal-error"></div>
       <button class="km-modal-submit" id="km-modal-submit" onclick="APP.submitKm()">
         <span id="km-modal-btn-text">עדכן ק"מ</span>
         <div class="km-modal-spinner hidden" id="km-modal-spinner"></div>

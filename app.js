@@ -1202,6 +1202,12 @@ const APP = {
     document.getElementById('km-modal-submit').disabled = false;
     document.getElementById('km-modal-btn-text').textContent = 'עדכן ק"מ';
     document.getElementById('km-modal-spinner').classList.add('hidden');
+    document.getElementById('km-modal-error').classList.add('hidden');
+    inp.style.borderColor = '';
+    inp.oninput = function() {
+      document.getElementById('km-modal-error').classList.add('hidden');
+      inp.style.borderColor = '';
+    };
     document.getElementById('km-modal').classList.remove('hidden');
     setTimeout(function() { inp.focus(); }, 120);
   },
@@ -1218,14 +1224,25 @@ const APP = {
       parseInt(v.currentKm, 10) || 0,
       parseInt(v.lastServiceKm, 10) || 0
     );
-    if (!km || isNaN(km) || km <= 0) { showToast('הכנס ק"מ תקין (מספר חיובי)'); return; }
-    if (km > 2000000) { showToast('ק"מ לא תקין — ערך גבוה מדי'); return; }
+    function kmErr(msg) {
+      var el = document.getElementById('km-modal-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      document.getElementById('km-modal-input').style.borderColor = 'rgba(255,59,48,0.6)';
+    }
+    function kmErrClear() {
+      document.getElementById('km-modal-error').classList.add('hidden');
+      document.getElementById('km-modal-input').style.borderColor = '';
+    }
+    kmErrClear();
+    if (!km || isNaN(km) || km <= 0) { kmErr('יש להזין מספר חיובי'); return; }
+    if (km > 2000000) { kmErr('ערך גבוה מדי'); return; }
     if (knownKm > 0 && km < knownKm) {
-      showToast('ק"מ נמוך מהדיווח האחרון (' + knownKm.toLocaleString('he') + ')');
+      kmErr('לא ניתן להזין ק"מ נמוך מהדיווח האחרון — ' + knownKm.toLocaleString('he') + ' ק"מ');
       return;
     }
     if (knownKm > 0 && km > knownKm + 80000) {
-      showToast('קפיצה לא סבירה — מעל 80,000 ק"מ');
+      kmErr('קפיצה לא סבירה — מעל 80,000 ק"מ מהדיווח האחרון');
       return;
     }
     const btn = document.getElementById('km-modal-submit');
@@ -1249,7 +1266,9 @@ const APP = {
       btn.disabled = false;
       document.getElementById('km-modal-btn-text').textContent = 'עדכן ק"מ';
       document.getElementById('km-modal-spinner').classList.add('hidden');
-      showToast('שגיאה: ' + e.message);
+      var errEl = document.getElementById('km-modal-error');
+      errEl.textContent = 'שגיאה: ' + e.message;
+      errEl.classList.remove('hidden');
     }
   },
 
