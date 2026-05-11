@@ -1477,24 +1477,20 @@ APP.helpPuncture = async function() {
   }
 };
 
-/* ── מצבר ── */
+/* ── מצבר / תקוע ── */
 APP.helpBattery = function() {
   _fireFieldEvent('battery', { actionTaken: 'none', locationShared: false });
   var gps = STATE.helpGps;
-  var locStr = (gps && gps.lat)
-    ? ' &#x05D4;&#x05DE;&#x05D9;&#x05E7;&#x05D5;&#x05DD; &#x05E9;&#x05DC;&#x05D9;: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng
-    : '';
-  var waText = encodeURIComponent('שלום, אני נהג עלה צריך עזרה עם מצבר.' + (gps && gps.lat ? ' המיקום שלי: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng : ''));
-  var waPhone = '972XXXXXXXXXX';
-  var waUrl = 'https://wa.me/' + waPhone + '?text=' + waText;
+  var waText = encodeURIComponent('שלום, אני נהג של עמותת עלה וצריך עזרה עם הרכב.' + (gps && gps.lat ? ' המיקום שלי: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng : ''));
+  var waUrl = 'https://wa.me/972772021230?text=' + waText;
   _showHelpCard(
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-    '<div class="help-card-title">&#x1F50B; מוקד ידידים</div>' +
-    '<div class="help-card-sub">סיוע בדרכים &#x2014; זמין 24/7</div>' +
+    '<div class="help-card-title">&#x1F50B; ידידים &#x2014; סיוע בדרכים</div>' +
+    '<div class="help-card-sub" style="line-height:1.5">ארגון מתנדבים לאומי לסיוע בדרכים.<br>פנצ\'ר, מצבר, רכב תקוע &#x2014; חינם, 24/6</div>' +
     '<hr class="help-card-divider">' +
-    '<button class="help-action-btn" onclick="window.open(\'tel:*6140\');APP._batteryCall()">&#x1F4DE; *6140 &#x2014; התקשר עכשיו</button>' +
-    '<button class="help-action-btn secondary" onclick="APP._batteryWa(\'' + waUrl + '\')">&#x1F4AC; שלח וואטסאפ + מיקום</button>' +
+    '<button class="help-action-btn" onclick="window.open(\'tel:1230\');APP._batteryCall()">&#x1F4DE; 1230 &#x2014; התקשר עכשיו</button>' +
+    '<button class="help-action-btn secondary" onclick="APP._batteryWa(\'' + waUrl + '\')">&#x1F4AC; וואטסאפ + מיקום</button>' +
     '</div>'
   );
 };
@@ -1545,28 +1541,50 @@ APP.helpTowing = async function() {
   }
 };
 
-/* ── קביעת תור ── */
+/* ── פנייה למוסך / דיווח תקלה ── */
 APP.helpAppointment = function() {
-  _fireFieldEvent('service_request', { reason: null, notes: null });
   APP._apptSelectedReason = null;
-  var garage     = (STATE.vehicle && STATE.vehicle.garageName) ? STATE.vehicle.garageName : 'מוסך לא מוגדר';
-  var garagePhone= (STATE.vehicle && STATE.vehicle.garagePhone) ? STATE.vehicle.garagePhone : '';
-  var reasons    = [['routine','טיפול שגרתי'],['fault','תקלה'],['warning_light','נורה דולקת'],['post_accident','לאחר תאונה'],['other','אחר']];
-  var radioHtml  = reasons.map(function(r) {
+  var g = (STATE.vehicle && STATE.vehicle.garage) ? STATE.vehicle.garage : null;
+  var garageName  = (g && g.name)  ? g.name  : '';
+  var garageAddr  = (g && g.address) ? g.address : '';
+  var garagePhone = (g && (g.contactPhone || g.phone)) ? (g.contactPhone || g.phone) : '';
+  var garageId    = (g && g.id) ? g.id : '';
+
+  var garageSection = '';
+  if (garageName || garageAddr || garagePhone) {
+    garageSection =
+      '<div style="background:rgba(255,255,255,0.07);border-radius:10px;padding:12px 14px;margin-bottom:14px">' +
+      '<div style="font-size:13px;color:#94a3b8;margin-bottom:4px">המוסך שלך</div>' +
+      '<div style="font-size:15px;font-weight:700;color:#f1f5f9">' + (garageName || 'מוסך') + '</div>' +
+      (garageAddr ? '<div style="font-size:12px;color:#94a3b8;margin-top:2px">&#x1F4CD; ' + garageAddr + '</div>' : '') +
+      (garagePhone ?
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<button class="help-action-btn secondary" style="flex:1;padding:10px 8px;font-size:13px" onclick="window.open(\'tel:\' + \'' + garagePhone.replace(/[^0-9+]/g,'') + '\')">&#x1F4DE; חייג למוסך</button>' +
+        '<button class="help-action-btn secondary" style="flex:1;padding:10px 8px;font-size:13px" onclick="window.open(\'https://wa.me/' + phoneToWa(garagePhone) + '?text=\' + encodeURIComponent(\'שלום, אני נהג עלה ברכב \' + (STATE.vehicle && STATE.vehicle.num || \'\') + \'. אשמח לתאם טיפול.\'))">&#x1F4AC; וואטסאפ</button>' +
+        '</div>'
+      : '') +
+      '</div>';
+  } else {
+    garageSection = '<div style="font-size:13px;color:#f59e0b;padding:8px 0;margin-bottom:8px">&#x26A0;&#xFE0F; לא שויך מוסך לרכב זה. פנה למנהל הצי.</div>';
+  }
+
+  var reasons = [['routine','טיפול תקופתי'],['fault','תקלה / בעיה'],['warning_light','נורה דולקת'],['post_accident','לאחר תאונה'],['noise','רעש / תחושה חריגה'],['other','אחר']];
+  var radioHtml = reasons.map(function(r) {
     return '<label class="help-radio-item" onclick="APP._apptSelectReason(\'' + r[0] + '\',this)">' +
            '<input type="radio" name="appt-reason" value="' + r[0] + '"><span class="help-radio-label">' + r[1] + '</span></label>';
   }).join('');
+
   _showHelpCard(
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-    '<div class="help-card-title">&#x1F4C5; קביעת תור</div>' +
-    '<div class="help-card-sub">המוסך שלך: ' + garage + '</div>' +
+    '<div class="help-card-title">&#x1F527; פנייה למוסך</div>' +
+    '<div class="help-card-sub">דווח לצי וקבל תיאום עם המוסך</div>' +
     '<hr class="help-card-divider">' +
-    (garagePhone ? '<button class="help-action-btn secondary" style="margin-bottom:16px" onclick="window.open(\'tel:\' + garagePhone.replace(/[^0-9+]/g,\'\') + \'\')">&#x1F4DE; חייג למוסך</button>' : '') +
-    '<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:10px">סיבת התור:</div>' +
+    garageSection +
+    '<div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:8px">מה הסיבה?</div>' +
     '<div class="help-radio-group" id="appt-reasons">' + radioHtml + '</div>' +
-    '<textarea class="help-textarea" id="appt-notes" placeholder="הערות (אופציונלי)" rows="3"></textarea>' +
-    '<button class="help-action-btn" onclick="APP._apptSubmit()">שלח בקשה למנהל הצי</button>' +
+    '<textarea class="help-textarea" id="appt-notes" placeholder="פרטים נוספים (אופציונלי)" rows="3"></textarea>' +
+    '<button class="help-action-btn" onclick="APP._apptSubmit()">&#x1F4E8; שלח דיווח למנהל הצי</button>' +
     '</div>'
   );
 };
@@ -1580,8 +1598,9 @@ APP._apptSelectReason = function(value, el) {
 APP._apptSubmit = async function() {
   if (!APP._apptSelectedReason) { showToast('יש לבחור סיבת תור'); return; }
   var notes   = (document.getElementById('appt-notes') || {}).value || '';
-  var garage  = (STATE.vehicle && STATE.vehicle.garageName) ? STATE.vehicle.garageName : '';
-  var garageId= (STATE.vehicle && STATE.vehicle.garageId)   ? STATE.vehicle.garageId   : '';
+  var _g      = (STATE.vehicle && STATE.vehicle.garage) ? STATE.vehicle.garage : {};
+  var garage  = _g.name || '';
+  var garageId= _g.id   || '';
   var result  = await _fireFieldEvent('service_request', { garageId: garageId, garageName: garage, reason: APP._apptSelectedReason, notes: notes });
   if (result.ok) {
     _showHelpCard(
