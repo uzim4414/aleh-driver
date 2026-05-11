@@ -1582,20 +1582,29 @@ APP.helpPuncture = async function() {
   }
 
   /* ── נתוני צמיגים ── */
-  var _tireBarFn = function(bar, label) {
+  var _gaugeHtml = function(bar, label) {
     if (!bar) return '';
-    var pct = Math.min(100, Math.round(((bar - 1.5) / (3.5 - 1.5)) * 100));
-    var color = bar < 2.0 ? '#ef4444' : bar > 2.8 ? '#f59e0b' : '#10b981';
-    return '<div class="tr-pres-item">' +
-      '<div class="tr-pres-label">' + label + '</div>' +
-      '<div class="tr-pres-val" style="color:' + color + '">' + bar.toFixed(1) + ' bar</div>' +
-      '<div class="tr-gauge-bg"><div class="tr-gauge-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+    var pct   = Math.min(1, Math.max(0, (bar - 1.5) / 2.0));
+    var CIRC  = 163.4;
+    var ARC   = 122.5;
+    var fill  = Math.round(ARC * pct * 10) / 10;
+    var clr   = bar < 2.0 ? '#ef4444' : bar > 2.8 ? '#f59e0b' : '#10b981';
+    var glow  = bar < 2.0 ? 'rgba(239,68,68,.5)' : bar > 2.8 ? 'rgba(245,158,11,.5)' : 'rgba(16,185,129,.5)';
+    return '<div class="tg-item">' +
+      '<div class="tg-label">' + label + '</div>' +
+      '<svg class="tg-svg" width="80" height="80" viewBox="0 0 64 64">' +
+        '<defs><filter id="glow-' + label + '"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
+        '<circle fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7" stroke-linecap="round" cx="32" cy="32" r="26" stroke-dasharray="' + ARC + ' ' + CIRC + '" transform="rotate(135 32 32)"/>' +
+        '<circle fill="none" stroke="' + clr + '" stroke-width="7" stroke-linecap="round" cx="32" cy="32" r="26" transform="rotate(135 32 32)" filter="url(#glow-' + label + ')">' +
+          '<animate attributeName="stroke-dasharray" from="0 ' + CIRC + '" to="' + fill + ' ' + CIRC + '" dur="1.1s" calcMode="spline" keySplines=".22 1 .36 1" fill="freeze"/>' +
+        '</circle>' +
+        '<text x="32" y="29" text-anchor="middle" dominant-baseline="central" fill="' + clr + '" font-size="14" font-weight="900" font-family="monospace">' + bar.toFixed(1) + '</text>' +
+        '<text x="32" y="41" text-anchor="middle" dominant-baseline="central" fill="#475569" font-size="9" font-weight="600">bar</text>' +
+      '</svg>' +
     '</div>';
   };
   var _gd  = STATE.govData  || {};
   var _veh = STATE.vehicle  || {};
-  console.log('[TIRE DEBUG] govData:', JSON.stringify(_gd));
-  console.log('[TIRE DEBUG] vehicle tirePressure:', _veh.tirePressureFront, _veh.tirePressureRear);
   var _tFrontSize = _gd.zmig_kidmi || '';
   var _tRearSize  = _gd.zmig_ahori || '';
   var _pFront = parseFloat(_veh.tirePressureFront) || 0;
@@ -1603,23 +1612,39 @@ APP.helpPuncture = async function() {
   var _pNote  = _veh.tirePressureNote || '';
   var tireHtml = (_tFrontSize || _tRearSize || _pFront || _pRear) ?
     '<div class="tire-card">' +
-      '<div class="tire-header">' +
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>' +
-        '<span>נתוני צמיגים — רכב זה</span>' +
+      '<div class="tire-hdr">' +
+        '<div class="tire-hdr-icon">' +
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3.5"/><line x1="12" y1="2" x2="12" y2="8.5"/><line x1="12" y1="15.5" x2="12" y2="22"/><line x1="2" y1="12" x2="8.5" y2="12"/><line x1="15.5" y1="12" x2="22" y2="12"/><line x1="4.22" y1="4.22" x2="8.7" y2="8.7"/><line x1="15.3" y1="15.3" x2="19.78" y2="19.78"/><line x1="19.78" y1="4.22" x2="15.3" y2="8.7"/><line x1="8.7" y1="15.3" x2="4.22" y2="19.78"/></svg>' +
+        '</div>' +
+        '<div class="tire-hdr-text">' +
+          '<div class="tire-hdr-title">נתוני צמיגים — רכב זה</div>' +
+          '<div class="tire-hdr-sub">ממשרד התחבורה</div>' +
+        '</div>' +
+        '<div class="tire-mot-badge">MOT API</div>' +
       '</div>' +
       (_tFrontSize || _tRearSize ?
         '<div class="tire-sizes">' +
-          (_tFrontSize ? '<div class="tire-sz-box"><div class="tire-sz-label">🔵 קדמי</div><div class="tire-sz-val">' + _tFrontSize + '</div></div>' : '') +
-          (_tRearSize  ? '<div class="tire-sz-box"><div class="tire-sz-label">🟢 אחורי</div><div class="tire-sz-val">' + _tRearSize  + '</div></div>' : '') +
+          (_tFrontSize ?
+            '<div class="tire-sz-item">' +
+              '<svg width="28" height="20" viewBox="0 0 28 20"><ellipse cx="14" cy="10" rx="13" ry="9" fill="none" stroke="#3b82f6" stroke-width="2"/><ellipse cx="14" cy="10" rx="6" ry="4" fill="none" stroke="#3b82f6" stroke-width="1.5"/><line x1="14" y1="1" x2="14" y2="6" stroke="#3b82f6" stroke-width="1.5"/><line x1="14" y1="14" x2="14" y2="19" stroke="#3b82f6" stroke-width="1.5"/><line x1="1" y1="10" x2="8" y2="10" stroke="#3b82f6" stroke-width="1.5"/><line x1="20" y1="10" x2="27" y2="10" stroke="#3b82f6" stroke-width="1.5"/></svg>' +
+              '<div class="tire-sz-lbl">קדמי</div>' +
+              '<div class="tire-sz-val">' + _tFrontSize + '</div>' +
+            '</div>' : '') +
+          (_tRearSize ?
+            '<div class="tire-sz-item">' +
+              '<svg width="28" height="20" viewBox="0 0 28 20"><ellipse cx="14" cy="10" rx="13" ry="9" fill="none" stroke="#10b981" stroke-width="2"/><ellipse cx="14" cy="10" rx="6" ry="4" fill="none" stroke="#10b981" stroke-width="1.5"/><line x1="14" y1="1" x2="14" y2="6" stroke="#10b981" stroke-width="1.5"/><line x1="14" y1="14" x2="14" y2="19" stroke="#10b981" stroke-width="1.5"/><line x1="1" y1="10" x2="8" y2="10" stroke="#10b981" stroke-width="1.5"/><line x1="20" y1="10" x2="27" y2="10" stroke="#10b981" stroke-width="1.5"/></svg>' +
+              '<div class="tire-sz-lbl">אחורי</div>' +
+              '<div class="tire-sz-val">' + _tRearSize + '</div>' +
+            '</div>' : '') +
         '</div>' : '') +
       (_pFront || _pRear ?
-        '<div class="tire-pres-wrap">' +
-          '<div class="tire-pres-title">לחץ אוויר מומלץ (יצרן)</div>' +
-          '<div class="tr-pres-row">' +
-            _tireBarFn(_pFront, 'קדמי') +
-            _tireBarFn(_pRear,  'אחורי') +
+        '<div class="tire-pres">' +
+          '<div class="tire-pres-hdr"><span>לחץ אוויר מומלץ</span></div>' +
+          '<div class="tg-row">' +
+            _gaugeHtml(_pFront, 'קדמי') +
+            _gaugeHtml(_pRear, 'אחורי') +
           '</div>' +
-          (_pNote ? '<div class="tire-note">💡 ' + _pNote + '</div>' : '') +
+          (_pNote ? '<div class="tire-note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + _pNote + '</div>' : '') +
         '</div>' : '') +
     '</div>'
   : '';
@@ -1656,21 +1681,29 @@ APP.helpPuncture = async function() {
     '.pc-emergency-body{font-size:13px;color:#78350f;line-height:1.65;margin-bottom:12px}' +
     '.pc-btn-search{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:14px;font-weight:700;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 12px rgba(245,158,11,.4)}' +
     '.pc-no-prov{text-align:center;padding:20px 0 10px;color:#64748b;font-size:14px}' +
-    '.tire-card{background:linear-gradient(135deg,#0f2942,#1e3a5f);border-radius:20px;overflow:hidden;margin-bottom:14px;box-shadow:0 4px 20px rgba(15,41,66,.4);animation:fade-in .3s ease}' +
-    '.tire-header{display:flex;align-items:center;gap:10px;padding:14px 18px 10px;color:#fff;font-size:15px;font-weight:800;letter-spacing:-.2px;border-bottom:1px solid rgba(255,255,255,.12)}' +
-    '.tire-sizes{display:flex;gap:10px;padding:14px 18px}' +
-    '.tire-sz-box{flex:1;background:rgba(255,255,255,.1);border-radius:14px;padding:12px;text-align:center}' +
-    '.tire-sz-label{font-size:11px;color:#93c5fd;font-weight:700;margin-bottom:6px}' +
-    '.tire-sz-val{font-size:15px;font-weight:900;color:#fff;letter-spacing:.5px;font-family:monospace}' +
-    '.tire-pres-wrap{padding:14px 18px 16px}' +
-    '.tire-pres-title{font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:.5px;margin-bottom:10px}' +
-    '.tr-pres-row{display:flex;gap:12px}' +
-    '.tr-pres-item{flex:1}' +
-    '.tr-pres-label{font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:4px}' +
-    '.tr-pres-val{font-size:22px;font-weight:900;line-height:1;margin-bottom:6px}' +
-    '.tr-gauge-bg{background:rgba(255,255,255,.15);border-radius:4px;height:6px;overflow:hidden}' +
-    '.tr-gauge-fill{height:100%;border-radius:4px;transition:width .6s ease}' +
-    '.tire-note{margin-top:10px;font-size:12px;color:#cbd5e1;line-height:1.5;background:rgba(255,255,255,.07);border-radius:10px;padding:8px 12px}' +
+    '@keyframes tire-up{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}' +
+    '@keyframes tire-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}' +
+    '@keyframes sz-pop{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:scale(1)}}' +
+    '.tire-card{background:linear-gradient(145deg,#0d1b2a,#172244);border:1px solid rgba(255,255,255,.1);border-radius:24px;overflow:hidden;margin-bottom:16px;box-shadow:0 12px 40px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07);animation:tire-up .45s cubic-bezier(.22,1,.36,1)}' +
+    '.tire-hdr{display:flex;align-items:center;gap:12px;padding:15px 18px 13px;background:linear-gradient(135deg,rgba(29,78,216,.85),rgba(30,58,138,.7));border-bottom:1px solid rgba(255,255,255,.09)}' +
+    '.tire-hdr-icon{width:42px;height:42px;background:rgba(255,255,255,.12);border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:tire-spin 10s linear infinite}' +
+    '.tire-hdr-text{flex:1}' +
+    '.tire-hdr-title{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.2px}' +
+    '.tire-hdr-sub{font-size:11px;color:#93c5fd;margin-top:2px}' +
+    '.tire-mot-badge{background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.3);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:800;color:#60a5fa;letter-spacing:.8px}' +
+    '.tire-sizes{display:flex;gap:10px;padding:14px 16px 12px}' +
+    '.tire-sz-item{flex:1;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px 10px;text-align:center;animation:sz-pop .4s cubic-bezier(.22,1,.36,1) backwards}' +
+    '.tire-sz-item:first-child{animation-delay:.08s}.tire-sz-item:last-child{animation-delay:.16s}' +
+    '.tire-sz-lbl{font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.5px;margin:8px 0 6px}' +
+    '.tire-sz-val{font-size:16px;font-weight:900;color:#f1f5f9;font-family:"Courier New",monospace;letter-spacing:1px;text-shadow:0 0 18px rgba(96,165,250,.35)}' +
+    '.tire-pres{padding:4px 16px 18px}' +
+    '.tire-pres-hdr{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;color:#475569;letter-spacing:.9px;text-transform:uppercase;margin-bottom:12px}' +
+    '.tire-pres-hdr::before,.tire-pres-hdr::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.07)}' +
+    '.tg-row{display:flex;gap:10px;justify-content:center}' +
+    '.tg-item{flex:1;text-align:center;max-width:120px}' +
+    '.tg-label{font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:8px;letter-spacing:.3px}' +
+    '.tg-svg{display:block;margin:0 auto;overflow:visible}' +
+    '.tire-note{display:flex;align-items:flex-start;gap:8px;margin-top:12px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.15);border-radius:12px;padding:10px 14px;font-size:12px;color:#cbd5e1;line-height:1.55}' +
     '</style>' +
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
