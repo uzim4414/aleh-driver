@@ -1594,6 +1594,8 @@ APP.helpPuncture = async function() {
   };
   var _gd  = STATE.govData  || {};
   var _veh = STATE.vehicle  || {};
+  console.log('[TIRE DEBUG] govData:', JSON.stringify(_gd));
+  console.log('[TIRE DEBUG] vehicle tirePressure:', _veh.tirePressureFront, _veh.tirePressureRear);
   var _tFrontSize = _gd.zmig_kidmi || '';
   var _tRearSize  = _gd.zmig_ahori || '';
   var _pFront = parseFloat(_veh.tirePressureFront) || 0;
