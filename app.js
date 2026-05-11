@@ -1713,6 +1713,133 @@ APP._batteryWa   = function(url) {
   window.open(url, '_blank');
 };
 
+/* ── שמשות ── */
+APP.helpWindshield = async function() {
+  _fireFieldEvent('windshield', {});
+  _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-spinner">&#x27F3; טוען פרטי ביטוח...</div></div>');
+
+  var plate    = (STATE.vehicle && STATE.vehicle.plate)   ? STATE.vehicle.plate   : '';
+  var vehNum   = (STATE.vehicle && STATE.vehicle.num)     ? STATE.vehicle.num     : '';
+
+  var insCompany = '', insPolicy = '', wdPhone = '', wdProvider = '';
+  try {
+    var res = await gasPost('get_vehicle_insurance_details', {});
+    if (res.ok && res.insurance && res.insurance.hasComprehensive) {
+      var ins = res.insurance;
+      insCompany = ins.company || '';
+      insPolicy  = ins.policyNumber || '';
+    }
+    /* חפש כיסוי שמשות ב-parsedData — מגיע מ-GAS דרך כיסויים */
+    if (res.windshieldCoverage) {
+      wdProvider = res.windshieldCoverage.provider || 'אילן קארגלס';
+      wdPhone    = res.windshieldCoverage.phone    || '03-6534444';
+    } else {
+      wdProvider = 'אילן קארגלס';
+      wdPhone    = '03-6534444';
+    }
+  } catch(e) {
+    wdProvider = 'אילן קארגלס';
+    wdPhone    = '03-6534444';
+  }
+
+  window._wdPhone = wdPhone.replace(/[^0-9+]/g,'');
+
+  var claimUrl = 'https://app.ilan-glass.co.il/InsuranceWizard';
+
+  _showHelpCard(
+    '<style>' +
+    '@keyframes wd-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+    '.wd-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;font-size:11px;font-weight:800;letter-spacing:.8px;padding:5px 16px;border-radius:20px;margin-bottom:12px;box-shadow:0 2px 8px rgba(14,165,233,.35)}' +
+    '.wd-card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);animation:wd-fade .35s ease}' +
+    '.wd-header{background:linear-gradient(135deg,#075985,#0369a1,#0284c7);padding:20px 18px 18px;display:flex;align-items:center;gap:14px}' +
+    '.wd-icon-wrap{width:56px;height:56px;flex-shrink:0;background:rgba(255,255,255,.15);border-radius:16px;display:flex;align-items:center;justify-content:center}' +
+    '.wd-company{font-size:20px;font-weight:900;color:#fff;line-height:1.2}' +
+    '.wd-policy{font-size:11px;color:rgba(255,255,255,.7);margin-top:4px}' +
+    '.wd-ins-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(34,197,94,.25);color:#86efac;font-size:10px;font-weight:800;padding:3px 10px;border-radius:10px;margin-top:6px;border:1px solid rgba(34,197,94,.3)}' +
+    '.wd-copy-box{margin:14px 16px 0;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:16px;padding:14px 16px}' +
+    '.wd-copy-title{font-size:11px;color:#0369a1;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}' +
+    '.wd-copy-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e0f2fe}' +
+    '.wd-copy-row:last-child{border:none}' +
+    '.wd-copy-label{font-size:11px;color:#64748b;font-weight:600}' +
+    '.wd-copy-val{font-size:14px;font-weight:800;color:#0c4a6e;font-family:monospace;letter-spacing:.3px}' +
+    '.wd-checklist{margin:12px 16px 0;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:16px;padding:14px 16px}' +
+    '.wd-checklist-title{font-size:11px;color:#475569;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}' +
+    '.wd-check-item{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;color:#334155;line-height:1.4}' +
+    '.wd-check-item:last-child{border:none}' +
+    '.wd-check-icon{font-size:16px;flex-shrink:0;margin-top:1px}' +
+    '.wd-provider-box{margin:12px 16px 0;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #7dd3fc;border-radius:14px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}' +
+    '.wd-provider-info .wd-provider-name{font-size:15px;font-weight:800;color:#0c4a6e}' +
+    '.wd-provider-info .wd-provider-sub{font-size:12px;color:#0369a1;margin-top:2px}' +
+    '.wd-btn-phone{display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-size:13px;font-weight:700;padding:9px 14px;border:none;border-radius:11px;cursor:pointer;white-space:nowrap}' +
+    '.wd-btns{display:flex;flex-direction:column;gap:10px;padding:14px 16px 18px}' +
+    '.wd-btn-claim{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:17px;background:linear-gradient(135deg,#0369a1,#0284c7,#0ea5e9);color:#fff;font-size:17px;font-weight:900;border:none;border-radius:16px;cursor:pointer;box-shadow:0 5px 20px rgba(3,105,161,.4)}' +
+    '.wd-btn-claim:active{transform:scale(.97)}' +
+    '.wd-btn-claim-inner{display:flex;flex-direction:column;align-items:flex-start}' +
+    '.wd-btn-claim-main{font-size:17px;font-weight:900;line-height:1.2}' +
+    '.wd-btn-claim-sub{font-size:11px;font-weight:500;opacity:.8;margin-top:2px}' +
+    '</style>' +
+    '<div class="help-card">' +
+    '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+    '<div class="wd-badge">🪟 תביעת שמשות</div>' +
+    '<div class="wd-card">' +
+
+      /* Header */
+      '<div class="wd-header">' +
+        '<div class="wd-icon-wrap">' +
+          '<svg width="34" height="34" viewBox="0 0 34 34" fill="none">' +
+            '<path d="M6 26 L5 14 Q7 5 17 5 Q27 5 29 14 L28 26 Z" fill="rgba(255,255,255,0.9)"/>' +
+            '<path d="M11 6 L14 14 L20 11 L18 26" stroke="#0369a1" stroke-width="1.8" fill="none" stroke-linecap="round"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div>' +
+          '<div class="wd-company">' + (insCompany || 'ביטוח מקיף') + '</div>' +
+          (insPolicy ? '<div class="wd-policy">פוליסה: ' + insPolicy + '</div>' : '') +
+          '<div class="wd-ins-badge">✅ כיסוי שמשות פעיל</div>' +
+        '</div>' +
+      '</div>' +
+
+      /* פרטים להעתקה לטופס */
+      '<div class="wd-copy-box">' +
+        '<div class="wd-copy-title">📋 פרטים למילוי הטופס</div>' +
+        (plate  ? '<div class="wd-copy-row"><span class="wd-copy-label">מספר רישוי</span><span class="wd-copy-val">' + plate + '</span></div>' : '') +
+        (vehNum ? '<div class="wd-copy-row"><span class="wd-copy-label">מספר רכב</span><span class="wd-copy-val">' + vehNum + '</span></div>' : '') +
+        (insCompany ? '<div class="wd-copy-row"><span class="wd-copy-label">חברת ביטוח</span><span class="wd-copy-val">' + insCompany + '</span></div>' : '') +
+        '<div class="wd-copy-row"><span class="wd-copy-label">סוג ביטוח</span><span class="wd-copy-val">ביטוח מקיף</span></div>' +
+      '</div>' +
+
+      /* צ׳קליסט הכנה */
+      '<div class="wd-checklist">' +
+        '<div class="wd-checklist-title">✅ מה להכין לפני הגשה</div>' +
+        '<div class="wd-check-item"><span class="wd-check-icon">📸</span><span>4 תמונות שמשה: שלמה, קרוב לנזק, אזור מראה פנימי, חזית הרכב עם לוחית</span></div>' +
+        '<div class="wd-check-item"><span class="wd-check-icon">📄</span><span>רישיון רכב (רישיון רכב בתוקף)</span></div>' +
+        '<div class="wd-check-item"><span class="wd-check-icon">📄</span><span>אישור ביטוח חובה</span></div>' +
+      '</div>' +
+
+      /* ספק */
+      '<div class="wd-provider-box">' +
+        '<div class="wd-provider-info">' +
+          '<div class="wd-provider-name">' + wdProvider + '</div>' +
+          '<div class="wd-provider-sub">ספק שמשות מורשה</div>' +
+        '</div>' +
+        (window._wdPhone ? '<button class="wd-btn-phone" onclick="window.open(\'tel:\'+window._wdPhone)"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' + wdPhone + '</button>' : '') +
+      '</div>' +
+
+      /* כפתור תביעה */
+      '<div class="wd-btns">' +
+        '<button class="wd-btn-claim" onclick="window.open(\'' + claimUrl + '\',\'_blank\')">' +
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+          '<div class="wd-btn-claim-inner">' +
+            '<div class="wd-btn-claim-main">פתח טופס תביעה</div>' +
+            '<div class="wd-btn-claim-sub">אילן קארגלס · מעבר לאתר</div>' +
+          '</div>' +
+        '</button>' +
+      '</div>' +
+
+    '</div>' +
+    '</div>'
+  );
+};
+
 /* ── גרר ── */
 APP.helpTowing = async function() {
   _fireFieldEvent('towing', { hasInsurance: null });
