@@ -1663,11 +1663,12 @@ APP.helpBattery = function() {
     '<div class="yd-card">' +
       '<div class="yd-header">' +
         '<div class="yd-logo-wrap">' +
-          /* Yadidim heart+hands logo */
-          '<svg width="42" height="42" viewBox="0 0 42 42" fill="none">' +
-            '<path d="M21 34C21 34 7 25.5 7 17C7 12.6 10.6 9 15 9C17.6 9 19.9 10.3 21 12.4C22.1 10.3 24.4 9 27 9C31.4 9 35 12.6 35 17C35 25.5 21 34 21 34Z" fill="white"/>' +
-            '<path d="M10 38 C14 35 19 33.5 21 33.5 C23 33.5 28 35 32 38" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.65"/>' +
-            '<circle cx="21" cy="17" r="3.5" fill="#dc2626"/>' +
+          /* Yadidim 4-color logo */
+          '<svg width="40" height="40" viewBox="0 0 40 40" fill="none">' +
+            '<rect x="2"  y="2"  width="16" height="16" rx="5" fill="#1565C0"/>' +
+            '<rect x="22" y="2"  width="16" height="16" rx="5" fill="#C2185B"/>' +
+            '<rect x="2"  y="22" width="16" height="16" rx="5" fill="#2E7D32"/>' +
+            '<rect x="22" y="22" width="16" height="16" rx="5" fill="#E65100"/>' +
           '</svg>' +
         '</div>' +
         '<div class="yd-title-wrap">' +
