@@ -1526,73 +1526,96 @@ APP.helpPuncture = async function() {
         hoursHtml += '</div>';
       }
 
+      var cleanAddr = p.address ? p.address.replace(/,?\s*\d[A-Z0-9]{3}\+[A-Z0-9]{2,}\s*/g,'').trim().replace(/,\s*$/,'') : '';
+      var wazUrl = cleanAddr ? 'https://waze.com/ul?q=' + encodeURIComponent(cleanAddr) + '&navigate=yes' : '';
+      var isMobile = /^0(5|7)\d/.test((p.phone||'').replace(/\D/g,'').replace(/^972/,'0'));
+      var waUrl = isMobile ? 'https://wa.me/' + waNum + '?text=' + waText : '';
+
       providerHtml =
-        '<div class="prov-section-badge">&#x1F3F7;&#xFE0F; ספק מורשה — עמותת עלה</div>' +
-        '<div class="prov-card">' +
-        '<div class="prov-card-name">&#x1F527; ' + (p.name||'') + '</div>' +
-        statusHtml +
-        (p.address ? (function() {
-          var cleanAddr = p.address.replace(/,?\s*\d[A-Z0-9]{3}\+[A-Z0-9]{2,}\s*/g, '').trim().replace(/,\s*$/, '');
-          var wazUrl = 'https://waze.com/ul?q=' + encodeURIComponent(cleanAddr) + '&navigate=yes';
-          return '<div class="prov-card-row"><span class="prov-card-icon">&#x1F4CD;</span>' +
-            '<span style="flex:1">' + cleanAddr + '</span>' +
-            '<a href="' + wazUrl + '" target="_blank" style="background:#05c8f7;color:#000;font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;text-decoration:none;white-space:nowrap;flex-shrink:0">Waze &#x1F6A6;</a>' +
-            '</div>';
-        })() : '') +
-        (p.contactName ? '<div class="prov-card-row"><span class="prov-card-icon">&#x1F464;</span><span>' + p.contactName + '</span></div>' : '') +
-        (hoursHtml
-          ? '<details class="prov-hours-details"><summary>&#x1F551; שעות פתיחה</summary>' + hoursHtml + '</details>'
-          : '') +
-        '<div class="prov-card-btns">' +
-        (phoneClean ? '<button class="help-action-btn" onclick="window.open(\'tel:' + phoneClean + '\')">&#x1F4DE; ' + p.phone + '</button>' : '') +
-        (phoneClean ? '<button class="help-action-btn secondary" onclick="window.open(\'https://wa.me/' + waNum + '?text=' + waText + '\')">&#x1F4AC; וואטסאפ + מיקום</button>' : '') +
-        '</div>' +
+        '<div class="pc-badge">🏷️ ספק מורשה — עמותת עלה</div>' +
+        '<div class="pc-card">' +
+          '<div class="pc-header">' +
+            '<div class="pc-icon-wrap">🔧</div>' +
+            '<div class="pc-name-wrap">' +
+              '<div class="pc-name">' + (p.name||'') + '</div>' +
+              (p.contactName ? '<div class="pc-contact">'+p.contactName+'</div>' : '') +
+            '</div>' +
+          '</div>' +
+          (statusHtml ? '<div class="pc-status-row">'+statusHtml+'</div>' : '') +
+          (cleanAddr ?
+            '<div class="pc-addr-row">' +
+              '<span class="pc-addr-text">📍 '+cleanAddr+'</span>' +
+              (wazUrl ? '<a href="'+wazUrl+'" target="_blank" class="pc-waze-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg> Waze</a>'  : '') +
+            '</div>' : '') +
+          (hoursHtml ?
+            '<details class="pc-hours-toggle"><summary>🕐 שעות פתיחה</summary>'+hoursHtml+'</details>'
+            : '') +
+          '<div class="pc-btns">' +
+            (phoneClean ?
+              '<button class="pc-btn-call" onclick="window.open(\'tel:'+phoneClean+'\')">'+
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
+                ' חייג — ' + (p.phone||'') +
+              '</button>'
+            : '') +
+            (waUrl ?
+              '<button class="pc-btn-wa" onclick="window.open(\''+waUrl+'\')">'+
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>' +
+                ' וואטסאפ + מיקום' +
+              '</button>'
+            : '') +
+          '</div>' +
         '</div>';
     }
-  } catch(e) { /* ספק לא נטען — isOpen נשאר null */ }
+  } catch(e) { /* ספק לא נטען */ }
 
-  /* החלטה: האם להציג חיפוש 24/7 */
-  var showSearch = (isOpen === false) || !providerHtml;
   var emergencyHtml = '';
   if (isOpen === false && providerHtml) {
     emergencyHtml =
-      '<div class="prov-emergency-box">' +
-      '<div class="prov-emergency-title">&#x26A0;&#xFE0F;&nbsp; ספק השירות המורשה סגור כעת</div>' +
-      '<div class="prov-emergency-body">במידה ומדובר במקרה חירום שאינו יכול להידחות לשעות הפעילות של ספק השירות בהסדר — ניתן לאתר שירות פנצריות זמין באזורך.</div>' +
-      '<button class="help-action-btn secondary" style="margin-top:10px" onclick="window.open(\'' + mapsUrl + '\')">&#x1F50D; חיפוש פנצריות פתוחות 24/7 קרוב אליי</button>' +
+      '<div class="pc-emergency">' +
+        '<div class="pc-emergency-title">⚠️ ספק השירות המורשה סגור כעת</div>' +
+        '<div class="pc-emergency-body">במידה ומדובר במקרה חירום שאינו יכול להידחות לשעות הפעילות של ספק השירות בהסדר — ניתן לאתר שירות פנצריות זמין באזורך.</div>' +
+        '<button class="pc-btn-search" onclick="window.open(\''+mapsUrl+'\')">🔍 חיפוש פנצריות פתוחות 24/7 קרוב אליי</button>' +
       '</div>';
   }
 
   _showHelpCard(
     '<style>' +
-    '@keyframes blink-warn{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.97)}}' +
-    '.prov-section-badge{display:inline-block;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;font-size:11px;font-weight:700;letter-spacing:.6px;padding:4px 14px;border-radius:20px;margin-bottom:10px}' +
-    '.prov-card{background:#f0f7ff;border:1.5px solid #bfdbfe;border-radius:16px;padding:16px;margin-bottom:4px}' +
-    '.prov-card-name{font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:8px}' +
-    '.prov-status-open{display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;margin-bottom:10px}' +
-    '.prov-status-closed{display:inline-flex;align-items:center;gap:5px;background:#fff3cd;color:#b45309;font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;margin-bottom:10px;animation:blink-warn 1.3s ease-in-out infinite}' +
-    '.prov-card-row{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#374151;margin-bottom:5px;line-height:1.4}' +
-    '.prov-card-icon{font-size:15px;flex-shrink:0;margin-top:1px}' +
-    '.prov-hours-details{margin:8px 0}' +
-    '.prov-hours-details summary{font-size:13px;color:#2563eb;font-weight:600;cursor:pointer;padding:4px 0}' +
-    '.prov-hours-wrap{background:#fff;border-radius:10px;padding:10px 12px;margin-top:6px}' +
-    '.prov-hours-row{font-size:12px;color:#64748b;padding:3px 0;border-bottom:1px solid #f1f5f9}' +
+    '@keyframes blink-warn{0%,100%{opacity:1}50%{opacity:.45}}' +
+    '@keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}' +
+    '.pc-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;font-size:11px;font-weight:800;letter-spacing:.8px;padding:5px 16px;border-radius:20px;margin-bottom:12px;box-shadow:0 2px 8px rgba(37,99,235,.35)}' +
+    '.pc-card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);animation:fade-in .35s ease}' +
+    '.pc-header{display:flex;align-items:center;gap:14px;padding:18px 18px 14px;background:linear-gradient(135deg,#0f2942,#1e3a5f)}' +
+    '.pc-icon-wrap{width:48px;height:48px;background:rgba(255,255,255,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}' +
+    '.pc-name{font-size:20px;font-weight:800;color:#fff;line-height:1.2}' +
+    '.pc-contact{font-size:12px;color:#93c5fd;margin-top:3px}' +
+    '.pc-status-row{padding:10px 18px 0}' +
+    '.pc-status-open{display:inline-flex;align-items:center;gap:6px;background:#dcfce7;color:#15803d;font-size:13px;font-weight:800;padding:5px 16px;border-radius:20px}' +
+    '.pc-status-closed{display:inline-flex;align-items:center;gap:6px;background:#fff3cd;color:#b45309;font-size:13px;font-weight:800;padding:5px 16px;border-radius:20px;animation:blink-warn 1.4s ease-in-out infinite}' +
+    '.pc-addr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;border-bottom:1px solid #f1f5f9}' +
+    '.pc-addr-text{font-size:13px;color:#475569;flex:1;line-height:1.4}' +
+    '.pc-waze-btn{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#06aed4,#0891b2);color:#fff;font-size:12px;font-weight:700;padding:6px 14px;border-radius:12px;text-decoration:none;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(6,174,212,.4)}' +
+    '.pc-hours-toggle{padding:10px 18px;border-bottom:1px solid #f1f5f9}' +
+    '.pc-hours-toggle summary{font-size:13px;color:#2563eb;font-weight:700;cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}' +
+    '.prov-hours-wrap{background:#f8fafc;border-radius:10px;padding:10px 12px;margin-top:8px}' +
+    '.prov-hours-row{font-size:12px;color:#64748b;padding:4px 0;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between}' +
     '.prov-hours-row:last-child{border:none}' +
-    '.prov-hours-today{font-weight:800;color:#1e3a5f;font-size:13px;background:#eff6ff;margin:0 -4px;padding:4px;border-radius:6px}' +
-    '.prov-card-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px}' +
-    '.prov-emergency-box{margin-top:14px;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:14px;padding:14px 16px}' +
-    '.prov-emergency-title{font-size:14px;font-weight:800;color:#92400e;margin-bottom:6px}' +
-    '.prov-emergency-body{font-size:12px;color:#78350f;line-height:1.6}' +
-    '.prov-search-only{margin-top:4px}' +
+    '.prov-hours-today{font-weight:800;color:#1e3a5f;background:#eff6ff;padding:4px 8px;border-radius:8px;margin:2px -4px}' +
+    '.pc-btns{display:flex;flex-direction:column;gap:10px;padding:14px 18px 18px}' +
+    '.pc-btn-call{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-size:17px;font-weight:800;border:none;border-radius:14px;cursor:pointer;box-shadow:0 4px 16px rgba(22,163,74,.4);transition:transform .15s,box-shadow .15s}' +
+    '.pc-btn-call:active{transform:scale(.97)}' +
+    '.pc-btn-wa{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;background:linear-gradient(135deg,#25D366,#1da851);color:#fff;font-size:16px;font-weight:700;border:none;border-radius:14px;cursor:pointer;box-shadow:0 4px 16px rgba(37,211,102,.35);transition:transform .15s}' +
+    '.pc-btn-wa:active{transform:scale(.97)}' +
+    '.pc-emergency{margin-top:14px;background:linear-gradient(135deg,#fffbeb,#fef9c3);border:2px solid #fcd34d;border-radius:18px;padding:16px 18px}' +
+    '.pc-emergency-title{font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px}' +
+    '.pc-emergency-body{font-size:13px;color:#78350f;line-height:1.65;margin-bottom:12px}' +
+    '.pc-btn-search{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:14px;font-weight:700;border:none;border-radius:12px;cursor:pointer;box-shadow:0 3px 12px rgba(245,158,11,.4)}' +
+    '.pc-no-prov{text-align:center;padding:20px 0 10px;color:#64748b;font-size:14px}' +
     '</style>' +
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-    (providerHtml ||
-      '<div class="prov-section-badge" style="background:#94a3b8">&#x1F527; פנצ\'ר</div>' +
-      '<div style="font-size:13px;color:#64748b;margin-bottom:4px">לא הוגדר ספק מורשה במערכת</div>'
-    ) +
+    (providerHtml || '<div class="pc-no-prov">לא הוגדר ספק מורשה במערכת</div>') +
     (emergencyHtml || (!providerHtml
-      ? '<div class="prov-search-only"><button class="help-action-btn secondary" onclick="window.open(\'' + mapsUrl + '\')">&#x1F50D; חיפוש פנצריות פתוחות 24/7 קרוב אליי</button></div>'
+      ? '<button class="pc-btn-search" style="margin-top:8px" onclick="window.open(\''+mapsUrl+'\')">🔍 חיפוש פנצריות פתוחות 24/7 קרוב אליי</button>'
       : '')
     ) +
     '</div>'
