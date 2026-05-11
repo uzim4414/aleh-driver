@@ -254,11 +254,13 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   }
   .signin-hint { font-size: 11px; text-align: center; }
   .splash-dev-credit { bottom: 10px; font-size: 9px; }
-  /* Greeting overlay */
-  #greeting { flex-direction:row; gap:48px; justify-content:center; align-items:center; padding:0 80px; }
-  .gr-time { font-size:20px; }
-  .gr-name { font-size:32px; }
-  .gr-bar-wrap { margin-top:0; width:220px; }
+  /* Greeting overlay — column centered, larger text for tablet */
+  #greeting { flex-direction:column; gap:14px; justify-content:center; align-items:center; padding:60px; }
+  .gr-time { font-size:28px; }
+  .gr-name { font-size:46px; }
+  .gr-bar-wrap { margin-top:28px; width:320px; }
+  .gr-bar-bg { height:5px; }
+  .gr-bar-label { font-size:14px; margin-bottom:12px; }
 }
 
 /* ── Greeting overlay ── */
