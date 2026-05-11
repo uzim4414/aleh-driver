@@ -136,6 +136,74 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 
 .fab { position:fixed; bottom:calc(90px + env(safe-area-inset-bottom,0px)); left:20px; background:var(--red); color:#fff; border-radius:100px; padding:13px 20px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; cursor:pointer; font-family:inherit; letter-spacing:-0.2px; z-index:50; white-space:nowrap; animation:fabPulse 2.5s ease-in-out infinite; border:none; }
 .fab:active{transform:scale(0.96)}
+.help-fab {
+  position: fixed; bottom: 24px; left: 24px; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: #1F8A3D; border: none; border-radius: 50%;
+  width: 56px; height: 56px; cursor: pointer; box-shadow: 0 4px 16px rgba(31,138,61,0.45);
+  animation: fabPulse 2.5s ease-in-out infinite;
+  padding: 0; justify-content: center;
+}
+.help-fab-label { font-size:9px; font-weight:700; color:white; letter-spacing:.5px; margin-top:-2px; }
+.help-fab.open { animation:none; background:#155e2a; }
+.help-overlay {
+  position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,.75); backdrop-filter:blur(12px);
+  opacity:0; pointer-events:none; transition:opacity 200ms ease;
+}
+.help-overlay.open { opacity:1; pointer-events:all; }
+.help-menu {
+  position:fixed; bottom:0; left:0; right:0; z-index:201;
+  background:#0f172a; border-radius:24px 24px 0 0;
+  padding:0 0 env(safe-area-inset-bottom,16px) 0;
+  transform:translateY(110%); transition:transform 320ms cubic-bezier(0.34,1.56,0.64,1);
+  max-height:85vh; overflow-y:auto; direction:rtl;
+}
+.help-menu.open { transform:translateY(0); }
+.help-menu-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px 12px; border-bottom:1px solid rgba(255,255,255,.07); }
+.help-menu-title { font-size:18px; font-weight:700; color:#f1f5f9; }
+.help-menu-close { background:rgba(255,255,255,.08); border:none; border-radius:50%; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#94a3b8; }
+.help-menu-items { padding:8px 12px 12px; display:flex; flex-direction:column; gap:6px; }
+.help-item {
+  display:flex; align-items:center; gap:14px;
+  background:#1e293b; border:1px solid rgba(255,255,255,.06);
+  border-radius:16px; padding:14px 16px; cursor:pointer;
+  width:100%; text-align:right; color:#f1f5f9;
+  opacity:0; transform:translateY(20px);
+  transition:background 180ms ease, transform 180ms ease;
+}
+.help-item:active { background:#2d3f55; }
+.help-item-icon { width:48px; height:48px; border-radius:14px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.help-item-text { flex:1; display:flex; flex-direction:column; gap:2px; }
+.help-item-title { font-size:15px; font-weight:700; }
+.help-item-sub { font-size:12px; color:#94a3b8; }
+.help-item-soon { opacity:.45 !important; transform:none !important; cursor:not-allowed; }
+.help-soon-badge { font-size:10px; font-weight:700; color:#94a3b8; background:rgba(148,163,184,.15); border-radius:6px; padding:3px 7px; }
+.help-item.anim-in { opacity:1; transform:translateY(0); }
+.help-card-wrap { padding:8px 12px 12px; }
+.help-card { background:#1e293b; border:1px solid rgba(255,255,255,.08); border-radius:20px; padding:20px; color:#f1f5f9; direction:rtl; }
+.help-card-title { font-size:17px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+.help-card-sub { font-size:13px; color:#94a3b8; margin-bottom:16px; }
+.help-card-divider { border:none; border-top:1px solid rgba(255,255,255,.07); margin:14px 0; }
+.help-card-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px; }
+.help-card-label { color:#94a3b8; font-size:12px; margin-bottom:2px; }
+.help-card-value { font-weight:600; }
+.help-card-status-open { color:#22c55e; font-weight:700; font-size:13px; }
+.help-card-status-closed { color:#ef4444; font-weight:700; font-size:13px; }
+.help-action-btn { display:flex; align-items:center; justify-content:center; gap:8px; background:#1F8A3D; color:white; border:none; border-radius:14px; padding:14px 20px; font-size:15px; font-weight:700; cursor:pointer; width:100%; margin-bottom:8px; }
+.help-action-btn.secondary { background:rgba(255,255,255,.07); color:#f1f5f9; }
+.help-action-btn:active { opacity:.85; }
+.help-back-btn { display:flex; align-items:center; gap:6px; background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer; padding:4px 0 12px; margin-right:4px; }
+.help-card-spinner { text-align:center; padding:30px; color:#64748b; font-size:14px; }
+.help-card-error { text-align:center; padding:20px; color:#ef4444; font-size:14px; }
+.help-radio-group { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.help-radio-item { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); border-radius:10px; padding:10px 14px; cursor:pointer; }
+.help-radio-item.selected { border-color:#1F8A3D; background:rgba(31,138,61,.12); }
+.help-radio-item input[type=radio] { display:none; }
+.help-radio-label { font-size:14px; font-weight:600; }
+.help-textarea { width:100%; box-sizing:border-box; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:10px; color:#f1f5f9; font-size:14px; padding:10px 12px; resize:none; font-family:inherit; margin-bottom:12px; direction:rtl; }
+.help-textarea:focus { outline:none; border-color:#1F8A3D; }
+
 
 .tabs { display:flex; background:#000; padding:0 16px; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
 .tabs::-webkit-scrollbar{display:none}
@@ -700,10 +768,69 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     </div>
   </div>
 
-  <button class="fab" id="fab" onclick="APP.nav('service');setTimeout(()=>document.getElementById('fault-section').scrollIntoView({behavior:'smooth'}),100)">
-    <svg width="18" height="18"><use href="#ic-plus" color="white"/></svg>
-    דווח תקלה
+  <!-- Help FAB -->
+  <button class="help-fab" id="help-fab" onclick="APP.openHelpMenu()" aria-label="צריך עזרה">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+    <span class="help-fab-label">עזרה</span>
   </button>
+
+  <!-- Help Menu Overlay -->
+  <div class="help-overlay" id="help-overlay" onclick="APP.closeHelpMenu()"></div>
+  <div class="help-menu" id="help-menu">
+    <div class="help-menu-header">
+      <span class="help-menu-title">במה נוכל לעזור?</span>
+      <button class="help-menu-close" onclick="APP.closeHelpMenu()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="help-menu-items" id="help-menu-items">
+      <button class="help-item" id="hitem-puncture" onclick="APP.helpPuncture()">
+        <span class="help-item-icon" style="background:linear-gradient(135deg,#1F8A3D,#16652e)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        </span>
+        <div class="help-item-text"><span class="help-item-title">פנצ&#x27;ר</span><span class="help-item-sub">ספק שירות + פנצריות 24/7</span></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="help-item" id="hitem-battery" onclick="APP.helpBattery()">
+        <span class="help-item-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+        </span>
+        <div class="help-item-text"><span class="help-item-title">מצבר / רכב תקוע</span><span class="help-item-sub">מוקד ידידים 24/7</span></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="help-item" id="hitem-towing" onclick="APP.helpTowing()">
+        <span class="help-item-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </span>
+        <div class="help-item-text"><span class="help-item-title">גרר</span><span class="help-item-sub">ביטוח מקיף — גרירה</span></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="help-item" id="hitem-appointment" onclick="APP.helpAppointment()">
+        <span class="help-item-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </span>
+        <div class="help-item-text"><span class="help-item-title">קביעת תור</span><span class="help-item-sub">בקשה למוסך</span></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="help-item help-item-soon" disabled>
+        <span class="help-item-icon" style="background:linear-gradient(135deg,#475569,#334155)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </span>
+        <div class="help-item-text"><span class="help-item-title">נורה דולקת</span><span class="help-item-sub">זיהוי AI — בקרוב</span></div>
+        <span class="help-soon-badge">בקרוב</span>
+      </button>
+      <button class="help-item help-item-soon" disabled>
+        <span class="help-item-icon" style="background:linear-gradient(135deg,#dc2626,#b91c1c)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </span>
+        <div class="help-item-text"><span class="help-item-title">תאונה</span><span class="help-item-sub">דיווח מלא — בקרוב</span></div>
+        <span class="help-soon-badge">בקרוב</span>
+      </button>
+    </div>
+    <div class="help-card-wrap" id="help-card-wrap" style="display:none"></div>
+  </div>
 
   <div class="bnav">
     <div class="bn-item active" id="bn-home" onclick="APP.nav('home')">

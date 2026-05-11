@@ -26,7 +26,9 @@ let STATE = {
   idToken: null,
   govData:    undefined,  // undefined=טרם נטען | null=שגיאה/לא נמצא | object=נטען
   govWLTP:    undefined,
-  govLoading: false
+  govLoading: false,
+  helpMenuOpen: false,
+  helpGps: null
 };
 
 /* ══ GAS API ══ */
@@ -117,8 +119,302 @@ function mockResponse(action) {
   if (action === 'driver_update_km') return { ok: true, km: 45000 };
   if (action === 'driver_report_fault') return { ok: true };
   if (action === 'driver_register_fcm') return { ok: true };
+  if (action === 'get_service_providers') {
+    return { ok: true, providers: [{ id:'SP001', name:'פנצריה מורשית עלה', category:'puncture', address:'רחוב הרצל 14, בני ברק', phone:'03-1234567', contactName:'יוסי כהן', googlePlaceId:'ChIJtest123', notes:'' }] };
+  }
+  if (action === 'get_vehicle_insurance_details') {
+    return { ok: true, insurance: { hasComprehensive:true, company:'מגדל ביטוח', policyNumber:'123456789', emergencyPhone:'1-800-123-456', towingCoverageKm:100, includesRentalCar:true, expiryDate:'2027-01-20' }, garage: { name:'מוסך טויוטה תל אביב', address:'רחוב הברזל 12, תל אביב', phone:'03-6789012' } };
+  }
+  if (action === 'driver_field_event') {
+    return { ok: true, eventId: 'EVT-DEMO-' + Date.now() };
+  }
   return { ok: false, error: 'Unknown action' };
 }
+
+/* ══════════════════════════════════════════════════════════════
+   GPS Utility
+══════════════════════════════════════════════════════════════ */
+function _getGps(timeoutMs) {
+  return new Promise(function(resolve) {
+    if (!navigator.geolocation) { resolve({ lat: null, lng: null }); return; }
+    var done = false;
+    var timer = setTimeout(function() {
+      if (!done) { done = true; resolve({ lat: null, lng: null }); }
+    }, timeoutMs || 8000);
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        if (!done) { done = true; clearTimeout(timer); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); }
+      },
+      function() {
+        if (!done) { done = true; clearTimeout(timer); resolve({ lat: null, lng: null }); }
+      },
+      { enableHighAccuracy: true, timeout: timeoutMs || 8000 }
+    );
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Offline Event Queue
+══════════════════════════════════════════════════════════════ */
+var PENDING_KEY = 'aleh_pending_events';
+
+function _queueEvent(eventData) {
+  var queue = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+  queue.push(Object.assign({ id: 'local-' + Date.now(), retries: 0 }, eventData));
+  localStorage.setItem(PENDING_KEY, JSON.stringify(queue));
+}
+
+async function _syncPendingEvents() {
+  var queue = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+  if (!queue.length) return;
+  var remaining = [];
+  for (var i = 0; i < queue.length; i++) {
+    var ev = queue[i];
+    if (ev.retries >= 3) { ev.syncFailed = true; remaining.push(ev); continue; }
+    try {
+      var result = await gasPost('driver_field_event', {
+        type: ev.type, lat: ev.lat || '', lng: ev.lng || '', details: JSON.stringify(ev.details || {})
+      });
+      if (!result.ok) { ev.retries++; remaining.push(ev); }
+    } catch(e2) { ev.retries++; remaining.push(ev); }
+  }
+  localStorage.setItem(PENDING_KEY, JSON.stringify(remaining));
+}
+
+async function _fireFieldEvent(type, details) {
+  var gps = STATE.helpGps || { lat: null, lng: null };
+  var payload = { type: type, lat: gps.lat || '', lng: gps.lng || '', details: JSON.stringify(details || {}) };
+  try {
+    var result = await gasPost('driver_field_event', payload);
+    if (!result.ok) throw new Error(result.error);
+    return result;
+  } catch(e) {
+    if (!navigator.onLine) {
+      _queueEvent(Object.assign({ type: type, details: details }, gps));
+      return { ok: true, eventId: 'queued', queued: true };
+    }
+    return { ok: false, error: String(e) };
+  }
+}
+
+window.addEventListener('online', function() { _syncPendingEvents(); });
+
+/* ══════════════════════════════════════════════════════════════
+   Help Menu
+══════════════════════════════════════════════════════════════ */
+APP.openHelpMenu = async function() {
+  if (!STATE.vehicle) { showToast('יש להתחבר תחילה'); return; }
+  if (STATE.helpMenuOpen) { APP.closeHelpMenu(); return; }
+  STATE.helpMenuOpen = true;
+  STATE.helpGps = null;
+  _getGps(8000).then(function(gps) { STATE.helpGps = gps; });
+  var overlay = document.getElementById('help-overlay');
+  var menu    = document.getElementById('help-menu');
+  var fab     = document.getElementById('help-fab');
+  if (overlay) overlay.classList.add('open');
+  if (menu)    menu.classList.add('open');
+  if (fab)     fab.classList.add('open');
+  var items = document.querySelectorAll('.help-item:not(.help-item-soon)');
+  items.forEach(function(el, i) {
+    setTimeout(function() { el.classList.add('anim-in'); }, 60 + i * 60);
+  });
+};
+
+APP.closeHelpMenu = function() {
+  STATE.helpMenuOpen = false;
+  var overlay = document.getElementById('help-overlay');
+  var menu    = document.getElementById('help-menu');
+  var fab     = document.getElementById('help-fab');
+  if (overlay) overlay.classList.remove('open');
+  if (menu)    menu.classList.remove('open');
+  if (fab)     fab.classList.remove('open');
+  setTimeout(function() {
+    document.querySelectorAll('.help-item:not(.help-item-soon)').forEach(function(el) { el.classList.remove('anim-in'); });
+    var wrap  = document.getElementById('help-card-wrap');
+    var items = document.getElementById('help-menu-items');
+    if (wrap)  { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+    if (items) items.style.display = '';
+  }, 350);
+};
+
+function _showHelpCard(html) {
+  var wrap  = document.getElementById('help-card-wrap');
+  var items = document.getElementById('help-menu-items');
+  if (items) items.style.display = 'none';
+  if (wrap)  { wrap.style.display = ''; wrap.innerHTML = html; }
+}
+
+APP._helpBackToMenu = function() {
+  var wrap  = document.getElementById('help-card-wrap');
+  var items = document.getElementById('help-menu-items');
+  if (wrap)  { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+  if (items) { items.style.display = ''; }
+  document.querySelectorAll('.help-item:not(.help-item-soon)').forEach(function(el, i) {
+    el.classList.remove('anim-in');
+    setTimeout(function() { el.classList.add('anim-in'); }, 40 + i * 50);
+  });
+};
+
+/* ── פנצ'ר ── */
+APP.helpPuncture = async function() {
+  _fireFieldEvent('puncture', { usedFallback24: false });
+  _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-spinner">&#x27F3; טוען ספק שירות...</div></div>');
+  var gps = STATE.helpGps;
+  var mapsUrl = (gps && gps.lat)
+    ? 'https://www.google.com/maps/search/%D7%A4%D7%A0%D7%A6%D7%A8%D7%99%D7%94+24+%D7%A9%D7%A2%D7%95%D7%AA/@' + gps.lat + ',' + gps.lng + ',15z'
+    : 'https://www.google.com/maps/search/%D7%A4%D7%A0%D7%A6%D7%A8%D7%99%D7%94+24+%D7%A9%D7%A2%D7%95%D7%AA';
+  try {
+    var res = await gasPost('get_service_providers', { category: 'puncture' });
+    if (res.ok && res.providers && res.providers.length > 0) {
+      var p = res.providers[0];
+      _showHelpCard(
+        '<div class="help-card">' +
+        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+        '<div class="help-card-title">&#x1F527; ' + p.name + '</div>' +
+        '<div class="help-card-sub">ספק מורשה</div>' +
+        '<hr class="help-card-divider">' +
+        '<div class="help-card-row"><span>&#x1F4CD;</span><span>' + (p.address||'') + '</span></div>' +
+        (p.contactName ? '<div class="help-card-row"><span>&#x1F464;</span><span>' + p.contactName + '</span></div>' : '') +
+        '<hr class="help-card-divider">' +
+        '<button class="help-action-btn" onclick="window.open('tel:' + (p.phone||'').replace(/[^0-9*+]/g,'') + '')">&#x1F4DE; ' + (p.phone||'') + ' &#x2014; חייג עכשיו</button>' +
+        '<button class="help-action-btn secondary" onclick="window.open('' + mapsUrl + '','_blank')">&#x1F50D; פנצריות פתוחות 24/7 קרוב אליי</button>' +
+        '</div>'
+      );
+    } else {
+      _showHelpCard(
+        '<div class="help-card">' +
+        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+        '<div class="help-card-title">&#x1F527; פנצ&#x27;ר</div>' +
+        '<div class="help-card-sub">לא נמצא ספק מורשה</div>' +
+        '<hr class="help-card-divider">' +
+        '<button class="help-action-btn" onclick="window.open('' + mapsUrl + '','_blank')">&#x1F50D; מצא פנצריות פתוחות 24/7 קרוב אליי</button>' +
+        '</div>'
+      );
+    }
+  } catch(e) {
+    _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-error">שגיאה בטעינת נתונים. בדוק חיבור רשת.</div></div>');
+  }
+};
+
+/* ── מצבר ── */
+APP.helpBattery = function() {
+  _fireFieldEvent('battery', { actionTaken: 'none', locationShared: false });
+  var gps = STATE.helpGps;
+  var locStr = (gps && gps.lat)
+    ? ' &#x05D4;&#x05DE;&#x05D9;&#x05E7;&#x05D5;&#x05DD; &#x05E9;&#x05DC;&#x05D9;: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng
+    : '';
+  var waText = encodeURIComponent('שלום, אני נהג עלה צריך עזרה עם מצבר.' + (gps && gps.lat ? ' המיקום שלי: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng : ''));
+  var waPhone = '972XXXXXXXXXX';
+  var waUrl = 'https://wa.me/' + waPhone + '?text=' + waText;
+  _showHelpCard(
+    '<div class="help-card">' +
+    '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+    '<div class="help-card-title">&#x1F50B; מוקד ידידים</div>' +
+    '<div class="help-card-sub">סיוע בדרכים &#x2014; זמין 24/7</div>' +
+    '<hr class="help-card-divider">' +
+    '<button class="help-action-btn" onclick="window.open('tel:*6140');APP._batteryCall()">&#x1F4DE; *6140 &#x2014; התקשר עכשיו</button>' +
+    '<button class="help-action-btn secondary" onclick="APP._batteryWa('' + waUrl + '')">&#x1F4AC; שלח וואטסאפ + מיקום</button>' +
+    '</div>'
+  );
+};
+
+APP._batteryCall = function() { _fireFieldEvent('battery', { actionTaken: 'call', locationShared: false }); };
+APP._batteryWa   = function(url) {
+  _fireFieldEvent('battery', { actionTaken: 'whatsapp', locationShared: !!(STATE.helpGps && STATE.helpGps.lat) });
+  window.open(url, '_blank');
+};
+
+/* ── גרר ── */
+APP.helpTowing = async function() {
+  _fireFieldEvent('towing', { hasInsurance: null });
+  _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-spinner">&#x27F3; טוען פרטי ביטוח...</div></div>');
+  try {
+    var res = await gasPost('get_vehicle_insurance_details', {});
+    var ins = res.insurance;
+    var garage = res.garage;
+    if (!ins || !ins.hasComprehensive) {
+      var mgrPhone = (STATE.vehicle && STATE.vehicle.fleetManagerPhone) ? STATE.vehicle.fleetManagerPhone : '';
+      _showHelpCard(
+        '<div class="help-card">' +
+        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+        '<div class="help-card-title">&#x26A0;&#xFE0F; אין ביטוח מקיף</div>' +
+        '<div class="help-card-sub">לא נמצא ביטוח מקיף פעיל לרכב זה.</div>' +
+        '<hr class="help-card-divider">' +
+        '<div style="font-size:14px;color:#94a3b8;text-align:center;padding:8px">פנה למנהל הצי לסיוע.</div>' +
+        (mgrPhone ? '<button class="help-action-btn" onclick="window.open('tel:' + mgrPhone.replace(/[^0-9+]/g,'') + '')">&#x1F4DE; התקשר למנהל הצי</button>' : '') +
+        '</div>'
+      );
+    } else {
+      _showHelpCard(
+        '<div class="help-card">' +
+        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+        '<div class="help-card-title">&#x1F69B; גרירה &#x2014; ביטוח מקיף</div>' +
+        '<div class="help-card-sub">' + (ins.company||'') + ' | פוליסה: ' + (ins.policyNumber||'') + '</div>' +
+        '<hr class="help-card-divider">' +
+        (ins.emergencyPhone ? '<button class="help-action-btn" onclick="window.open('tel:' + ins.emergencyPhone.replace(/[^0-9+]/g,'') + '')">&#x1F4DE; מוקד חירום 24/7 &#x2014; ' + ins.emergencyPhone + '</button>' : '') +
+        (ins.towingCoverageKm ? '<div class="help-card-row"><span class="help-card-label">כיסוי גרירה:</span><span class="help-card-value">עד ' + ins.towingCoverageKm + ' ק"מ</span></div>' : '') +
+        '<div class="help-card-row"><span class="help-card-label">רכב חלופי:</span><span class="help-card-value">' + (ins.includesRentalCar ? '&#x2705; כלול' : '&#x274C; לא כלול') + '</span></div>' +
+        (ins.expiryDate ? '<div class="help-card-row"><span class="help-card-label">בתוקף עד:</span><span class="help-card-value">' + ins.expiryDate + '</span></div>' : '') +
+        (garage ? '<hr class="help-card-divider"><div class="help-card-title" style="font-size:14px">&#x1F527; יעד גרירה מומלץ</div><div class="help-card-row">' + (garage.name||'') + '</div>' + (garage.address ? '<div class="help-card-row">&#x1F4CD; ' + garage.address + '</div>' : '') : '') +
+        '</div>'
+      );
+    }
+  } catch(e) {
+    _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-error">שגיאה בטעינת נתונים.</div></div>');
+  }
+};
+
+/* ── קביעת תור ── */
+APP.helpAppointment = function() {
+  _fireFieldEvent('service_request', { reason: null, notes: null });
+  APP._apptSelectedReason = null;
+  var garage     = (STATE.vehicle && STATE.vehicle.garageName) ? STATE.vehicle.garageName : 'מוסך לא מוגדר';
+  var garagePhone= (STATE.vehicle && STATE.vehicle.garagePhone) ? STATE.vehicle.garagePhone : '';
+  var reasons    = [['routine','טיפול שגרתי'],['fault','תקלה'],['warning_light','נורה דולקת'],['post_accident','לאחר תאונה'],['other','אחר']];
+  var radioHtml  = reasons.map(function(r) {
+    return '<label class="help-radio-item" onclick="APP._apptSelectReason(\'' + r[0] + '\',this)">' +
+           '<input type="radio" name="appt-reason" value="' + r[0] + '"><span class="help-radio-label">' + r[1] + '</span></label>';
+  }).join('');
+  _showHelpCard(
+    '<div class="help-card">' +
+    '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+    '<div class="help-card-title">&#x1F4C5; קביעת תור</div>' +
+    '<div class="help-card-sub">המוסך שלך: ' + garage + '</div>' +
+    '<hr class="help-card-divider">' +
+    (garagePhone ? '<button class="help-action-btn secondary" style="margin-bottom:16px" onclick="window.open('tel:' + garagePhone.replace(/[^0-9+]/g,'') + '')">&#x1F4DE; חייג למוסך</button>' : '') +
+    '<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:10px">סיבת התור:</div>' +
+    '<div class="help-radio-group" id="appt-reasons">' + radioHtml + '</div>' +
+    '<textarea class="help-textarea" id="appt-notes" placeholder="הערות (אופציונלי)" rows="3"></textarea>' +
+    '<button class="help-action-btn" onclick="APP._apptSubmit()">שלח בקשה למנהל הצי</button>' +
+    '</div>'
+  );
+};
+
+APP._apptSelectReason = function(value, el) {
+  APP._apptSelectedReason = value;
+  document.querySelectorAll('.help-radio-item').forEach(function(item) { item.classList.remove('selected'); });
+  if (el) el.classList.add('selected');
+};
+
+APP._apptSubmit = async function() {
+  if (!APP._apptSelectedReason) { showToast('יש לבחור סיבת תור'); return; }
+  var notes   = (document.getElementById('appt-notes') || {}).value || '';
+  var garage  = (STATE.vehicle && STATE.vehicle.garageName) ? STATE.vehicle.garageName : '';
+  var garageId= (STATE.vehicle && STATE.vehicle.garageId)   ? STATE.vehicle.garageId   : '';
+  var result  = await _fireFieldEvent('service_request', { garageId: garageId, garageName: garage, reason: APP._apptSelectedReason, notes: notes });
+  if (result.ok) {
+    _showHelpCard(
+      '<div class="help-card" style="text-align:center;padding:32px 20px">' +
+      '<div style="font-size:48px;margin-bottom:12px">&#x2705;</div>' +
+      '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">הבקשה נשלחה!</div>' +
+      '<div style="font-size:14px;color:#94a3b8;margin-bottom:20px">מנהל הצי יצור איתך קשר לתיאום</div>' +
+      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+      '</div>'
+    );
+  } else {
+    showToast('שגיאה בשליחה — נסה שוב');
+  }
+};
 
 /* ══ Session ══ */
 function saveSession(token, vehicleData, userInfo) {
@@ -1177,8 +1473,7 @@ const APP = {
     });
 
     STATE.currentScreen = screen;
-    const fab = document.getElementById('fab');
-    if (fab) fab.style.display = screen === 'service' ? 'none' : 'flex';
+    // help-fab is always visible
 
     if (screen === 'vehicle') renderVehicleScreen(STATE.currentTab);
   },
