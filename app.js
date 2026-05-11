@@ -276,8 +276,8 @@ APP.helpPuncture = async function() {
         '<div class="help-card-row"><span>&#x1F4CD;</span><span>' + (p.address||'') + '</span></div>' +
         (p.contactName ? '<div class="help-card-row"><span>&#x1F464;</span><span>' + p.contactName + '</span></div>' : '') +
         '<hr class="help-card-divider">' +
-        '<button class="help-action-btn" onclick="window.open('tel:' + (p.phone||'').replace(/[^0-9*+]/g,'') + '')">&#x1F4DE; ' + (p.phone||'') + ' &#x2014; חייג עכשיו</button>' +
-        '<button class="help-action-btn secondary" onclick="window.open('' + mapsUrl + '','_blank')">&#x1F50D; פנצריות פתוחות 24/7 קרוב אליי</button>' +
+        '<button class="help-action-btn" onclick="window.open(\'tel:\' + (p.phone||\'\').replace(/[^0-9*+]/g,\'\') + \'\')">&#x1F4DE; ' + (p.phone||'') + ' &#x2014; חייג עכשיו</button>' +
+        '<button class="help-action-btn secondary" onclick="window.open(\'' + mapsUrl + '\')" >&#x1F50D; פנצריות פתוחות 24/7 קרוב אליי</button>' +
         '</div>'
       );
     } else {
@@ -287,7 +287,7 @@ APP.helpPuncture = async function() {
         '<div class="help-card-title">&#x1F527; פנצ&#x27;ר</div>' +
         '<div class="help-card-sub">לא נמצא ספק מורשה</div>' +
         '<hr class="help-card-divider">' +
-        '<button class="help-action-btn" onclick="window.open('' + mapsUrl + '','_blank')">&#x1F50D; מצא פנצריות פתוחות 24/7 קרוב אליי</button>' +
+        '<button class="help-action-btn" onclick="window.open(\'' + mapsUrl + '\')" >&#x1F50D; מצא פנצריות פתוחות 24/7 קרוב אליי</button>' +
         '</div>'
       );
     }
@@ -312,8 +312,8 @@ APP.helpBattery = function() {
     '<div class="help-card-title">&#x1F50B; מוקד ידידים</div>' +
     '<div class="help-card-sub">סיוע בדרכים &#x2014; זמין 24/7</div>' +
     '<hr class="help-card-divider">' +
-    '<button class="help-action-btn" onclick="window.open('tel:*6140');APP._batteryCall()">&#x1F4DE; *6140 &#x2014; התקשר עכשיו</button>' +
-    '<button class="help-action-btn secondary" onclick="APP._batteryWa('' + waUrl + '')">&#x1F4AC; שלח וואטסאפ + מיקום</button>' +
+    '<button class="help-action-btn" onclick="window.open(\'tel:*6140\');APP._batteryCall()">&#x1F4DE; *6140 &#x2014; התקשר עכשיו</button>' +
+    '<button class="help-action-btn secondary" onclick="APP._batteryWa(\'' + waUrl + '\')">&#x1F4AC; שלח וואטסאפ + מיקום</button>' +
     '</div>'
   );
 };
@@ -341,7 +341,7 @@ APP.helpTowing = async function() {
         '<div class="help-card-sub">לא נמצא ביטוח מקיף פעיל לרכב זה.</div>' +
         '<hr class="help-card-divider">' +
         '<div style="font-size:14px;color:#94a3b8;text-align:center;padding:8px">פנה למנהל הצי לסיוע.</div>' +
-        (mgrPhone ? '<button class="help-action-btn" onclick="window.open('tel:' + mgrPhone.replace(/[^0-9+]/g,'') + '')">&#x1F4DE; התקשר למנהל הצי</button>' : '') +
+        (mgrPhone ? '<button class="help-action-btn" onclick="window.open(\'tel:\' + mgrPhone.replace(/[^0-9+]/g,\'\') + \'\')">&#x1F4DE; התקשר למנהל הצי</button>' : '') +
         '</div>'
       );
     } else {
@@ -351,7 +351,7 @@ APP.helpTowing = async function() {
         '<div class="help-card-title">&#x1F69B; גרירה &#x2014; ביטוח מקיף</div>' +
         '<div class="help-card-sub">' + (ins.company||'') + ' | פוליסה: ' + (ins.policyNumber||'') + '</div>' +
         '<hr class="help-card-divider">' +
-        (ins.emergencyPhone ? '<button class="help-action-btn" onclick="window.open('tel:' + ins.emergencyPhone.replace(/[^0-9+]/g,'') + '')">&#x1F4DE; מוקד חירום 24/7 &#x2014; ' + ins.emergencyPhone + '</button>' : '') +
+        (ins.emergencyPhone ? '<button class="help-action-btn" onclick="window.open(\'tel:\' + ins.emergencyPhone.replace(/[^0-9+]/g,\'\') + \'\')">&#x1F4DE; מוקד חירום 24/7 &#x2014; ' + ins.emergencyPhone + '</button>' : '') +
         (ins.towingCoverageKm ? '<div class="help-card-row"><span class="help-card-label">כיסוי גרירה:</span><span class="help-card-value">עד ' + ins.towingCoverageKm + ' ק"מ</span></div>' : '') +
         '<div class="help-card-row"><span class="help-card-label">רכב חלופי:</span><span class="help-card-value">' + (ins.includesRentalCar ? '&#x2705; כלול' : '&#x274C; לא כלול') + '</span></div>' +
         (ins.expiryDate ? '<div class="help-card-row"><span class="help-card-label">בתוקף עד:</span><span class="help-card-value">' + ins.expiryDate + '</span></div>' : '') +
@@ -381,7 +381,7 @@ APP.helpAppointment = function() {
     '<div class="help-card-title">&#x1F4C5; קביעת תור</div>' +
     '<div class="help-card-sub">המוסך שלך: ' + garage + '</div>' +
     '<hr class="help-card-divider">' +
-    (garagePhone ? '<button class="help-action-btn secondary" style="margin-bottom:16px" onclick="window.open('tel:' + garagePhone.replace(/[^0-9+]/g,'') + '')">&#x1F4DE; חייג למוסך</button>' : '') +
+    (garagePhone ? '<button class="help-action-btn secondary" style="margin-bottom:16px" onclick="window.open(\'tel:\' + garagePhone.replace(/[^0-9+]/g,\'\') + \'\')">&#x1F4DE; חייג למוסך</button>' : '') +
     '<div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:10px">סיבת התור:</div>' +
     '<div class="help-radio-group" id="appt-reasons">' + radioHtml + '</div>' +
     '<textarea class="help-textarea" id="appt-notes" placeholder="הערות (אופציונלי)" rows="3"></textarea>' +
