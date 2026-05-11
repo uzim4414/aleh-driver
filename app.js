@@ -1438,43 +1438,105 @@ APP._helpBackToMenu = function() {
 
 /* ── פנצ'ר ── */
 APP.helpPuncture = async function() {
-  _fireFieldEvent('puncture', { usedFallback24: false });
-  _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-spinner">&#x27F3; טוען ספק שירות...</div></div>');
+  _fireFieldEvent('puncture', {});
   var gps = STATE.helpGps;
   var mapsUrl = (gps && gps.lat)
     ? 'https://www.google.com/maps/search/%D7%A4%D7%A0%D7%A6%D7%A8%D7%99%D7%94+24+%D7%A9%D7%A2%D7%95%D7%AA/@' + gps.lat + ',' + gps.lng + ',15z'
     : 'https://www.google.com/maps/search/%D7%A4%D7%A0%D7%A6%D7%A8%D7%99%D7%94+24+%D7%A9%D7%A2%D7%95%D7%AA';
+
+  _showHelpCard(
+    '<div class="help-card">' +
+    '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+    '<div class="help-card-spinner">&#x27F3; טוען ספק שירות...</div>' +
+    '</div>'
+  );
+
+  var providerHtml = '';
   try {
     var res = await gasPost('get_service_providers', { category: 'puncture' });
     if (res.ok && res.providers && res.providers.length > 0) {
       var p = res.providers[0];
-      _showHelpCard(
-        '<div class="help-card">' +
-        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-        '<div class="help-card-title">&#x1F527; ' + p.name + '</div>' +
-        '<div class="help-card-sub">ספק מורשה</div>' +
-        '<hr class="help-card-divider">' +
-        '<div class="help-card-row"><span>&#x1F4CD;</span><span>' + (p.address||'') + '</span></div>' +
-        (p.contactName ? '<div class="help-card-row"><span>&#x1F464;</span><span>' + p.contactName + '</span></div>' : '') +
-        '<hr class="help-card-divider">' +
-        '<button class="help-action-btn" onclick="window.open(\'tel:\' + (p.phone||\'\').replace(/[^0-9*+]/g,\'\') + \'\')">&#x1F4DE; ' + (p.phone||'') + ' &#x2014; חייג עכשיו</button>' +
-        '<button class="help-action-btn secondary" onclick="window.open(\'' + mapsUrl + '\')" >&#x1F50D; פנצריות פתוחות 24/7 קרוב אליי</button>' +
-        '</div>'
-      );
-    } else {
-      _showHelpCard(
-        '<div class="help-card">' +
-        '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-        '<div class="help-card-title">&#x1F527; פנצ&#x27;ר</div>' +
-        '<div class="help-card-sub">לא נמצא ספק מורשה</div>' +
-        '<hr class="help-card-divider">' +
-        '<button class="help-action-btn" onclick="window.open(\'' + mapsUrl + '\')" >&#x1F50D; מצא פנצריות פתוחות 24/7 קרוב אליי</button>' +
-        '</div>'
-      );
+      var phoneClean = (p.phone || '').replace(/[^0-9*+]/g, '');
+      var waNum = phoneClean.startsWith('+') ? phoneClean.replace('+','') : ('972' + phoneClean.replace(/^0/,''));
+      var waText = encodeURIComponent('שלום, אני נהג עמותת עלה וצריך עזרה עם פנצ\'ר.' + (gps && gps.lat ? ' מיקום: https://maps.google.com/?q=' + gps.lat + ',' + gps.lng : ''));
+
+      /* סטטוס פתיחה */
+      var isOpen = null;
+      if (p.googlePlaceId) {
+        try {
+          var sr = await gasPost('get_place_status', { placeId: p.googlePlaceId });
+          if (sr && sr.ok !== undefined) isOpen = sr.isOpen;
+        } catch(e2) {}
+      }
+      var statusHtml = '';
+      if (isOpen === true)  statusHtml = '<div class="prov-status-open">&#x2705; פתוח כרגע</div>';
+      if (isOpen === false) statusHtml = '<div class="prov-status-closed">&#x26A0;&#xFE0F; סגור כרגע</div>';
+
+      /* שעות פתיחה */
+      var hoursHtml = '';
+      if (p.openingHours && p.openingHours.trim()) {
+        var dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        var todayName = dayNames[new Date().getDay()];
+        var lines = p.openingHours.split('\n').filter(function(l){ return l.trim(); });
+        hoursHtml = '<div class="prov-hours-wrap">';
+        lines.forEach(function(line) {
+          var isToday = line.indexOf(todayName) !== -1;
+          hoursHtml += '<div class="prov-hours-row' + (isToday ? ' prov-hours-today' : '') + '">' +
+            line.replace(/</g,'&lt;') + '</div>';
+        });
+        hoursHtml += '</div>';
+      }
+
+      providerHtml =
+        '<div class="prov-section-badge">&#x1F3F7;&#xFE0F; ספק מורשה — עמותת עלה</div>' +
+        '<div class="prov-card">' +
+        '<div class="prov-card-name">&#x1F527; ' + (p.name||'') + '</div>' +
+        statusHtml +
+        (p.address ? '<div class="prov-card-row"><span class="prov-card-icon">&#x1F4CD;</span><span>' + p.address + '</span></div>' : '') +
+        (p.contactName ? '<div class="prov-card-row"><span class="prov-card-icon">&#x1F464;</span><span>' + p.contactName + '</span></div>' : '') +
+        (hoursHtml
+          ? '<details class="prov-hours-details"><summary>&#x1F551; שעות פתיחה</summary>' + hoursHtml + '</details>'
+          : '') +
+        '<div class="prov-card-btns">' +
+        (phoneClean ? '<button class="help-action-btn" onclick="window.open(\'tel:' + phoneClean + '\')">&#x1F4DE; ' + p.phone + '</button>' : '') +
+        (phoneClean ? '<button class="help-action-btn secondary" onclick="window.open(\'https://wa.me/' + waNum + '?text=' + waText + '\')">&#x1F4AC; וואטסאפ + מיקום</button>' : '') +
+        '</div>' +
+        '</div>';
     }
-  } catch(e) {
-    _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-error">שגיאה בטעינת נתונים. בדוק חיבור רשת.</div></div>');
-  }
+  } catch(e) { /* נפרד — ספק לא נטען, נציג רק חיפוש */ }
+
+  _showHelpCard(
+    '<style>' +
+    '@keyframes blink-warn{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.97)}}' +
+    '.prov-section-badge{display:inline-block;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;font-size:11px;font-weight:700;letter-spacing:.6px;padding:4px 14px;border-radius:20px;margin-bottom:10px}' +
+    '.prov-card{background:#f0f7ff;border:1.5px solid #bfdbfe;border-radius:16px;padding:16px;margin-bottom:4px}' +
+    '.prov-card-name{font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:8px}' +
+    '.prov-status-open{display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;margin-bottom:10px}' +
+    '.prov-status-closed{display:inline-flex;align-items:center;gap:5px;background:#fff3cd;color:#b45309;font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;margin-bottom:10px;animation:blink-warn 1.3s ease-in-out infinite}' +
+    '.prov-card-row{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#374151;margin-bottom:5px;line-height:1.4}' +
+    '.prov-card-icon{font-size:15px;flex-shrink:0;margin-top:1px}' +
+    '.prov-hours-details{margin:8px 0}' +
+    '.prov-hours-details summary{font-size:13px;color:#2563eb;font-weight:600;cursor:pointer;padding:4px 0}' +
+    '.prov-hours-wrap{background:#fff;border-radius:10px;padding:10px 12px;margin-top:6px}' +
+    '.prov-hours-row{font-size:12px;color:#64748b;padding:3px 0;border-bottom:1px solid #f1f5f9}' +
+    '.prov-hours-row:last-child{border:none}' +
+    '.prov-hours-today{font-weight:800;color:#1e3a5f;font-size:13px;background:#eff6ff;margin:0 -4px;padding:4px;border-radius:6px}' +
+    '.prov-card-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px}' +
+    '.prov-search-section{margin-top:14px}' +
+    '.prov-search-label{font-size:11px;font-weight:700;letter-spacing:.6px;color:#94a3b8;margin-bottom:8px}' +
+    '</style>' +
+    '<div class="help-card">' +
+    '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+    (providerHtml ||
+      '<div class="prov-section-badge" style="background:#94a3b8">&#x1F527; פנצ\'ר</div>' +
+      '<div style="font-size:13px;color:#64748b;margin-bottom:12px">לא הוגדר ספק מורשה במערכת</div>'
+    ) +
+    '<div class="prov-search-section">' +
+    '<div class="prov-search-label">&#x1F50D; חיפוש בסביבה</div>' +
+    '<button class="help-action-btn secondary" onclick="window.open(\'' + mapsUrl + '\')">&#x1F5FA;&#xFE0F; פנצריות פתוחות 24/7 קרוב אליי</button>' +
+    '</div>' +
+    '</div>'
+  );
 };
 
 /* ── מצבר / תקוע ── */

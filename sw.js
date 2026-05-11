@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aleh-driver-v50';
+const CACHE_NAME = 'aleh-driver-v51';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
