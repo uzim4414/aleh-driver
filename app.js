@@ -441,9 +441,10 @@ function renderHomeScreen() {
   document.getElementById('car-plate').textContent = formatPlate(v.num);
 
   const photo = document.getElementById('car-photo');
-  const imgUrl = driveToImgUrl(v.appPhotoLink) || getCarImageUrl(v.make, v.model);
+  const imgUrl = driveToImgUrl(v.appPhotoLink || v.photoLink) || getCarImageUrl(v.make, v.model);
   if (imgUrl) {
     photo.src = imgUrl;
+    photo.onerror = () => { photo.style.display = 'none'; };
   } else {
     document.querySelector('.hero-img-area').style.display = 'none';
   }
