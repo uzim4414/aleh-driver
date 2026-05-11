@@ -515,7 +515,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   }
 
   /* ── Topbar ── */
-  #global-topbar       { padding: 8px 24px 10px; min-height: 54px; flex-shrink: 0; }
+  #global-topbar       { padding: 8px 24px 10px; min-height: 52px; flex-shrink: 0; }
   .tb-btn, .tb-avatar  { width: 40px; height: 40px; border-radius: 12px; }
   .tb-badge            { width: 16px; height: 16px; font-size: 8px; border-width: 2px; top: -4px; right: -4px; }
   .tb-logo-name        { font-size: 13px; letter-spacing: 0.38em; }
@@ -535,13 +535,13 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     flex-direction: row !important;
     flex-shrink: 0;
     align-self: stretch;
-    margin: 0 16px 8px;
+    margin: 0 14px 8px;
     border-radius: 20px;
     padding: 6px 8px;
+    min-height: 64px;
     gap: 0;
     justify-content: space-around;
     align-items: center;
-    min-height: 64px;
   }
   .bn-item {
     flex: 1;
@@ -564,142 +564,157 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tab      { padding: 10px 18px; font-size: 14px; }
 
   /* ════════════════════════════════════════════
-     HOME SCREEN — TWO-COLUMN HERO
-     RTL: first child = visual RIGHT (car image)
-          second child = visual LEFT (content)
+     HOME SCREEN — CENTERED SINGLE COLUMN
+     תמונת רכב גדולה למעלה, שם ומספר, כפתורים, ווידג'טים
   ════════════════════════════════════════════ */
+
+  /* Kill ALL hero pseudo-elements — scan-line + fade overlay */
+  .hero-img-area::before,
+  .hero-img-area::after { display: none !important; content: none !important; }
+
   #screen-home > .content {
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 0;
+    align-items: center;
+    overflow-y: auto;
+    padding: 8px 16px 12px;
   }
+
   #screen-home .hero-card {
-    flex: 1;
-    min-height: 0;
-    margin: 8px 12px;
+    width: 100%;
+    max-width: 920px;
     display: flex !important;
-    flex-direction: row !important;
-    align-items: stretch;
+    flex-direction: column !important;
+    align-items: center;
     border-radius: 24px;
     overflow: hidden;
-    gap: 0;
+    margin: 0;
   }
 
-  /* RIGHT PANEL — car image (40%) */
+  /* Car image — full width, fixed height, centered */
   #screen-home .hero-img-area {
-    flex: 0 0 40% !important;
-    width: 40% !important;
-    height: auto !important;
+    width: 100% !important;
+    height: 195px !important;
     min-height: 0 !important;
     max-height: none !important;
-    overflow: hidden;
+    flex-shrink: 0;
     display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: linear-gradient(180deg, #0c0c0c 0%, #111 80%, #0e0e0e 100%) !important;
+    overflow: hidden;
+    position: relative;
+  }
+  #screen-home .car-wrap {
+    width: auto;
+    height: 100%;
+    display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    background:
-      radial-gradient(ellipse at 50% 75%, rgba(31,138,61,0.13) 0%, transparent 65%),
-      #0d0d0d;
-  }
-
-  /* Kill pseudo-elements (scan-line etc.) in all landscape */
-  .hero-img-area::before,
-  .hero-img-area::after { display: none !important; }
-
-  #screen-home .car-wrap {
-    width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px 16px;
+    padding: 14px 24px;
+    animation: none;
   }
   #screen-home .car-img {
     width: auto !important;
-    height: clamp(130px, 58%, 270px) !important;
-    max-width: 92% !important;
+    height: 164px !important;
+    max-width: 380px !important;
     object-fit: contain;
-    filter: drop-shadow(0 8px 28px rgba(0,0,0,0.65));
+    filter: brightness(1.1) contrast(1.05) drop-shadow(0 10px 28px rgba(0,0,0,0.7));
+    mix-blend-mode: screen;
+    animation: none;
   }
-  #screen-home .car-glow { width: 54%; bottom: 12px; height: 14px; opacity: 0.55; }
-  #screen-home .hl-glow  { display: none; }
+  #screen-home .car-glow {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    height: 14px;
+    animation: none;
+    opacity: 0.6;
+  }
+  #screen-home .hl-glow { display: none; }
 
-  /* LEFT PANEL — content (60%) */
+  /* Content — centered, full width */
   #screen-home .hero-body {
-    flex: 1 !important;
-    min-width: 0;
+    width: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: stretch !important;
-    padding: 20px 26px 16px !important;
-    gap: 10px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: none;
-    text-align: right;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 18px 32px 22px !important;
+    gap: 12px;
+    overflow: visible;
     min-height: 0;
-    background: linear-gradient(160deg, #141414 0%, #0f0f0f 100%);
-    border-right: 1px solid rgba(255,255,255,0.06);
   }
-  #screen-home .hero-body::-webkit-scrollbar { display: none; }
 
-  /* Identity */
+  /* Vehicle name — big, centered */
   #screen-home .hero-name {
-    font-size: clamp(24px, 3vw, 42px) !important;
+    font-size: clamp(30px, 4.8vw, 58px) !important;
     font-weight: 900;
-    text-align: right;
+    text-align: center !important;
+    width: 100%;
     line-height: 1.1;
+    letter-spacing: -0.025em;
     flex-shrink: 0;
-    letter-spacing: -0.02em;
   }
+
+  /* Plate — centered */
   #screen-home .hero-plate-wrap {
-    text-align: right !important;
-    margin-top: 2px;
+    text-align: center !important;
+    margin-top: 0;
     flex-shrink: 0;
   }
   #screen-home .hero-plate {
-    font-size: clamp(15px, 2vw, 26px) !important;
-    padding: 7px 20px !important;
-    letter-spacing: 3px;
+    font-size: clamp(18px, 2.8vw, 34px) !important;
+    padding: 9px 28px !important;
+    letter-spacing: 4px;
     border-width: 2px;
   }
 
-  /* Action buttons — 2-col grid */
+  /* Buttons — horizontal row, centered */
   #screen-home .hero-btns {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px;
     width: 100%;
+    max-width: 520px;
     flex-shrink: 0;
+    margin-top: 2px;
   }
   #screen-home .hero-btn {
-    min-height: 58px !important;
-    padding: 14px 10px !important;
-    font-size: 14px !important;
+    flex: 1;
+    min-height: 60px !important;
+    padding: 16px 14px !important;
+    font-size: 15px !important;
     font-weight: 700;
-    border-radius: 14px;
+    border-radius: 14px !important;
   }
   #screen-home .hero-alert {
-    padding: 10px 14px;
+    padding: 10px 16px;
     width: 100%;
+    max-width: 520px;
     border-radius: 12px;
     flex-shrink: 0;
+    text-align: right;
   }
 
-  /* Widgets — full width, stacked */
+  /* Widgets — full panel width */
   #screen-home #svc-progress-mount,
   #screen-home #fuel-widget-mount { width: 100% !important; flex-shrink: 0; }
   #screen-home .svc-card {
     width: 100% !important;
     box-sizing: border-box;
     margin: 0 !important;
-    padding: 14px 16px 16px !important;
-    border-radius: 16px;
+    padding: 16px 22px 18px !important;
+    border-radius: 18px;
   }
   #screen-home .fuel-widget {
     width: 100% !important;
     box-sizing: border-box;
     margin: 0 !important;
-    padding: 14px 16px !important;
-    border-radius: 16px;
+    padding: 16px 22px !important;
+    border-radius: 18px;
   }
 
   /* Hide quick-actions on home in landscape */
@@ -716,20 +731,20 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
     animation: none;
   }
 
-  /* ── Service-progress widget ── */
+  /* ── Service-progress widget sizes ── */
   .svc-hdr      { margin-bottom: 10px; }
   .svc-icn      { width: 30px; height: 30px; border-radius: 9px; }
   .svc-title    { font-size: 13px; }
   .svc-pill     { font-size: 10px; padding: 3px 9px; }
   .svc-stat-lbl { font-size: 10px; }
   .svc-stat-val { font-size: 17px; }
-  .svc-stat-val .unit         { font-size: 10px; }
-  .svc-bar-bg                 { height: 9px; }
-  .svc-bar-wrap.with-marker   { padding-bottom: 28px; }
+  .svc-stat-val .unit       { font-size: 10px; }
+  .svc-bar-bg               { height: 9px; }
+  .svc-bar-wrap.with-marker { padding-bottom: 28px; }
   .svc-foot-txt { font-size: 11px; }
   .svc-foot-val { font-size: 12px; }
 
-  /* ── Fuel widget ── */
+  /* ── Fuel widget sizes ── */
   .fw-label      { font-size: 12px; }
   .fw-pill       { font-size: 11px; padding: 3px 9px; }
   .fw-badge      { font-size: 26px; }
@@ -790,8 +805,8 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .tc-tag   { font-size: 12px; padding: 6px 16px; margin-top: 10px; border-radius: 20px; }
 
   /* ════════════════════════════════════════════
-     SERVICE SCREEN — SIDE-BY-SIDE LAYOUT
-     KM card (RIGHT, RTL-start) + Fault card (LEFT, RTL-end)
+     SERVICE SCREEN — SIDE-BY-SIDE
+     KM card (RIGHT, RTL) + Fault card (LEFT)
   ════════════════════════════════════════════ */
   #screen-service > .content {
     display: flex !important;
@@ -914,6 +929,13 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   ════════════════════════════════════════════ */
   #confirm-modal       { align-items: center !important; justify-content: center !important; }
   #confirm-modal > div { border-radius: 24px !important; padding: 32px 28px 36px !important; max-width: 480px !important; }
+
+  /* ════════════════════════════════════════════
+     LOADING SCREEN — תיקון פס אפור
+     gr-bar-bg ← track שקוף כמעט
+  ════════════════════════════════════════════ */
+  .gr-bar-bg   { height: 3px; background: rgba(255,255,255,0.07) !important; }
+  .gr-bar-fill { background: var(--ok) !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════

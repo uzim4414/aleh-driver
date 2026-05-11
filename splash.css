@@ -238,9 +238,10 @@ html, body {
     flex-direction: row;
     align-items: stretch;
     justify-content: center;
-    background: #000;
+    background: #000 !important;
   }
-  .stage::before { display: none; }
+  .stage::before { display: none !important; content: none !important; }
+  .stage::after  { display: none !important; content: none !important; }
 
   /* Logo: large, fills right column — !important overrides React inline --logo-scale */
   .splash-logo {
