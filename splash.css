@@ -233,42 +233,48 @@ html, body {
    LANDSCAPE — מסך התחברות רוחבי
 ══════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
-  /* לוגו מוקטן — !important כדי לנצח את ה-inline style של React */
-  .splash-logo {
-    width:  min(220px, calc(50vw)) !important;
-    height: min(220px, calc(100vh - 140px)) !important;
-  }
-
-  /* רקע מותאם לפורמט רוחבי */
+  /* Two-column stage: #splash-react-root RIGHT (RTL-start), .login-chrome LEFT (RTL-end) */
   .stage {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
     background:
-      radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 55%),
-      radial-gradient(ellipse at 70% 85%, rgba(255,45,45,0.05) 0%, rgba(0,0,0,0) 50%),
+      radial-gradient(ellipse at 25% 50%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 55%),
+      radial-gradient(ellipse at 75% 60%, rgba(255,45,45,0.05) 0%, rgba(0,0,0,0) 50%),
       #000;
   }
-
-  /* מסתיר את ה-scan-lines שגורמים לפס אפור בנוף */
+  /* Suppress scan-line bar */
   .stage::before { display: none; }
 
-  /* chrome עליון: קומפקטי */
+  /* Logo: large, fills right column — !important overrides React inline --logo-scale */
+  .splash-logo {
+    width:  min(400px, calc(50vw - 40px)) !important;
+    height: min(400px, calc(100vh - 60px)) !important;
+  }
+
+  /* login-chrome becomes static flex column (left column in RTL) */
   .login-chrome {
-    padding: 14px 24px 18px;
+    padding: 20px 48px 20px !important;
   }
   .login-chrome .top {
     font-size: 9px;
     letter-spacing: 0.38em;
   }
 
-  /* כפתור כניסה: דק יותר */
+  /* Sign-in button: full-width tablet proportions */
   .signin-btn {
-    padding: 13px 44px 13px 48px;
-    font-size: 11px;
+    padding: 18px 48px !important;
+    font-size: 15px;
+    width: 100%;
+    max-width: 340px;
+    min-height: 58px;
   }
   .signin-hint {
-    font-size: 8px;
+    font-size: 10px;
+    text-align: center;
   }
 
-  /* replay pill */
+  /* Replay pill */
   .replay-btn {
     bottom: 12px;
     right: 12px;

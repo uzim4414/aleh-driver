@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&family=Outfit:wght@200;300;400;500;600;700&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700&family=Manrope:wght@200;300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="splash.css?v=21">
+<link rel="stylesheet" href="splash.css?v=22">
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -211,12 +211,53 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   50%     { box-shadow:0 0 22px 6px rgba(31,138,61,0.28); border-color:rgba(31,138,61,1); }
 }
 @media (orientation: landscape) {
-  .login-chrome .bottom { bottom:14px !important; left:50% !important; right:auto !important; transform:translateX(-50%); width:max-content; }
-  .splash-dev-credit { bottom:8px; font-size:9px; }
-  #greeting { flex-direction:row; gap:32px; justify-content:center; align-items:center; }
-  .gr-time { font-size:16px; }
-  .gr-name { font-size:26px; }
-  .gr-bar-wrap { margin-top:0; width:160px; }
+  /* Splash — two-column: logo RIGHT (RTL-start), login LEFT (RTL-end) */
+  #splash-react-root {
+    flex: 0 0 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-chrome {
+    position: static !important;
+    flex: 0 0 50% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px;
+    padding: 20px 48px !important;
+    pointer-events: auto !important;
+    height: 100vh;
+  }
+  .login-chrome .top { display: none; }
+  .login-chrome .bottom {
+    position: static !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 340px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+  }
+  .signin-btn {
+    min-height: 58px !important;
+    width: 100% !important;
+    padding: 18px 24px !important;
+    font-size: 16px !important;
+    letter-spacing: 0.42em !important;
+  }
+  .signin-hint { font-size: 11px; text-align: center; }
+  .splash-dev-credit { bottom: 10px; font-size: 9px; }
+  /* Greeting overlay */
+  #greeting { flex-direction:row; gap:48px; justify-content:center; align-items:center; padding:0 80px; }
+  .gr-time { font-size:20px; }
+  .gr-name { font-size:32px; }
+  .gr-bar-wrap { margin-top:0; width:220px; }
 }
 
 /* ── Greeting overlay ── */
@@ -452,234 +493,309 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .fm-close-btn:active { background:rgba(255,255,255,0.1); }
 
 /* ══════════════════════════════════════════════════════════════
-   LANDSCAPE — רוחבי: flex-column, bnav למטה, תוכן רוחב מלא
+   LANDSCAPE TABLET — two-column hero, spacious nav, full widths
+   Target: Samsung tablet ~1270×752px (height > 500px)
+   Ultra-compact phones (≤500px) handled in block below — UNTOUCHED
 ══════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
 
-  /* ── App: עמודה אחת, רוחב מלא, ללא grid ── */
+  /* ── App container ── */
   #app {
     max-width: 100% !important;
     width: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    height: 100vh;
     height: 100dvh;
     margin: 0 !important;
   }
 
-  /* ── Topbar: קומפקטי ── */
-  #global-topbar {
-    padding: 4px 16px 6px;
-    min-height: 44px;
-    flex-shrink: 0;
-  }
-  .tb-btn, .tb-avatar { width: 34px; height: 34px; border-radius: 10px; }
-  .tb-badge { width: 14px; height: 14px; font-size: 8px; border-width: 2px; top: -3px; right: -3px; }
-  .tb-logo-name  { font-size: 11px; letter-spacing: 0.34em; }
-  .tb-logo-sub   { font-size: 6.5px; letter-spacing: 0.3em; }
-  .tb-greet-hi   { font-size: 10px; }
-  .tb-greet-name { font-size: 12px; }
-  .tb-user { gap: 6px; }
+  /* ── Topbar: tablet sizing ── */
+  #global-topbar { padding: 6px 20px 8px; min-height: 50px; flex-shrink: 0; }
+  .tb-btn, .tb-avatar { width: 38px; height: 38px; border-radius: 12px; }
+  .tb-badge { width: 15px; height: 15px; font-size: 8px; border-width: 2px; top: -3px; right: -3px; }
+  .tb-logo-name  { font-size: 12px; letter-spacing: 0.36em; }
+  .tb-logo-sub   { font-size: 7px; letter-spacing: 0.32em; }
+  .tb-greet-hi   { font-size: 11px; }
+  .tb-greet-name { font-size: 14px; }
+  .tb-user { gap: 8px; }
 
-  /* ── Screens: flex-column, תופסים את כל השטח הפנוי ── */
+  /* ── Screen scaffold ── */
   .screen        { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
   .screen.active { display: flex; }
-  .content       { flex: 1; overflow-y: auto; min-height: 0; }
+  .content       { flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: none; }
+  .content::-webkit-scrollbar { display: none; }
 
-  /* ── Bottom nav: נשאר למטה, כפתורים גדולים יותר ── */
+  /* ── Bottom nav: tablet spacious ── */
   .bnav {
     flex-direction: row !important;
     flex-shrink: 0;
     align-self: stretch;
-    margin: 4px 10px;
-    border-radius: 16px;
-    padding: 6px 8px;
+    margin: 4px 12px;
+    border-radius: 18px;
+    padding: 6px 12px;
     gap: 0;
     justify-content: space-around;
     align-items: center;
     box-sizing: border-box;
+    min-height: 68px;
   }
   .bn-item {
     flex: 1;
     flex-direction: column;
     padding: 10px 4px;
-    border-radius: 12px;
-    gap: 3px;
-    min-height: 54px;
+    border-radius: 14px;
+    gap: 4px;
+    min-height: 58px;
   }
-  .bn-item.active { flex: 1.4; }
-  .bn-lbl                 { font-size: 9px; }
-  .bn-item.active .bn-lbl { font-size: 9.5px; }
-  .bn-ic                  { width: 22px; height: 22px; }
+  .bn-item.active { flex: 1.5; }
+  .bn-lbl                 { font-size: 11px; }
+  .bn-item.active .bn-lbl { font-size: 11.5px; font-weight: 700; }
+  .bn-ic                  { width: 24px; height: 24px; }
 
-  /* ── phead קומפקטי ── */
-  .phead { padding: 6px 16px 8px; }
-  .ph-title { font-size: 15px; }
-  .ph-sub   { font-size: 11px; }
+  /* ── phead & tabs ── */
+  .phead    { padding: 8px 20px 10px; }
+  .ph-title { font-size: 18px; }
+  .ph-sub   { font-size: 12px; }
+  .tabs { padding: 0 16px; }
+  .tab  { padding: 10px 16px; font-size: 13px; }
 
-  /* ── Tabs ── */
-  .tabs { padding: 0 14px; }
-  .tab  { padding: 9px 12px; font-size: 12px; }
-
-  /* ── Hero card: עמודה אחת, רוחב מלא ── */
-  .hero-card {
-    margin: 6px 10px;
-    align-self: stretch;
-    display: flex;
-    flex-direction: column !important;
-    min-height: 0;
-    border-radius: 18px;
-  }
-  .hero-img-area {
-    width: 100% !important;
-    height: 25vh;
-    min-height: 140px;
-    max-height: 200px;
-    flex-shrink: 0;
+  /* ════════════════════════════════════════════
+     HOME SCREEN — TWO-COLUMN HERO CARD
+     RIGHT (38%): car image — RTL-start, visual right
+     LEFT  (62%): name + plate + btns + widgets
+  ════════════════════════════════════════════ */
+  #screen-home > .content {
     overflow: hidden;
     display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+  #screen-home .hero-card {
+    flex: 1;
+    min-height: 0;
+    margin: 6px 10px;
+    flex-direction: row !important;
+    align-items: stretch;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  /* RIGHT PANEL — car image (38%) */
+  #screen-home .hero-img-area {
+    flex: 0 0 38% !important;
+    width: 38% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden;
+    display: flex !important;
     align-items: center;
     justify-content: center;
+    position: relative;
+    background: linear-gradient(180deg, #0e0e0e 0%, #111 60%, #0d0d0d 100%);
   }
-  .hero-img-area::before {
-    animation: none !important;
-    opacity: 0 !important;
-    display: none !important;
+  #screen-home .hero-img-area::before { animation: none !important; opacity: 0 !important; display: none !important; }
+  #screen-home .hero-img-area::after  { display: none !important; }
+  #screen-home .car-wrap {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
   }
-  .car-wrap { padding: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-  .car-img  { height: 22vh; max-height: 180px; width: auto; max-width: 90%; object-fit: contain; }
-  .car-glow { width: 55%; bottom: 4px; height: 14px; }
-  .hl-glow  { display: none; }
-  .hero-body {
-    padding: 10px 18px 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  #screen-home .car-img {
+    width: auto !important;
+    height: 65% !important;
+    max-height: 300px !important;
+    max-width: 90% !important;
+    object-fit: contain;
+  }
+  #screen-home .car-glow { width: 60%; bottom: 14px; height: 16px; }
+  #screen-home .hl-glow  { display: none; }
+
+  /* LEFT PANEL — content column (62%) */
+  #screen-home .hero-body {
+    flex: 1 !important;
     min-width: 0;
-    width: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 22px 28px !important;
+    gap: 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    text-align: right;
+    min-height: 0;
   }
-  .hero-name      { font-size: clamp(18px, 2vw, 28px); text-align: center; font-weight: 700; }
-  .hero-plate-wrap{ text-align: center; margin-top: 8px; }
-  .hero-plate     { font-size: clamp(16px, 1.8vw, 24px); padding: 6px 20px; letter-spacing: 3px; border-width: 2px; }
-  .hero-btns      { margin-top: 10px; gap: 10px; width: 100%; }
-  .hero-btn       { font-size: 13px; padding: 14px 0; }
-  .hero-alert     { padding: 8px 12px; margin-top: 8px; width: 100%; }
-  .ha-title       { font-size: 13px; }
-  .ha-sub         { font-size: 11px; }
+  #screen-home .hero-body::-webkit-scrollbar { display: none; }
 
-  /* ── Quick actions ── */
-  .sec { padding: 10px 14px 6px; font-size: 14px; }
-  .qa  { gap: 8px; padding: 0 12px; grid-template-columns: 1fr 1fr 1fr; width: 100%; }
-  .qa-card    { padding: 10px 6px 8px; border-radius: 14px; gap: 6px; }
-  .qa-icon-box{ width: 36px; height: 36px; border-radius: 10px; }
-  .qa-lbl     { font-size: 10px; }
+  /* Identity */
+  #screen-home .hero-name {
+    font-size: clamp(22px, 2.8vw, 38px) !important;
+    font-weight: 800;
+    text-align: right;
+    width: 100%;
+    line-height: 1.1;
+    flex-shrink: 0;
+  }
+  #screen-home .hero-plate-wrap {
+    text-align: right !important;
+    margin-top: 0;
+    width: 100%;
+    flex-shrink: 0;
+  }
+  #screen-home .hero-plate {
+    font-size: clamp(18px, 2.2vw, 28px) !important;
+    padding: 8px 22px !important;
+    letter-spacing: 3px;
+    border-width: 2px;
+  }
 
-  /* ── Widgets: mount points + cards רוחב מלא ── */
-  #svc-progress-mount,
-  #fuel-widget-mount { width: 100%; }
-  .svc-card    { margin: 8px 0 0; width: 100%; box-sizing: border-box; padding: 14px 16px 16px; border-radius: 16px; }
-  .svc-hdr     { margin-bottom: 10px; }
-  .svc-icn     { width: 28px; height: 28px; border-radius: 9px; }
-  .svc-title   { font-size: 13px; }
-  .svc-pill    { font-size: 10px; padding: 3px 8px; }
-  .svc-stat-lbl{ font-size: 10px; }
-  .svc-stat-val{ font-size: 16px; }
-  .svc-stat-val .unit { font-size: 10px; }
-  .svc-bar-bg  { height: 9px; }
-  .svc-bar-wrap.with-marker { padding-bottom: 32px; }
-  .svc-foot-txt{ font-size: 11px; }
-  .svc-foot-val{ font-size: 12px; }
+  /* Action buttons: 2-col grid, full panel width */
+  #screen-home .hero-btns {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  #screen-home .hero-btn {
+    min-height: 62px !important;
+    padding: 16px 12px !important;
+    font-size: 15px !important;
+    font-weight: 600;
+    border-radius: 14px;
+  }
+  #screen-home .hero-alert {
+    padding: 10px 14px;
+    margin-top: 0;
+    width: 100%;
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
 
-  .fuel-widget { margin: 8px 0 0; width: 100%; box-sizing: border-box; padding: 14px 16px 14px; border-radius: 16px; }
-  .fw-label    { font-size: 12px; }
-  .fw-pill     { font-size: 11px; padding: 3px 8px; }
-  .fw-badge    { font-size: 26px; }
-  .fw-headline { font-size: 15px; }
-  .fw-sub      { font-size: 11px; margin-bottom: 8px; }
-  .fw-bar-bg   { height: 6px; }
-  .fw-bar-labels { font-size: 10px; }
-  .fw-cta      { font-size: 11px; padding-top: 6px; }
+  /* Widgets: FULL panel width, STACKED vertically */
+  #screen-home #svc-progress-mount,
+  #screen-home #fuel-widget-mount { width: 100% !important; flex-shrink: 0; }
+  #screen-home .svc-card {
+    width: 100% !important; box-sizing: border-box;
+    margin: 0 !important; padding: 16px 18px 18px !important; border-radius: 16px;
+  }
+  #screen-home .fuel-widget {
+    width: 100% !important; box-sizing: border-box;
+    margin: 0 !important; padding: 16px 18px !important; border-radius: 16px;
+  }
 
-  /* ── Info grid (vehicle screen) — 4 עמודות ── */
-  .igrid { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 14px; }
-  .ig-card { padding: 10px 12px; border-radius: 14px; }
-  .ig-icon { margin-bottom: 6px; }
-  .ig-lbl  { font-size: 10px; }
-  .ig-val  { font-size: 14px; }
+  /* Hide quick actions in landscape (km via nav tab, fault via FAB) */
+  #screen-home .sec,
+  #screen-home .qa { display: none !important; }
 
-  /* ── Tech specs ── */
-  .tech-sec-hdr   { padding: 10px 16px 4px; }
-  .tech-sec-title { font-size: 13px; }
-  .tspec-cat      { padding: 8px 14px 4px; }
-  .tspec-cat-title{ font-size: 11px; padding-bottom: 7px; margin-bottom: 7px; }
-  .tspec-grid     { grid-template-columns: repeat(6, 1fr); gap: 6px; }
-  .tspec-item     { padding: 9px 4px 7px; border-radius: 11px; }
-  .tspec-icon     { width: 28px; height: 28px; border-radius: 8px; }
-  .tspec-val      { font-size: 11px; }
-  .tspec-lbl      { font-size: 8.5px; }
-  .tspec-bool     { font-size: 10px; padding: 5px 10px; }
-
-  /* ── Alerts ── */
-  .ssec       { padding: 8px 16px 4px; }
-  .ss-lbl     { font-size: 13px; }
-  .ss-count   { font-size: 11px; }
-  .alert-card { margin: 0 14px 8px; padding: 10px 14px; border-radius: 14px; }
-  .ac-title   { font-size: 13px; }
-  .ac-sub     { font-size: 11px; }
-  .ac-date    { font-size: 11px; margin-top: 6px; }
-
-  /* ── Documents ── */
-  .doc-row    { margin: 0 14px 6px; padding: 10px 14px; border-radius: 14px; gap: 12px; }
-  .dr-icon-wrap { width: 34px; height: 34px; border-radius: 10px; }
-  .dr-title   { font-size: 13px; }
-  .dr-sub     { font-size: 11px; }
-
-  /* ── Timeline / history ── */
-  .timeline   { padding: 10px 14px 14px; }
-  .tl-row     { gap: 14px; margin-bottom: 8px; }
-  .tl-card    { padding: 10px 14px; border-radius: 14px; }
-  .tc-date    { font-size: 13px; }
-  .tc-row     { font-size: 12px; margin-top: 4px; }
-  .tc-lbl     { font-size: 11px; }
-  .tc-tag     { font-size: 11px; padding: 4px 12px; margin-top: 8px; }
-
-  /* ── Service screen ── */
-  .km-card    { margin: 10px 14px 0; padding: 14px; border-radius: 14px; }
-  .km-label   { font-size: 11px; }
-  .km-prev    { font-size: 11px; }
-  .km-input   { font-size: 16px; padding: 9px 12px; }
-  .km-btn     { font-size: 13px; padding: 9px 16px; }
-  .fault-card { margin: 10px 14px; padding: 12px; border-radius: 14px; }
-  .fault-label{ font-size: 11px; margin-bottom: 8px; }
-  .fault-textarea { font-size: 12px; min-height: 60px; padding: 10px; }
-  .fault-btn  { font-size: 13px; padding: 10px; }
-
-  /* ── Garage tab ── */
-  .gar-wrap { padding: 10px 14px; gap: 10px; }
-  .gar-card { border-radius: 16px; }
-  .gar-head { padding: 12px 14px 10px; gap: 12px; }
-  .gar-logo { width: 44px; height: 44px; border-radius: 14px; }
-  .gar-name { font-size: 15px; }
-  .gar-tag  { font-size: 10px; }
-  .gar-row  { padding: 10px 14px; gap: 10px; }
-  .gar-row-icn { width: 30px; height: 30px; border-radius: 9px; }
-  .gar-row-lbl { font-size: 9.5px; }
-  .gar-row-val { font-size: 12.5px; }
-  .gar-mini-btn{ width: 32px; height: 32px; border-radius: 10px; }
-  .gar-cta     { padding: 10px 14px; gap: 8px; }
-  .gar-cta-btn { padding: 10px 12px; font-size: 12px; border-radius: 12px; }
-
-  /* ── FAB: מרחף מעל ה-bnav ── */
+  /* FAB: above nav */
   .fab {
-    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-    left: 18px;
-    right: auto;
-    padding: 10px 16px;
-    font-size: 12px;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    left: 18px; right: auto;
+    padding: 12px 18px; font-size: 13px;
     animation: none;
   }
 
-  /* ── Fuel modal: מרכזי, scaled ── */
+  /* ── Widget detail classes ── */
+  .svc-hdr     { margin-bottom: 12px; }
+  .svc-icn     { width: 32px; height: 32px; border-radius: 10px; }
+  .svc-title   { font-size: 14px; }
+  .svc-pill    { font-size: 11px; padding: 4px 10px; }
+  .svc-stat-lbl{ font-size: 11px; }
+  .svc-stat-val{ font-size: 18px; }
+  .svc-stat-val .unit { font-size: 11px; }
+  .svc-bar-bg  { height: 10px; }
+  .svc-bar-wrap.with-marker { padding-bottom: 32px; }
+  .svc-foot-txt{ font-size: 12px; }
+  .svc-foot-val{ font-size: 13px; }
+
+  .fw-label    { font-size: 13px; }
+  .fw-pill     { font-size: 12px; padding: 4px 10px; }
+  .fw-badge    { font-size: 28px; }
+  .fw-headline { font-size: 16px; }
+  .fw-sub      { font-size: 12px; margin-bottom: 8px; }
+  .fw-bar-bg   { height: 7px; }
+  .fw-bar-labels { font-size: 11px; }
+  .fw-cta      { font-size: 12px; padding-top: 6px; }
+
+  /* ── Vehicle screen ── */
+  .igrid { grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px 16px; }
+  .ig-card { padding: 12px 14px; border-radius: 16px; }
+  .ig-icon { margin-bottom: 8px; }
+  .ig-lbl  { font-size: 11px; }
+  .ig-val  { font-size: 15px; }
+
+  .tech-sec-hdr   { padding: 12px 18px 6px; }
+  .tech-sec-title { font-size: 15px; }
+  .tspec-cat      { padding: 8px 16px 4px; }
+  .tspec-cat-title{ font-size: 12px; padding-bottom: 8px; margin-bottom: 8px; }
+  .tspec-grid     { grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .tspec-item     { padding: 10px 6px 8px; border-radius: 12px; }
+  .tspec-icon     { width: 30px; height: 30px; border-radius: 9px; }
+  .tspec-val      { font-size: 12px; }
+  .tspec-lbl      { font-size: 9.5px; }
+  .tspec-bool     { font-size: 11px; padding: 6px 12px; }
+
+  /* ── Alerts screen ── */
+  .ssec       { padding: 10px 18px 6px; }
+  .ss-lbl     { font-size: 15px; }
+  .ss-count   { font-size: 12px; }
+  .alert-card { margin: 0 16px 10px; padding: 14px 18px; border-radius: 16px; }
+  .ac-title   { font-size: 15px; }
+  .ac-sub     { font-size: 13px; }
+  .ac-date    { font-size: 12px; margin-top: 8px; }
+
+  /* ── Documents ── */
+  .doc-row      { margin: 0 16px 8px; padding: 12px 16px; border-radius: 16px; gap: 14px; }
+  .dr-icon-wrap { width: 38px; height: 38px; border-radius: 12px; }
+  .dr-title     { font-size: 15px; }
+  .dr-sub       { font-size: 12px; }
+
+  /* ── History / timeline ── */
+  .timeline { padding: 12px 16px 16px; }
+  .tl-row   { gap: 16px; margin-bottom: 10px; }
+  .tl-card  { padding: 12px 16px; border-radius: 16px; }
+  .tc-date  { font-size: 14px; }
+  .tc-row   { font-size: 13px; margin-top: 5px; }
+  .tc-lbl   { font-size: 12px; }
+  .tc-tag   { font-size: 12px; padding: 5px 14px; margin-top: 10px; }
+
+  /* ── Service screen ── */
+  .km-card    { margin: 12px 16px 0; padding: 18px 22px; border-radius: 18px; }
+  .km-label   { font-size: 12px; }
+  .km-prev    { font-size: 12px; }
+  .km-input   { font-size: 18px; padding: 12px 16px; }
+  .km-btn     { font-size: 15px; padding: 14px 20px; }
+  .fault-card { margin: 12px 16px; padding: 18px 22px; border-radius: 18px; }
+  .fault-label{ font-size: 12px; margin-bottom: 10px; }
+  .fault-textarea { font-size: 14px; min-height: 80px; padding: 12px 14px; }
+  .fault-btn  { font-size: 15px; padding: 14px; }
+
+  /* ── Garage tab ── */
+  .gar-wrap { padding: 12px 16px; gap: 12px; }
+  .gar-card { border-radius: 18px; }
+  .gar-head { padding: 14px 16px 12px; gap: 14px; }
+  .gar-logo { width: 48px; height: 48px; border-radius: 16px; }
+  .gar-name { font-size: 17px; }
+  .gar-tag  { font-size: 11px; }
+  .gar-row  { padding: 12px 16px; gap: 12px; }
+  .gar-row-icn { width: 34px; height: 34px; border-radius: 10px; }
+  .gar-row-lbl { font-size: 10.5px; }
+  .gar-row-val { font-size: 14px; }
+  .gar-mini-btn{ width: 36px; height: 36px; border-radius: 12px; }
+  .gar-cta     { padding: 12px 16px; gap: 10px; }
+  .gar-cta-btn { padding: 12px 16px; font-size: 14px; border-radius: 14px; }
+
+  /* ── Quick actions (hidden on home, kept for any other screen) ── */
+  .sec { padding: 10px 16px 6px; font-size: 14px; }
+  .qa  { gap: 8px; padding: 0 14px; grid-template-columns: 1fr 1fr 1fr; width: 100%; }
+  .qa-card    { padding: 12px 8px 10px; border-radius: 16px; gap: 7px; }
+  .qa-icon-box{ width: 38px; height: 38px; border-radius: 11px; }
+  .qa-lbl     { font-size: 11px; }
+
+  /* ── Fuel modal: centered on tablet ── */
   .fuel-modal { align-items: center; }
   .fm-sheet {
     max-width: min(580px, 86vw);
@@ -691,44 +807,44 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   .fuel-modal.open .fm-sheet { animation: modalScaleIn .35s cubic-bezier(.16,1,.3,1) forwards; }
   @keyframes modalScaleIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
   .fm-drag-handle { display: none; }
-  .fm-hero        { padding: 14px 18px 12px; }
-  .fm-hero-val    { font-size: 38px; letter-spacing: -1px; }
-  .fm-hero-unit   { font-size: 12px; }
-  .fm-hero-row2   { margin-top: 8px; gap: 6px; }
+  .fm-hero        { padding: 16px 20px 14px; }
+  .fm-hero-val    { font-size: 40px; letter-spacing: -1px; }
+  .fm-hero-unit   { font-size: 13px; }
+  .fm-hero-row2   { margin-top: 10px; gap: 8px; }
   .fm-hero-chip,
   .fm-hero-chip2,
-  .fm-hero-chip3  { font-size: 11px; padding: 4px 10px; }
-  .fm-section     { padding: 0 14px 12px; }
-  .fm-sec-title   { font-size: 10px; margin-bottom: 7px; }
-  .fm-insight-card{ padding: 12px 14px; border-radius: 14px; }
-  .fm-insight-icon{ font-size: 16px; }
-  .fm-insight-label{font-size: 10px; }
-  .fm-insight-text{ font-size: 12px; line-height: 1.55; }
-  .fm-insight-footer{font-size: 9px; margin-top: 7px; }
-  .fm-chart       { height: 70px; gap: 5px; }
-  .fm-chart-val   { font-size: 8.5px; }
-  .fm-chart-label { font-size: 9px; }
-  .fm-chart-cost  { font-size: 7.5px; }
-  .fm-tiles       { grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .fm-tile        { padding: 10px 12px; border-radius: 12px; }
-  .fm-tile-lbl    { font-size: 9px; margin-bottom: 4px; }
-  .fm-tile-val    { font-size: 16px; }
-  .fm-tile-unit   { font-size: 10px; }
-  .fm-stations    { gap: 6px; }
-  .fm-station-card{ padding: 9px 12px; border-radius: 12px; gap: 10px; }
-  .fm-station-rank{ width: 24px; height: 24px; font-size: 11px; }
-  .fm-station-name{ font-size: 11px; }
-  .fm-station-cost{ font-size: 12px; }
-  .fm-station-ppl { font-size: 9px; }
-  .fm-annual      { gap: 8px; }
-  .fm-annual-item { padding: 9px 12px; border-radius: 12px; }
-  .fm-annual-val  { font-size: 14px; }
-  .fm-annual-lbl  { font-size: 9px; }
-  .fm-close-btn   { margin: 12px; padding: 11px; font-size: 13px; border-radius: 12px; width: calc(100% - 24px); }
+  .fm-hero-chip3  { font-size: 12px; padding: 5px 12px; }
+  .fm-section     { padding: 0 16px 14px; }
+  .fm-sec-title   { font-size: 11px; margin-bottom: 8px; }
+  .fm-insight-card{ padding: 14px 16px; border-radius: 16px; }
+  .fm-insight-icon{ font-size: 18px; }
+  .fm-insight-label{font-size: 11px; }
+  .fm-insight-text{ font-size: 13px; line-height: 1.6; }
+  .fm-insight-footer{font-size: 10px; margin-top: 8px; }
+  .fm-chart       { height: 80px; gap: 6px; }
+  .fm-chart-val   { font-size: 9px; }
+  .fm-chart-label { font-size: 10px; }
+  .fm-chart-cost  { font-size: 8px; }
+  .fm-tiles       { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .fm-tile        { padding: 12px 14px; border-radius: 14px; }
+  .fm-tile-lbl    { font-size: 10px; margin-bottom: 5px; }
+  .fm-tile-val    { font-size: 18px; }
+  .fm-tile-unit   { font-size: 11px; }
+  .fm-stations    { gap: 8px; }
+  .fm-station-card{ padding: 10px 14px; border-radius: 14px; gap: 12px; }
+  .fm-station-rank{ width: 26px; height: 26px; font-size: 12px; }
+  .fm-station-name{ font-size: 12px; }
+  .fm-station-cost{ font-size: 13px; }
+  .fm-station-ppl { font-size: 10px; }
+  .fm-annual      { gap: 10px; }
+  .fm-annual-item { padding: 10px 14px; border-radius: 14px; }
+  .fm-annual-val  { font-size: 16px; }
+  .fm-annual-lbl  { font-size: 10px; }
+  .fm-close-btn   { margin: 14px; padding: 13px; font-size: 14px; border-radius: 14px; width: calc(100% - 28px); }
 
-  /* ── Confirm modal — ממורכז ── */
+  /* ── Confirm modal: centered ── */
   #confirm-modal { align-items: center !important; }
-  #confirm-modal > div { border-radius: 18px !important; padding: 24px 22px 28px !important; max-width: 420px !important; }
+  #confirm-modal > div { border-radius: 20px !important; padding: 28px 24px 32px !important; max-width: 460px !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════
