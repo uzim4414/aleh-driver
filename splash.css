@@ -236,14 +236,10 @@ html, body {
   /* Two-column stage: #splash-react-root RIGHT (RTL-start), .login-chrome LEFT (RTL-end) */
   .stage {
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
-    background:
-      radial-gradient(ellipse at 25% 50%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 55%),
-      radial-gradient(ellipse at 75% 60%, rgba(255,45,45,0.05) 0%, rgba(0,0,0,0) 50%),
-      #000;
+    background: #000;
   }
-  /* Suppress scan-line bar */
   .stage::before { display: none; }
 
   /* Logo: large, fills right column — !important overrides React inline --logo-scale */
