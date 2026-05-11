@@ -1549,7 +1549,19 @@ APP.helpPuncture = async function() {
         '</div>' +
         '</div>';
     }
-  } catch(e) { /* נפרד — ספק לא נטען, נציג רק חיפוש */ }
+  } catch(e) { /* ספק לא נטען — isOpen נשאר null */ }
+
+  /* החלטה: האם להציג חיפוש 24/7 */
+  var showSearch = (isOpen === false) || !providerHtml;
+  var emergencyHtml = '';
+  if (isOpen === false && providerHtml) {
+    emergencyHtml =
+      '<div class="prov-emergency-box">' +
+      '<div class="prov-emergency-title">&#x26A0;&#xFE0F;&nbsp; ספק השירות המורשה סגור כעת</div>' +
+      '<div class="prov-emergency-body">במידה ומדובר במקרה חירום שאינו יכול להידחות לשעות הפעילות של ספק השירות בהסדר — ניתן לאתר שירות פנצריות זמין באזורך.</div>' +
+      '<button class="help-action-btn secondary" style="margin-top:10px" onclick="window.open(\'' + mapsUrl + '\')">&#x1F50D; חיפוש פנצריות פתוחות 24/7 קרוב אליי</button>' +
+      '</div>';
+  }
 
   _showHelpCard(
     '<style>' +
@@ -1568,19 +1580,21 @@ APP.helpPuncture = async function() {
     '.prov-hours-row:last-child{border:none}' +
     '.prov-hours-today{font-weight:800;color:#1e3a5f;font-size:13px;background:#eff6ff;margin:0 -4px;padding:4px;border-radius:6px}' +
     '.prov-card-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px}' +
-    '.prov-search-section{margin-top:14px}' +
-    '.prov-search-label{font-size:11px;font-weight:700;letter-spacing:.6px;color:#94a3b8;margin-bottom:8px}' +
+    '.prov-emergency-box{margin-top:14px;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:14px;padding:14px 16px}' +
+    '.prov-emergency-title{font-size:14px;font-weight:800;color:#92400e;margin-bottom:6px}' +
+    '.prov-emergency-body{font-size:12px;color:#78350f;line-height:1.6}' +
+    '.prov-search-only{margin-top:4px}' +
     '</style>' +
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
     (providerHtml ||
       '<div class="prov-section-badge" style="background:#94a3b8">&#x1F527; פנצ\'ר</div>' +
-      '<div style="font-size:13px;color:#64748b;margin-bottom:12px">לא הוגדר ספק מורשה במערכת</div>'
+      '<div style="font-size:13px;color:#64748b;margin-bottom:4px">לא הוגדר ספק מורשה במערכת</div>'
     ) +
-    '<div class="prov-search-section">' +
-    '<div class="prov-search-label">&#x1F50D; חיפוש בסביבה</div>' +
-    '<button class="help-action-btn secondary" onclick="window.open(\'' + mapsUrl + '\')">&#x1F5FA;&#xFE0F; פנצריות פתוחות 24/7 קרוב אליי</button>' +
-    '</div>' +
+    (emergencyHtml || (!providerHtml
+      ? '<div class="prov-search-only"><button class="help-action-btn secondary" onclick="window.open(\'' + mapsUrl + '\')">&#x1F50D; חיפוש פנצריות פתוחות 24/7 קרוב אליי</button></div>'
+      : '')
+    ) +
     '</div>'
   );
 };
