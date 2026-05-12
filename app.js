@@ -2046,12 +2046,16 @@ APP.helpGarage = function() {
     '</div>';
 
   var reasons = [
-    { id: 'periodic_service', label: '🔧 טיפול תקופתי', sub: 'ק"מ לפי לוח שירות' },
-    { id: 'fault', label: '⚠️ תקלה / בעיה', sub: 'תיאור חופשי' }
+    { id: 'periodic_service', label: 'טיפול תקופתי', icon: '🔧', sub: 'לפי לוח שירות הרכב' },
+    { id: 'fault',            label: 'תקלה / בעיה',  icon: '⚠️', sub: 'תיאור חופשי של הבעיה' }
   ];
   var reasonsHtml = reasons.map(function(r) {
-    return '<button class="help-item" style="margin-bottom:8px" onclick="APP._garageSelectReason(\'' + r.id + '\',\'' + r.label + '\')">' +
-      '<div class="help-item-text"><span class="help-item-title">' + r.label + '</span><span class="help-item-sub">' + r.sub + '</span></div>' +
+    return '<button onclick="APP._garageSelectReason(\'' + r.id + '\')" style="display:flex;align-items:center;gap:14px;width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;text-align:right">' +
+      '<span style="font-size:26px;flex-shrink:0">' + r.icon + '</span>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:15px;font-weight:700;color:#f1f5f9">' + r.label + '</div>' +
+        '<div style="font-size:12px;color:#94a3b8;margin-top:2px">' + r.sub + '</div>' +
+      '</div>' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>' +
       '</button>';
   }).join('');
@@ -2070,7 +2074,9 @@ APP.helpGarage = function() {
   APP._garageCtx = { garageId: garageId, garageName: garageName, garageAddress: garageAddr };
 };
 
-APP._garageSelectReason = function(reasonId, reasonLabel) {
+APP._garageSelectReason = function(reasonId) {
+  var labels = { periodic_service: 'טיפול תקופתי', fault: 'תקלה / בעיה' };
+  var reasonLabel = labels[reasonId] || reasonId;
   APP._garageCtx = APP._garageCtx || {};
   APP._garageCtx.reasonId = reasonId;
   APP._garageCtx.reasonLabel = reasonLabel;
