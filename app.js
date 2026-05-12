@@ -1582,24 +1582,48 @@ APP.helpPuncture = async function() {
   }
 
   /* ── נתוני צמיגים ── */
-  var _gaugeHtml = function(bar, label) {
-    if (!bar) return '';
-    var pct   = Math.min(1, Math.max(0, (bar - 1.5) / 2.0));
-    var CIRC  = 163.4;
-    var ARC   = 122.5;
-    var fill  = Math.round(ARC * pct * 10) / 10;
-    var clr   = bar < 2.0 ? '#ef4444' : bar > 2.8 ? '#f59e0b' : '#10b981';
-    var glow  = bar < 2.0 ? 'rgba(239,68,68,.5)' : bar > 2.8 ? 'rgba(245,158,11,.5)' : 'rgba(16,185,129,.5)';
+  /* _wheelSvg — גלגל מבט מהצד עם חישורים, 48x48 viewBox */
+  var _wheelSvg = function(clr) {
+    var s = clr; /* spoke+rim color */
+    /* 5 חישורים: זוויות 90°,162°,234°,306°,18° — מרכז r=5 → שפה r=15 */
+    var spokes = '';
+    var angles = [90, 162, 234, 306, 18];
+    for (var ai = 0; ai < angles.length; ai++) {
+      var rad = angles[ai] * Math.PI / 180;
+      var x1 = (24 + 5 * Math.cos(rad)).toFixed(2);
+      var y1 = (24 - 5 * Math.sin(rad)).toFixed(2);
+      var x2 = (24 + 15 * Math.cos(rad)).toFixed(2);
+      var y2 = (24 - 15 * Math.sin(rad)).toFixed(2);
+      spokes += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + s + '" stroke-width="2.2" stroke-linecap="round"/>';
+    }
+    return '<svg width="52" height="52" viewBox="0 0 48 48" style="display:block;margin:0 auto 6px">' +
+      '<circle cx="24" cy="24" r="22" fill="#0d1624" stroke="#1e293b" stroke-width="1"/>' +
+      '<circle cx="24" cy="24" r="22" fill="none" stroke="' + s + '" stroke-width="4.5" stroke-dasharray="5.5 3" stroke-dashoffset="2" opacity=".75"/>' +
+      '<circle cx="24" cy="24" r="17" fill="#0a1020" stroke="#1e2d40" stroke-width="1"/>' +
+      '<circle cx="24" cy="24" r="15" fill="none" stroke="' + s + '" stroke-width="1.5" opacity=".5"/>' +
+      spokes +
+      '<circle cx="24" cy="24" r="5" fill="' + s + '" opacity=".9"/>' +
+      '<circle cx="24" cy="24" r="2.2" fill="#0a1020"/>' +
+    '</svg>';
+  };
+  var _gaugeHtml = function(psi, label) {
+    if (!psi) return '';
+    var pct  = Math.min(1, Math.max(0, (psi - 20) / 35)); /* 20–55 PSI range */
+    var CIRC = 163.4;
+    var ARC  = 122.5; /* 270° arc */
+    var fill = Math.round(ARC * pct * 10) / 10;
+    var clr  = psi < 29 ? '#ef4444' : psi > 40 ? '#f59e0b' : '#10b981';
+    var filterId = 'gf-' + label.replace(/[^a-z]/gi,'');
     return '<div class="tg-item">' +
       '<div class="tg-label">' + label + '</div>' +
-      '<svg class="tg-svg" width="80" height="80" viewBox="0 0 64 64">' +
-        '<defs><filter id="glow-' + label + '"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
-        '<circle fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7" stroke-linecap="round" cx="32" cy="32" r="26" stroke-dasharray="' + ARC + ' ' + CIRC + '" transform="rotate(135 32 32)"/>' +
-        '<circle fill="none" stroke="' + clr + '" stroke-width="7" stroke-linecap="round" cx="32" cy="32" r="26" transform="rotate(135 32 32)" filter="url(#glow-' + label + ')">' +
-          '<animate attributeName="stroke-dasharray" from="0 ' + CIRC + '" to="' + fill + ' ' + CIRC + '" dur="1.1s" calcMode="spline" keySplines=".22 1 .36 1" fill="freeze"/>' +
+      '<svg class="tg-svg" width="84" height="84" viewBox="0 0 64 64">' +
+        '<defs><filter id="' + filterId + '"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
+        '<circle fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7" stroke-linecap="round" cx="32" cy="32" r="26" stroke-dasharray="' + ARC + ' ' + CIRC + '" transform="rotate(135 32 32)"/>' +
+        '<circle fill="none" stroke="' + clr + '" stroke-width="7" stroke-linecap="round" cx="32" cy="32" r="26" transform="rotate(135 32 32)" filter="url(#' + filterId + ')">' +
+          '<animate attributeName="stroke-dasharray" from="0 ' + CIRC + '" to="' + fill + ' ' + CIRC + '" dur="1.2s" calcMode="spline" keySplines=".22 1 .36 1" fill="freeze"/>' +
         '</circle>' +
-        '<text x="32" y="29" text-anchor="middle" dominant-baseline="central" fill="' + clr + '" font-size="14" font-weight="900" font-family="monospace">' + bar.toFixed(1) + '</text>' +
-        '<text x="32" y="41" text-anchor="middle" dominant-baseline="central" fill="#475569" font-size="9" font-weight="600">bar</text>' +
+        '<text x="32" y="28" text-anchor="middle" dominant-baseline="central" fill="' + clr + '" font-size="15" font-weight="900" font-family="monospace">' + Math.round(psi) + '</text>' +
+        '<text x="32" y="40" text-anchor="middle" dominant-baseline="central" fill="#64748b" font-size="9" font-weight="700">PSI</text>' +
       '</svg>' +
     '</div>';
   };
@@ -1614,7 +1638,7 @@ APP.helpPuncture = async function() {
     '<div class="tire-card">' +
       '<div class="tire-hdr">' +
         '<div class="tire-hdr-icon">' +
-          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3.5"/><line x1="12" y1="2" x2="12" y2="8.5"/><line x1="12" y1="15.5" x2="12" y2="22"/><line x1="2" y1="12" x2="8.5" y2="12"/><line x1="15.5" y1="12" x2="22" y2="12"/><line x1="4.22" y1="4.22" x2="8.7" y2="8.7"/><line x1="15.3" y1="15.3" x2="19.78" y2="19.78"/><line x1="19.78" y1="4.22" x2="15.3" y2="8.7"/><line x1="8.7" y1="15.3" x2="4.22" y2="19.78"/></svg>' +
+          '<svg width="24" height="24" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="white" stroke-width="4" stroke-dasharray="5 3" opacity=".8"/><circle cx="24" cy="24" r="14" fill="none" stroke="white" stroke-width="1.5" opacity=".5"/><line x1="24" y1="3" x2="24" y2="10" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="24" y1="38" x2="24" y2="45" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="3" y1="24" x2="10" y2="24" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="38" y1="24" x2="45" y2="24" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="24" r="4.5" fill="white" opacity=".9"/><circle cx="24" cy="24" r="2" fill="#1e3a8a"/></svg>' +
         '</div>' +
         '<div class="tire-hdr-text">' +
           '<div class="tire-hdr-title">נתוני צמיגים — רכב זה</div>' +
@@ -1626,14 +1650,14 @@ APP.helpPuncture = async function() {
         '<div class="tire-sizes">' +
           (_tFrontSize ?
             '<div class="tire-sz-item">' +
-              '<svg width="28" height="20" viewBox="0 0 28 20"><ellipse cx="14" cy="10" rx="13" ry="9" fill="none" stroke="#3b82f6" stroke-width="2"/><ellipse cx="14" cy="10" rx="6" ry="4" fill="none" stroke="#3b82f6" stroke-width="1.5"/><line x1="14" y1="1" x2="14" y2="6" stroke="#3b82f6" stroke-width="1.5"/><line x1="14" y1="14" x2="14" y2="19" stroke="#3b82f6" stroke-width="1.5"/><line x1="1" y1="10" x2="8" y2="10" stroke="#3b82f6" stroke-width="1.5"/><line x1="20" y1="10" x2="27" y2="10" stroke="#3b82f6" stroke-width="1.5"/></svg>' +
-              '<div class="tire-sz-lbl">קדמי</div>' +
+              _wheelSvg('#3b82f6') +
+              '<div class="tire-sz-lbl">צמיג קדמי</div>' +
               '<div class="tire-sz-val">' + _tFrontSize + '</div>' +
             '</div>' : '') +
           (_tRearSize ?
             '<div class="tire-sz-item">' +
-              '<svg width="28" height="20" viewBox="0 0 28 20"><ellipse cx="14" cy="10" rx="13" ry="9" fill="none" stroke="#10b981" stroke-width="2"/><ellipse cx="14" cy="10" rx="6" ry="4" fill="none" stroke="#10b981" stroke-width="1.5"/><line x1="14" y1="1" x2="14" y2="6" stroke="#10b981" stroke-width="1.5"/><line x1="14" y1="14" x2="14" y2="19" stroke="#10b981" stroke-width="1.5"/><line x1="1" y1="10" x2="8" y2="10" stroke="#10b981" stroke-width="1.5"/><line x1="20" y1="10" x2="27" y2="10" stroke="#10b981" stroke-width="1.5"/></svg>' +
-              '<div class="tire-sz-lbl">אחורי</div>' +
+              _wheelSvg('#10b981') +
+              '<div class="tire-sz-lbl">צמיג אחורי</div>' +
               '<div class="tire-sz-val">' + _tRearSize + '</div>' +
             '</div>' : '') +
         '</div>' : '') +
