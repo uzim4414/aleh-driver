@@ -2151,45 +2151,52 @@ APP._garageFaultFlow = function() {
   APP._garageCtx.licensePlate = (STATE.vehicle || {}).num || '';
 };
 
-APP._garageSubmitFault = function() {
+APP._garageSubmitFault = async function() {
   var desc = ((document.getElementById('garage-fault-desc') || {}).value || '').trim();
   if (desc.length < 20) { showToast('יש לתאר את הבעיה (מינימום 20 תווים)'); return; }
+  if (!APP._garageCtx) APP._garageCtx = {};
   APP._garageCtx.description = desc;
-  APP._garageSubmitRequest();
+  await APP._garageSubmitRequest();
 };
 
 APP._garageSubmitRequest = async function() {
-  var ctx = APP._garageCtx || {};
-  var v = STATE.vehicle || {};
-  var details = {
-    reason: ctx.reasonId,
-    reasonLabel: ctx.reasonLabel,
-    garageId: ctx.garageId || '',
-    garageName: ctx.garageName || '',
-    garageAddress: ctx.garageAddress || '',
-    km: ctx.km || 0,
-    kmToService: ctx.kmToService != null ? ctx.kmToService : null,
-    description: ctx.description || '',
-    licensePlate: ctx.licensePlate || v.num || '',
-    driverName: (STATE.userInfo && STATE.userInfo.name) || ''
-  };
   var btn = document.querySelector('.help-action-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
-  var result = await _fireFieldEvent('garage_request', details);
-  if (result.ok) {
-    var eventId = result.eventId || '';
-    try { localStorage.setItem('pendingGarageRequest', JSON.stringify({ eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, submittedAt: Date.now() })); } catch(e) {}
-    _showHelpCard(
-      '<div class="help-card" style="text-align:center;padding:32px 20px">' +
-      '<div style="font-size:48px;margin-bottom:12px">📤</div>' +
-      '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">הבקשה נשלחה!</div>' +
-      '<div style="font-size:14px;color:#94a3b8;margin-bottom:20px">ממתין לאישור מנהל הצי — תקבל התראה בהקדם</div>' +
-      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
-      '</div>'
-    );
-  } else {
+  try {
+    var ctx = APP._garageCtx || {};
+    var v = STATE.vehicle || {};
+    var details = {
+      reason: ctx.reasonId,
+      reasonLabel: ctx.reasonLabel,
+      garageId: ctx.garageId || '',
+      garageName: ctx.garageName || '',
+      garageAddress: ctx.garageAddress || '',
+      km: ctx.km || 0,
+      kmToService: ctx.kmToService != null ? ctx.kmToService : null,
+      description: ctx.description || '',
+      licensePlate: ctx.licensePlate || v.num || '',
+      driverName: (STATE.userInfo && STATE.userInfo.name) || ''
+    };
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
+    var result = await _fireFieldEvent('garage_request', details);
+    if (result.ok) {
+      var eventId = result.eventId || '';
+      try { localStorage.setItem('pendingGarageRequest', JSON.stringify({ eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, submittedAt: Date.now() })); } catch(e) {}
+      _showHelpCard(
+        '<div class="help-card" style="text-align:center;padding:32px 20px">' +
+        '<div style="font-size:48px;margin-bottom:12px">📤</div>' +
+        '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">הבקשה נשלחה!</div>' +
+        '<div style="font-size:14px;color:#94a3b8;margin-bottom:20px">ממתין לאישור מנהל הצי — תקבל התראה בהקדם</div>' +
+        '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+        '</div>'
+      );
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
+      showToast('שגיאה בשליחה: ' + (result.error || 'נסה שוב'));
+    }
+  } catch(e) {
+    console.error('_garageSubmitRequest:', e);
     if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
-    showToast('שגיאה בשליחה — נסה שוב');
+    showToast('שגיאה: ' + (e.message || String(e)));
   }
 };
 
