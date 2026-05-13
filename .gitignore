@@ -1,0 +1,10 @@
+# Firebase service account credentials — NEVER commit
+*firebase-adminsdk*.json
+aleh-fleet-firebase-*.json
+service-account.json
+firebase-service-account.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

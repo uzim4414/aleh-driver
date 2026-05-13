@@ -2318,11 +2318,41 @@ APP._garageAppointmentNo = function() {
 async function registerFcm() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
+    if (typeof firebase === 'undefined' || !firebase.messaging) {
+      console.warn('Firebase Messaging SDK not loaded');
+      return;
+    }
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') return;
-    const reg = await navigator.serviceWorker.ready;
-    const token = reg.scope + '_' + Date.now();
-    await gasPost('driver_register_fcm', { fcmToken: token });
+    if (perm !== 'granted') { console.log('FCM permission denied'); return; }
+
+    const messaging = firebase.messaging();
+    // Dedicated SW for FCM (separate from main sw.js)
+    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './firebase-cloud-messaging-push-scope' });
+
+    const token = await messaging.getToken({
+      vapidKey: window.FIREBASE_VAPID,
+      serviceWorkerRegistration: swReg
+    });
+    if (!token) { console.warn('FCM: no token received'); return; }
+    console.log('FCM token registered:', token.substring(0, 24) + '...');
+
+    // Primary path: authenticated driver_register_fcm (uses idToken from STATE)
+    try {
+      await gasPost('driver_register_fcm', { fcmToken: token });
+    } catch(eA) { console.warn('driver_register_fcm:', eA.message); }
+
+    // Secondary path: simple register_fcm by vehicleId (for fast lookup)
+    const vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
+    if (vid) {
+      try {
+        await fetch(GAS_URL + '?action=register_fcm&vid=' + encodeURIComponent(vid) + '&token=' + encodeURIComponent(token), { method: 'GET', mode: 'no-cors' });
+      } catch(eF) {}
+    }
+
+    messaging.onMessage(payload => {
+      console.log('FCM foreground message:', payload);
+      if (window.showInAppNotification) window.showInAppNotification(payload);
+    });
   } catch(e) {
     console.warn('FCM registration:', e.message);
   }

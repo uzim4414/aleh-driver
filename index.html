@@ -14,6 +14,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&family=Outfit:wght@200;300;400;500;600;700&family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700&family=Manrope:wght@200;300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="splash.css?v=20">
+<!-- Firebase Messaging SDK (compat version) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+<script>
+  window.FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA",
+    authDomain: "aleh-fleet.firebaseapp.com",
+    projectId: "aleh-fleet",
+    storageBucket: "aleh-fleet.firebasestorage.app",
+    messagingSenderId: "247079131404",
+    appId: "1:247079131404:web:68816ccdf27667cdc39129",
+    measurementId: "G-EP6WVGRFNZ"
+  };
+  window.FIREBASE_VAPID = "BFk3kfNOCdHnlYCsH3rE3rhRVd2Qp71ibh4T464v9j-Kv_hiY-Jo7S-EZjW43ww_QSCyvvQ7vVxXXnnWAZrNSTM";
+  try { firebase.initializeApp(window.FIREBASE_CONFIG); } catch(e) { console.warn('Firebase init:', e.message); }
+</script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
