@@ -549,6 +549,97 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 .fm-annual-lbl { font-size:10px; color:var(--t2); margin-top:3px; }
 .fm-close-btn { width:calc(100% - 32px); margin:16px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:14px; padding:14px; color:var(--t1); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; letter-spacing:-0.2px; display:block; }
 .fm-close-btn:active { background:rgba(255,255,255,0.1); }
+
+/* ── In-app Notification Cards (FCM foreground) ───────────────── */
+@keyframes notifSlideIn  { from{opacity:0;transform:translateY(-24px) scale(0.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes notifSlideOut { from{opacity:1;transform:translateY(0) scale(1)} to{opacity:0;transform:translateY(-18px) scale(0.97)} }
+@keyframes notifPulse    { 0%,100%{box-shadow:0 12px 36px rgba(220,38,38,.55),0 0 0 0 rgba(220,38,38,.55)} 50%{box-shadow:0 14px 44px rgba(220,38,38,.75),0 0 0 14px rgba(220,38,38,0)} }
+@keyframes notifShake    { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-3px)} 40%,80%{transform:translateX(3px)} }
+@keyframes notifIconSpin { from{transform:rotate(-12deg) scale(.85);opacity:0} to{transform:rotate(0) scale(1);opacity:1} }
+
+#driver-notif-stack {
+  position:fixed; top:max(12px, env(safe-area-inset-top)); right:12px; left:12px;
+  z-index:9999; max-width:430px; margin:0 auto;
+  display:flex; flex-direction:column; gap:10px;
+  pointer-events:none; max-height:calc(100vh - 24px); overflow-y:auto;
+  scrollbar-width:none;
+}
+#driver-notif-stack::-webkit-scrollbar { display:none; }
+
+.dn-card {
+  pointer-events:auto;
+  position:relative;
+  border-radius:18px;
+  padding:14px 16px;
+  color:#fff;
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:0 12px 36px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.14);
+  animation:notifSlideIn .3s cubic-bezier(.22,1,.36,1) both;
+  cursor:pointer;
+  overflow:hidden;
+  direction:rtl;
+}
+.dn-card.removing { animation:notifSlideOut .25s ease-in forwards; }
+.dn-card.type-overdue   { background:linear-gradient(135deg,#DC2626 0%,#991B1B 100%); animation:notifSlideIn .3s cubic-bezier(.22,1,.36,1) both, notifShake .55s ease-in-out .35s, notifPulse 2s ease-in-out 1s infinite; }
+.dn-card.type-urgent    { background:linear-gradient(135deg,#F59E0B 0%,#D97706 100%); box-shadow:0 12px 36px rgba(245,158,11,.4),0 2px 8px rgba(0,0,0,.25); }
+.dn-card.type-plan      { background:linear-gradient(135deg,#3B82F6 0%,#1E40AF 100%); box-shadow:0 12px 36px rgba(59,130,246,.4),0 2px 8px rgba(0,0,0,.25); }
+.dn-card.type-km_update { background:linear-gradient(135deg,#8B5CF6 0%,#6D28D9 100%); box-shadow:0 12px 36px rgba(139,92,246,.4),0 2px 8px rgba(0,0,0,.25); }
+
+.dn-card::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(circle at 100% 0%, rgba(255,255,255,.18), transparent 55%);
+  pointer-events:none;
+}
+.dn-row { display:flex; align-items:flex-start; gap:12px; position:relative; z-index:1; }
+.dn-icon-wrap {
+  flex-shrink:0; width:42px; height:42px; border-radius:13px;
+  background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.25);
+  display:flex; align-items:center; justify-content:center;
+  animation:notifIconSpin .35s ease-out both;
+}
+.dn-body { flex:1; min-width:0; }
+.dn-title {
+  font-size:14px; font-weight:800; letter-spacing:-.2px;
+  line-height:1.3; margin-bottom:3px;
+  text-shadow:0 1px 2px rgba(0,0,0,.25);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.dn-text {
+  font-size:12.5px; font-weight:500; color:rgba(255,255,255,.92);
+  line-height:1.45;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.dn-close {
+  flex-shrink:0; width:26px; height:26px; border-radius:50%;
+  background:rgba(0,0,0,.22); border:none; color:#fff;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  font-size:14px; font-weight:700; padding:0; line-height:1;
+  transition:background .15s;
+}
+.dn-close:active { background:rgba(0,0,0,.4); }
+.dn-actions {
+  display:flex; gap:8px; margin-top:11px; position:relative; z-index:1;
+}
+.dn-btn {
+  flex:1; padding:8px 12px; border-radius:11px;
+  background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.22);
+  color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+  font-family:inherit; letter-spacing:-.1px;
+  transition:background .15s, transform .1s;
+}
+.dn-btn:active { transform:scale(.97); background:rgba(255,255,255,.28); }
+.dn-btn.primary { background:rgba(255,255,255,.92); color:#0f172a; }
+.dn-btn.primary:active { background:#fff; }
+
+/* progress bar for auto-dismiss countdown */
+.dn-progress {
+  position:absolute; bottom:0; left:0; height:3px; width:100%;
+  background:rgba(255,255,255,.22); transform-origin:right center;
+  animation:dnProgressShrink linear forwards;
+}
+@keyframes dnProgressShrink { from{transform:scaleX(1)} to{transform:scaleX(0)} }
 </style>
 </head>
 <body>
@@ -891,7 +982,190 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   </div>
 </div>
 
-<script src="app.js?v=27"></script>
+<!-- In-app notification stack (FCM foreground / SW postMessage) -->
+<div id="driver-notif-stack" aria-live="polite" aria-atomic="false"></div>
+
+<script src="app.js?v=28"></script>
+<script>
+/* ══ In-app Notification System (FCM foreground + SW postMessage) ══ */
+(function(){
+  var MAX_VISIBLE = 3;
+  var stack = document.getElementById('driver-notif-stack');
+  if (!stack) return;
+
+  var ICON_BY_TYPE = {
+    overdue:   'ic-alert',
+    urgent:    'ic-tool',
+    plan:      'ic-cal',
+    km_update: 'ic-gauge'
+  };
+  var DURATION_BY_TYPE = {
+    overdue:   0,      // sticky — must be clicked
+    urgent:    12000,
+    plan:      8000,
+    km_update: 8000
+  };
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  function incrementUnread(){
+    try {
+      var n = parseInt(localStorage.getItem('driver_notif_unread')||'0',10) || 0;
+      n++;
+      localStorage.setItem('driver_notif_unread', String(n));
+      var badge = document.getElementById('alert-badge');
+      if (badge) {
+        badge.textContent = n > 99 ? '99+' : String(n);
+        badge.classList.remove('hidden');
+      }
+    } catch(e) {}
+  }
+
+  function clearUnread(){
+    try {
+      localStorage.setItem('driver_notif_unread','0');
+      var badge = document.getElementById('alert-badge');
+      if (badge) badge.classList.add('hidden');
+    } catch(e) {}
+  }
+  // expose for app.js if it wants to clear when user views alerts
+  window.DRIVER_NOTIF = { clearUnread: clearUnread };
+
+  function dismissCard(card){
+    if (!card || card.classList.contains('removing')) return;
+    card.classList.add('removing');
+    setTimeout(function(){
+      if (card && card.parentNode) card.parentNode.removeChild(card);
+    }, 260);
+  }
+
+  function pruneOverflow(){
+    var cards = stack.querySelectorAll('.dn-card:not(.removing)');
+    if (cards.length <= MAX_VISIBLE) return;
+    for (var i = 0; i < cards.length - MAX_VISIBLE; i++) {
+      dismissCard(cards[i]);
+    }
+  }
+
+  function navigateForNotif(meta){
+    var hash = meta && meta.click_action;
+    if (hash && typeof hash === 'string') {
+      try {
+        if (hash.charAt(0) === '#') location.hash = hash.slice(1);
+        else location.hash = hash;
+      } catch(e) {}
+    }
+    if (window.APP) {
+      if (typeof APP.nav === 'function') {
+        try { APP.nav('vehicle'); } catch(e) {}
+      }
+    }
+    clearUnread();
+  }
+
+  function showInAppNotification(payload){
+    payload = payload || {};
+    var notif = payload.notification || {};
+    var meta  = payload.data || {};
+    var type  = meta.alertType || 'plan';
+    var title = notif.title || meta.title || 'עלה — התראה';
+    var body  = notif.body  || meta.body  || '';
+    var iconId = ICON_BY_TYPE[type] || 'ic-bell';
+    var duration = DURATION_BY_TYPE[type];
+    if (duration === undefined) duration = 8000;
+
+    incrementUnread();
+
+    var card = document.createElement('div');
+    card.className = 'dn-card type-' + type;
+    card.setAttribute('role', 'alert');
+    card.innerHTML =
+      '<div class="dn-row">' +
+        '<div class="dn-icon-wrap"><svg width="22" height="22"><use href="#' + iconId + '" color="#fff"/></svg></div>' +
+        '<div class="dn-body">' +
+          '<div class="dn-title">' + escapeHtml(title) + '</div>' +
+          '<div class="dn-text">' + escapeHtml(body) + '</div>' +
+        '</div>' +
+        '<button class="dn-close" aria-label="סגור" type="button">&times;</button>' +
+      '</div>' +
+      '<div class="dn-actions">' +
+        '<button class="dn-btn primary" type="button" data-act="open">פתח</button>' +
+        '<button class="dn-btn" type="button" data-act="dismiss">הבנתי</button>' +
+      '</div>' +
+      (duration > 0 ? '<div class="dn-progress" style="animation-duration:' + duration + 'ms"></div>' : '');
+
+    // Click whole card → navigate (except buttons)
+    card.addEventListener('click', function(ev){
+      var t = ev.target;
+      if (t.closest('.dn-close')) return;
+      if (t.closest('.dn-btn[data-act="dismiss"]')) return;
+      navigateForNotif(meta);
+      dismissCard(card);
+    });
+    card.querySelector('.dn-close').addEventListener('click', function(ev){
+      ev.stopPropagation();
+      dismissCard(card);
+    });
+    var openBtn = card.querySelector('.dn-btn[data-act="open"]');
+    openBtn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      navigateForNotif(meta);
+      dismissCard(card);
+    });
+    var dismissBtn = card.querySelector('.dn-btn[data-act="dismiss"]');
+    dismissBtn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      dismissCard(card);
+    });
+
+    stack.appendChild(card);
+    pruneOverflow();
+
+    if (duration > 0) {
+      setTimeout(function(){ dismissCard(card); }, duration + 50);
+    }
+  }
+  window.showInAppNotification = showInAppNotification;
+
+  // Listen for messages from service worker (notificationclick relay)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function(ev){
+      var msg = ev.data || {};
+      if (msg.type === 'notification-click' && msg.data) {
+        navigateForNotif(msg.data);
+      } else if (msg.type === 'push-foreground' && msg.payload) {
+        showInAppNotification(msg.payload);
+      }
+    });
+  }
+
+  // Optional: Firebase Messaging foreground listener (fires only if firebase SDK is loaded)
+  if (window.firebase && window.firebase.messaging) {
+    try {
+      var messaging = window.firebase.messaging();
+      if (messaging && typeof messaging.onMessage === 'function') {
+        messaging.onMessage(function(payload){ showInAppNotification(payload); });
+      }
+    } catch(e) {
+      console.warn('Firebase messaging foreground listener:', e.message);
+    }
+  }
+
+  // Restore badge unread count on load
+  try {
+    var n = parseInt(localStorage.getItem('driver_notif_unread')||'0',10) || 0;
+    var badge = document.getElementById('alert-badge');
+    if (badge && n > 0) {
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.classList.remove('hidden');
+    }
+  } catch(e) {}
+})();
+</script>
 <script src="aleh-logo-data.js?v=1"></script>
 <!-- KM UPDATE MODAL -->
 <div class="km-modal-overlay hidden" id="km-modal" onclick="if(event.target===this)APP.closeKmModal()">

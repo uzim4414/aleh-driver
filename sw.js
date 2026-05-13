@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aleh-driver-v62';
+const CACHE_NAME = 'aleh-driver-v63';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -52,21 +52,55 @@ self.addEventListener('fetch', e => {
 
 self.addEventListener('push', e => {
   const data = e.data ? e.data.json() : {};
-  const title = (data.notification && data.notification.title) || 'עלה — התראה';
-  const body  = (data.notification && data.notification.body)  || '';
-  e.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: './icons/icon-192.png',
-      badge: './icons/icon-192.png',
-      dir: 'rtl',
-      lang: 'he',
-      data: data.data || {}
-    })
-  );
+  const notif = data.notification || {};
+  const meta  = data.data || {};
+
+  const title = notif.title || 'עלה — התראה';
+  const body  = notif.body  || '';
+  const alertType = meta.alertType || '';
+
+  const TYPE_CONFIG = {
+    overdue:   { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
+    urgent:    { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+    plan:      { vibrate: [200],                 requireInteraction: false, badge: './icons/badge-blue.png' },
+    km_update: { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' }
+  };
+  const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
+
+  const opts = {
+    body,
+    icon: './icons/icon-192.png',
+    badge: cfg.badge || './icons/icon-192.png',
+    dir: 'rtl',
+    lang: 'he',
+    tag: 'maint-' + (meta.vehicleId || 'general'),
+    renotify: true,
+    vibrate: cfg.vibrate,
+    requireInteraction: cfg.requireInteraction,
+    data: meta,
+    actions: alertType ? [
+      { action: 'open',    title: 'פתח באפליקציה' },
+      { action: 'dismiss', title: 'הבנתי' }
+    ] : []
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow('./index.html'));
+  if (e.action === 'dismiss') return;
+  const meta = e.notification.data || {};
+  const hash = meta.click_action || '';
+  const url  = './index.html' + (hash || '');
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if (c.url.includes('/driver/') && 'focus' in c) {
+          c.postMessage({ type: 'notification-click', data: meta });
+          return c.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
 });
