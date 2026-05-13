@@ -582,8 +582,10 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   direction:rtl;
 }
 .dn-card.removing { animation:notifSlideOut .25s ease-in forwards; }
-.dn-card.type-overdue   { background:linear-gradient(135deg,#DC2626 0%,#991B1B 100%); animation:notifSlideIn .3s cubic-bezier(.22,1,.36,1) both, notifShake .55s ease-in-out .35s, notifPulse 2s ease-in-out 1s infinite; }
-.dn-card.type-urgent    { background:linear-gradient(135deg,#F59E0B 0%,#D97706 100%); box-shadow:0 12px 36px rgba(245,158,11,.4),0 2px 8px rgba(0,0,0,.25); }
+.dn-card.type-overdue,
+.dn-card.type-test_urgent { background:linear-gradient(135deg,#DC2626 0%,#991B1B 100%); animation:notifSlideIn .3s cubic-bezier(.22,1,.36,1) both, notifShake .55s ease-in-out .35s, notifPulse 2s ease-in-out 1s infinite; }
+.dn-card.type-urgent,
+.dn-card.type-test_due    { background:linear-gradient(135deg,#F59E0B 0%,#D97706 100%); box-shadow:0 12px 36px rgba(245,158,11,.4),0 2px 8px rgba(0,0,0,.25); }
 .dn-card.type-plan      { background:linear-gradient(135deg,#3B82F6 0%,#1E40AF 100%); box-shadow:0 12px 36px rgba(59,130,246,.4),0 2px 8px rgba(0,0,0,.25); }
 .dn-card.type-km_update { background:linear-gradient(135deg,#8B5CF6 0%,#6D28D9 100%); box-shadow:0 12px 36px rgba(139,92,246,.4),0 2px 8px rgba(0,0,0,.25); }
 
@@ -994,16 +996,20 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   if (!stack) return;
 
   var ICON_BY_TYPE = {
-    overdue:   'ic-alert',
-    urgent:    'ic-tool',
-    plan:      'ic-cal',
-    km_update: 'ic-gauge'
+    overdue:     'ic-alert',
+    urgent:      'ic-tool',
+    plan:        'ic-cal',
+    km_update:   'ic-gauge',
+    test_due:    'ic-cal-plus',
+    test_urgent: 'ic-cal-plus'
   };
   var DURATION_BY_TYPE = {
-    overdue:   0,      // sticky — must be clicked
-    urgent:    12000,
-    plan:      8000,
-    km_update: 8000
+    overdue:     0,      // sticky — must be clicked
+    urgent:      12000,
+    plan:        8000,
+    km_update:   8000,
+    test_due:    12000,
+    test_urgent: 0       // sticky — must be clicked
   };
 
   function escapeHtml(s){

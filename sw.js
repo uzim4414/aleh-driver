@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aleh-driver-v63';
+const CACHE_NAME = 'aleh-driver-v64';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -63,7 +63,9 @@ self.addEventListener('push', e => {
     overdue:   { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
     urgent:    { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
     plan:      { vibrate: [200],                 requireInteraction: false, badge: './icons/badge-blue.png' },
-    km_update: { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' }
+    km_update: { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' },
+    test_due:    { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+    test_urgent: { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' }
   };
   const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
 
