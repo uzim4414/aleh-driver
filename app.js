@@ -2318,56 +2318,41 @@ APP._garageAppointmentNo = function() {
 async function registerFcm() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
-    if (typeof firebase === 'undefined' || !firebase.messaging) {
-      console.warn('[FCM] Firebase Messaging SDK not loaded');
+    if (!window.__fbGetToken) {
+      console.warn('[FCM] Firebase v11 not loaded yet, retrying in 1s...');
+      setTimeout(registerFcm, 1000);
       return;
     }
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') { console.log('[FCM] permission denied'); return; }
 
-    const messaging = firebase.messaging();
-
-    // Use the EXISTING main SW (sw.js) — FCM handler is merged into it.
-    // Registering a separate firebase-messaging-sw.js at the same scope
-    // conflicts with sw.js → getToken hangs forever.
-    console.log('[FCM] Getting existing SW registration...');
+    console.log('[FCM] Waiting for SW ready...');
     const swReg = await navigator.serviceWorker.ready;
-    console.log('[FCM] SW ready. scope=', swReg.scope);
+    console.log('[FCM] SW ready scope:', swReg.scope);
 
-    // Race getToken against a 20s timeout so a hang surfaces as an error
-    // instead of a forever-pending Promise.
-    console.log('[FCM] Calling getToken...');
-    const tokenPromise = messaging.getToken({
-      vapidKey: window.FIREBASE_VAPID,
+    console.log('[FCM] Calling getToken (v11 modular)...');
+    const tokenPromise = window.__fbGetToken({
+      vapidKey: window.__fbVAPID,
       serviceWorkerRegistration: swReg
     });
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('getToken timeout (20s)')), 20000)
+      setTimeout(() => reject(new Error('getToken timeout 25s')), 25000)
     );
     const token = await Promise.race([tokenPromise, timeoutPromise]);
+    if (!token) { console.warn('[FCM] empty token'); return; }
+    console.log('[FCM] TOKEN:', token.substring(0, 32) + '...');
 
-    if (!token) { console.warn('[FCM] no token received'); return; }
-    console.log('[FCM] token registered:', token.substring(0, 24) + '...');
-
-    // Primary path: authenticated driver_register_fcm (uses idToken from STATE)
-    try {
-      await gasPost('driver_register_fcm', { fcmToken: token });
-    } catch(eA) { console.warn('[FCM] driver_register_fcm:', eA.message); }
-
-    // Secondary path: simple register_fcm by vehicleId (for fast lookup)
+    // Save to GAS
+    try { await gasPost('driver_register_fcm', { fcmToken: token }); }
+    catch(e) { console.warn('[FCM] gas save:', e.message); }
     const vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
     if (vid) {
       try {
-        await fetch(GAS_URL + '?action=register_fcm&vid=' + encodeURIComponent(vid) + '&token=' + encodeURIComponent(token), { method: 'GET', mode: 'no-cors' });
-      } catch(eF) {}
+        await fetch(GAS_URL + '?action=register_fcm&vid=' + encodeURIComponent(vid) + '&token=' + encodeURIComponent(token), { method:'GET', mode:'no-cors' });
+      } catch(e2) {}
     }
-
-    messaging.onMessage(payload => {
-      console.log('[FCM] foreground:', payload);
-      if (window.showInAppNotification) window.showInAppNotification(payload);
-    });
   } catch(e) {
-    console.error('[FCM] registration error:', e.message);
+    console.error('[FCM] registration error:', e.message, e);
   }
 }
 

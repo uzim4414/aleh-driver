@@ -1,12 +1,14 @@
+// SW build: 2026-05-14T00:00:00Z // v70
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Merged with Firebase Cloud Messaging handler — there is only ONE
    service worker for this scope to avoid registration conflicts that
    cause firebase.messaging.getToken() to hang.
+   Upgraded to Firebase v11.0.2 compat (client uses modular v11 ESM).
    ════════════════════════════════════════════════════════════════════ */
 
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging-compat.js');
 
 firebase.initializeApp({
   apiKey: "AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA",
@@ -57,7 +59,7 @@ messaging.onBackgroundMessage(payload => {
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v67';
+const CACHE_NAME = 'aleh-driver-v70';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
