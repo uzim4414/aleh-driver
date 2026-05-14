@@ -2327,7 +2327,7 @@ async function registerPush() {
     const swReg = await navigator.serviceWorker.ready;
     console.log('[Push] SW ready');
 
-    const vapidPublic = window.__VAPID_PUBLIC || 'BB8zUm-_zwI3aIN0bTTqVBj_KaJo7-fyweKDH4MIzJJl8fodlTuyfrB_rt-IlNpjEhsYNkGKpzOrSingnCxSDHU';
+    const vapidPublic = window.__VAPID_PUBLIC || 'BFLZcYjxU_yOMukgr3oSnP8ayrFzw16i0s8-z1fbEy1I_E-qP0_B8k3ccvjpE8RmyGYRzSu-ybm2k94pyJfMLyg';
     const applicationServerKey = urlBase64ToUint8Array(vapidPublic);
 
     // Check existing subscription
