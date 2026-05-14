@@ -2325,12 +2325,47 @@ async function registerPush() {
     if (perm !== 'granted') { console.log('[Push] permission denied'); return; }
 
     const swReg = await navigator.serviceWorker.ready;
-    console.log('[Push] SW ready, subscribing...');
+    console.log('[Push] SW ready');
 
     const vapidPublic = window.__VAPID_PUBLIC || 'BB8zUm-_zwI3aIN0bTTqVBj_KaJo7-fyweKDH4MIzJJl8fodlTuyfrB_rt-IlNpjEhsYNkGKpzOrSingnCxSDHU';
     const applicationServerKey = urlBase64ToUint8Array(vapidPublic);
 
+    // Check existing subscription
     let subscription = await swReg.pushManager.getSubscription();
+
+    if (subscription) {
+      // VERIFY existing subscription's applicationServerKey matches current VAPID
+      const existingKey = subscription.options && subscription.options.applicationServerKey;
+      let needsResubscribe = false;
+
+      if (!existingKey) {
+        needsResubscribe = true;
+        console.log('[Push] Existing sub has no applicationServerKey, re-subscribing');
+      } else {
+        const existingBytes = new Uint8Array(existingKey);
+        if (existingBytes.length !== applicationServerKey.length) {
+          needsResubscribe = true;
+        } else {
+          for (let i = 0; i < existingBytes.length; i++) {
+            if (existingBytes[i] !== applicationServerKey[i]) {
+              needsResubscribe = true;
+              break;
+            }
+          }
+        }
+        if (needsResubscribe) {
+          console.log('[Push] VAPID changed, unsubscribing old...');
+        }
+      }
+
+      if (needsResubscribe) {
+        try { await subscription.unsubscribe(); } catch(e) { console.warn('[Push] unsubscribe failed:', e.message); }
+        subscription = null;
+      } else {
+        console.log('[Push] Existing subscription matches current VAPID');
+      }
+    }
+
     if (!subscription) {
       console.log('[Push] Creating new subscription...');
       const subPromise = swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationServerKey });
@@ -2358,6 +2393,13 @@ async function registerPush() {
       console.log('[Push] Registered with GAS ✓');
     } catch(e) {
       console.warn('[Push] gas register failed:', e.message);
+    }
+
+    // Also try unauthenticated path
+    if (vid) {
+      try {
+        await fetch(GAS_URL + '?action=register_fcm&vid=' + encodeURIComponent(vid) + '&token=' + encodeURIComponent(subJson.endpoint), { method:'GET', mode:'no-cors' });
+      } catch(e2) {}
     }
   } catch(e) {
     console.error('[Push] error:', e.message, e);
