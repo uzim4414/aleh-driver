@@ -2319,54 +2319,40 @@ async function registerFcm() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
     if (typeof firebase === 'undefined' || !firebase.messaging) {
-      console.warn('Firebase Messaging SDK not loaded');
+      console.warn('[FCM] Firebase Messaging SDK not loaded');
       return;
     }
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { console.log('FCM permission denied'); return; }
+    if (perm !== 'granted') { console.log('[FCM] permission denied'); return; }
 
     const messaging = firebase.messaging();
 
-    // Dedicated SW for FCM (separate from main sw.js).
-    // CRITICAL: Use default scope (no scope option). On GitHub Pages subpaths
-    // a custom scope conflicts with the main sw.js registration at root scope,
-    // causing register() to return the wrong registration → getToken hangs.
-    console.log('[FCM] Registering firebase-messaging-sw.js...');
-    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-    console.log('[FCM] SW registered. scope=', swReg.scope, 'active=', !!swReg.active, 'installing=', !!swReg.installing);
-
-    // Wait until the SW reaches the "activated" state.
-    // Firebase getToken() internally calls pushManager.subscribe() which
-    // requires an active worker. With compat SDK v10.x this is not awaited
-    // reliably → Promise hangs. We await it explicitly here.
-    if (!swReg.active) {
-      console.log('[FCM] Waiting for SW to activate...');
-      await new Promise((resolve, reject) => {
-        const sw = swReg.installing || swReg.waiting;
-        if (!sw) { resolve(); return; }
-        const timer = setTimeout(() => reject(new Error('SW activation timeout')), 15000);
-        sw.addEventListener('statechange', () => {
-          if (sw.state === 'activated') { clearTimeout(timer); resolve(); }
-          if (sw.state === 'redundant') { clearTimeout(timer); reject(new Error('SW became redundant')); }
-        });
-      });
-      console.log('[FCM] SW activated.');
-    }
+    // Use the EXISTING main SW (sw.js) — FCM handler is merged into it.
+    // Registering a separate firebase-messaging-sw.js at the same scope
+    // conflicts with sw.js → getToken hangs forever.
+    console.log('[FCM] Getting existing SW registration...');
+    const swReg = await navigator.serviceWorker.ready;
+    console.log('[FCM] SW ready. scope=', swReg.scope);
 
     // Race getToken against a 20s timeout so a hang surfaces as an error
     // instead of a forever-pending Promise.
     console.log('[FCM] Calling getToken...');
-    const token = await Promise.race([
-      messaging.getToken({ vapidKey: window.FIREBASE_VAPID, serviceWorkerRegistration: swReg }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('getToken timeout (20s)')), 20000))
-    ]);
-    if (!token) { console.warn('FCM: no token received'); return; }
-    console.log('FCM token registered:', token.substring(0, 24) + '...');
+    const tokenPromise = messaging.getToken({
+      vapidKey: window.FIREBASE_VAPID,
+      serviceWorkerRegistration: swReg
+    });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('getToken timeout (20s)')), 20000)
+    );
+    const token = await Promise.race([tokenPromise, timeoutPromise]);
+
+    if (!token) { console.warn('[FCM] no token received'); return; }
+    console.log('[FCM] token registered:', token.substring(0, 24) + '...');
 
     // Primary path: authenticated driver_register_fcm (uses idToken from STATE)
     try {
       await gasPost('driver_register_fcm', { fcmToken: token });
-    } catch(eA) { console.warn('driver_register_fcm:', eA.message); }
+    } catch(eA) { console.warn('[FCM] driver_register_fcm:', eA.message); }
 
     // Secondary path: simple register_fcm by vehicleId (for fast lookup)
     const vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
@@ -2377,11 +2363,11 @@ async function registerFcm() {
     }
 
     messaging.onMessage(payload => {
-      console.log('FCM foreground message:', payload);
+      console.log('[FCM] foreground:', payload);
       if (window.showInAppNotification) window.showInAppNotification(payload);
     });
   } catch(e) {
-    console.warn('FCM registration:', e.message);
+    console.error('[FCM] registration error:', e.message);
   }
 }
 

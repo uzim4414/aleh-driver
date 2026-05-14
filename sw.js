@@ -1,4 +1,63 @@
-const CACHE_NAME = 'aleh-driver-v66';
+/* ════════════════════════════════════════════════════════════════════
+   Main service worker for the עלה driver PWA.
+   Merged with Firebase Cloud Messaging handler — there is only ONE
+   service worker for this scope to avoid registration conflicts that
+   cause firebase.messaging.getToken() to hang.
+   ════════════════════════════════════════════════════════════════════ */
+
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA",
+  authDomain: "aleh-fleet.firebaseapp.com",
+  projectId: "aleh-fleet",
+  storageBucket: "aleh-fleet.firebasestorage.app",
+  messagingSenderId: "247079131404",
+  appId: "1:247079131404:web:68816ccdf27667cdc39129"
+});
+
+const messaging = firebase.messaging();
+
+/* Background FCM handler — fires when app is closed / backgrounded */
+messaging.onBackgroundMessage(payload => {
+  console.log('[SW] FCM bg:', payload);
+  const notif = payload.notification || {};
+  const data  = payload.data || {};
+
+  const TYPE_CONFIG = {
+    overdue:     { vibrate: [400,100,400,100,400], requireInteraction: true },
+    urgent:      { vibrate: [300,100,300] },
+    plan:        { vibrate: [200] },
+    km_update:   { vibrate: [150] },
+    test_due:    { vibrate: [300,100,300] },
+    test_urgent: { vibrate: [400,100,400,100,400], requireInteraction: true }
+  };
+  const cfg = TYPE_CONFIG[data.alertType] || { vibrate: [200] };
+
+  self.registration.showNotification(notif.title || 'עלה', {
+    body: notif.body || '',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    dir: 'rtl',
+    lang: 'he',
+    tag: 'maint-' + (data.vehicleId || 'general'),
+    renotify: true,
+    vibrate: cfg.vibrate,
+    requireInteraction: !!cfg.requireInteraction,
+    data: data,
+    actions: [
+      { action: 'open',    title: 'פתח באפליקציה' },
+      { action: 'dismiss', title: 'הבנתי' }
+    ]
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════
+   Cache / offline
+   ════════════════════════════════════════════════════════════════════ */
+
+const CACHE_NAME = 'aleh-driver-v67';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -26,12 +85,11 @@ self.addEventListener('fetch', e => {
 
   const url = e.request.url;
 
-  /* cross-origin (GAS, Google APIs) — תמיד רשת, ללא התערבות */
+  /* cross-origin (GAS, Google APIs, gstatic firebase) — תמיד רשת, ללא התערבות */
   if (!url.startsWith(self.location.origin)) return;
 
-  /* FCM service worker file + scope endpoint — חייב להיות תמיד רשת טרייה
-     (חתימה stale תגרום ל-getToken להיתקע) */
-  if (url.includes('firebase-messaging-sw.js') || url.includes('firebase-cloud-messaging-push-scope')) return;
+  /* FCM scope endpoint — חייב להיות תמיד רשת טרייה */
+  if (url.includes('firebase-cloud-messaging-push-scope')) return;
 
   /* index.html + app.js — network-first: תמיד מנסה רשת, fallback לcache */
   const isAppFile = url.endsWith('/') || url.includes('index.html') || url.includes('app.js') || url.includes('manifest.json');
@@ -54,10 +112,20 @@ self.addEventListener('fetch', e => {
   );
 });
 
+/* ════════════════════════════════════════════════════════════════════
+   Web Push (raw push event — when payload arrives without FCM SDK route)
+   ════════════════════════════════════════════════════════════════════ */
+
 self.addEventListener('push', e => {
-  const data = e.data ? e.data.json() : {};
+  // If FCM SDK is handling it via onBackgroundMessage, this path may still
+  // fire for non-FCM pushes. Keep it for resilience.
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch(_) { return; }
   const notif = data.notification || {};
   const meta  = data.data || {};
+
+  // If notification field is absent, assume FCM SDK already handled it.
+  if (!notif.title && !notif.body) return;
 
   const title = notif.title || 'עלה — התראה';
   const body  = notif.body  || '';
