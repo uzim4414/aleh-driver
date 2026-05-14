@@ -486,7 +486,7 @@ function startApp() {
   document.getElementById('app').classList.remove('hidden');
   renderAll();
   initSwipe();
-  if ('serviceWorker' in navigator && GAS_URL) registerFcm();
+  if ('serviceWorker' in navigator && GAS_URL) registerPush();
 }
 
 function logout() {
@@ -2314,46 +2314,68 @@ APP._garageAppointmentNo = function() {
 };
 
 
-/* ══ FCM ══ */
-async function registerFcm() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+/* ══ Web Push (direct PushManager.subscribe — no Firebase SDK) ══ */
+async function registerPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[Push] not supported');
+    return;
+  }
   try {
-    if (!window.__fbGetToken) {
-      console.warn('[FCM] Firebase v11 not loaded yet, retrying in 1s...');
-      setTimeout(registerFcm, 1000);
-      return;
-    }
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { console.log('[FCM] permission denied'); return; }
+    if (perm !== 'granted') { console.log('[Push] permission denied'); return; }
 
-    console.log('[FCM] Waiting for SW ready...');
     const swReg = await navigator.serviceWorker.ready;
-    console.log('[FCM] SW ready scope:', swReg.scope);
+    console.log('[Push] SW ready, subscribing...');
 
-    console.log('[FCM] Calling getToken (v11 modular)...');
-    const tokenPromise = window.__fbGetToken({
-      vapidKey: window.__fbVAPID,
-      serviceWorkerRegistration: swReg
+    const vapidPublic = window.__VAPID_PUBLIC || 'BFk3kfNOCdHnlYCsH3rE3rhRVd2Qp71ibh4T464v9j-Kv_hiY-Jo7S-EZjW43ww_QSCyvvQ7vVxXXnnWAZrNSTM';
+    const applicationServerKey = urlBase64ToUint8Array(vapidPublic);
+
+    let subscription = await swReg.pushManager.getSubscription();
+    if (!subscription) {
+      console.log('[Push] Creating new subscription...');
+      const subPromise = swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationServerKey });
+      const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('subscribe timeout 20s')), 20000));
+      subscription = await Promise.race([subPromise, timeoutP]);
+    }
+
+    if (!subscription) { console.warn('[Push] no subscription'); return; }
+
+    const subJson = subscription.toJSON();
+    console.log('[Push] Subscribed! endpoint:', subJson.endpoint.substring(0, 60) + '...');
+    console.log('[Push] keys:', {
+      p256dh: (subJson.keys && subJson.keys.p256dh ? subJson.keys.p256dh.substring(0,20) + '...' : 'n/a'),
+      auth:   (subJson.keys && subJson.keys.auth   ? subJson.keys.auth.substring(0,8)   + '...' : 'n/a')
     });
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('getToken timeout 25s')), 25000)
-    );
-    const token = await Promise.race([tokenPromise, timeoutPromise]);
-    if (!token) { console.warn('[FCM] empty token'); return; }
-    console.log('[FCM] TOKEN:', token.substring(0, 32) + '...');
 
-    // Save to GAS
-    try { await gasPost('driver_register_fcm', { fcmToken: token }); }
-    catch(e) { console.warn('[FCM] gas save:', e.message); }
     const vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
-    if (vid) {
-      try {
-        await fetch(GAS_URL + '?action=register_fcm&vid=' + encodeURIComponent(vid) + '&token=' + encodeURIComponent(token), { method:'GET', mode:'no-cors' });
-      } catch(e2) {}
+    try {
+      await gasPost('driver_register_push', {
+        endpoint: subJson.endpoint,
+        p256dh:   subJson.keys && subJson.keys.p256dh,
+        auth:     subJson.keys && subJson.keys.auth,
+        vehicleId: vid
+      });
+      console.log('[Push] Registered with GAS ✓');
+    } catch(e) {
+      console.warn('[Push] gas register failed:', e.message);
     }
   } catch(e) {
-    console.error('[FCM] registration error:', e.message, e);
+    console.error('[Push] error:', e.message, e);
   }
+}
+
+function urlBase64ToUint8Array(b64) {
+  const padding = '='.repeat((4 - b64.length % 4) % 4);
+  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+// Expose for manual console testing
+if (typeof window !== 'undefined') {
+  window.registerPush = registerPush;
 }
 
 /* ══ Utils ══ */

@@ -1,65 +1,16 @@
-// SW build: 2026-05-14T00:00:00Z // v70
+// SW build: 2026-05-14T12:00:00Z // v75
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
-   Merged with Firebase Cloud Messaging handler — there is only ONE
-   service worker for this scope to avoid registration conflicts that
-   cause firebase.messaging.getToken() to hang.
-   Upgraded to Firebase v11.0.2 compat (client uses modular v11 ESM).
+   Firebase SDK removed — uses direct W3C Web Push API.
+   Push events: handles both payload-bearing and empty pushes
+   (empty → fetch latest pending notification from GAS).
    ════════════════════════════════════════════════════════════════════ */
-
-importScripts('https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging-compat.js');
-
-firebase.initializeApp({
-  apiKey: "AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA",
-  authDomain: "aleh-fleet.firebaseapp.com",
-  projectId: "aleh-fleet",
-  storageBucket: "aleh-fleet.firebasestorage.app",
-  messagingSenderId: "247079131404",
-  appId: "1:247079131404:web:68816ccdf27667cdc39129"
-});
-
-const messaging = firebase.messaging();
-
-/* Background FCM handler — fires when app is closed / backgrounded */
-messaging.onBackgroundMessage(payload => {
-  console.log('[SW] FCM bg:', payload);
-  const notif = payload.notification || {};
-  const data  = payload.data || {};
-
-  const TYPE_CONFIG = {
-    overdue:     { vibrate: [400,100,400,100,400], requireInteraction: true },
-    urgent:      { vibrate: [300,100,300] },
-    plan:        { vibrate: [200] },
-    km_update:   { vibrate: [150] },
-    test_due:    { vibrate: [300,100,300] },
-    test_urgent: { vibrate: [400,100,400,100,400], requireInteraction: true }
-  };
-  const cfg = TYPE_CONFIG[data.alertType] || { vibrate: [200] };
-
-  self.registration.showNotification(notif.title || 'עלה', {
-    body: notif.body || '',
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-192.png',
-    dir: 'rtl',
-    lang: 'he',
-    tag: 'maint-' + (data.vehicleId || 'general'),
-    renotify: true,
-    vibrate: cfg.vibrate,
-    requireInteraction: !!cfg.requireInteraction,
-    data: data,
-    actions: [
-      { action: 'open',    title: 'פתח באפליקציה' },
-      { action: 'dismiss', title: 'הבנתי' }
-    ]
-  });
-});
 
 /* ════════════════════════════════════════════════════════════════════
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v70';
+const CACHE_NAME = 'aleh-driver-v75';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -118,48 +69,71 @@ self.addEventListener('fetch', e => {
    Web Push (raw push event — when payload arrives without FCM SDK route)
    ════════════════════════════════════════════════════════════════════ */
 
+self.GAS_URL = self.GAS_URL || '';
+
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'set-gas-url' && typeof e.data.url === 'string') {
+    self.GAS_URL = e.data.url;
+  }
+});
+
+const TYPE_CONFIG = {
+  overdue:     { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
+  urgent:      { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+  plan:        { vibrate: [200],                 requireInteraction: false, badge: './icons/badge-blue.png' },
+  km_update:   { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' },
+  test_due:    { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+  test_urgent: { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' }
+};
+
 self.addEventListener('push', e => {
-  // If FCM SDK is handling it via onBackgroundMessage, this path may still
-  // fire for non-FCM pushes. Keep it for resilience.
-  let data = {};
-  try { data = e.data ? e.data.json() : {}; } catch(_) { return; }
-  const notif = data.notification || {};
-  const meta  = data.data || {};
+  e.waitUntil((async () => {
+    let payload = null;
+    try { if (e.data) payload = e.data.json(); } catch(_) {}
 
-  // If notification field is absent, assume FCM SDK already handled it.
-  if (!notif.title && !notif.body) return;
+    let notif = null, meta = {};
+    if (payload) {
+      notif = payload.notification || (payload.title ? payload : null);
+      meta  = payload.data || {};
+    }
 
-  const title = notif.title || 'עלה — התראה';
-  const body  = notif.body  || '';
-  const alertType = meta.alertType || '';
+    // Empty push — fetch latest pending notification from GAS
+    if (!notif && self.GAS_URL) {
+      try {
+        const r = await fetch(self.GAS_URL + '?action=driver_pending_notifications', { mode: 'cors' });
+        const list = await r.json();
+        if (list && list.ok && list.notifications && list.notifications.length) {
+          const first = list.notifications[0];
+          notif = first.notification || first;
+          meta  = first.data || meta;
+        }
+      } catch(_) {}
+    }
 
-  const TYPE_CONFIG = {
-    overdue:   { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
-    urgent:    { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
-    plan:      { vibrate: [200],                 requireInteraction: false, badge: './icons/badge-blue.png' },
-    km_update: { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' },
-    test_due:    { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
-    test_urgent: { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' }
-  };
-  const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
+    if (!notif) {
+      notif = { title: 'עלה — התראה', body: 'יש התראה חדשה. פתח את האפליקציה.' };
+    }
 
-  const opts = {
-    body,
-    icon: './icons/icon-192.png',
-    badge: cfg.badge || './icons/icon-192.png',
-    dir: 'rtl',
-    lang: 'he',
-    tag: 'maint-' + (meta.vehicleId || 'general'),
-    renotify: true,
-    vibrate: cfg.vibrate,
-    requireInteraction: cfg.requireInteraction,
-    data: meta,
-    actions: alertType ? [
-      { action: 'open',    title: 'פתח באפליקציה' },
-      { action: 'dismiss', title: 'הבנתי' }
-    ] : []
-  };
-  e.waitUntil(self.registration.showNotification(title, opts));
+    const alertType = meta.alertType || '';
+    const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
+
+    return self.registration.showNotification(notif.title || 'עלה', {
+      body: notif.body || '',
+      icon: './icons/icon-192.png',
+      badge: cfg.badge || './icons/icon-192.png',
+      dir: 'rtl',
+      lang: 'he',
+      tag: 'maint-' + (meta.vehicleId || ('t' + Date.now())),
+      renotify: true,
+      vibrate: cfg.vibrate,
+      requireInteraction: cfg.requireInteraction,
+      data: meta,
+      actions: alertType ? [
+        { action: 'open',    title: 'פתח באפליקציה' },
+        { action: 'dismiss', title: 'הבנתי' }
+      ] : []
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', e => {

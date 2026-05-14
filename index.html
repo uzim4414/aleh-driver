@@ -991,47 +991,18 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
 <!-- In-app notification stack (FCM foreground / SW postMessage) -->
 <div id="driver-notif-stack" aria-live="polite" aria-atomic="false"></div>
 
-<script src="app.js?v=33"></script>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA",
-  authDomain: "aleh-fleet.firebaseapp.com",
-  projectId: "aleh-fleet",
-  storageBucket: "aleh-fleet.firebasestorage.app",
-  messagingSenderId: "247079131404",
-  appId: "1:247079131404:web:68816ccdf27667cdc39129"
-};
-const VAPID = "BFk3kfNOCdHnlYCsH3rE3rhRVd2Qp71ibh4T464v9j-Kv_hiY-Jo7S-EZjW43ww_QSCyvvQ7vVxXXnnWAZrNSTM";
-
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
-
-// Expose to non-module code (app.js)
-window.__fbMessaging = messaging;
-window.__fbGetToken = (opts) => getToken(messaging, opts);
-window.__fbOnMessage = (cb) => onMessage(messaging, cb);
-window.__fbVAPID = VAPID;
-
-// Foreground messages -> in-app card
-onMessage(messaging, payload => {
-  console.log('[FCM] foreground:', payload);
-  if (window.showInAppNotification) window.showInAppNotification(payload);
-});
-
-console.log('[FCM] Firebase v11 ready');
+<script>
+  // VAPID public key used by direct PushManager.subscribe() — Firebase SDK no longer required on client.
+  window.__VAPID_PUBLIC = "BFk3kfNOCdHnlYCsH3rE3rhRVd2Qp71ibh4T464v9j-Kv_hiY-Jo7S-EZjW43ww_QSCyvvQ7vVxXXnnWAZrNSTM";
 </script>
+<script src="app.js?v=40"></script>
 <script>
 window.fcmDebug = async function() {
   const checks = {
     'Notification.permission': Notification.permission,
     'navigator.serviceWorker': !!navigator.serviceWorker,
     'PushManager': !!window.PushManager,
-    'window.__fbMessaging': !!window.__fbMessaging,
-    'window.__fbGetToken': typeof window.__fbGetToken,
-    'window.__fbVAPID': !!window.__fbVAPID,
+    'window.__VAPID_PUBLIC': !!window.__VAPID_PUBLIC,
     'SW controller': (navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL) || 'none',
     'SW ready scope': (await navigator.serviceWorker.ready).scope,
     'App version': (document.querySelector('script[src*="app.js"]') || {}).src || 'n/a'
