@@ -2385,22 +2385,23 @@ async function registerPush() {
 
     const vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
     try {
-      await gasPost('driver_register_push', {
-        endpoint: subJson.endpoint,
-        p256dh:   subJson.keys && subJson.keys.p256dh,
-        auth:     subJson.keys && subJson.keys.auth,
-        vehicleId: vid
+      const regResp = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action:    'driver_register_push',
+          idToken:   STATE.idToken || '',
+          endpoint:  subJson.endpoint,
+          p256dh:    subJson.keys && subJson.keys.p256dh,
+          auth:      subJson.keys && subJson.keys.auth,
+          vehicleId: vid
+        })
       });
-      console.log('[Push] Registered with GAS ✓');
+      const regData = await regResp.json();
+      if (regData.ok) console.log('[Push] Registered with GAS ✓ vid:', vid);
+      else console.warn('[Push] GAS register error:', regData.error);
     } catch(e) {
       console.warn('[Push] gas register failed:', e.message);
-    }
-
-    // Also try unauthenticated path
-    if (vid) {
-      try {
-        await fetch(GAS_URL + '?action=register_fcm&vid=' + encodeURIComponent(vid) + '&token=' + encodeURIComponent(subJson.endpoint), { method:'GET', mode:'no-cors' });
-      } catch(e2) {}
     }
   } catch(e) {
     console.error('[Push] error:', e.message, e);
