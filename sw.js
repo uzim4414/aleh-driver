@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aleh-driver-v65';
+const CACHE_NAME = 'aleh-driver-v66';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -28,6 +28,10 @@ self.addEventListener('fetch', e => {
 
   /* cross-origin (GAS, Google APIs) — תמיד רשת, ללא התערבות */
   if (!url.startsWith(self.location.origin)) return;
+
+  /* FCM service worker file + scope endpoint — חייב להיות תמיד רשת טרייה
+     (חתימה stale תגרום ל-getToken להיתקע) */
+  if (url.includes('firebase-messaging-sw.js') || url.includes('firebase-cloud-messaging-push-scope')) return;
 
   /* index.html + app.js — network-first: תמיד מנסה רשת, fallback לcache */
   const isAppFile = url.endsWith('/') || url.includes('index.html') || url.includes('app.js') || url.includes('manifest.json');
