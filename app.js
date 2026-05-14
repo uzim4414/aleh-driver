@@ -375,6 +375,8 @@ async function loadFullData() {
   }
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
+  // רישום Push אחרי טעינת הרכב — STATE.vehicle.id זמין כאן
+  if ('serviceWorker' in navigator && GAS_URL) registerPush();
 }
 
 /* ══ Alerts ══ */
@@ -486,7 +488,6 @@ function startApp() {
   document.getElementById('app').classList.remove('hidden');
   renderAll();
   initSwipe();
-  if ('serviceWorker' in navigator && GAS_URL) registerPush();
 }
 
 function logout() {
