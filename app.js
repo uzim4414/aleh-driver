@@ -375,8 +375,42 @@ async function loadFullData() {
   }
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
-  // רישום Push אחרי טעינת הרכב — STATE.vehicle.id זמין כאן
   if ('serviceWorker' in navigator && GAS_URL) registerPush();
+  loadNotifHistoryFromGAS();
+}
+
+async function loadNotifHistoryFromGAS() {
+  if (!STATE.vehicle || !STATE.vehicle.id) return;
+  try {
+    const vid = STATE.vehicle.id;
+    const resp = await fetch(GAS_URL + '?action=driver_get_notifs&vid=' + encodeURIComponent(vid));
+    const data = await resp.json();
+    if (!data.ok || !data.notifications || !data.notifications.length) return;
+    // Merge with localStorage — GAS is source of truth
+    var existing = [];
+    try { existing = JSON.parse(localStorage.getItem('driver_notif_history') || '[]'); } catch(e) {}
+    var existingIds = new Set(existing.map(function(n) { return n.ts; }));
+    var merged = existing.slice();
+    data.notifications.forEach(function(n) {
+      if (!existingIds.has(n.ts)) {
+        merged.push({ title: n.title, body: n.body, alertType: n.alertType, ts: n.ts, id: n.ts });
+      }
+    });
+    merged.sort(function(a, b) { return b.ts - a.ts; });
+    if (merged.length > 30) merged = merged.slice(0, 30);
+    localStorage.setItem('driver_notif_history', JSON.stringify(merged));
+    // Update unread badge — count GAS notifs newer than last-seen
+    var lastSeen = parseInt(localStorage.getItem('driver_notif_last_seen') || '0', 10);
+    var unread = data.notifications.filter(function(n) { return n.ts > lastSeen; }).length;
+    if (unread > 0 && window.DRIVER_NOTIF) {
+      var badge = document.getElementById('alert-badge');
+      if (badge) {
+        badge.textContent = unread > 99 ? '99+' : String(unread);
+        badge.classList.remove('hidden');
+      }
+    }
+    if (STATE.currentScreen === 'alerts') renderNotifHistory();
+  } catch(e) { console.warn('loadNotifHistoryFromGAS:', e.message); }
 }
 
 /* ══ Alerts ══ */
@@ -1329,6 +1363,7 @@ const APP = {
 
     if (screen === 'vehicle') renderVehicleScreen(STATE.currentTab);
     if (screen === 'alerts') {
+      localStorage.setItem('driver_notif_last_seen', String(Date.now()));
       if (window.DRIVER_NOTIF && window.DRIVER_NOTIF.clearUnread) window.DRIVER_NOTIF.clearUnread();
       renderNotifHistory();
     }
