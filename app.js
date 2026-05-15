@@ -58,14 +58,28 @@ function saveNotifToHistory(payload) {
   try {
     var notif = payload.notification || {};
     var meta  = payload.data || {};
-    var list  = getNotifHistory();
+    var ts    = payload.ts || Date.now();
+
+    // Respect "clear all" — drop notifications older than last clear
+    var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
+    if (ts <= clearedAt) return;
+
+    // Auto-clear garage pending state when approval/rejection arrives
+    var alertType = meta.alertType || '';
+    if (alertType === 'garage_approved' || alertType === 'garage_rejected') {
+      try { localStorage.removeItem('pendingGarageRequest'); } catch(_e) {}
+    }
+
+    var list = getNotifHistory();
+    // Dedup by ts
+    if (list.some(function(n) { return n.ts === ts; })) return;
     list.unshift({
-      id:        Date.now(),
+      id:        ts,
       title:     notif.title || 'עלה — התראה',
       body:      notif.body  || '',
-      alertType: meta.alertType || 'plan',
+      alertType: alertType || 'plan',
       vehicleId: meta.vehicleId || '',
-      ts:        payload.ts || Date.now()
+      ts:        ts
     });
     if (list.length > 30) list = list.slice(0, 30);
     localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
@@ -608,14 +622,17 @@ function getCarImageUrl(make, model) {
 /* ══ Swipe navigation ══ */
 function initSwipe() {
   const SCREENS = ['home', 'alerts', 'vehicle', 'history'];
-  let startX = 0, startY = 0;
+  let startX = 0, startY = 0, _swipeOnItem = false;
 
   document.getElementById('app').addEventListener('touchstart', function(e) {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    // Flag if touch started on a swipeable notification item — let item handler own it
+    _swipeOnItem = !!(e.target && e.target.closest && e.target.closest('.nh-item'));
   }, { passive: true });
 
   document.getElementById('app').addEventListener('touchend', function(e) {
+    if (_swipeOnItem) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
@@ -1162,12 +1179,14 @@ function renderNotifHistory() {
   }
 
   var ACTION_LABEL = {
-    km_update:   'עדכן ק"מ',
-    overdue:     'הזמן תור',
-    urgent:      'הזמן תור',
-    plan:        'פרטי רכב',
-    test_due:    'פרטי טסט',
-    test_urgent: 'פרטי טסט'
+    km_update:        'עדכן ק"מ',
+    overdue:          'הזמן תור',
+    urgent:           'הזמן תור',
+    plan:             'פרטי רכב',
+    test_due:         'פרטי טסט',
+    test_urgent:      'פרטי טסט',
+    garage_approved:  'פרטי המוסך',
+    garage_rejected:  'בקשה חדשה'
   };
 
   var itemsHtml = history.map(function(n, i) {
