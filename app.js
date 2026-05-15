@@ -35,8 +35,12 @@ function navigateForAlertType(alertType, meta) {
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('info'); }, 350);
       break;
+    case 'garage_approved':
+    case 'garage_rejected':
+      APP.nav('vehicle');
+      setTimeout(function() { APP.switchTab('garage'); }, 350);
+      break;
     default:
-      // garage approved/rejected/appointment reminder
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
       break;
