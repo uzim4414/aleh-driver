@@ -1053,7 +1053,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   // VAPID public key used by direct PushManager.subscribe() — Firebase SDK no longer required on client.
   window.__VAPID_PUBLIC = "BFLZcYjxU_yOMukgr3oSnP8ayrFzw16i0s8-z1fbEy1I_E-qP0_B8k3ccvjpE8RmyGYRzSu-ybm2k94pyJfMLyg";
 </script>
-<script src="app.js?v=65"></script>
+<script src="app.js?v=66"></script>
 <script>
 window.fcmDebug = async function() {
   const checks = {
@@ -1277,10 +1277,25 @@ window.fcmDebug = async function() {
       }
     });
 
-    // Ask SW for any buffered notifications (e.g. arrived while app was closed)
+    // Ask SW for any buffered notifications (app was open when push arrived)
     navigator.serviceWorker.ready.then(function(reg) {
       if (reg.active) reg.active.postMessage({ type: 'get-pending-notifs' });
     }).catch(function(){});
+  }
+
+  // Read notification data from URL (user tapped OS notification while app was closed)
+  try {
+    var _urlParams = new URLSearchParams(location.search);
+    var _notifRaw  = _urlParams.get('_notif');
+    if (_notifRaw) {
+      var _notifData = JSON.parse(decodeURIComponent(_notifRaw));
+      saveNotifToHistory(_notifData);
+      // Clean URL without reload
+      history.replaceState({}, '', location.pathname + location.hash);
+      // Show in-app card after a short delay so app is rendered
+      setTimeout(function() { showInAppNotification(_notifData); }, 800);
+    }
+  } catch(e) {}
   }
 
   // Restore badge unread count on load

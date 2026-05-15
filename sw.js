@@ -1,4 +1,4 @@
-// SW build: 2026-05-15T11:00:00Z // v78
+// SW build: 2026-05-15T12:00:00Z // v79
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v78';
+const CACHE_NAME = 'aleh-driver-v79';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
@@ -166,24 +166,25 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
   const meta = e.notification.data || {};
-  const hash = meta.click_action || '';
-  const url  = './index.html' + (hash || '');
   const fullPayload = {
     notification: { title: e.notification.title || 'עלה', body: e.notification.body || '' },
     data: meta,
     ts: Date.now()
   };
+  // Encode notification in URL so app always receives it — reliable even after SW restart
+  const notifParam = encodeURIComponent(JSON.stringify(fullPayload));
+  const url = './index.html?_notif=' + notifParam;
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
         if (c.url.includes('/driver/') && 'focus' in c) {
+          // App already open — postMessage directly
           c.postMessage({ type: 'push-received', payload: fullPayload });
           c.postMessage({ type: 'notification-click', data: meta });
           return c.focus();
         }
       }
-      // App not open — buffer for collection after openWindow loads
-      _pendingNotifs.push(fullPayload);
+      // App closed — open with notif data in URL
       return clients.openWindow(url);
     })
   );
