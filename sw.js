@@ -1,4 +1,4 @@
-// SW build: 2026-05-14T15:00:00Z // v76
+// SW build: 2026-05-15T10:00:00Z // v77
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v76';
+const CACHE_NAME = 'aleh-driver-v77';
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -116,6 +116,16 @@ self.addEventListener('push', e => {
 
     const alertType = meta.alertType || '';
     const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
+
+    // Relay to any open driver clients for in-app notification + history
+    const openClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: false });
+    const relayPayload = {
+      notification: { title: notif.title || 'עלה', body: notif.body || '' },
+      data: meta
+    };
+    for (const c of openClients) {
+      c.postMessage({ type: 'push-foreground', payload: relayPayload });
+    }
 
     return self.registration.showNotification(notif.title || 'עלה', {
       body: notif.body || '',

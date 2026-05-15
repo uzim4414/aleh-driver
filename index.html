@@ -646,6 +646,64 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   animation:dnProgressShrink linear forwards;
 }
 @keyframes dnProgressShrink { from{transform:scaleX(1)} to{transform:scaleX(0)} }
+
+/* ── Notification History ── */
+.nh-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 16px 10px; margin-top:8px;
+}
+.nh-title { font-size:15px; font-weight:700; color:var(--t1); }
+.nh-clear-btn {
+  font-size:12px; color:var(--t2); background:none; border:none;
+  cursor:pointer; font-family:inherit; padding:4px 8px;
+  border-radius:8px; transition:background .15s;
+}
+.nh-clear-btn:hover { background:rgba(255,255,255,.06); }
+.nh-empty {
+  text-align:center; padding:32px 16px;
+  color:var(--t2); font-size:14px;
+}
+.nh-item {
+  margin:0 16px 10px;
+  border-radius:16px;
+  padding:13px 15px;
+  position:relative; overflow:hidden;
+  animation:slideInRight .35s cubic-bezier(.22,1,.36,1) both;
+  cursor:default;
+}
+.nh-item::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(circle at 100% 0%, rgba(255,255,255,.15), transparent 55%);
+  pointer-events:none;
+}
+.nh-item.type-overdue,.nh-item.type-test_urgent {
+  background:linear-gradient(135deg,#DC2626 0%,#991B1B 100%);
+  box-shadow:0 8px 24px rgba(220,38,38,.35);
+}
+.nh-item.type-urgent,.nh-item.type-test_due {
+  background:linear-gradient(135deg,#F59E0B 0%,#D97706 100%);
+  box-shadow:0 8px 24px rgba(245,158,11,.3);
+}
+.nh-item.type-plan {
+  background:linear-gradient(135deg,#3B82F6 0%,#1E40AF 100%);
+  box-shadow:0 8px 24px rgba(59,130,246,.3);
+}
+.nh-item.type-km_update {
+  background:linear-gradient(135deg,#8B5CF6 0%,#6D28D9 100%);
+  box-shadow:0 8px 24px rgba(139,92,246,.3);
+}
+.nh-row { display:flex; align-items:flex-start; gap:11px; }
+.nh-icon {
+  flex:0 0 36px; width:36px; height:36px;
+  background:rgba(255,255,255,.2); border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.18);
+}
+.nh-icon svg { width:18px; height:18px; stroke:#fff; stroke-width:2.2; fill:none; }
+.nh-body { flex:1; min-width:0; }
+.nh-item-title { font-size:14px; font-weight:700; color:#fff; line-height:1.3; margin-bottom:3px; }
+.nh-item-body  { font-size:12.5px; color:rgba(255,255,255,.85); line-height:1.4; }
+.nh-item-time  { font-size:11px; color:rgba(255,255,255,.55); margin-top:6px; }
 </style>
 </head>
 <body>
@@ -995,7 +1053,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   // VAPID public key used by direct PushManager.subscribe() — Firebase SDK no longer required on client.
   window.__VAPID_PUBLIC = "BFLZcYjxU_yOMukgr3oSnP8ayrFzw16i0s8-z1fbEy1I_E-qP0_B8k3ccvjpE8RmyGYRzSu-ybm2k94pyJfMLyg";
 </script>
-<script src="app.js?v=63"></script>
+<script src="app.js?v=64"></script>
 <script>
 window.fcmDebug = async function() {
   const checks = {
@@ -1161,19 +1219,57 @@ window.fcmDebug = async function() {
   }
   window.showInAppNotification = showInAppNotification;
 
-  // Listen for messages from service worker (notificationclick relay)
+  /* ── Notification history (localStorage) ── */
+  var NOTIF_HISTORY_KEY = 'driver_notif_history';
+  var NOTIF_MAX = 30;
+
+  function saveNotifToHistory(payload) {
+    try {
+      var notif = payload.notification || {};
+      var meta  = payload.data || {};
+      var list  = JSON.parse(localStorage.getItem(NOTIF_HISTORY_KEY) || '[]');
+      list.unshift({
+        id:        Date.now(),
+        title:     notif.title || 'עלה — התראה',
+        body:      notif.body  || '',
+        alertType: meta.alertType || 'plan',
+        vehicleId: meta.vehicleId || '',
+        ts:        Date.now()
+      });
+      if (list.length > NOTIF_MAX) list = list.slice(0, NOTIF_MAX);
+      localStorage.setItem(NOTIF_HISTORY_KEY, JSON.stringify(list));
+      // signal app.js to refresh the history list if alerts screen is open
+      if (window.APP && typeof APP.refreshNotifHistory === 'function') APP.refreshNotifHistory();
+    } catch(e) {}
+  }
+
+  function getNotifHistory() {
+    try { return JSON.parse(localStorage.getItem(NOTIF_HISTORY_KEY) || '[]'); } catch(e) { return []; }
+  }
+
+  function clearNotifHistory() {
+    try { localStorage.removeItem(NOTIF_HISTORY_KEY); } catch(e) {}
+  }
+
+  window.DRIVER_NOTIF = {
+    clearUnread:     clearUnread,
+    getHistory:      getNotifHistory,
+    clearHistory:    clearNotifHistory,
+    saveToHistory:   saveNotifToHistory
+  };
+
+  // Listen for messages from service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', function(ev){
       var msg = ev.data || {};
       if (msg.type === 'notification-click' && msg.data) {
         navigateForNotif(msg.data);
       } else if (msg.type === 'push-foreground' && msg.payload) {
+        saveNotifToHistory(msg.payload);
         showInAppNotification(msg.payload);
       }
     });
   }
-
-  // Foreground FCM messages are wired up by the Firebase v11 module script at the bottom of body.
 
   // Restore badge unread count on load
   try {

@@ -974,6 +974,75 @@ function renderGarageTab() {
   '</div>';
 }
 
+function _escHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+function _notifTimeLabel(ts) {
+  var d = new Date(ts);
+  var now = new Date();
+  var diff = Math.floor((now - d) / 1000);
+  if (diff < 60)  return 'עכשיו';
+  if (diff < 3600) return Math.floor(diff/60) + ' דק\'';
+  if (diff < 86400) return Math.floor(diff/3600) + ' שע\'';
+  var dd = Math.floor(diff/86400);
+  return dd === 1 ? 'אתמול' : dd + ' ימים';
+}
+
+var NOTIF_ICON_BY_TYPE = {
+  overdue: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>',
+  urgent:  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  plan:    '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  km_update:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  test_due:'<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>',
+  test_urgent:'<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
+};
+
+function renderNotifHistory() {
+  var container = document.getElementById('alerts-content');
+  if (!container) return;
+
+  var history = (window.DRIVER_NOTIF && window.DRIVER_NOTIF.getHistory) ? window.DRIVER_NOTIF.getHistory() : [];
+
+  // remove old history section if exists
+  var old = document.getElementById('nh-section');
+  if (old) old.parentNode.removeChild(old);
+
+  var section = document.createElement('div');
+  section.id = 'nh-section';
+
+  var headerHtml = '<div class="nh-header">' +
+    '<div class="nh-title">הודעות שהתקבלו</div>' +
+    (history.length ? '<button class="nh-clear-btn" onclick="APP.clearNotifHistory()">נקה הכל</button>' : '') +
+    '</div>';
+
+  if (!history.length) {
+    section.innerHTML = headerHtml + '<div class="nh-empty">אין הודעות שהתקבלו עדיין</div>';
+    container.appendChild(section);
+    return;
+  }
+
+  var itemsHtml = history.map(function(n, i) {
+    var type = n.alertType || 'plan';
+    var iconPath = NOTIF_ICON_BY_TYPE[type] || NOTIF_ICON_BY_TYPE.plan;
+    return '<div class="nh-item type-' + type + '" style="animation-delay:' + (i * 0.05) + 's">' +
+      '<div class="nh-row">' +
+        '<div class="nh-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
+        '<div class="nh-body">' +
+          '<div class="nh-item-title">' + _escHtml(n.title) + '</div>' +
+          '<div class="nh-item-body">'  + _escHtml(n.body)  + '</div>' +
+          '<div class="nh-item-time">'  + _notifTimeLabel(n.ts) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  section.innerHTML = headerHtml + itemsHtml;
+  container.appendChild(section);
+}
+
 function renderAlerts() {
   const container = document.getElementById('alerts-content');
   const empty = document.getElementById('alerts-empty');
@@ -981,41 +1050,44 @@ function renderAlerts() {
 
   if (STATE.alerts.length === 0) {
     empty.classList.remove('hidden');
-    return;
-  }
-  empty.classList.add('hidden');
+    container.innerHTML = '';
+  } else {
+    empty.classList.add('hidden');
 
-  const cats = [
-    { key: 'red',  label: 'דחוף' },
-    { key: 'warn', label: 'להתייחסות' },
-    { key: 'ok',   label: 'פעולות שבוצעו' }
-  ];
+    const cats = [
+      { key: 'red',  label: 'דחוף' },
+      { key: 'warn', label: 'להתייחסות' },
+      { key: 'ok',   label: 'פעולות שבוצעו' }
+    ];
 
-  let html = '';
-  cats.forEach(function(cat) {
-    const items = STATE.alerts.filter(function(a) { return a.type === cat.key; });
-    if (!items.length) return;
-    html += '<div class="ssec"><div class="ss-lbl">' + cat.label + '</div><div class="ss-count">' + items.length + '</div></div>';
-    items.forEach(function(a, i) {
-      html += '<div class="alert-card ' + a.type + '" style="animation-delay:' + (i * 0.06) + 's">';
-      html += '<div class="ac-row">';
-      html += '<div><div class="ac-title">' + a.title + '</div><div class="ac-sub">' + a.sub + '</div></div>';
-      if (a.type === 'red') {
-        html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
-        html += '<span class="pill red">' + a.label + '</span>';
-        html += '<div class="ping-wrap"><div class="ping-dot"></div><div class="ping-ring"></div></div>';
+    let html = '';
+    cats.forEach(function(cat) {
+      const items = STATE.alerts.filter(function(a) { return a.type === cat.key; });
+      if (!items.length) return;
+      html += '<div class="ssec"><div class="ss-lbl">' + cat.label + '</div><div class="ss-count">' + items.length + '</div></div>';
+      items.forEach(function(a, i) {
+        html += '<div class="alert-card ' + a.type + '" style="animation-delay:' + (i * 0.06) + 's">';
+        html += '<div class="ac-row">';
+        html += '<div><div class="ac-title">' + a.title + '</div><div class="ac-sub">' + a.sub + '</div></div>';
+        if (a.type === 'red') {
+          html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
+          html += '<span class="pill red">' + a.label + '</span>';
+          html += '<div class="ping-wrap"><div class="ping-dot"></div><div class="ping-ring"></div></div>';
+          html += '</div>';
+        } else {
+          html += '<span class="pill ' + a.type + '">' + a.label + '</span>';
+        }
         html += '</div>';
-      } else {
-        html += '<span class="pill ' + a.type + '">' + a.label + '</span>';
-      }
-      html += '</div>';
-      if (a.days !== null) {
-        html += '<div class="ac-date ' + a.type + '">' + a.days + ' ימים</div>';
-      }
-      html += '</div>';
+        if (a.days !== null) {
+          html += '<div class="ac-date ' + a.type + '">' + a.days + ' ימים</div>';
+        }
+        html += '</div>';
+      });
     });
-  });
-  container.innerHTML = html;
+    container.innerHTML = html;
+  }
+
+  renderNotifHistory();
 }
 
 function renderHistory() {
@@ -1254,9 +1326,12 @@ const APP = {
     });
 
     STATE.currentScreen = screen;
-    // help-fab is always visible
 
     if (screen === 'vehicle') renderVehicleScreen(STATE.currentTab);
+    if (screen === 'alerts') {
+      if (window.DRIVER_NOTIF && window.DRIVER_NOTIF.clearUnread) window.DRIVER_NOTIF.clearUnread();
+      renderNotifHistory();
+    }
   },
 
   switchTab: function(tab) {
@@ -1376,6 +1451,15 @@ const APP = {
       hideLoader();
     }
   }
+};
+
+APP.clearNotifHistory = function() {
+  if (window.DRIVER_NOTIF && window.DRIVER_NOTIF.clearHistory) window.DRIVER_NOTIF.clearHistory();
+  renderNotifHistory();
+};
+
+APP.refreshNotifHistory = function() {
+  if (STATE.currentScreen === 'alerts') renderNotifHistory();
 };
 
 /* ══════════════════════════════════════════════════════════════
