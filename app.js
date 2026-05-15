@@ -40,7 +40,19 @@ function saveNotifToHistory(payload) {
 }
 
 function clearNotifHistory() {
-  try { localStorage.removeItem(_NOTIF_HISTORY_KEY); } catch(e) {}
+  try {
+    localStorage.removeItem(_NOTIF_HISTORY_KEY);
+    localStorage.setItem('driver_notif_cleared_at', String(Date.now()));
+    localStorage.setItem('driver_notif_unread', '0');
+    _applyBadgeCount(0);
+  } catch(e) {}
+}
+
+function deleteNotifById(id) {
+  try {
+    var list = getNotifHistory().filter(function(n) { return String(n.id) !== String(id); });
+    localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+  } catch(e) {}
 }
 
 function _applyBadgeCount(n) {
@@ -443,13 +455,24 @@ async function loadNotifHistoryFromGAS() {
     const vid = STATE.vehicle.id;
     const resp = await fetch(GAS_URL + '?action=driver_get_notifs&vid=' + encodeURIComponent(vid));
     const data = await resp.json();
-    if (!data.ok || !data.notifications || !data.notifications.length) return;
-    // Merge with localStorage — GAS is source of truth
+
+    // Respect user's "clear all" — skip notifications older than last clear time
+    var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
+    var gasNotifs = (data.ok && data.notifications) ? data.notifications.filter(function(n) { return n.ts > clearedAt; }) : [];
+
+    if (!gasNotifs.length) {
+      // Nothing from GAS — just sync badge with localStorage
+      var stored = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10);
+      _applyBadgeCount(stored);
+      return;
+    }
+
+    // Merge GAS data into localStorage (dedup by ts)
     var existing = [];
     try { existing = JSON.parse(localStorage.getItem('driver_notif_history') || '[]'); } catch(e) {}
     var existingIds = new Set(existing.map(function(n) { return n.ts; }));
     var merged = existing.slice();
-    data.notifications.forEach(function(n) {
+    gasNotifs.forEach(function(n) {
       if (!existingIds.has(n.ts)) {
         merged.push({ title: n.title, body: n.body, alertType: n.alertType, ts: n.ts, id: n.ts });
       }
@@ -457,13 +480,13 @@ async function loadNotifHistoryFromGAS() {
     merged.sort(function(a, b) { return b.ts - a.ts; });
     if (merged.length > 30) merged = merged.slice(0, 30);
     localStorage.setItem('driver_notif_history', JSON.stringify(merged));
-    // Update unread badge — count GAS notifs newer than last-seen
+
+    // Always update badge — GAS is source of truth for unread count
     var lastSeen = parseInt(localStorage.getItem('driver_notif_last_seen') || '0', 10);
-    var unread = data.notifications.filter(function(n) { return n.ts > lastSeen; }).length;
-    if (unread > 0) {
-      localStorage.setItem('driver_notif_unread', String(unread));
-      _applyBadgeCount(unread);
-    }
+    var unread = gasNotifs.filter(function(n) { return n.ts > lastSeen; }).length;
+    localStorage.setItem('driver_notif_unread', String(unread));
+    _applyBadgeCount(unread);
+
     if (STATE.currentScreen === 'alerts') renderNotifHistory();
   } catch(e) { console.warn('loadNotifHistoryFromGAS:', e.message); }
 }
@@ -1116,7 +1139,8 @@ function renderNotifHistory() {
   var itemsHtml = history.map(function(n, i) {
     var type = n.alertType || 'plan';
     var iconPath = NOTIF_ICON_BY_TYPE[type] || NOTIF_ICON_BY_TYPE.plan;
-    return '<div class="nh-item type-' + type + '" style="animation-delay:' + (i * 0.05) + 's" onclick="APP.nav(\'vehicle\')">' +
+    var safeId = String(n.id || n.ts || i);
+    return '<div class="nh-item type-' + type + '" style="animation-delay:' + (i * 0.05) + 's" onclick="if(!event.target.closest(\'.nh-del\'))APP.nav(\'vehicle\')">' +
       '<div class="nh-row">' +
         '<div class="nh-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
         '<div class="nh-body">' +
@@ -1124,7 +1148,7 @@ function renderNotifHistory() {
           '<div class="nh-item-body">'  + _escHtml(n.body)  + '</div>' +
           '<div class="nh-item-time">'  + _notifTimeLabel(n.ts) + '</div>' +
         '</div>' +
-        '<div class="nh-arrow">›</div>' +
+        '<button class="nh-del" onclick="event.stopPropagation();APP.deleteNotif(\'' + safeId + '\')" aria-label="מחק">×</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1546,6 +1570,11 @@ const APP = {
 
 APP.clearNotifHistory = function() {
   clearNotifHistory();
+  renderNotifHistory();
+};
+
+APP.deleteNotif = function(id) {
+  deleteNotifById(id);
   renderNotifHistory();
 };
 
