@@ -43,24 +43,30 @@ function clearNotifHistory() {
   try { localStorage.removeItem(_NOTIF_HISTORY_KEY); } catch(e) {}
 }
 
+function _applyBadgeCount(n) {
+  var label = n > 99 ? '99+' : String(n);
+  var show = n > 0;
+  ['alert-badge', 'alerts-badge-bottom'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = label;
+    el.classList.toggle('hidden', !show);
+  });
+}
+
 function incrementUnreadBadge() {
   try {
     var n = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10) || 0;
     n++;
     localStorage.setItem('driver_notif_unread', String(n));
-    var badge = document.getElementById('alert-badge');
-    if (badge) {
-      badge.textContent = n > 99 ? '99+' : String(n);
-      badge.classList.remove('hidden');
-    }
+    _applyBadgeCount(n);
   } catch(e) {}
 }
 
 function clearUnreadBadge() {
   try {
     localStorage.setItem('driver_notif_unread', '0');
-    var badge = document.getElementById('alert-badge');
-    if (badge) badge.classList.add('hidden');
+    _applyBadgeCount(0);
   } catch(e) {}
 }
 
@@ -455,11 +461,8 @@ async function loadNotifHistoryFromGAS() {
     var lastSeen = parseInt(localStorage.getItem('driver_notif_last_seen') || '0', 10);
     var unread = data.notifications.filter(function(n) { return n.ts > lastSeen; }).length;
     if (unread > 0) {
-      var badge = document.getElementById('alert-badge');
-      if (badge) {
-        badge.textContent = unread > 99 ? '99+' : String(unread);
-        badge.classList.remove('hidden');
-      }
+      localStorage.setItem('driver_notif_unread', String(unread));
+      _applyBadgeCount(unread);
     }
     if (STATE.currentScreen === 'alerts') renderNotifHistory();
   } catch(e) { console.warn('loadNotifHistoryFromGAS:', e.message); }
@@ -1113,7 +1116,7 @@ function renderNotifHistory() {
   var itemsHtml = history.map(function(n, i) {
     var type = n.alertType || 'plan';
     var iconPath = NOTIF_ICON_BY_TYPE[type] || NOTIF_ICON_BY_TYPE.plan;
-    return '<div class="nh-item type-' + type + '" style="animation-delay:' + (i * 0.05) + 's">' +
+    return '<div class="nh-item type-' + type + '" style="animation-delay:' + (i * 0.05) + 's" onclick="APP.nav(\'vehicle\')">' +
       '<div class="nh-row">' +
         '<div class="nh-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
         '<div class="nh-body">' +
@@ -1121,6 +1124,7 @@ function renderNotifHistory() {
           '<div class="nh-item-body">'  + _escHtml(n.body)  + '</div>' +
           '<div class="nh-item-time">'  + _notifTimeLabel(n.ts) + '</div>' +
         '</div>' +
+        '<div class="nh-arrow">›</div>' +
       '</div>' +
     '</div>';
   }).join('');
