@@ -1053,7 +1053,7 @@ body { background:#000; font-family:'Noto Sans Hebrew',-apple-system,sans-serif;
   // VAPID public key used by direct PushManager.subscribe() — Firebase SDK no longer required on client.
   window.__VAPID_PUBLIC = "BFLZcYjxU_yOMukgr3oSnP8ayrFzw16i0s8-z1fbEy1I_E-qP0_B8k3ccvjpE8RmyGYRzSu-ybm2k94pyJfMLyg";
 </script>
-<script src="app.js?v=64"></script>
+<script src="app.js?v=65"></script>
 <script>
 window.fcmDebug = async function() {
   const checks = {
@@ -1267,8 +1267,20 @@ window.fcmDebug = async function() {
       } else if (msg.type === 'push-foreground' && msg.payload) {
         saveNotifToHistory(msg.payload);
         showInAppNotification(msg.payload);
+      } else if (msg.type === 'push-received' && msg.payload) {
+        saveNotifToHistory(msg.payload);
+        showInAppNotification(msg.payload);
+      } else if (msg.type === 'pending-notifs' && msg.notifs && msg.notifs.length) {
+        msg.notifs.forEach(function(p) { saveNotifToHistory(p); });
+        // show only the latest as in-app card
+        showInAppNotification(msg.notifs[0]);
       }
     });
+
+    // Ask SW for any buffered notifications (e.g. arrived while app was closed)
+    navigator.serviceWorker.ready.then(function(reg) {
+      if (reg.active) reg.active.postMessage({ type: 'get-pending-notifs' });
+    }).catch(function(){});
   }
 
   // Restore badge unread count on load

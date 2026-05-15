@@ -1,4 +1,4 @@
-// SW build: 2026-05-15T10:00:00Z // v77
+// SW build: 2026-05-15T11:00:00Z // v78
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,10 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v77';
+const CACHE_NAME = 'aleh-driver-v78';
+
+// Pending notifications buffer — survives until client collects them (max 60s)
+let _pendingNotifs = [];
 
 /* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
 const PRECACHE = [
@@ -72,8 +75,14 @@ self.addEventListener('fetch', e => {
 self.GAS_URL = self.GAS_URL || '';
 
 self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'set-gas-url' && typeof e.data.url === 'string') {
+  if (!e.data) return;
+  if (e.data.type === 'set-gas-url' && typeof e.data.url === 'string') {
     self.GAS_URL = e.data.url;
+  }
+  // Client asks for buffered notifications (on app open)
+  if (e.data.type === 'get-pending-notifs' && e.source) {
+    e.source.postMessage({ type: 'pending-notifs', notifs: _pendingNotifs });
+    _pendingNotifs = [];
   }
 });
 
@@ -117,12 +126,19 @@ self.addEventListener('push', e => {
     const alertType = meta.alertType || '';
     const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
 
-    // Relay to any open driver clients for in-app notification + history
-    const openClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: false });
+    // Buffer the notification so app can collect it on next open
     const relayPayload = {
       notification: { title: notif.title || 'עלה', body: notif.body || '' },
-      data: meta
+      data: meta,
+      ts: Date.now()
     };
+    _pendingNotifs.push(relayPayload);
+    setTimeout(() => {
+      _pendingNotifs = _pendingNotifs.filter(n => Date.now() - n.ts < 300000);
+    }, 300000);
+
+    // Also relay to any currently open driver clients
+    const openClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: false });
     for (const c of openClients) {
       c.postMessage({ type: 'push-foreground', payload: relayPayload });
     }
@@ -152,14 +168,22 @@ self.addEventListener('notificationclick', e => {
   const meta = e.notification.data || {};
   const hash = meta.click_action || '';
   const url  = './index.html' + (hash || '');
+  const fullPayload = {
+    notification: { title: e.notification.title || 'עלה', body: e.notification.body || '' },
+    data: meta,
+    ts: Date.now()
+  };
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
         if (c.url.includes('/driver/') && 'focus' in c) {
+          c.postMessage({ type: 'push-received', payload: fullPayload });
           c.postMessage({ type: 'notification-click', data: meta });
           return c.focus();
         }
       }
+      // App not open — buffer for collection after openWindow loads
+      _pendingNotifs.push(fullPayload);
       return clients.openWindow(url);
     })
   );
