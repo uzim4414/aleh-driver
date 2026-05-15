@@ -1703,6 +1703,7 @@ APP.openHelpMenu = async function() {
 
 APP.closeHelpMenu = function() {
   STATE.helpMenuOpen = false;
+  APP._garageStopPoll();
   var overlay = document.getElementById('help-overlay');
   var menu    = document.getElementById('help-menu');
   var fab     = document.getElementById('help-fab');
@@ -2338,9 +2339,9 @@ APP.helpGarage = function() {
   var garageAddr = (g && g.address) ? g.address : '';
   var garageId   = (g && g.id) ? g.id : '';
 
-  // Check if there's a pending request already
+  // Check if there's a pending request — show UI then start live status polling
   var pending = APP._garageGetPending();
-  if (pending) { APP._garageShowPending(pending); return; }
+  if (pending) { APP._garageShowPending(pending); APP._garagePollStatus(pending); return; }
 
   var garageInfo = '<div style="background:rgba(255,255,255,0.07);border-radius:10px;padding:10px 14px;margin-bottom:14px">' +
     '<div style="font-size:12px;color:#94a3b8;margin-bottom:2px">המוסך שלך</div>' +
@@ -2528,6 +2529,46 @@ APP._garageShowPending = function(pending) {
 
 APP._garageClearPending = function() {
   try { localStorage.removeItem('pendingGarageRequest'); } catch(e) {}
+  APP._garageStopPoll();
+};
+
+APP._garageStopPoll = function() {
+  if (APP._garagePollTimer) { clearInterval(APP._garagePollTimer); APP._garagePollTimer = null; }
+};
+
+APP._garagePollStatus = function(pending) {
+  if (!pending || !pending.eventId) return;
+  APP._garageStopPoll();
+
+  var check = async function() {
+    try {
+      var r = await gasPost('get_garage_status', { eventId: pending.eventId });
+      if (!r || !r.ok) return;
+      var st = String(r.status || '').toLowerCase();
+      if (st === 'approved') {
+        APP._garageStopPoll();
+        APP._garageClearPending();
+        APP._garageShowApproved(r.garageInfo, pending.eventId, r.reasonLabel || pending.reasonLabel);
+      } else if (st === 'rejected') {
+        APP._garageStopPoll();
+        APP._garageClearPending();
+        _showHelpCard(
+          '<div class="help-card" style="text-align:center;padding:28px 20px">' +
+          '<div style="font-size:40px;margin-bottom:10px">❌</div>' +
+          '<div style="font-size:17px;font-weight:700;color:#f1f5f9;margin-bottom:6px">הבקשה נדחתה</div>' +
+          (r.managerNote ? '<div style="font-size:13px;color:#94a3b8;margin-bottom:16px">הערת המנהל: <b style="color:#f1f5f9">' + _escHtml(r.managerNote) + '</b></div>' : '') +
+          '<button class="help-action-btn secondary" onclick="APP.helpGarage()">&#x1F504; בקשה חדשה</button>' +
+          '<button class="help-action-btn secondary" style="margin-top:8px" onclick="APP.closeHelpMenu()">סגור</button>' +
+          '</div>'
+        );
+      }
+    } catch(e) { console.warn('[garagePoll]', e.message); }
+  };
+
+  check();
+  APP._garagePollTimer = setInterval(check, 8000);
+  // Auto-stop after 10 minutes
+  setTimeout(function() { APP._garageStopPoll(); }, 600000);
 };
 
 APP._garageShowApproved = function(garageInfo, eventId, reasonLabel) {
@@ -2665,7 +2706,7 @@ async function registerPush() {
         try { await subscription.unsubscribe(); } catch(e) { console.warn('[Push] unsubscribe failed:', e.message); }
         subscription = null;
       } else {
-        console.log('[Push] Existing subscription matches current VAPID');
+        console.log('[Push] Existing subscription matches current VAPID — will re-register with GAS to ensure vehicleId is current');
       }
     }
 
