@@ -36,6 +36,21 @@ function navigateForAlertType(alertType, meta) {
       setTimeout(function() { APP.switchTab('info'); }, 350);
       break;
     case 'garage_approved':
+      // פתח את תפריט הסיוע והצג את מסך המוסך המאושר עם פרטי קשר מלאים
+      APP.nav('vehicle');
+      setTimeout(function() {
+        if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') {
+          APP.openHelpMenu();
+        }
+        setTimeout(function() {
+          if (typeof APP._garageShowApprovedFromStorage === 'function') {
+            APP._garageShowApprovedFromStorage(meta);
+          } else if (typeof APP.helpGarage === 'function') {
+            APP.helpGarage();
+          }
+        }, 250);
+      }, 350);
+      break;
     case 'garage_rejected':
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
@@ -69,6 +84,17 @@ function saveNotifToHistory(payload) {
     if (alertType === 'garage_approved' || alertType === 'garage_rejected') {
       try { localStorage.removeItem('pendingGarageRequest'); } catch(_e) {}
     }
+    // שמור פרטי אישור מוסך — ישמשו את מסך "פרטי המוסך" המאושר
+    if (alertType === 'garage_approved') {
+      try {
+        localStorage.setItem('approvedGarageRequest', JSON.stringify({
+          eventId:      meta.eventId      || '',
+          reasonLabel:  meta.reasonLabel  || '',
+          approvedAt:   ts,
+          vehicleId:    meta.vehicleId    || ''
+        }));
+      } catch(_e) {}
+    }
 
     var list = getNotifHistory();
     // Dedup by ts
@@ -79,6 +105,11 @@ function saveNotifToHistory(payload) {
       body:      notif.body  || '',
       alertType: alertType || 'plan',
       vehicleId: meta.vehicleId || '',
+      requestNumber:       meta.requestNumber || '',
+      reasonLabel:         meta.reasonLabel || '',
+      originalDescription: meta.originalDescription || '',
+      managerNote:         meta.managerNote || '',
+      eventId:             meta.eventId || '',
       ts:        ts
     });
     if (list.length > 30) list = list.slice(0, 30);
@@ -91,9 +122,29 @@ function saveNotifToHistory(payload) {
 function clearNotifHistory() {
   try {
     localStorage.removeItem(_NOTIF_HISTORY_KEY);
-    localStorage.setItem('driver_notif_cleared_at', String(Date.now()));
+    var now = Date.now();
+    localStorage.setItem('driver_notif_cleared_at', String(now));
     localStorage.setItem('driver_notif_unread', '0');
     _applyBadgeCount(0);
+
+    // Tell SW to drop its pending buffer (prevents replay on next serviceWorker.ready)
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'clear-pending-notifs' });
+      }
+    } catch(_) {}
+
+    // Tell GAS to truncate the server-side log (prevents re-pull on next loadFullData)
+    try {
+      var vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
+      if (vid && typeof GAS_URL !== 'undefined' && GAS_URL) {
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'driver_clear_notifs', idToken: (STATE && STATE.idToken) || '', vehicleId: vid, clearedAt: now })
+        }).catch(function(){});
+      }
+    } catch(_) {}
   } catch(e) {}
 }
 
@@ -1194,12 +1245,33 @@ function renderNotifHistory() {
     var iconPath = NOTIF_ICON_BY_TYPE[type] || NOTIF_ICON_BY_TYPE.plan;
     var safeId = String(n.id || n.ts || i);
     var actionLabel = ACTION_LABEL[type] || 'פרטים';
+
+    // Extra detail rows for garage approval/rejection notifications
+    var extraHtml = '';
+    var isGarage = (type === 'garage_approved' || type === 'garage_rejected');
+    if (isGarage) {
+      if (n.requestNumber) {
+        extraHtml += '<div class="nh-item-meta"><span class="nh-meta-label">בקשה מס\':</span> #' + _escHtml(n.requestNumber) + '</div>';
+      }
+      if (n.reasonLabel) {
+        extraHtml += '<div class="nh-item-meta"><span class="nh-meta-label">סיבה:</span> ' + _escHtml(n.reasonLabel) + '</div>';
+      }
+      if (n.originalDescription) {
+        extraHtml += '<div class="nh-item-meta"><span class="nh-meta-label">תיאור הבקשה:</span> ' + _escHtml(n.originalDescription) + '</div>';
+      }
+      if (n.managerNote) {
+        var noteLabel = (type === 'garage_rejected') ? 'סיבת דחייה' : 'הערת מנהל';
+        extraHtml += '<div class="nh-item-meta nh-meta-note"><span class="nh-meta-label">' + noteLabel + ':</span> ' + _escHtml(n.managerNote) + '</div>';
+      }
+    }
+
     return '<div class="nh-item type-' + type + '" data-id="' + safeId + '" data-type="' + type + '" style="animation-delay:' + (i * 0.05) + 's">' +
       '<div class="nh-row">' +
         '<div class="nh-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
         '<div class="nh-body">' +
           '<div class="nh-item-title">' + _escHtml(n.title) + '</div>' +
           '<div class="nh-item-body">'  + _escHtml(n.body)  + '</div>' +
+          extraHtml +
           '<div class="nh-item-time">'  + _notifTimeLabel(n.ts) + '</div>' +
         '</div>' +
         '<button class="nh-del" onclick="event.stopPropagation();APP.deleteNotif(\'' + safeId + '\')" aria-label="מחק">×</button>' +
@@ -1627,42 +1699,117 @@ const APP = {
 };
 
 function _initSwipeDelete(container) {
-  var startX, startY, activeItem;
-  container.addEventListener('touchstart', function(e) {
-    var item = e.target.closest('.nh-item');
+  // Wrap each .nh-item in a swipe-wrap that holds a red reveal layer behind it
+  container.querySelectorAll('.nh-item').forEach(function(item) {
+    if (item.parentNode && item.parentNode.classList.contains('nh-swipe-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'nh-swipe-wrap';
+    var bg = document.createElement('div');
+    bg.className = 'nh-swipe-bg';
+    bg.innerHTML =
+      '<div class="nh-swipe-bg-inner">' +
+        '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="3 6 5 6 21 6"/>' +
+          '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>' +
+          '<path d="M10 11v6M14 11v6"/>' +
+          '<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>' +
+        '</svg>' +
+        '<span>מחיקה</span>' +
+      '</div>';
+    item.parentNode.insertBefore(wrap, item);
+    wrap.appendChild(bg);
+    wrap.appendChild(item);
+  });
+
+  var THRESHOLD = 90;
+  var startX = 0, startY = 0;
+  var activeItem = null, activeWrap = null, activeBg = null;
+  var locked = null, armed = false;
+
+  function reset() { activeItem = activeWrap = activeBg = locked = null; armed = false; }
+
+  function onStart(e) {
+    var t = e.touches ? e.touches[0] : e;
+    var item = e.target.closest && e.target.closest('.nh-item');
     if (!item) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
     activeItem = item;
-    item.style.transition = 'none';
-  }, { passive: true });
+    activeWrap = item.parentNode;
+    activeBg   = activeWrap && activeWrap.querySelector('.nh-swipe-bg');
+    if (!activeWrap || !activeBg) { reset(); return; }
+    startX = t.clientX; startY = t.clientY;
+    locked = null; armed = false;
+    activeItem.style.transition = 'none';
+    activeBg.style.transition = 'none';
+  }
 
-  container.addEventListener('touchmove', function(e) {
+  function onMove(e) {
     if (!activeItem) return;
-    var dx = e.touches[0].clientX - startX;
-    var dy = e.touches[0].clientY - startY;
-    if (Math.abs(dy) > Math.abs(dx) + 5) { activeItem = null; return; }
-    activeItem.style.transform = 'translateX(' + dx + 'px)';
-    activeItem.style.opacity = String(Math.max(0, 1 - Math.abs(dx) / 180));
-  }, { passive: true });
-
-  container.addEventListener('touchend', function(e) {
-    if (!activeItem) return;
-    var dx = e.changedTouches[0].clientX - startX;
-    var item = activeItem;
-    activeItem = null;
-    if (Math.abs(dx) > 90) {
-      item.style.transition = 'transform .22s ease, opacity .22s ease';
-      item.style.transform = 'translateX(' + (dx > 0 ? '120%' : '-120%') + ')';
-      item.style.opacity = '0';
-      var id = item.getAttribute('data-id');
-      setTimeout(function() { APP.deleteNotif(id); }, 230);
-    } else {
-      item.style.transition = 'transform .2s cubic-bezier(.22,1,.36,1), opacity .2s ease';
-      item.style.transform = '';
-      item.style.opacity = '';
-      setTimeout(function() { item.style.transition = ''; }, 210);
+    var t = e.touches ? e.touches[0] : e;
+    var dx = t.clientX - startX;
+    var dy = t.clientY - startY;
+    if (locked === null) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (locked === 'y') { reset(); return; }
     }
+    if (locked !== 'x') return;
+    if (dx < 0) dx = dx * 0.25; // rubber-band left
+    var travel = Math.min(320, Math.max(-40, dx));
+    var progress = Math.max(0, Math.min(1, travel / THRESHOLD));
+    activeItem.style.transform = 'translate3d(' + travel + 'px,0,0)';
+    activeItem.style.opacity = String(Math.max(0.2, 1 - Math.abs(travel) / 260));
+    activeBg.style.opacity = String(progress);
+    activeBg.style.transform = 'scale(' + (0.9 + 0.1 * progress) + ')';
+    var nowArmed = travel >= THRESHOLD;
+    if (nowArmed !== armed) {
+      armed = nowArmed;
+      activeBg.classList.toggle('is-armed', armed);
+      if (armed) { try { if (navigator.vibrate) navigator.vibrate(8); } catch(_) {} }
+    }
+  }
+
+  function onEnd(e) {
+    if (!activeItem) return;
+    var t = e.changedTouches ? e.changedTouches[0] : e;
+    var dx = t.clientX - startX;
+    var item = activeItem, wrap = activeWrap, bg = activeBg, didArm = armed;
+    reset();
+    if (dx >= THRESHOLD) {
+      item.style.transition = 'transform .28s cubic-bezier(.22,1,.36,1), opacity .22s ease';
+      item.style.transform  = 'translate3d(120%,0,0)';
+      item.style.opacity    = '0';
+      bg.style.opacity      = didArm ? '1' : String(bg.style.opacity || 1);
+      var id = item.getAttribute('data-id');
+      setTimeout(function() {
+        wrap.style.overflow   = 'hidden';
+        wrap.style.maxHeight  = wrap.offsetHeight + 'px';
+        wrap.offsetHeight; // force reflow
+        wrap.style.transition = 'max-height .26s ease, opacity .2s ease, margin .2s ease';
+        wrap.style.maxHeight  = '0';
+        wrap.style.opacity    = '0';
+        wrap.style.marginBottom = '0';
+        setTimeout(function() { APP.deleteNotif(id); }, 270);
+      }, 230);
+    } else {
+      item.style.transition = 'transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s ease';
+      item.style.transform  = '';
+      item.style.opacity    = '';
+      bg.style.transition   = 'opacity .25s ease, transform .25s ease';
+      bg.style.opacity      = '0';
+      bg.style.transform    = 'scale(.9)';
+      bg.classList.remove('is-armed');
+      setTimeout(function() { item.style.transition = ''; bg.style.transition = ''; }, 360);
+    }
+  }
+
+  container.addEventListener('touchstart',  onStart,  { passive: true });
+  container.addEventListener('touchmove',   onMove,   { passive: true });
+  container.addEventListener('touchend',    onEnd,    { passive: true });
+  container.addEventListener('touchcancel', function() {
+    if (!activeItem) return;
+    var item = activeItem, bg = activeBg; reset();
+    if (item) { item.style.transition = 'transform .25s ease'; item.style.transform = ''; item.style.opacity = ''; }
+    if (bg) { bg.style.opacity = '0'; bg.style.transform = 'scale(.9)'; bg.classList.remove('is-armed'); }
   }, { passive: true });
 }
 
@@ -2339,6 +2486,10 @@ APP.helpGarage = function() {
   var garageAddr = (g && g.address) ? g.address : '';
   var garageId   = (g && g.id) ? g.id : '';
 
+  // אם יש אישור פעיל — הצג מסך מוסך מאושר עם פרטי קשר מלאים
+  var approved = APP._garageGetApproved && APP._garageGetApproved();
+  if (approved) { APP._garageShowApprovedFromStorage(); return; }
+
   // Check if there's a pending request — show UI then start live status polling
   var pending = APP._garageGetPending();
   if (pending) { APP._garageShowPending(pending); APP._garagePollStatus(pending); return; }
@@ -2512,6 +2663,72 @@ APP._garageGetPending = function() {
   } catch(e) { return null; }
 };
 
+APP._garageGetApproved = function() {
+  try {
+    var raw = localStorage.getItem('approvedGarageRequest');
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    // אישור פג תוקף אחרי 14 ימים
+    if (obj.approvedAt && (Date.now() - obj.approvedAt) > 14 * 24 * 3600 * 1000) {
+      try { localStorage.removeItem('approvedGarageRequest'); } catch(e) {}
+      return null;
+    }
+    return obj;
+  } catch(e) { return null; }
+};
+
+APP._garageClearApproved = function() {
+  try { localStorage.removeItem('approvedGarageRequest'); } catch(e) {}
+};
+
+// בונה אובייקט garageInfo מלא מ-STATE.vehicle.garage עבור מסך מוסך מאושר
+APP._garageBuildInfoFromState = function() {
+  var g = (STATE.vehicle && STATE.vehicle.garage) ? STATE.vehicle.garage : {};
+  return {
+    id:           g.id || '',
+    name:         g.name || '',
+    address:      g.address || '',
+    phone:        g.phone || '',
+    email:        g.email || '',
+    contactName:  g.contactName || '',
+    contactPhone: g.contactPhone || g.phone || '',
+    bookingUrl:   g.bookingUrl || ''
+  };
+};
+
+// מציג מסך מוסך מאושר מתוך נתוני localStorage + STATE — בלי קריאה לשרת.
+// אם יש eventId — ננסה לרענן מהשרת ברקע, אבל מציגים מיידית את מה שיש.
+APP._garageShowApprovedFromStorage = function(meta) {
+  var approved = APP._garageGetApproved();
+  if (!approved && meta && meta.eventId) {
+    // אם הגענו דרך toast עם meta אבל עדיין לא נשמר — שמור עכשיו
+    try {
+      localStorage.setItem('approvedGarageRequest', JSON.stringify({
+        eventId: meta.eventId, reasonLabel: meta.reasonLabel || '', approvedAt: Date.now()
+      }));
+    } catch(e) {}
+    approved = APP._garageGetApproved();
+  }
+  if (!approved) {
+    // אין נתוני אישור — נפילה חזרה לזרימת הבקשה
+    APP.helpGarage();
+    return;
+  }
+  var info     = APP._garageBuildInfoFromState();
+  var eventId  = approved.eventId || '';
+  var reason   = approved.reasonLabel || '';
+  APP._garageShowApproved(info, eventId, reason);
+
+  // רענון אופציונלי מהשרת — אם הצליח, נציג שוב עם נתונים מעודכנים
+  if (eventId && typeof gasPost === 'function') {
+    gasPost('get_garage_status', { eventId: eventId }).then(function(r) {
+      if (r && r.ok && String(r.status||'').toLowerCase() === 'approved' && r.garageInfo) {
+        APP._garageShowApproved(r.garageInfo, eventId, r.reasonLabel || reason);
+      }
+    }).catch(function() {});
+  }
+};
+
 APP._garageShowPending = function(pending) {
   var since = pending.submittedAt ? new Date(pending.submittedAt).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
   _showHelpCard(
@@ -2548,6 +2765,13 @@ APP._garagePollStatus = function(pending) {
       if (st === 'approved') {
         APP._garageStopPoll();
         APP._garageClearPending();
+        try {
+          localStorage.setItem('approvedGarageRequest', JSON.stringify({
+            eventId: pending.eventId,
+            reasonLabel: r.reasonLabel || pending.reasonLabel || '',
+            approvedAt: Date.now()
+          }));
+        } catch(e) {}
         APP._garageShowApproved(r.garageInfo, pending.eventId, r.reasonLabel || pending.reasonLabel);
       } else if (st === 'rejected') {
         APP._garageStopPoll();
@@ -2631,6 +2855,7 @@ APP._garageConfirmAppointment = async function(eventId) {
   var result = await gasPost('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal });
   if (result && result.ok) {
     APP._garageClearPending();
+    if (typeof APP._garageClearApproved === 'function') APP._garageClearApproved();
     _showHelpCard(
       '<div class="help-card" style="text-align:center;padding:32px 20px">' +
       '<div style="font-size:48px;margin-bottom:12px">🎉</div>' +
