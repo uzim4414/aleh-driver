@@ -317,8 +317,8 @@ async function gasPost(action, extra, opts) {
   if (!GAS_URL) return mockResponse(action, extra);
 
   if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken)) {
-    if (!opts.silent) _sessionExpired();
-    throw new Error('session_expired');
+    if (!opts.silent) { _sessionExpired(); throw new Error('session_expired'); }
+    return { ok: false, error: 'session_expired' };
   }
 
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
@@ -330,6 +330,7 @@ async function gasPost(action, extra, opts) {
       _sessionExpired();
       throw new Error('session_expired');
     }
+    if (opts.silent) return data;
     throw new Error(data.error || 'שגיאת שרת');
   }
   return data;
@@ -3070,7 +3071,9 @@ APP._garageConfirmAppointment = async function(eventId) {
       if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
       var errCode = (result && result.error) || 'unknown';
       console.error('[garageAppt] GAS error:', errCode);
-      if (errCode === 'not_found') {
+      if (errCode === 'session_expired') {
+        showToast('פג תוקף הכניסה — התחבר מחדש');
+      } else if (errCode === 'not_found') {
         showToast('האירוע לא נמצא — נסה לסגור ולפתוח מחדש');
       } else if (errCode === 'unauthorized') {
         showToast('נדרש אימות מחדש — התחבר שוב');
