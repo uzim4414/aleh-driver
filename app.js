@@ -3143,16 +3143,25 @@ document.addEventListener('DOMContentLoaded', async function() {
     STATE.idToken = session.token;
     STATE.vehicle = session.vehicleData;
     STATE.user    = session.userInfo;
-    try {
-      hideLoader();
-      showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name));
-      await loadFullData();
-      hideGreeting();
-      startApp();
-      return;
-    } catch(e) {
-      hideGreeting();
+
+    // If token already expired — clear silently and fall through to login (no scary overlay)
+    if (_isTokenExpired(STATE.idToken)) {
       localStorage.removeItem(SESSION_KEY);
+      STATE.idToken = null;
+      STATE.vehicle = null;
+      STATE.user    = null;
+    } else {
+      try {
+        hideLoader();
+        showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name));
+        await loadFullData();
+        hideGreeting();
+        startApp();
+        return;
+      } catch(e) {
+        hideGreeting();
+        localStorage.removeItem(SESSION_KEY);
+      }
     }
   } else if (session && session.token === 'demo_token') {
     localStorage.removeItem(SESSION_KEY);
@@ -3185,6 +3194,7 @@ var _REFRESH_MIN = 5 * 60 * 1000; // 5 דקות מינימום בין רענונ
 document.addEventListener('visibilitychange', async function() {
   if (document.visibilityState !== 'visible') return;
   if (!STATE.idToken || !STATE.vehicle) return;
+  if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
   if (Date.now() - _lastRefresh < _REFRESH_MIN) return;
   try {
     await loadFullData();
