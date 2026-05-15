@@ -235,12 +235,13 @@ function _sessionExpired() {
   el.style.display = 'flex';
 }
 
-async function gasPost(action, extra) {
+async function gasPost(action, extra, opts) {
   extra = extra || {};
+  opts  = opts  || {};
   if (!GAS_URL) return mockResponse(action, extra);
 
   if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken)) {
-    _sessionExpired();
+    if (!opts.silent) _sessionExpired();
     throw new Error('session_expired');
   }
 
@@ -249,7 +250,7 @@ async function gasPost(action, extra) {
   const resp = await fetch(url, { method: 'GET' });
   const data = await resp.json();
   if (!data.ok) {
-    if (data.error && (data.error.includes('idToken') || data.error === 'unauthorized')) {
+    if (!opts.silent && data.error && (data.error.includes('idToken') || data.error === 'unauthorized')) {
       _sessionExpired();
       throw new Error('session_expired');
     }
@@ -2722,9 +2723,9 @@ APP._garageShowApprovedFromStorage = function(meta) {
   var reason   = approved.reasonLabel || '';
   APP._garageShowApproved(info, eventId, reason);
 
-  // רענון אופציונלי מהשרת — רק אם טוקן בתוקף (אחרת _sessionExpired יוצאת ומנגנת re-login)
-  if (eventId && typeof gasPost === 'function' && STATE.idToken && !_isTokenExpired(STATE.idToken)) {
-    gasPost('get_garage_status', { eventId: eventId }).then(function(r) {
+  // רענון אופציונלי מהשרת — silent: לא מפעיל _sessionExpired אם נכשל
+  if (eventId && typeof gasPost === 'function') {
+    gasPost('get_garage_status', { eventId: eventId }, { silent: true }).then(function(r) {
       if (r && r.ok && String(r.status||'').toLowerCase() === 'approved' && r.garageInfo) {
         APP._garageShowApproved(r.garageInfo, eventId, r.reasonLabel || reason);
       }
@@ -2761,9 +2762,8 @@ APP._garagePollStatus = function(pending) {
   APP._garageStopPoll();
 
   var check = async function() {
-    if (_isTokenExpired(STATE.idToken)) { APP._garageStopPoll(); return; }
     try {
-      var r = await gasPost('get_garage_status', { eventId: pending.eventId });
+      var r = await gasPost('get_garage_status', { eventId: pending.eventId }, { silent: true });
       if (!r || !r.ok) return;
       var st = String(r.status || '').toLowerCase();
       if (st === 'approved') {
@@ -2856,7 +2856,14 @@ APP._garageConfirmAppointment = async function(eventId) {
   if (!dateVal) { showToast('יש לבחור תאריך'); return; }
   var btn = document.querySelector('.help-action-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
-  var result = await gasPost('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal });
+  var result;
+  try {
+    result = await gasPost('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal });
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
+    showToast('שגיאה — נסה שוב');
+    return;
+  }
   if (result && result.ok) {
     APP._garageClearPending();
     if (typeof APP._garageClearApproved === 'function') APP._garageClearApproved();
