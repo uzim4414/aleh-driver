@@ -12,6 +12,58 @@ const GOOGLE_CLIENT_ID = '11295167732-dov0o2p2858i4nhe0lm1r6aa5sucvukp.apps.goog
 const SESSION_KEY = 'aleh_driver_session';
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 
+/* ══ Notification History — global functions (called from IIFE + app logic) ══ */
+var _NOTIF_HISTORY_KEY = 'driver_notif_history';
+
+function getNotifHistory() {
+  try { return JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]'); } catch(e) { return []; }
+}
+
+function saveNotifToHistory(payload) {
+  try {
+    var notif = payload.notification || {};
+    var meta  = payload.data || {};
+    var list  = getNotifHistory();
+    list.unshift({
+      id:        Date.now(),
+      title:     notif.title || 'עלה — התראה',
+      body:      notif.body  || '',
+      alertType: meta.alertType || 'plan',
+      vehicleId: meta.vehicleId || '',
+      ts:        payload.ts || Date.now()
+    });
+    if (list.length > 30) list = list.slice(0, 30);
+    localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+    incrementUnreadBadge();
+    if (typeof STATE !== 'undefined' && STATE.currentScreen === 'alerts') renderNotifHistory();
+  } catch(e) {}
+}
+
+function clearNotifHistory() {
+  try { localStorage.removeItem(_NOTIF_HISTORY_KEY); } catch(e) {}
+}
+
+function incrementUnreadBadge() {
+  try {
+    var n = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10) || 0;
+    n++;
+    localStorage.setItem('driver_notif_unread', String(n));
+    var badge = document.getElementById('alert-badge');
+    if (badge) {
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.classList.remove('hidden');
+    }
+  } catch(e) {}
+}
+
+function clearUnreadBadge() {
+  try {
+    localStorage.setItem('driver_notif_unread', '0');
+    var badge = document.getElementById('alert-badge');
+    if (badge) badge.classList.add('hidden');
+  } catch(e) {}
+}
+
 let STATE = {
   user: null,
   vehicle: null,
@@ -402,7 +454,7 @@ async function loadNotifHistoryFromGAS() {
     // Update unread badge — count GAS notifs newer than last-seen
     var lastSeen = parseInt(localStorage.getItem('driver_notif_last_seen') || '0', 10);
     var unread = data.notifications.filter(function(n) { return n.ts > lastSeen; }).length;
-    if (unread > 0 && window.DRIVER_NOTIF) {
+    if (unread > 0) {
       var badge = document.getElementById('alert-badge');
       if (badge) {
         badge.textContent = unread > 99 ? '99+' : String(unread);
@@ -1038,7 +1090,7 @@ function renderNotifHistory() {
   var container = document.getElementById('alerts-content');
   if (!container) return;
 
-  var history = (window.DRIVER_NOTIF && window.DRIVER_NOTIF.getHistory) ? window.DRIVER_NOTIF.getHistory() : [];
+  var history = getNotifHistory();
 
   // remove old history section if exists
   var old = document.getElementById('nh-section');
@@ -1364,7 +1416,7 @@ const APP = {
     if (screen === 'vehicle') renderVehicleScreen(STATE.currentTab);
     if (screen === 'alerts') {
       localStorage.setItem('driver_notif_last_seen', String(Date.now()));
-      if (window.DRIVER_NOTIF && window.DRIVER_NOTIF.clearUnread) window.DRIVER_NOTIF.clearUnread();
+      clearUnreadBadge();
       renderNotifHistory();
     }
   },
@@ -1489,7 +1541,7 @@ const APP = {
 };
 
 APP.clearNotifHistory = function() {
-  if (window.DRIVER_NOTIF && window.DRIVER_NOTIF.clearHistory) window.DRIVER_NOTIF.clearHistory();
+  clearNotifHistory();
   renderNotifHistory();
 };
 
