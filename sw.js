@@ -159,7 +159,7 @@ self.addEventListener('push', e => {
       renotify: true,
       vibrate: cfg.vibrate,
       requireInteraction: cfg.requireInteraction,
-      data: meta,
+      data: Object.assign({}, meta, { _pushTs: relayPayload.ts }),
       actions: alertType ? [
         { action: 'open',    title: 'פתח באפליקציה' },
         { action: 'dismiss', title: 'הבנתי' }
@@ -172,10 +172,12 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
   const meta = e.notification.data || {};
+  // Preserve original push timestamp so clearedAt guard in saveNotifToHistory works correctly.
+  // _pushTs was embedded in the notification data at showNotification time.
   const fullPayload = {
     notification: { title: e.notification.title || 'עלה', body: e.notification.body || '' },
     data: meta,
-    ts: Date.now()
+    ts: meta._pushTs || Date.now()
   };
   // Encode notification in URL so app always receives it — reliable even after SW restart
   const notifParam = encodeURIComponent(JSON.stringify(fullPayload));

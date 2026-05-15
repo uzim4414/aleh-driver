@@ -127,10 +127,13 @@ function clearNotifHistory() {
     localStorage.setItem('driver_notif_unread', '0');
     _applyBadgeCount(0);
 
-    // Tell SW to drop its pending buffer (prevents replay on next serviceWorker.ready)
+    // Tell SW to drop its pending buffer (prevents replay on next serviceWorker.ready).
+    // Use serviceWorker.ready so this works even when controller is null (new SW install / SW update).
     try {
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'clear-pending-notifs' });
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then(function(reg) {
+          if (reg.active) reg.active.postMessage({ type: 'clear-pending-notifs' });
+        }).catch(function(){});
       }
     } catch(_) {}
 
