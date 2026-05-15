@@ -2722,8 +2722,8 @@ APP._garageShowApprovedFromStorage = function(meta) {
   var reason   = approved.reasonLabel || '';
   APP._garageShowApproved(info, eventId, reason);
 
-  // רענון אופציונלי מהשרת — אם הצליח, נציג שוב עם נתונים מעודכנים
-  if (eventId && typeof gasPost === 'function') {
+  // רענון אופציונלי מהשרת — רק אם טוקן בתוקף (אחרת _sessionExpired יוצאת ומנגנת re-login)
+  if (eventId && typeof gasPost === 'function' && STATE.idToken && !_isTokenExpired(STATE.idToken)) {
     gasPost('get_garage_status', { eventId: eventId }).then(function(r) {
       if (r && r.ok && String(r.status||'').toLowerCase() === 'approved' && r.garageInfo) {
         APP._garageShowApproved(r.garageInfo, eventId, r.reasonLabel || reason);
@@ -2761,6 +2761,7 @@ APP._garagePollStatus = function(pending) {
   APP._garageStopPoll();
 
   var check = async function() {
+    if (_isTokenExpired(STATE.idToken)) { APP._garageStopPoll(); return; }
     try {
       var r = await gasPost('get_garage_status', { eventId: pending.eventId });
       if (!r || !r.ok) return;
