@@ -12,6 +12,37 @@ const GOOGLE_CLIENT_ID = '11295167732-dov0o2p2858i4nhe0lm1r6aa5sucvukp.apps.goog
 const SESSION_KEY = 'aleh_driver_session';
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 
+/* ══ Smart notification routing — called from toast "פתח" + history card tap ══ */
+function navigateForAlertType(alertType, meta) {
+  meta = meta || {};
+  if (typeof APP === 'undefined') return;
+  switch (alertType) {
+    case 'km_update':
+      APP.nav('vehicle');
+      setTimeout(function() { if (typeof APP.openKmModal === 'function') APP.openKmModal(); }, 350);
+      break;
+    case 'overdue':
+    case 'urgent':
+      APP.nav('vehicle');
+      setTimeout(function() { APP.switchTab('garage'); }, 350);
+      break;
+    case 'plan':
+      APP.nav('vehicle');
+      setTimeout(function() { APP.switchTab('info'); }, 350);
+      break;
+    case 'test_due':
+    case 'test_urgent':
+      APP.nav('vehicle');
+      setTimeout(function() { APP.switchTab('info'); }, 350);
+      break;
+    default:
+      // garage approved/rejected/appointment reminder
+      APP.nav('vehicle');
+      setTimeout(function() { APP.switchTab('garage'); }, 350);
+      break;
+  }
+}
+
 /* ══ Notification History — global functions (called from IIFE + app logic) ══ */
 var _NOTIF_HISTORY_KEY = 'driver_notif_history';
 
@@ -641,27 +672,17 @@ function renderAll() {
 
 function renderTopBar() {
   if (!STATE.user) return;
-
   const holderName = (STATE.vehicle && STATE.vehicle.holder) || STATE.user.name;
   const firstName = holderName.split(' ')[0];
   document.getElementById('user-name').textContent = firstName;
-
   const initialsEl = document.getElementById('user-initials');
   if (initialsEl) {
     initialsEl.textContent = getInitials(holderName);
     initialsEl.style.color = '#fff';
   }
-
-  const badge = document.getElementById('alert-badge');
-  const total = STATE.alerts.length;
-  if (total > 0) {
-    badge.textContent = total;
-    badge.classList.remove('hidden');
-    const hasRed = STATE.alerts.some(function(a) { return a.type === 'red'; });
-    badge.style.background = hasRed ? 'var(--red)' : 'var(--warn)';
-  } else {
-    badge.classList.add('hidden');
-  }
+  // Badge managed exclusively by push notification system — re-sync without overriding
+  var pushUnread = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10) || 0;
+  _applyBadgeCount(pushUnread);
 }
 
 function renderHomeScreen() {
@@ -1136,11 +1157,21 @@ function renderNotifHistory() {
     return;
   }
 
+  var ACTION_LABEL = {
+    km_update:   'עדכן ק"מ',
+    overdue:     'הזמן תור',
+    urgent:      'הזמן תור',
+    plan:        'פרטי רכב',
+    test_due:    'פרטי טסט',
+    test_urgent: 'פרטי טסט'
+  };
+
   var itemsHtml = history.map(function(n, i) {
     var type = n.alertType || 'plan';
     var iconPath = NOTIF_ICON_BY_TYPE[type] || NOTIF_ICON_BY_TYPE.plan;
     var safeId = String(n.id || n.ts || i);
-    return '<div class="nh-item type-' + type + '" style="animation-delay:' + (i * 0.05) + 's" onclick="if(!event.target.closest(\'.nh-del\'))APP.nav(\'vehicle\')">' +
+    var actionLabel = ACTION_LABEL[type] || 'פרטים';
+    return '<div class="nh-item type-' + type + '" data-id="' + safeId + '" data-type="' + type + '" style="animation-delay:' + (i * 0.05) + 's">' +
       '<div class="nh-row">' +
         '<div class="nh-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
         '<div class="nh-body">' +
@@ -1150,11 +1181,15 @@ function renderNotifHistory() {
         '</div>' +
         '<button class="nh-del" onclick="event.stopPropagation();APP.deleteNotif(\'' + safeId + '\')" aria-label="מחק">×</button>' +
       '</div>' +
+      '<div class="nh-actions-row">' +
+        '<button class="nh-action-btn" onclick="event.stopPropagation();navigateForAlertType(\'' + type + '\',{})">' + actionLabel + ' ›</button>' +
+      '</div>' +
     '</div>';
   }).join('');
 
   section.innerHTML = headerHtml + itemsHtml;
   container.appendChild(section);
+  _initSwipeDelete(section);
 }
 
 function renderAlerts() {
@@ -1567,6 +1602,46 @@ const APP = {
     }
   }
 };
+
+function _initSwipeDelete(container) {
+  var startX, startY, activeItem;
+  container.addEventListener('touchstart', function(e) {
+    var item = e.target.closest('.nh-item');
+    if (!item) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    activeItem = item;
+    item.style.transition = 'none';
+  }, { passive: true });
+
+  container.addEventListener('touchmove', function(e) {
+    if (!activeItem) return;
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx) + 5) { activeItem = null; return; }
+    activeItem.style.transform = 'translateX(' + dx + 'px)';
+    activeItem.style.opacity = String(Math.max(0, 1 - Math.abs(dx) / 180));
+  }, { passive: true });
+
+  container.addEventListener('touchend', function(e) {
+    if (!activeItem) return;
+    var dx = e.changedTouches[0].clientX - startX;
+    var item = activeItem;
+    activeItem = null;
+    if (Math.abs(dx) > 90) {
+      item.style.transition = 'transform .22s ease, opacity .22s ease';
+      item.style.transform = 'translateX(' + (dx > 0 ? '120%' : '-120%') + ')';
+      item.style.opacity = '0';
+      var id = item.getAttribute('data-id');
+      setTimeout(function() { APP.deleteNotif(id); }, 230);
+    } else {
+      item.style.transition = 'transform .2s cubic-bezier(.22,1,.36,1), opacity .2s ease';
+      item.style.transform = '';
+      item.style.opacity = '';
+      setTimeout(function() { item.style.transition = ''; }, 210);
+    }
+  }, { passive: true });
+}
 
 APP.clearNotifHistory = function() {
   clearNotifHistory();
