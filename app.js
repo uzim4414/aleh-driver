@@ -2668,7 +2668,12 @@ APP.helpGarage = function() {
     reasonsHtml +
     '</div>'
   );
-  APP._garageCtx = { garageId: garageId, garageName: garageName, garageAddress: garageAddr };
+  APP._garageCtx = {
+    garageId:      garageId,
+    garageName:    garageName,
+    garageAddress: garageAddr,
+    garageInfo:    APP._garageBuildInfoFromState()
+  };
 };
 
 APP._garageSelectReason = function(reasonId) {
@@ -2762,16 +2767,17 @@ APP._garageSubmitRequest = async function() {
     var ctx = APP._garageCtx || {};
     var v = STATE.vehicle || {};
     var details = {
-      reason: ctx.reasonId,
-      reasonLabel: ctx.reasonLabel,
-      garageId: ctx.garageId || '',
-      garageName: ctx.garageName || '',
+      reason:        ctx.reasonId      || '',
+      reasonLabel:   ctx.reasonLabel   || '',
+      garageId:      ctx.garageId      || '',
+      garageName:    ctx.garageName    || '',
       garageAddress: ctx.garageAddress || '',
-      km: ctx.km || 0,
-      kmToService: ctx.kmToService != null ? ctx.kmToService : null,
-      description: ctx.description || '',
-      licensePlate: ctx.licensePlate || v.num || '',
-      driverName: (STATE.userInfo && STATE.userInfo.name) || ''
+      garageInfo:    ctx.garageInfo    || APP._garageBuildInfoFromState(),
+      km:            ctx.km            || 0,
+      kmToService:   ctx.kmToService   != null ? ctx.kmToService : null,
+      description:   ctx.description   || '',
+      licensePlate:  ctx.licensePlate  || v.num || '',
+      driverName:    (STATE.user && STATE.user.name) || v.holder || ''
     };
     if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
     var result = await _fireFieldEvent('garage_request', details);
@@ -2786,9 +2792,23 @@ APP._garageSubmitRequest = async function() {
         '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
         '</div>'
       );
+    } else if (result && result.error === 'duplicate_pending_request') {
+      var dupEventId = result.eventId || '';
+      var ctx2 = APP._garageCtx || {};
+      try {
+        localStorage.setItem('pendingGarageRequest', JSON.stringify({
+          eventId:     dupEventId,
+          reason:      ctx2.reasonId    || '',
+          reasonLabel: ctx2.reasonLabel || '',
+          submittedAt: Date.now()
+        }));
+      } catch(_e) {}
+      if (btn) { btn.disabled = false; }
+      var dup = APP._garageGetPending();
+      if (dup) { APP._garageShowPending(dup); APP._garagePollStatus(dup); }
     } else {
       if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
-      showToast('שגיאה בשליחה: ' + (result.error || 'נסה שוב'));
+      showToast('שגיאה בשליחה: ' + ((result && result.error) || 'נסה שוב'));
     }
   } catch(e) {
     console.error('_garageSubmitRequest:', e);
@@ -2846,7 +2866,11 @@ APP._garageShowApprovedFromStorage = function(meta) {
     // אם הגענו דרך toast עם meta אבל עדיין לא נשמר — שמור עכשיו
     try {
       localStorage.setItem('approvedGarageRequest', JSON.stringify({
-        eventId: meta.eventId, reasonLabel: meta.reasonLabel || '', approvedAt: Date.now()
+        eventId:       meta.eventId,
+        reasonLabel:   meta.reasonLabel   || '',
+        requestNumber: meta.requestNumber || '',
+        managerNote:   meta.managerNote   || '',
+        approvedAt:    meta.approvedAt    || Date.now()
       }));
     } catch(e) {}
     approved = APP._garageGetApproved();
@@ -2881,7 +2905,8 @@ APP._garageShowPending = function(pending) {
     '<div style="font-size:17px;font-weight:700;color:#f1f5f9;margin-bottom:6px">בקשה בהמתנה</div>' +
     '<div style="font-size:13px;color:#94a3b8;margin-bottom:4px">סיבה: <b style="color:#f1f5f9">' + (pending.reasonLabel || '') + '</b></div>' +
     (since ? '<div style="font-size:12px;color:#64748b;margin-bottom:16px">נשלח: ' + since + '</div>' : '') +
-    '<div style="font-size:13px;color:#94a3b8;margin-bottom:20px">ממתין לאישור מנהל הצי. תקבל הודעה כשהבקשה תאושר.</div>' +
+    '<div style="font-size:13px;color:#94a3b8;margin-bottom:12px">ממתין לאישור מנהל הצי. תקבל התראה push כשהבקשה תאושר.</div>' +
+    '<div id="garage-poll-status" style="font-size:11px;color:#64748b;margin-bottom:16px">בודק סטטוס...</div>' +
     '<button class="help-action-btn secondary" onclick="APP._garageClearPending();APP.helpGarage()">&#x1F504; בקשה חדשה</button>' +
     '<button class="help-action-btn secondary" style="margin-top:8px" onclick="APP.closeHelpMenu()">סגור</button>' +
     '</div>'
@@ -2901,19 +2926,32 @@ APP._garagePollStatus = function(pending) {
   if (!pending || !pending.eventId) return;
   APP._garageStopPoll();
 
+  var _pollFailures = 0;
   var check = async function() {
     try {
       var r = await gasPost('get_garage_status', { eventId: pending.eventId }, { silent: true });
-      if (!r || !r.ok) return;
+      if (!r || !r.ok) {
+        _pollFailures++;
+        if (_pollFailures >= 5) {
+          APP._garageStopPoll();
+          showToast('לא ניתן לבדוק סטטוס — בדוק חיבור לאינטרנט');
+        }
+        return;
+      }
+      _pollFailures = 0;
       var st = String(r.status || '').toLowerCase();
       if (st === 'approved') {
         APP._garageStopPoll();
         APP._garageClearPending();
         try {
+          var _reqMatch = String(pending.eventId || '').match(/-(\d+)$/);
+          var _reqNum   = _reqMatch ? String(parseInt(_reqMatch[1], 10)) : '';
           localStorage.setItem('approvedGarageRequest', JSON.stringify({
-            eventId: pending.eventId,
-            reasonLabel: r.reasonLabel || pending.reasonLabel || '',
-            approvedAt: Date.now()
+            eventId:       pending.eventId,
+            reasonLabel:   r.reasonLabel   || pending.reasonLabel || '',
+            requestNumber: r.requestNumber || _reqNum,
+            managerNote:   r.managerNote   || '',
+            approvedAt:    Date.now()
           }));
         } catch(e) {}
         APP._garageShowApproved(r.garageInfo, pending.eventId, r.reasonLabel || pending.reasonLabel);
@@ -3008,29 +3046,40 @@ APP._garageAppointmentYes = function(eventId) {
 APP._garageConfirmAppointment = async function(eventId) {
   var dateVal = ((document.getElementById('garage-appt-date') || {}).value || '').trim();
   if (!dateVal) { showToast('יש לבחור תאריך'); return; }
+  if (!eventId) { showToast('מזהה אירוע חסר — פנה למנהל'); return; }
   var btn = document.querySelector('.help-action-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
-  var result;
   try {
-    result = await gasPost('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal });
-  } catch(e) {
-    if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
-    showToast('שגיאה — נסה שוב');
-    return;
-  }
-  if (result && result.ok) {
-    APP._garageClearPending();
-    if (typeof APP._garageClearApproved === 'function') APP._garageClearApproved();
-    _showHelpCard(
-      '<div class="help-card" style="text-align:center;padding:32px 20px">' +
-      '<div style="font-size:48px;margin-bottom:12px">🎉</div>' +
-      '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">תור נקבע!</div>' +
-      '<div style="font-size:14px;color:#94a3b8;margin-bottom:6px">תאריך: <b style="color:#f1f5f9">' + dateVal.split('-').reverse().join('/') + '</b></div>' +
-      '<div style="font-size:13px;color:#64748b;margin-bottom:20px">מנהל הצי קיבל עדכון</div>' +
-      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
-      '</div>'
+    var result = await gasPost('garage_set_appointment',
+      { eventId: eventId, appointmentDate: dateVal },
+      { silent: true }
     );
-  } else {
+    if (result && result.ok) {
+      APP._garageClearPending();
+      APP._garageClearApproved();
+      _showHelpCard(
+        '<div class="help-card" style="text-align:center;padding:32px 20px">' +
+        '<div style="font-size:48px;margin-bottom:12px">🎉</div>' +
+        '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">תור נקבע!</div>' +
+        '<div style="font-size:14px;color:#94a3b8;margin-bottom:6px">תאריך: <b style="color:#f1f5f9">' + dateVal.split('-').reverse().join('/') + '</b></div>' +
+        '<div style="font-size:13px;color:#64748b;margin-bottom:20px">מנהל הצי קיבל עדכון</div>' +
+        '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+        '</div>'
+      );
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
+      var errCode = (result && result.error) || 'unknown';
+      console.error('[garageAppt] GAS error:', errCode);
+      if (errCode === 'not_found') {
+        showToast('האירוע לא נמצא — נסה לסגור ולפתוח מחדש');
+      } else if (errCode === 'unauthorized') {
+        showToast('נדרש אימות מחדש — התחבר שוב');
+      } else {
+        showToast('שגיאה בקביעת תור (' + errCode + ') — נסה שוב');
+      }
+    }
+  } catch(e) {
+    console.error('_garageConfirmAppointment:', e);
     if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
     showToast('שגיאה — נסה שוב');
   }
