@@ -36,19 +36,16 @@ function navigateForAlertType(alertType, meta) {
       setTimeout(function() { APP.switchTab('info'); }, 350);
       break;
     case 'garage_approved':
-      // פתח את תפריט הסיוע והצג את מסך המוסך המאושר עם פרטי קשר מלאים
-      APP.nav('vehicle');
+      // פתח help menu ישירות — בלי nav('vehicle') שגורם לפלאש
+      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') {
+        APP.openHelpMenu();
+      }
       setTimeout(function() {
-        if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') {
-          APP.openHelpMenu();
+        if (typeof APP._garageShowApprovedFromStorage === 'function') {
+          APP._garageShowApprovedFromStorage(meta);
+        } else if (typeof APP.helpGarage === 'function') {
+          APP.helpGarage();
         }
-        setTimeout(function() {
-          if (typeof APP._garageShowApprovedFromStorage === 'function') {
-            APP._garageShowApprovedFromStorage(meta);
-          } else if (typeof APP.helpGarage === 'function') {
-            APP.helpGarage();
-          }
-        }, 250);
       }, 350);
       break;
     case 'garage_rejected':
@@ -88,10 +85,12 @@ function saveNotifToHistory(payload) {
     if (alertType === 'garage_approved') {
       try {
         localStorage.setItem('approvedGarageRequest', JSON.stringify({
-          eventId:      meta.eventId      || '',
-          reasonLabel:  meta.reasonLabel  || '',
-          approvedAt:   ts,
-          vehicleId:    meta.vehicleId    || ''
+          eventId:       meta.eventId       || '',
+          reasonLabel:   meta.reasonLabel   || '',
+          requestNumber: meta.requestNumber || '',
+          managerNote:   meta.managerNote   || '',
+          approvedAt:    ts,
+          vehicleId:     meta.vehicleId     || ''
         }));
       } catch(_e) {}
     }
@@ -122,6 +121,7 @@ function saveNotifToHistory(payload) {
 function clearNotifHistory() {
   try {
     localStorage.removeItem(_NOTIF_HISTORY_KEY);
+    localStorage.removeItem('driver_notif_deleted_ts');
     var now = Date.now();
     localStorage.setItem('driver_notif_cleared_at', String(now));
     localStorage.setItem('driver_notif_unread', '0');
@@ -153,8 +153,16 @@ function clearNotifHistory() {
 
 function deleteNotifById(id) {
   try {
+    var ts = parseInt(id, 10);
     var list = getNotifHistory().filter(function(n) { return String(n.id) !== String(id); });
     localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+    // Track deleted ts so GAS re-pull doesn't resurrect it
+    if (ts) {
+      var del = JSON.parse(localStorage.getItem('driver_notif_deleted_ts') || '[]');
+      if (del.indexOf(ts) === -1) del.push(ts);
+      if (del.length > 100) del = del.slice(-100);
+      localStorage.setItem('driver_notif_deleted_ts', JSON.stringify(del));
+    }
   } catch(e) {}
 }
 
@@ -560,9 +568,12 @@ async function loadNotifHistoryFromGAS() {
     const resp = await fetch(GAS_URL + '?action=driver_get_notifs&vid=' + encodeURIComponent(vid));
     const data = await resp.json();
 
-    // Respect user's "clear all" — skip notifications older than last clear time
+    // Respect user's "clear all" and individual deletes — filter by both
     var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
-    var gasNotifs = (data.ok && data.notifications) ? data.notifications.filter(function(n) { return n.ts > clearedAt; }) : [];
+    var deletedTs = new Set(JSON.parse(localStorage.getItem('driver_notif_deleted_ts') || '[]'));
+    var gasNotifs = (data.ok && data.notifications) ? data.notifications.filter(function(n) {
+      return n.ts > clearedAt && !deletedTs.has(n.ts);
+    }) : [];
 
     if (!gasNotifs.length) {
       // Nothing from GAS — just sync badge with localStorage
@@ -2718,10 +2729,12 @@ APP._garageShowApprovedFromStorage = function(meta) {
     APP.helpGarage();
     return;
   }
-  var info     = APP._garageBuildInfoFromState();
-  var eventId  = approved.eventId || '';
-  var reason   = approved.reasonLabel || '';
-  APP._garageShowApproved(info, eventId, reason);
+  var info          = APP._garageBuildInfoFromState();
+  var eventId       = approved.eventId       || '';
+  var reason        = approved.reasonLabel   || '';
+  var requestNumber = approved.requestNumber || '';
+  var approvedAt    = approved.approvedAt    || 0;
+  APP._garageShowApproved(info, eventId, reason, requestNumber, approvedAt);
 
   // רענון אופציונלי מהשרת — silent: לא מפעיל _sessionExpired אם נכשל
   if (eventId && typeof gasPost === 'function') {
@@ -2799,7 +2812,7 @@ APP._garagePollStatus = function(pending) {
   setTimeout(function() { APP._garageStopPoll(); }, 600000);
 };
 
-APP._garageShowApproved = function(garageInfo, eventId, reasonLabel) {
+APP._garageShowApproved = function(garageInfo, eventId, reasonLabel, requestNumber, approvedAt) {
   var g = garageInfo || {};
   var name = g.name || g.garageName || '';
   var addr = g.address || g.garageAddress || '';
@@ -2807,6 +2820,19 @@ APP._garageShowApproved = function(garageInfo, eventId, reasonLabel) {
   var phone = g.contactPhone || g.phone || '';
   var wa = g.whatsapp || phone;
   var bookingUrl = g.bookingUrl || '';
+
+  var approvedDateStr = '';
+  if (approvedAt) {
+    try {
+      approvedDateStr = new Date(approvedAt).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+    } catch(e) {}
+  }
+
+  var metaRows = '<div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px">';
+  if (requestNumber) metaRows += '<div style="color:#94a3b8;margin-bottom:3px">מספר אישור: <b style="color:#f1f5f9">#' + requestNumber + '</b></div>';
+  if (reasonLabel)   metaRows += '<div style="color:#94a3b8;margin-bottom:3px">סיבה: <b style="color:#f1f5f9">' + _escHtml(reasonLabel) + '</b></div>';
+  if (approvedDateStr) metaRows += '<div style="color:#64748b">אושר: ' + approvedDateStr + '</div>';
+  metaRows += '</div>';
 
   var contactRows = '';
   if (contact || phone) {
@@ -2821,11 +2847,12 @@ APP._garageShowApproved = function(garageInfo, eventId, reasonLabel) {
 
   _showHelpCard(
     '<div class="help-card">' +
-    '<div style="text-align:center;margin-bottom:14px">' +
+    '<div style="text-align:center;margin-bottom:12px">' +
       '<div style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:50px;padding:6px 16px;font-size:12px;font-weight:700;color:#fff">✅ מאושר על ידי מנהל</div>' +
     '</div>' +
     '<div class="help-card-title" style="margin-bottom:4px">🏭 ' + (name || 'המוסך') + '</div>' +
-    (addr ? '<div style="font-size:13px;color:#94a3b8;margin-bottom:12px">📍 ' + addr + '</div>' : '') +
+    (addr ? '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">📍 ' + addr + '</div>' : '') +
+    metaRows +
     '<hr class="help-card-divider">' +
     contactRows +
     (bookingUrl ? '<a class="help-action-btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px" href="' + bookingUrl + '" target="_blank" rel="noopener">📅 קבע תור אונליין</a>' : '') +
