@@ -52,11 +52,79 @@ function navigateForAlertType(alertType, meta) {
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
       break;
+    case 'fuel_high':
+      APP.nav('vehicle');
+      setTimeout(function() {
+        APP.switchTab('info');
+        setTimeout(function() { _renderFuelAlertCard(meta); }, 200);
+      }, 350);
+      break;
+    case 'fuel_km_high':
+      APP.nav('vehicle');
+      setTimeout(function() {
+        APP.switchTab('info');
+        setTimeout(function() { _renderCostAlertCard(meta); }, 200);
+      }, 350);
+      break;
     default:
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
       break;
   }
+}
+
+function _renderFuelAlertCard(meta) {
+  var mount = document.getElementById('fuel-alert-card-mount');
+  if (!mount) {
+    mount = document.createElement('div');
+    mount.id = 'fuel-alert-card-mount';
+    var infoTab = document.getElementById('vehicle-tab-info');
+    if (infoTab) infoTab.insertBefore(mount, infoTab.firstChild);
+  }
+  var consumption = (meta && meta.fuelConsumption) ? meta.fuelConsumption : '—';
+  var threshold   = (meta && meta.threshold)       ? meta.threshold       : '12';
+  mount.innerHTML =
+    '<div class="notif-card notif-urgent" style="margin-bottom:12px;direction:rtl">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        SEVERITY_ICONS.urgent +
+        '<div style="font-size:15px;font-weight:700">⛽ צריכת דלק חריגה</div>' +
+      '</div>' +
+      '<div style="font-size:13px;color:var(--notif-text-secondary);line-height:1.8">' +
+        '<div>צריכה ממוצעת: <b style="color:#fff">' + _escHtml(String(consumption)) + ' ל/100קמ</b></div>' +
+        '<div>סף מקובל: <b style="color:#fff">' + _escHtml(String(threshold)) + ' ל/100קמ</b></div>' +
+      '</div>' +
+      '<button onclick="APP._fireFieldEvent&&APP._fireFieldEvent(\'fuel_report\',{})" ' +
+        'style="margin-top:12px;width:100%;padding:10px;background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.35);border-radius:10px;color:#f59e0b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">' +
+        'דווח לצ\'ק-אפ ←' +
+      '</button>' +
+    '</div>';
+}
+
+function _renderCostAlertCard(meta) {
+  var mount = document.getElementById('cost-alert-card-mount');
+  if (!mount) {
+    mount = document.createElement('div');
+    mount.id = 'cost-alert-card-mount';
+    var infoTab = document.getElementById('vehicle-tab-info');
+    if (infoTab) infoTab.insertBefore(mount, infoTab.firstChild);
+  }
+  var costPerKm    = (meta && meta.costPerKm)    ? meta.costPerKm    : '—';
+  var fleetAverage = (meta && meta.fleetAverage) ? meta.fleetAverage : '—';
+  mount.innerHTML =
+    '<div class="notif-card notif-info" style="margin-bottom:12px;direction:rtl">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        SEVERITY_ICONS.info +
+        '<div style="font-size:15px;font-weight:700">📊 עלות לקמ חריגה</div>' +
+      '</div>' +
+      '<div style="font-size:13px;color:var(--notif-text-secondary);line-height:1.8">' +
+        '<div>עלות לקמ ברכבך: <b style="color:#fff">₪' + _escHtml(String(costPerKm)) + '</b></div>' +
+        '<div>ממוצע צי: <b style="color:#fff">₪' + _escHtml(String(fleetAverage)) + '</b></div>' +
+      '</div>' +
+      '<button onclick="APP.nav&&APP.nav(\'fuel\')" ' +
+        'style="margin-top:12px;width:100%;padding:10px;background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.35);border-radius:10px;color:#8b5cf6;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">' +
+        'לדוח מלא ←' +
+      '</button>' +
+    '</div>';
 }
 
 /* ══ Notification History — global functions (called from IIFE + app logic) ══ */
@@ -402,6 +470,56 @@ async function _syncPendingEvents() {
   localStorage.setItem(PENDING_KEY, JSON.stringify(remaining));
 }
 
+/* --- Web Audio Notification Sound System --- */
+var _notifAudioCtx = null;
+
+function _playNotifSound(alertType) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!window.AudioContext && !window.webkitAudioContext) return;
+  try {
+    if (!_notifAudioCtx) {
+      _notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    var ctx = _notifAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    var TONES = {
+      overdue:         [880, 660, 880],
+      urgent:          [660],
+      plan:            [440],
+      km_update:       [330],
+      fuel_high:       [550],
+      fuel_km_high:    [440],
+      test_urgent:     [880, 660],
+      test_due:        [550],
+      garage_approved: [523, 659],
+      garage_rejected: [220]
+    };
+
+    var tones = TONES[alertType] || [440];
+    var now = ctx.currentTime;
+    var NOTE_DUR = 0.20, ATTACK = 0.01, DECAY = 0.10, RELEASE = 0.20;
+
+    tones.forEach(function(freq, i) {
+      var start = now + i * (NOTE_DUR + 0.04);
+      var osc  = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + ATTACK);
+      gain.gain.linearRampToValueAtTime(0.18 * 0.30, start + ATTACK + DECAY);
+      gain.gain.linearRampToValueAtTime(0, start + NOTE_DUR + RELEASE);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + NOTE_DUR + RELEASE + 0.02);
+    });
+  } catch(e) {
+    console.warn('[notif-sound] failed:', e);
+  }
+}
+
 async function _fireFieldEvent(type, details) {
   var gps = STATE.helpGps || { lat: null, lng: null };
   var payload = { type: type, lat: gps.lat || '', lng: gps.lng || '', details: JSON.stringify(details || {}) };
@@ -718,6 +836,20 @@ function startApp() {
   document.getElementById('app').classList.remove('hidden');
   renderAll();
   initSwipe();
+
+  // Handle cold-start from OS notification tap (SW encoded notif in URL)
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var notifParam = params.get('_notif');
+    if (notifParam) {
+      var payload = JSON.parse(decodeURIComponent(notifParam));
+      saveNotifToHistory(payload);
+      var alertType = (payload.data && payload.data.alertType) || 'plan';
+      setTimeout(function() { navigateForAlertType(alertType, payload.data || {}); }, 600);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  } catch(e) {}
 }
 
 function logout() {
@@ -1226,12 +1358,12 @@ function renderNotifHistory() {
 
   var history = getNotifHistory();
 
-  // remove old history section if exists
   var old = document.getElementById('nh-section');
   if (old) old.parentNode.removeChild(old);
 
   var section = document.createElement('div');
   section.id = 'nh-section';
+  section.style.cssText = 'padding:0 0 8px';
 
   var headerHtml = '<div class="nh-header">' +
     '<div class="nh-title">הודעות שהתקבלו</div>' +
@@ -1239,60 +1371,55 @@ function renderNotifHistory() {
     '</div>';
 
   if (!history.length) {
-    section.innerHTML = headerHtml + '<div class="nh-empty">אין הודעות שהתקבלו עדיין</div>';
+    section.innerHTML = headerHtml +
+      '<div class="notif-empty">' +
+        '<svg class="notif-empty-bell" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
+          '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>' +
+        '</svg>' +
+        '<div class="notif-empty-title">אין התראות חדשות</div>' +
+        '<div class="notif-empty-subtitle">נעדכן אותך כשיהיה משהו חשוב</div>' +
+      '</div>';
     container.appendChild(section);
     return;
   }
 
-  var ACTION_LABEL = {
-    km_update:        'עדכן ק"מ',
-    overdue:          'הזמן תור',
-    urgent:           'הזמן תור',
-    plan:             'פרטי רכב',
-    test_due:         'פרטי טסט',
-    test_urgent:      'פרטי טסט',
-    garage_approved:  'פרטי המוסך',
-    garage_rejected:  'בקשה חדשה'
-  };
-
   var itemsHtml = history.map(function(n, i) {
-    var type = n.alertType || 'plan';
-    var iconPath = NOTIF_ICON_BY_TYPE[type] || NOTIF_ICON_BY_TYPE.plan;
-    var safeId = String(n.id || n.ts || i);
-    var actionLabel = ACTION_LABEL[type] || 'פרטים';
+    var type     = n.alertType || 'plan';
+    var severity = SEVERITY_MAP[type] || 'plan';
+    var safeId   = String(n.id || n.ts || i);
+    var iconHtml = (SEVERITY_ICONS[severity] || SEVERITY_ICONS.plan)
+      .replace('width="22"', 'width="20"').replace('height="22"', 'height="20"');
 
-    // Extra detail rows for garage approval/rejection notifications
-    var extraHtml = '';
-    var isGarage = (type === 'garage_approved' || type === 'garage_rejected');
-    if (isGarage) {
-      if (n.requestNumber) {
-        extraHtml += '<div class="nh-item-meta"><span class="nh-meta-label">בקשה מס\':</span> #' + _escHtml(n.requestNumber) + '</div>';
-      }
-      if (n.reasonLabel) {
-        extraHtml += '<div class="nh-item-meta"><span class="nh-meta-label">סיבה:</span> ' + _escHtml(n.reasonLabel) + '</div>';
-      }
-      if (n.originalDescription) {
-        extraHtml += '<div class="nh-item-meta"><span class="nh-meta-label">תיאור הבקשה:</span> ' + _escHtml(n.originalDescription) + '</div>';
-      }
-      if (n.managerNote) {
-        var noteLabel = (type === 'garage_rejected') ? 'סיבת דחייה' : 'הערת מנהל';
-        extraHtml += '<div class="nh-item-meta nh-meta-note"><span class="nh-meta-label">' + noteLabel + ':</span> ' + _escHtml(n.managerNote) + '</div>';
-      }
+    // Meta rows
+    var metaHtml = '';
+    var metaItems = [];
+    if (n.requestNumber) metaItems.push('בקשה #' + _escHtml(n.requestNumber));
+    if (n.reasonLabel)   metaItems.push(_escHtml(n.reasonLabel));
+    if (type === 'fuel_high' && n.fuelConsumption)
+      metaItems.push('צריכה: ' + _escHtml(n.fuelConsumption) + ' ל/100קמ');
+    if (type === 'fuel_km_high' && n.costPerKm)
+      metaItems.push('עלות: ₪' + _escHtml(n.costPerKm) + '/קמ');
+    if (n.managerNote)   metaItems.push(_escHtml(n.managerNote));
+    if (metaItems.length) {
+      metaHtml = '<div class="notif-meta">' +
+        metaItems.map(function(m) { return '<span>' + m + '</span>'; }).join('') +
+        '</div>';
     }
 
-    return '<div class="nh-item type-' + type + '" data-id="' + safeId + '" data-type="' + type + '" style="animation-delay:' + (i * 0.05) + 's">' +
-      '<div class="nh-row">' +
-        '<div class="nh-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
-        '<div class="nh-body">' +
-          '<div class="nh-item-title">' + _escHtml(n.title) + '</div>' +
-          '<div class="nh-item-body">'  + _escHtml(n.body)  + '</div>' +
-          extraHtml +
-          '<div class="nh-item-time">'  + _notifTimeLabel(n.ts) + '</div>' +
-        '</div>' +
-        '<button class="nh-del" onclick="event.stopPropagation();APP.deleteNotif(\'' + safeId + '\')" aria-label="מחק">×</button>' +
+    return '<div class="notif-history-item notif-card notif-' + severity + '" ' +
+        'data-id="' + safeId + '" data-type="' + type + '" ' +
+        'style="animation:card-enter 0.35s var(--ease-out) both;animation-delay:' + (i * 0.05) + 's;margin-bottom:10px;cursor:pointer" ' +
+        'onclick="navigateForAlertType(\'' + type + '\',' + JSON.stringify(n) + ')">' +
+      '<div class="notif-icon">' + iconHtml + '</div>' +
+      '<div class="notif-content">' +
+        '<div class="notif-title">' + _escHtml(n.title) + '</div>' +
+        '<div class="notif-body">'  + _escHtml(n.body)  + '</div>' +
+        metaHtml +
       '</div>' +
-      '<div class="nh-actions-row">' +
-        '<button class="nh-action-btn" onclick="event.stopPropagation();navigateForAlertType(\'' + type + '\',{})">' + actionLabel + ' ›</button>' +
+      '<div class="notif-time">' + _notifTimeLabel(n.ts) + '</div>' +
+      '<div class="notif-swipe-reveal">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -3106,6 +3233,125 @@ function showLoginError(msg) {
   const el = document.getElementById('login-err');
   el.textContent = msg;
   el.classList.remove('hidden');
+}
+
+/* ══ In-App Notification Toast ══ */
+var SEVERITY_MAP = {
+  overdue:         'critical',
+  test_urgent:     'critical',
+  urgent:          'urgent',
+  test_due:        'urgent',
+  fuel_high:       'urgent',
+  plan:            'plan',
+  km_update:       'plan',
+  fuel_km_high:    'info',
+  garage_rejected: 'info',
+  garage_approved: 'approved'
+};
+
+var TOAST_DURATION = {
+  critical: 8000,
+  urgent:   6000,
+  plan:     4000,
+  info:     3000,
+  approved: 5000
+};
+
+var SEVERITY_ICONS = {
+  critical: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#ef4444"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  urgent:   '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  plan:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#3b82f6"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>',
+  info:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#8b5cf6"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>',
+  approved: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#22c55e"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>'
+};
+
+var _activeToast = null;
+
+function showInAppNotification(payload) {
+  var notif     = payload.notification || {};
+  var meta      = payload.data || {};
+  var alertType = meta.alertType || 'plan';
+  var severity  = SEVERITY_MAP[alertType] || 'plan';
+  var duration  = TOAST_DURATION[severity] || 4000;
+  var icon      = SEVERITY_ICONS[severity] || SEVERITY_ICONS.plan;
+
+  // Save to history
+  saveNotifToHistory(payload);
+
+  // Remove existing toast
+  if (_activeToast && _activeToast.parentNode) {
+    _activeToast.parentNode.removeChild(_activeToast);
+  }
+
+  var el = document.createElement('div');
+  el.className = 'notif-toast notif-card notif-' + severity;
+  el.setAttribute('role', 'alert');
+  el.innerHTML =
+    '<div class="notif-icon">' + icon + '</div>' +
+    '<div class="notif-content">' +
+      '<div class="notif-title">' + (notif.title || 'עלה — התראה') + '</div>' +
+      '<div class="notif-body">' + (notif.body || '') + '</div>' +
+    '</div>' +
+    '<button class="notif-action">פרטים ›</button>' +
+    '<button class="notif-dismiss" aria-label="סגור">×</button>';
+
+  document.body.appendChild(el);
+  _activeToast = el;
+
+  // Sound
+  _playNotifSound(alertType);
+
+  // "פרטים" button
+  el.querySelector('.notif-action').addEventListener('click', function(e) {
+    e.stopPropagation();
+    dismissToast(el);
+    navigateForAlertType(alertType, meta);
+  });
+
+  // Dismiss button
+  el.querySelector('.notif-dismiss').addEventListener('click', function(e) {
+    e.stopPropagation();
+    dismissToast(el);
+  });
+
+  // Tap anywhere on toast
+  el.addEventListener('click', function() {
+    dismissToast(el);
+    navigateForAlertType(alertType, meta);
+  });
+
+  // Auto-dismiss
+  var _dismissTimer = setTimeout(function() { dismissToast(el); }, duration);
+  el._dismissTimer = _dismissTimer;
+}
+
+function dismissToast(el) {
+  if (!el || !el.parentNode) return;
+  clearTimeout(el._dismissTimer);
+  el.classList.add('leaving');
+  setTimeout(function() {
+    if (el.parentNode) el.parentNode.removeChild(el);
+    if (_activeToast === el) _activeToast = null;
+  }, 320);
+}
+
+/* SW message handler — receives push-foreground from service worker */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', function(event) {
+    var msg = event.data;
+    if (!msg) return;
+    if (msg.type === 'push-foreground' && msg.payload) {
+      showInAppNotification(msg.payload);
+    } else if (msg.type === 'push-received' && msg.payload) {
+      saveNotifToHistory(msg.payload);
+      navigateForAlertType(
+        (msg.payload.data && msg.payload.data.alertType) || 'plan',
+        msg.payload.data || {}
+      );
+    } else if (msg.type === 'notification-click' && msg.data) {
+      navigateForAlertType(msg.data.alertType || 'plan', msg.data);
+    }
+  });
 }
 
 /* ══ Greeting ══ */
