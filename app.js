@@ -833,12 +833,13 @@ function _playNotifSound(alertType) {
   }
 }
 
-async function _fireFieldEvent(type, details) {
+async function _fireFieldEvent(type, details, opts) {
   var gps = STATE.helpGps || { lat: null, lng: null };
   var payload = { type: type, lat: gps.lat || '', lng: gps.lng || '', details: JSON.stringify(details || {}) };
   try {
-    // Return the full result (including business-logic errors like duplicate_pending_request)
-    return await gasPost('driver_field_event', payload);
+    // silent:true so gasPost returns business-logic errors (e.g. duplicate_pending_request)
+    // instead of throwing — callers that care (garage) check result.ok themselves
+    return await gasPost('driver_field_event', payload, Object.assign({ silent: true }, opts || {}));
   } catch(e) {
     if (!navigator.onLine) {
       _queueEvent(Object.assign({ type: type, details: details }, gps));
