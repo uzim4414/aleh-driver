@@ -11,14 +11,14 @@
 **File:** `driver/app.js:2902-2964`, `driver/index.html` (CSS)
 
 ### 1A — אייקון שעון חול עם אנימציה
-- [ ] הוסף CSS לאנימציית שעון חול ב-index.html
-- [ ] החלף SVG שעון ב-SVG שעון חול עם אנימציית `hourglass-spin`
+- [x] הוסף CSS לאנימציית שעון חול ב-index.html
+- [x] החלף SVG שעון ב-SVG שעון חול עם אנימציית `hourglass-spin`
 
 ### 1B — כפתור חזרה — הסר transparent square
-- [ ] הוסף `border-radius:20px;padding:6px 14px;` לstyle של הbutton
+- [x] הוסף `border-radius:20px;padding:6px 14px;` לstyle של הbutton
 
 ### 1C — הוסף `description` בתוכן הבקשה
-- [ ] הוסף שורת תיאור מ-`pending.description` בcards info box
+- [x] הוסף שורת תיאור מ-`pending.description` בcards info box
 
 ---
 
@@ -26,10 +26,10 @@
 
 **File:** `driver/app.js:1389-1431`, `driver/index.html` (CSS)
 
-- [ ] כל כרטיס — expand/collapse עם אנימציה
-- [ ] layout ברור: icon + title + badge בשורה ראשית, פרטים expanded
-- [ ] fix swipe: `_initSwipeDelete` מחפש `.nh-item` — תקן ל-`.notif-history-item`
-- [ ] הוסף CSS expand animation
+- [x] כל כרטיס — expand/collapse עם אנימציה
+- [x] layout ברור: icon + title + badge בשורה ראשית, פרטים expanded
+- [x] fix swipe: `_initSwipeDelete` מחפש `.nh-item` — תקן ל-`.notif-history-item`
+- [x] הוסף CSS expand animation
 
 ---
 
@@ -41,11 +41,10 @@
 
 **Fix:** dedup נוסף לפי `eventId` לגבי garage notifications, ולפי combination של `alertType + body` לשאר.
 
-- [ ] הוסף dedup לפי eventId (אם קיים) ב-saveNotifToHistory
+- [x] הוסף dedup לפי eventId (אם קיים) ב-saveNotifToHistory
 
 ---
 
 ## Task 4 — Deploy + Commit
-- [ ] clasp push (index.html)
-- [ ] git commit app.js + index.html
-- [ ] git push
+- [x] git commit app.js + index.html
+- [x] git push → GitHub Pages

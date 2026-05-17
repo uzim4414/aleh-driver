@@ -12,6 +12,41 @@ const GOOGLE_CLIENT_ID = '11295167732-dov0o2p2858i4nhe0lm1r6aa5sucvukp.apps.goog
 const SESSION_KEY = 'aleh_driver_session';
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 
+/* ══ Firebase Config + Init ══
+   databaseURL נוסף ידנית — מופיע ב: Firebase Console → Realtime Database → URL בראש העמוד
+   שאר הערכים מה-Console → Project Settings → aleh-driver-pwa
+════════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            'AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA',
+  authDomain:        'aleh-fleet.firebaseapp.com',
+  databaseURL:       'PLACEHOLDER_DATABASE_URL',   // ← תחליף ברגע שתשלח את ה-URL
+  projectId:         'aleh-fleet',
+  storageBucket:     'aleh-fleet.firebasestorage.app',
+  messagingSenderId: '247079131404',
+  appId:             '1:247079131404:web:68816ccdf27667cdc39129',
+  measurementId:     'G-EP6WVGRFNZ'
+};
+
+var _fbApp, _fbAuth, _fbDb;
+(function() {
+  try {
+    if (typeof firebase === 'undefined') {
+      console.warn('[firebase] SDK לא נטען — מצב localStorage בלבד');
+      return;
+    }
+    if (FIREBASE_CONFIG.databaseURL === 'PLACEHOLDER_DATABASE_URL') {
+      console.warn('[firebase] databaseURL חסר — מצב localStorage בלבד');
+      return;
+    }
+    _fbApp  = firebase.apps.length ? firebase.apps[0] : firebase.initializeApp(FIREBASE_CONFIG);
+    _fbAuth = firebase.auth(_fbApp);
+    _fbDb   = firebase.database(_fbApp);
+    console.log('[firebase] init OK — project:', FIREBASE_CONFIG.projectId);
+  } catch(e) {
+    console.warn('[firebase] init failed:', e.message);
+  }
+})();
+
 /* ══ Smart notification routing — called from toast "פתח" + history card tap ══ */
 function navigateForAlertType(alertType, meta) {
   meta = meta || {};
@@ -127,6 +162,203 @@ function _renderCostAlertCard(meta) {
     '</div>';
 }
 
+/* ══════════════════════════════════════════════════════════════
+   Firebase Realtime DB — Cross-Device Sync
+   מבנה: /driverData/{uid}/notifications/{ts}, pendingGarage, approvedGarage, reminders/{id}
+══════════════════════════════════════════════════════════════ */
+
+/** מחזיר DB reference לנתיב תחת /driverData/{uid}/... — null אם לא מחובר */
+function _fbRef(path) {
+  if (!_fbDb || !STATE.firebaseUid) return null;
+  return _fbDb.ref('driverData/' + STATE.firebaseUid + (path ? '/' + path : ''));
+}
+
+/* ── Notifications ── */
+
+/** שמירת התראה בודדת — key=ts מאפשר overwrite בטוח אם אותה התראה מגיעה שוב */
+function _fbSaveNotif(item) {
+  var ref = _fbRef('notifications/' + String(item.ts));
+  if (!ref || !item || !item.ts) return;
+  ref.set(item).catch(function(e) { console.warn('[fbSync] saveNotif:', e.message); });
+}
+
+/** מחיקת התראה + הוספה ל-deletedTs blacklist — מונע GAS re-pull מלהחיות אותה */
+function _fbDeleteNotif(id) {
+  var notifRef   = _fbRef('notifications/' + String(id));
+  var deletedRef = _fbRef('deletedTs/' + String(id));
+  if (!notifRef) return;
+  notifRef.remove().catch(function(e) { console.warn('[fbSync] deleteNotif:', e.message); });
+  if (deletedRef) deletedRef.set(true).catch(function() {});
+}
+
+/** ניקוי כל ההתראות + שמירת clearedAt — מתפשט real-time לכל המכשירים */
+function _fbClearAllNotifs(clearedAt) {
+  var notifRef   = _fbRef('notifications');
+  var clearedRef = _fbRef('clearedAt');
+  if (!notifRef) return;
+  notifRef.remove().catch(function() {});
+  if (clearedRef) clearedRef.set(clearedAt || Date.now()).catch(function() {});
+}
+
+/* ── Garage State ── */
+
+/** שמירת/עדכון בקשת מוסך פתוחה — מופיעה בכל מכשירי הנהג מיידית */
+function _fbSetPendingGarage(data) {
+  var ref = _fbRef('pendingGarage');
+  if (!ref) return;
+  ref.set(data).catch(function(e) { console.warn('[fbSync] setPendingGarage:', e.message); });
+}
+
+/** מחיקת בקשת מוסך — בעקבות ביטול / אישור / דחייה */
+function _fbClearPendingGarage() {
+  var ref = _fbRef('pendingGarage');
+  if (!ref) return;
+  ref.remove().catch(function(e) { console.warn('[fbSync] clearPendingGarage:', e.message); });
+}
+
+/** שמירת פרטי מוסך מאושר — כתובת, שעות, הערת מנהל */
+function _fbSetApprovedGarage(data) {
+  var ref = _fbRef('approvedGarage');
+  if (!ref) return;
+  ref.set(data).catch(function(e) { console.warn('[fbSync] setApprovedGarage:', e.message); });
+}
+
+/** מחיקת פרטי מוסך מאושר */
+function _fbClearApprovedGarage() {
+  var ref = _fbRef('approvedGarage');
+  if (!ref) return;
+  ref.remove().catch(function(e) { console.warn('[fbSync] clearApprovedGarage:', e.message); });
+}
+
+/* ── Reminders ── */
+
+/** שמירת תזכורת בודדת — id = createdAt timestamp */
+function _fbSaveReminder(reminder) {
+  var id  = String(reminder.id || reminder.createdAt || Date.now());
+  var ref = _fbRef('reminders/' + id);
+  if (!ref) return;
+  ref.set(reminder).catch(function(e) { console.warn('[fbSync] saveReminder:', e.message); });
+}
+
+/** מחיקת תזכורת בודדת */
+function _fbDeleteReminder(id) {
+  var ref = _fbRef('reminders/' + String(id));
+  if (!ref) return;
+  ref.remove().catch(function(e) { console.warn('[fbSync] deleteReminder:', e.message); });
+}
+
+/* ── Master Sync Init ── */
+
+/** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
+function _initFbSync() {
+  _initFbNotifSync();
+  _initFbGarageSync();
+  _initFbReminderSync();
+}
+
+/* ── Listener: Notifications ── */
+function _initFbNotifSync() {
+  var ref = _fbRef('notifications');
+  if (!ref) return;
+
+  // Listener על כלל ההתראות
+  ref.on('value', function(snap) {
+    try {
+      var data  = snap.val() || {};
+      var items = Object.keys(data)
+        .map(function(k) { return data[k]; })
+        .filter(function(n) { return n && n.ts; })
+        .sort(function(a, b) { return b.ts - a.ts; })
+        .slice(0, 30);
+
+      localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(items));
+
+      var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
+      var unread = items.filter(function(n) { return n.ts > clearedAt; }).length;
+      _applyBadgeCount(unread);
+
+      if (typeof STATE !== 'undefined' && STATE.currentScreen === 'alerts') renderNotifHistory();
+    } catch(e) { console.warn('[fbSync] notif onValue:', e.message); }
+  }, function(err) { console.warn('[fbSync] notif listener:', err.message); });
+
+  // Listener על clearedAt — ניקוי הכל ממכשיר אחר
+  var clearedRef = _fbRef('clearedAt');
+  if (clearedRef) {
+    clearedRef.on('value', function(snap) {
+      var remote = snap.val();
+      if (!remote) return;
+      var local = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
+      if (remote > local) {
+        localStorage.setItem('driver_notif_cleared_at', String(remote));
+        localStorage.setItem('driver_notif_unread', '0');
+        localStorage.setItem(_NOTIF_HISTORY_KEY, '[]');
+        _applyBadgeCount(0);
+        if (typeof STATE !== 'undefined' && STATE.currentScreen === 'alerts') renderNotifHistory();
+      }
+    });
+  }
+
+  // Listener על deletedTs — סנכרון blacklist מחיקות בין מכשירים
+  var deletedRef = _fbRef('deletedTs');
+  if (deletedRef) {
+    deletedRef.on('value', function(snap) {
+      var data = snap.val() || {};
+      var tsList = Object.keys(data).map(Number).filter(Boolean);
+      if (tsList.length) localStorage.setItem('driver_notif_deleted_ts', JSON.stringify(tsList));
+    });
+  }
+}
+
+/* ── Listener: Garage State ── */
+function _initFbGarageSync() {
+  // Pending garage — בקשה פתוחה
+  var pendingRef = _fbRef('pendingGarage');
+  if (pendingRef) {
+    pendingRef.on('value', function(snap) {
+      try {
+        var data = snap.val();
+        if (data) {
+          localStorage.setItem('pendingGarageRequest', JSON.stringify(data));
+        } else {
+          localStorage.removeItem('pendingGarageRequest');
+        }
+      } catch(e) { console.warn('[fbSync] pendingGarage onValue:', e.message); }
+    });
+  }
+
+  // Approved garage — פרטי מוסך מאושר
+  var approvedRef = _fbRef('approvedGarage');
+  if (approvedRef) {
+    approvedRef.on('value', function(snap) {
+      try {
+        var data = snap.val();
+        if (data) {
+          localStorage.setItem('approvedGarageRequest', JSON.stringify(data));
+        } else {
+          localStorage.removeItem('approvedGarageRequest');
+        }
+      } catch(e) { console.warn('[fbSync] approvedGarage onValue:', e.message); }
+    });
+  }
+}
+
+/* ── Listener: Reminders ── */
+function _initFbReminderSync() {
+  var ref = _fbRef('reminders');
+  if (!ref) return;
+
+  ref.on('value', function(snap) {
+    try {
+      var data = snap.val() || {};
+      var reminders = Object.keys(data)
+        .map(function(k) { return data[k]; })
+        .filter(function(r) { return r && r.date; })
+        .sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; });
+      localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
+    } catch(e) { console.warn('[fbSync] reminders onValue:', e.message); }
+  });
+}
+
 /* ══ Notification History — global functions (called from IIFE + app logic) ══ */
 var _NOTIF_HISTORY_KEY = 'driver_notif_history';
 
@@ -170,18 +402,21 @@ function saveNotifToHistory(payload) {
     var alertType = meta.alertType || '';
     if (alertType === 'garage_approved' || alertType === 'garage_rejected') {
       try { localStorage.removeItem('pendingGarageRequest'); } catch(_e) {}
+      _fbClearPendingGarage();
     }
     // שמור פרטי אישור מוסך — ישמשו את מסך "פרטי המוסך" המאושר
     if (alertType === 'garage_approved') {
       try {
-        localStorage.setItem('approvedGarageRequest', JSON.stringify({
+        var _approvedData = {
           eventId:       meta.eventId       || '',
           reasonLabel:   meta.reasonLabel   || '',
           requestNumber: meta.requestNumber || '',
           managerNote:   meta.managerNote   || '',
           approvedAt:    ts,
           vehicleId:     meta.vehicleId     || ''
-        }));
+        };
+        localStorage.setItem('approvedGarageRequest', JSON.stringify(_approvedData));
+        _fbSetApprovedGarage(_approvedData);
       } catch(_e) {}
     }
 
@@ -190,23 +425,25 @@ function saveNotifToHistory(payload) {
     if (list.some(function(n) { return n.ts === ts; })) return;
     // Dedup by eventId — prevents duplicate when same push arrives via two code paths
     if (meta.eventId && list.some(function(n) { return n.eventId === meta.eventId && n.alertType === alertType; })) return;
-    list.unshift({
-      id:        ts,
-      title:     notif.title || 'עלה — התראה',
-      body:      notif.body  || '',
-      alertType: alertType || 'plan',
-      vehicleId: meta.vehicleId || '',
+    var newItem = {
+      id:                  ts,
+      title:               notif.title || 'עלה — התראה',
+      body:                notif.body  || '',
+      alertType:           alertType || 'plan',
+      vehicleId:           meta.vehicleId || '',
       requestNumber:       meta.requestNumber || '',
       reasonLabel:         meta.reasonLabel || '',
       originalDescription: meta.originalDescription || '',
       managerNote:         meta.managerNote || '',
       eventId:             meta.eventId || '',
-      ts:        ts
-    });
+      ts:                  ts
+    };
+    list.unshift(newItem);
     if (list.length > 30) list = list.slice(0, 30);
     localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
     incrementUnreadBadge();
     if (typeof STATE !== 'undefined' && STATE.currentScreen === 'alerts') renderNotifHistory();
+    _fbSaveNotif(newItem); // ← Firebase sync
   } catch(e) {}
 }
 
@@ -218,6 +455,7 @@ function clearNotifHistory() {
     localStorage.setItem('driver_notif_cleared_at', String(now));
     localStorage.setItem('driver_notif_unread', '0');
     _applyBadgeCount(0);
+    _fbClearAllNotifs(now); // ← Firebase sync — ניקוי מתפשט לכל המכשירים
 
     // Tell SW to drop its pending buffer (prevents replay on next serviceWorker.ready).
     // Use serviceWorker.ready so this works even when controller is null (new SW install / SW update).
@@ -255,6 +493,7 @@ function deleteNotifById(id) {
       if (del.length > 100) del = del.slice(-100);
       localStorage.setItem('driver_notif_deleted_ts', JSON.stringify(del));
     }
+    _fbDeleteNotif(id); // ← Firebase sync — מחיקה + blacklist לכל המכשירים
   } catch(e) {}
 }
 
@@ -300,8 +539,9 @@ let STATE = {
   govData:    undefined,  // undefined=טרם נטען | null=שגיאה/לא נמצא | object=נטען
   govWLTP:    undefined,
   govLoading: false,
-  helpMenuOpen: false,
-  helpGps: null
+  helpMenuOpen:  false,
+  helpGps:       null,
+  firebaseUid:   null   // מאוכלס אחרי _fbSignIn — משמש כ-key ב-/driverData/{uid}/
 };
 
 /* ══ GAS API ══ */
@@ -314,7 +554,26 @@ function _isTokenExpired(token) {
   } catch(e) { return true; }
 }
 
+/* ══ Firebase Auth — משתמש ב-Google idToken הקיים, ללא לוגין נוסף לנהג ══ */
+async function _fbSignIn(googleIdToken) {
+  if (!_fbAuth || !googleIdToken || googleIdToken === 'demo_token') return false;
+  try {
+    var credential = firebase.auth.GoogleAuthProvider.credential(googleIdToken);
+    var userCred   = await _fbAuth.signInWithCredential(credential);
+    STATE.firebaseUid = userCred.user.uid;
+    console.log('[fbAuth] signed in, uid:', STATE.firebaseUid);
+    _initFbSync();   // מפעיל את כל ה-listeners real-time
+    return true;
+  } catch(e) {
+    console.warn('[fbAuth] failed — localStorage-only mode:', e.message);
+    return false;
+  }
+}
+
 function _sessionExpired() {
+  // Firebase signOut — מנתק listener + מנקה session
+  try { if (_fbAuth) _fbAuth.signOut(); } catch(_e) {}
+  STATE.firebaseUid = null;
   localStorage.removeItem(SESSION_KEY);
   STATE.idToken = null;
   STATE.vehicle = null;
@@ -614,6 +873,7 @@ async function handleGoogleCredential(response) {
     STATE.vehicle = result.vehicle;
 
     saveSession(STATE.idToken, STATE.vehicle, STATE.user);
+    _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth — non-blocking
     hideLoader();
     showGreeting((result.vehicle && result.vehicle.holder) || STATE.user.name);
     await loadFullData();
@@ -2843,7 +3103,11 @@ APP._garageSubmitRequest = async function() {
     var result = await _fireFieldEvent('garage_request', details);
     if (result.ok) {
       var eventId = result.eventId || '';
-      try { localStorage.setItem('pendingGarageRequest', JSON.stringify({ eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() })); } catch(e) {}
+      try {
+        var _pendingData = { eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() };
+        localStorage.setItem('pendingGarageRequest', JSON.stringify(_pendingData));
+        _fbSetPendingGarage(_pendingData);
+      } catch(e) {}
       _showHelpCard(
         '<div class="help-card" style="text-align:center;padding:32px 20px">' +
         '<div style="font-size:48px;margin-bottom:12px">📤</div>' +
@@ -2856,13 +3120,15 @@ APP._garageSubmitRequest = async function() {
       var dupEventId = result.eventId || '';
       var ctx2 = APP._garageCtx || {};
       try {
-        localStorage.setItem('pendingGarageRequest', JSON.stringify({
+        var _dupPending = {
           eventId:     dupEventId,
           reason:      ctx2.reasonId    || '',
           reasonLabel: ctx2.reasonLabel || '',
           description: ctx2.description || '',
           submittedAt: Date.now()
-        }));
+        };
+        localStorage.setItem('pendingGarageRequest', JSON.stringify(_dupPending));
+        _fbSetPendingGarage(_dupPending);
       } catch(_e) {}
       if (btn) { btn.disabled = false; }
       var dup = APP._garageGetPending();
@@ -2894,6 +3160,7 @@ APP._garageGetApproved = function() {
     // אישור פג תוקף אחרי 14 ימים
     if (obj.approvedAt && (Date.now() - obj.approvedAt) > 14 * 24 * 3600 * 1000) {
       try { localStorage.removeItem('approvedGarageRequest'); } catch(e) {}
+      _fbClearApprovedGarage();
       return null;
     }
     return obj;
@@ -2902,6 +3169,7 @@ APP._garageGetApproved = function() {
 
 APP._garageClearApproved = function() {
   try { localStorage.removeItem('approvedGarageRequest'); } catch(e) {}
+  _fbClearApprovedGarage();
 };
 
 // בונה אובייקט garageInfo מלא מ-STATE.vehicle.garage עבור מסך מוסך מאושר
@@ -2926,13 +3194,15 @@ APP._garageShowApprovedFromStorage = function(meta) {
   if (!approved && meta && meta.eventId) {
     // אם הגענו דרך toast עם meta אבל עדיין לא נשמר — שמור עכשיו
     try {
-      localStorage.setItem('approvedGarageRequest', JSON.stringify({
+      var _metaApproved = {
         eventId:       meta.eventId,
         reasonLabel:   meta.reasonLabel   || '',
         requestNumber: meta.requestNumber || '',
         managerNote:   meta.managerNote   || '',
         approvedAt:    meta.approvedAt    || Date.now()
-      }));
+      };
+      localStorage.setItem('approvedGarageRequest', JSON.stringify(_metaApproved));
+      _fbSetApprovedGarage(_metaApproved);
     } catch(e) {}
     approved = APP._garageGetApproved();
   }
@@ -3030,6 +3300,7 @@ APP._garageShowPending = function(pending) {
 
 APP._garageClearPending = function() {
   try { localStorage.removeItem('pendingGarageRequest'); } catch(e) {}
+  _fbClearPendingGarage();
   APP._garageStopPoll();
 };
 
@@ -3061,13 +3332,15 @@ APP._garagePollStatus = function(pending) {
         try {
           var _reqMatch = String(pending.eventId || '').match(/-(\d+)$/);
           var _reqNum   = _reqMatch ? String(parseInt(_reqMatch[1], 10)) : '';
-          localStorage.setItem('approvedGarageRequest', JSON.stringify({
+          var _pollApproved = {
             eventId:       pending.eventId,
             reasonLabel:   r.reasonLabel   || pending.reasonLabel || '',
             requestNumber: r.requestNumber || _reqNum,
             managerNote:   r.managerNote   || '',
             approvedAt:    Date.now()
-          }));
+          };
+          localStorage.setItem('approvedGarageRequest', JSON.stringify(_pollApproved));
+          _fbSetApprovedGarage(_pollApproved);
         } catch(e) {}
         APP._garageShowApproved(r.garageInfo, pending.eventId, r.reasonLabel || pending.reasonLabel);
       } else if (st === 'rejected') {
@@ -3284,14 +3557,17 @@ APP._saveGarageReminder = function(appointmentDate, daysBefore) {
     var reminders = [];
     try { reminders = JSON.parse(localStorage.getItem('driver_garage_reminders') || '[]'); } catch(_) {}
     reminders = reminders.filter(function(r) { return r.appointmentDate !== appointmentDate; });
-    reminders.push({
+    var _newReminder = {
+      id:              remindMs,
       appointmentDate: appointmentDate,
       remindAt:        remindMs,
       daysBefore:      daysBefore,
       vehicleNum:      (STATE.vehicle && STATE.vehicle.num) || '',
       shown:           false
-    });
+    };
+    reminders.push(_newReminder);
     localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
+    _fbSaveReminder(_newReminder);
     _showHelpCard(
       '<div class="help-card" style="text-align:center;padding:32px 20px">' +
       '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);margin-bottom:14px;animation:notif-approved-glow 2.5s ease infinite">' +
@@ -3327,11 +3603,14 @@ APP._checkGarageReminders = function() {
           ts: now
         };
         if (typeof showInAppNotification === 'function') showInAppNotification(payload);
+        _fbSaveReminder(r);
       }
     });
     reminders = reminders.filter(function(r) {
       var apptMs = new Date(r.appointmentDate + 'T23:59:00').getTime();
-      return now < apptMs + (3 * 86400000);
+      var keep = now < apptMs + (3 * 86400000);
+      if (!keep && r.id) { _fbDeleteReminder(r.id); }
+      return keep;
     });
     if (updated) localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
   } catch(e) { console.warn('_checkGarageReminders:', e); }
@@ -3733,6 +4012,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       STATE.user    = null;
     } else {
       try {
+        _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
         hideLoader();
         showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name));
         await loadFullData();

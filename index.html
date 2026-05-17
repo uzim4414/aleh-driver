@@ -1592,7 +1592,11 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   // VAPID public key used by direct PushManager.subscribe() — Firebase SDK no longer required on client.
   window.__VAPID_PUBLIC = "BFLZcYjxU_yOMukgr3oSnP8ayrFzw16i0s8-z1fbEy1I_E-qP0_B8k3ccvjpE8RmyGYRzSu-ybm2k94pyJfMLyg";
 </script>
-<script src="app.js?v=71"></script>
+<!-- Firebase SDK (compat v9 — חושף firebase.* כ-global, ללא bundler) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="app.js?v=73"></script>
 <script>
 window.fcmDebug = async function() {
   const checks = {
