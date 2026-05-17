@@ -3180,7 +3180,7 @@ APP._garageSubmitRequest = async function() {
         '<button class="help-action-btn" style="margin-bottom:8px" onclick="(function(){' +
           'var d=APP._garageGetPending();if(d){APP._garageShowPending(d);APP._garagePollStatus(d);}' +
         '})()">&#x23F3; המתן לאישור מנהל</button>' +
-        '<button class="help-action-btn secondary" onclick="APP._garageClearPending();APP.helpGarage();">&#x1F5D1; מחק בקשה ישנה — שלח חדשה</button>' +
+        '<button class="help-action-btn secondary" onclick="APP._garageCancelAndReset(this)">&#x1F5D1; מחק בקשה ישנה — שלח חדשה</button>' +
         '</div>'
       );
     } else {
@@ -3343,7 +3343,7 @@ APP._garageShowPending = function(pending) {
         'במידה ומדובר בפנייה חדשה ושונה — לחץ "בקשה חדשה"' +
       '</div>' +
 
-      '<button class="help-action-btn secondary" style="margin-bottom:8px" onclick="APP._garageClearPending();APP.helpGarage()">&#x1F504; בקשה חדשה</button>' +
+      '<button class="help-action-btn secondary" style="margin-bottom:8px" onclick="APP._garageCancelAndReset(this)">&#x1F504; בקשה חדשה</button>' +
       '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
     '</div></div>'
   );
@@ -3353,6 +3353,19 @@ APP._garageClearPending = function() {
   try { localStorage.removeItem('pendingGarageRequest'); } catch(e) {}
   _fbClearPendingGarage();
   APP._garageStopPoll();
+};
+
+APP._garageCancelAndReset = async function(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ מבטל...'; }
+  var pending = APP._garageGetPending();
+  var eventId = pending && pending.eventId;
+  if (eventId && String(eventId).indexOf('queued') === -1) {
+    try {
+      await gasPost('garage_request_action', { action: 'cancel', eventId: eventId }, { silent: true });
+    } catch(e) {}
+  }
+  APP._garageClearPending();
+  APP.helpGarage();
 };
 
 APP._garageStopPoll = function() {
