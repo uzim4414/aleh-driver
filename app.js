@@ -27,7 +27,7 @@ const FIREBASE_CONFIG = {
   measurementId:     'G-EP6WVGRFNZ'
 };
 
-var _fbApp, _fbAuth, _fbDb;
+var _fbApp, _fbAuth, _fbDb, _fbSyncReady = false;
 (function() {
   try {
     if (typeof firebase === 'undefined') {
@@ -42,6 +42,18 @@ var _fbApp, _fbAuth, _fbDb;
     _fbAuth = firebase.auth(_fbApp);
     _fbDb   = firebase.database(_fbApp);
     console.log('[firebase] init OK — project:', FIREBASE_CONFIG.projectId);
+
+    // onAuthStateChanged — מופעל גם כשה-SDK מחדש session מ-IndexedDB (אחרי token פג תוקף)
+    // מבטיח ש-_initFbSync תמיד תרוץ גם אם signInWithCredential נכשל
+    _fbAuth.onAuthStateChanged(function(user) {
+      if (user && !_fbSyncReady) {
+        _fbSyncReady = true;
+        STATE.firebaseUid = user.uid;
+        console.log('[fbAuth] onAuthStateChanged — uid:', user.uid);
+        _initFbSync();
+      }
+      if (!user) { _fbSyncReady = false; STATE.firebaseUid = null; }
+    });
   } catch(e) {
     console.warn('[firebase] init failed:', e.message);
   }
@@ -577,12 +589,16 @@ async function _fbSignIn(googleIdToken) {
   try {
     var credential = firebase.auth.GoogleAuthProvider.credential(googleIdToken);
     var userCred   = await _fbAuth.signInWithCredential(credential);
-    STATE.firebaseUid = userCred.user.uid;
-    console.log('[fbAuth] signed in, uid:', STATE.firebaseUid);
-    _initFbSync();   // מפעיל את כל ה-listeners real-time
+    // אם onAuthStateChanged כבר הפעיל את הסנכרון — לא מפעיל שוב
+    if (!_fbSyncReady) {
+      _fbSyncReady      = true;
+      STATE.firebaseUid = userCred.user.uid;
+      console.log('[fbAuth] signed in, uid:', STATE.firebaseUid);
+      _initFbSync();
+    }
     return true;
   } catch(e) {
-    console.warn('[fbAuth] failed — localStorage-only mode:', e.message);
+    console.warn('[fbAuth] signInWithCredential failed (token expired?) — onAuthStateChanged יטפל:', e.message);
     return false;
   }
 }
