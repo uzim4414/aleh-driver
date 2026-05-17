@@ -2973,7 +2973,21 @@ APP.helpGarage = function() {
 
   // Check if there's a pending request — show UI then start live status polling
   var pending = APP._garageGetPending();
-  if (pending) { APP._garageShowPending(pending); APP._garagePollStatus(pending); return; }
+  if (pending) {
+    APP._garageShowPending(pending);
+    APP._garagePollStatus(pending);
+    // Firebase reality-check: if DB has no pending → localStorage is stale → clear & refresh
+    var _pendingFbRef = _fbRef('pendingGarage');
+    if (_pendingFbRef) {
+      _pendingFbRef.once('value').then(function(snap) {
+        if (snap.val()) return; // Firebase has data — localStorage is in sync, all good
+        localStorage.removeItem('pendingGarageRequest');
+        APP._garageStopPoll();
+        if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+      }).catch(function() {});
+    }
+    return;
+  }
 
   var garageInfo = '<div style="background:rgba(255,255,255,0.07);border-radius:10px;padding:10px 14px;margin-bottom:14px">' +
     '<div style="font-size:12px;color:#94a3b8;margin-bottom:2px">המוסך שלך</div>' +
