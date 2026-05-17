@@ -837,9 +837,8 @@ async function _fireFieldEvent(type, details) {
   var gps = STATE.helpGps || { lat: null, lng: null };
   var payload = { type: type, lat: gps.lat || '', lng: gps.lng || '', details: JSON.stringify(details || {}) };
   try {
-    var result = await gasPost('driver_field_event', payload);
-    if (!result.ok) throw new Error(result.error);
-    return result;
+    // Return the full result (including business-logic errors like duplicate_pending_request)
+    return await gasPost('driver_field_event', payload);
   } catch(e) {
     if (!navigator.onLine) {
       _queueEvent(Object.assign({ type: type, details: details }, gps));
@@ -3152,21 +3151,18 @@ APP._garageSubmitRequest = async function() {
         '</div>'
       );
     } else if (result && result.error === 'duplicate_pending_request') {
-      var dupEventId = result.eventId || '';
-      var ctx2 = APP._garageCtx || {};
-      try {
-        var _dupPending = {
-          eventId:     dupEventId,
-          reason:      ctx2.reasonId    || '',
-          reasonLabel: ctx2.reasonLabel || '',
-          description: ctx2.description || '',
-          submittedAt: Date.now()
-        };
-        localStorage.setItem('pendingGarageRequest', JSON.stringify(_dupPending));
-        _fbSetPendingGarage(_dupPending);
-      } catch(_e) {}
-      if (btn) { btn.disabled = false; }
+      // Preserve existing pending (has correct reason/description from original submission)
+      // Only write minimal entry if localStorage is empty (different device)
       var dup = APP._garageGetPending();
+      if (!dup && result.eventId) {
+        try {
+          var _dupPending = { eventId: result.eventId, submittedAt: Date.now() };
+          localStorage.setItem('pendingGarageRequest', JSON.stringify(_dupPending));
+          _fbSetPendingGarage(_dupPending);
+          dup = APP._garageGetPending();
+        } catch(_e) {}
+      }
+      if (btn) { btn.disabled = false; }
       // מסך הסבר ברור לנהג במקום להציג ישירות את מסך ההמתנה
       _showHelpCard(
         '<div class="help-card" style="text-align:center;padding:28px 20px">' +
