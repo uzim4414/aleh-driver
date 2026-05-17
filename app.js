@@ -330,16 +330,12 @@ function _initFbGarageSync() {
       try {
         var data    = snap.val();
         var prevRaw = localStorage.getItem('pendingGarageRequest');
+        // Only sync when Firebase has data — null means "not written yet", not "no request"
+        // Deletion only happens when GAS poll returns approved/rejected
         if (data) {
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
             localStorage.setItem('pendingGarageRequest', newStr);
-            if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
-          }
-        } else {
-          if (prevRaw) {
-            localStorage.removeItem('pendingGarageRequest');
-            if (APP._garagePollTimer) APP._garageStopPoll();
             if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
           }
         }
@@ -2992,16 +2988,6 @@ APP.helpGarage = function() {
   if (pending) {
     APP._garageShowPending(pending);
     APP._garagePollStatus(pending);
-    // Firebase reality-check: if DB has no pending → localStorage is stale → clear & refresh
-    var _pendingFbRef = _fbRef('pendingGarage');
-    if (_pendingFbRef) {
-      _pendingFbRef.once('value').then(function(snap) {
-        if (snap.val()) return; // Firebase has data — localStorage is in sync, all good
-        localStorage.removeItem('pendingGarageRequest');
-        APP._garageStopPoll();
-        if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
-      }).catch(function() {});
-    }
     return;
   }
 
