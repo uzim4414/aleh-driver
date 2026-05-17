@@ -1426,7 +1426,7 @@ function renderNotifHistory() {
         'data-id="' + safeId + '" data-type="' + type + '" ' +
         'style="animation:card-enter 0.35s var(--ease-out) both;animation-delay:' + (i * 0.05) + 's;margin-bottom:10px;display:block;padding:12px 14px">' +
 
-      '<div class="nh-header-row" onclick="APP._toggleNotif(this)">' +
+      '<div class="nh-header-row" onclick="_toggleNotifCard(this)">' +
         '<div class="notif-icon" style="flex-shrink:0;margin-top:1px">' + iconHtml + '</div>' +
         '<div class="nh-header-info">' +
           '<div class="nh-title-line">' +
@@ -1455,19 +1455,18 @@ function renderNotifHistory() {
   _initSwipeDelete(section);
 }
 
-APP._toggleNotif = function(headerEl) {
+function _toggleNotifCard(headerEl) {
   var card = headerEl.closest('.notif-history-item');
   if (!card) return;
   var isOpen = card.classList.contains('is-open');
-  // Close siblings first
-  var section = card.closest('#nh-section');
-  if (section) {
-    section.querySelectorAll('.notif-history-item.is-open').forEach(function(el) {
+  var nhSection = card.closest('#nh-section');
+  if (nhSection) {
+    nhSection.querySelectorAll('.notif-history-item.is-open').forEach(function(el) {
       if (el !== card) el.classList.remove('is-open');
     });
   }
   card.classList.toggle('is-open', !isOpen);
-};
+}
 
 function renderAlerts() {
   const container = document.getElementById('alerts-content');
