@@ -316,11 +316,20 @@ function _initFbGarageSync() {
   if (pendingRef) {
     pendingRef.on('value', function(snap) {
       try {
-        var data = snap.val();
+        var data    = snap.val();
+        var prevRaw = localStorage.getItem('pendingGarageRequest');
         if (data) {
-          localStorage.setItem('pendingGarageRequest', JSON.stringify(data));
+          var newStr = JSON.stringify(data);
+          if (prevRaw !== newStr) {
+            localStorage.setItem('pendingGarageRequest', newStr);
+            if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+          }
         } else {
-          localStorage.removeItem('pendingGarageRequest');
+          if (prevRaw) {
+            localStorage.removeItem('pendingGarageRequest');
+            if (APP._garagePollTimer) APP._garageStopPoll();
+            if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+          }
         }
       } catch(e) { console.warn('[fbSync] pendingGarage onValue:', e.message); }
     });
@@ -331,11 +340,19 @@ function _initFbGarageSync() {
   if (approvedRef) {
     approvedRef.on('value', function(snap) {
       try {
-        var data = snap.val();
+        var data    = snap.val();
+        var prevRaw = localStorage.getItem('approvedGarageRequest');
         if (data) {
-          localStorage.setItem('approvedGarageRequest', JSON.stringify(data));
+          var newStr = JSON.stringify(data);
+          if (prevRaw !== newStr) {
+            localStorage.setItem('approvedGarageRequest', newStr);
+            if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+          }
         } else {
-          localStorage.removeItem('approvedGarageRequest');
+          if (prevRaw) {
+            localStorage.removeItem('approvedGarageRequest');
+            if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+          }
         }
       } catch(e) { console.warn('[fbSync] approvedGarage onValue:', e.message); }
     });
@@ -2312,6 +2329,7 @@ APP.openHelpMenu = async function() {
 
 APP.closeHelpMenu = function() {
   STATE.helpMenuOpen = false;
+  APP._garageView = null;
   APP._garageStopPoll();
   var overlay = document.getElementById('help-overlay');
   var menu    = document.getElementById('help-menu');
@@ -2943,6 +2961,7 @@ APP.helpTowing = async function() {
 
 /* ── מוסך — זרימת אישור מנהל ── */
 APP.helpGarage = function() {
+  APP._garageView = 'main';
   var g = (STATE.vehicle && STATE.vehicle.garage) ? STATE.vehicle.garage : null;
   var garageName = (g && g.name) ? g.name : '';
   var garageAddr = (g && g.address) ? g.address : '';
@@ -3229,6 +3248,7 @@ APP._garageShowApprovedFromStorage = function(meta) {
 };
 
 APP._garageShowPending = function(pending) {
+  APP._garageView = 'pending';
   var since = '';
   if (pending.submittedAt) {
     try {
@@ -3366,6 +3386,7 @@ APP._garagePollStatus = function(pending) {
 };
 
 APP._garageShowApproved = function(garageInfo, eventId, reasonLabel, requestNumber, approvedAt) {
+  APP._garageView = 'approved';
   var g = garageInfo || {};
   var name = g.name || g.garageName || '';
   var addr = g.address || g.garageAddress || '';
