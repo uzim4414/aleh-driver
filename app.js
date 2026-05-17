@@ -131,7 +131,29 @@ function _renderCostAlertCard(meta) {
 var _NOTIF_HISTORY_KEY = 'driver_notif_history';
 
 function getNotifHistory() {
-  try { return JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]'); } catch(e) { return []; }
+  try {
+    var raw = JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]');
+    // Deduplicate: prefer first occurrence (highest ts = most recent, since list is unshifted)
+    var seen = {};
+    var cleaned = raw.filter(function(n) {
+      // Primary key: eventId+alertType (most reliable)
+      var eidKey = n.eventId ? (n.eventId + '|' + (n.alertType || '')) : null;
+      if (eidKey) {
+        if (seen[eidKey]) return false;
+        seen[eidKey] = true;
+      }
+      // Fallback key: ts
+      var tsKey = 'ts:' + n.ts;
+      if (seen[tsKey]) return false;
+      seen[tsKey] = true;
+      return true;
+    });
+    // Write back cleaned list if duplicates were found
+    if (cleaned.length !== raw.length) {
+      try { localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(cleaned)); } catch(_) {}
+    }
+    return cleaned;
+  } catch(e) { return []; }
 }
 
 function saveNotifToHistory(payload) {
