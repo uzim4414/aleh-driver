@@ -837,6 +837,7 @@ function startApp() {
   document.getElementById('app').classList.remove('hidden');
   renderAll();
   initSwipe();
+  setTimeout(APP._checkGarageReminders, 1500);
 
   // Handle cold-start from OS notification tap (SW encoded notif in URL)
   try {
@@ -2899,18 +2900,66 @@ APP._garageShowApprovedFromStorage = function(meta) {
 };
 
 APP._garageShowPending = function(pending) {
-  var since = pending.submittedAt ? new Date(pending.submittedAt).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+  var since = '';
+  if (pending.submittedAt) {
+    try {
+      var d = new Date(pending.submittedAt);
+      since = d.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'2-digit' }) +
+              ' · ' + d.toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' });
+    } catch(e) {}
+  }
+  var reqNum = '';
+  if (pending.eventId) {
+    var m = String(pending.eventId).match(/-(\d+)$/);
+    if (m) reqNum = String(parseInt(m[1], 10));
+  }
+  var reasonLabel = pending.reasonLabel || pending.reason || '';
+
   _showHelpCard(
-    '<div class="help-card" style="text-align:center;padding:28px 20px">' +
-    '<div style="font-size:40px;margin-bottom:10px">⏳</div>' +
-    '<div style="font-size:17px;font-weight:700;color:#f1f5f9;margin-bottom:6px">בקשה בהמתנה</div>' +
-    '<div style="font-size:13px;color:#94a3b8;margin-bottom:4px">סיבה: <b style="color:#f1f5f9">' + (pending.reasonLabel || '') + '</b></div>' +
-    (since ? '<div style="font-size:12px;color:#64748b;margin-bottom:16px">נשלח: ' + since + '</div>' : '') +
-    '<div style="font-size:13px;color:#94a3b8;margin-bottom:12px">ממתין לאישור מנהל הצי. תקבל התראה push כשהבקשה תאושר.</div>' +
-    '<div id="garage-poll-status" style="font-size:11px;color:#64748b;margin-bottom:16px">בודק סטטוס...</div>' +
-    '<button class="help-action-btn secondary" onclick="APP._garageClearPending();APP.helpGarage()">&#x1F504; בקשה חדשה</button>' +
-    '<button class="help-action-btn secondary" style="margin-top:8px" onclick="APP.closeHelpMenu()">סגור</button>' +
-    '</div>'
+    '<div class="help-card" style="padding:0;overflow:hidden">' +
+
+    '<div style="background:linear-gradient(135deg,#78350f,#b45309,#d97706);padding:26px 20px 20px;text-align:center;position:relative">' +
+      '<button class="help-back-btn" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);margin:0" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+      '<div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);margin:8px 0 10px;animation:notif-approved-glow 3s ease infinite">' +
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+      '</div>' +
+      '<div style="font-size:17px;font-weight:900;color:#fff;margin-bottom:3px">בקשה בהמתנה</div>' +
+      '<div style="font-size:12px;color:rgba(255,255,255,.75)">ממתינה לאישור מנהל הצי</div>' +
+    '</div>' +
+
+    '<div style="padding:20px">' +
+
+      '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);border-radius:14px;padding:14px 16px;margin-bottom:14px">' +
+        '<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:10px;display:flex;align-items:center;gap:7px">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>' +
+          'כבר הגשת בקשה להיכנס למוסך' +
+        '</div>' +
+        (reqNum ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-size:11px;color:#64748b">מספר פנייה</span>' +
+          '<span style="font-size:15px;font-weight:900;color:#f1f5f9">#' + reqNum + '</span>' +
+        '</div>' : '') +
+        (reasonLabel ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-size:11px;color:#64748b">סיבה</span>' +
+          '<span style="font-size:12px;font-weight:600;color:#f1f5f9">' + _escHtml(reasonLabel) + '</span>' +
+        '</div>' : '') +
+        (since ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0">' +
+          '<span style="font-size:11px;color:#64748b">נשלח</span>' +
+          '<span style="font-size:12px;font-weight:600;color:#f1f5f9">' + since + '</span>' +
+        '</div>' : '') +
+      '</div>' +
+
+      '<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 14px;margin-bottom:16px">' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;animation:notif-critical-pulse 2s ease infinite"></div>' +
+        '<div style="font-size:12px;color:#94a3b8">תקבל התראה push כשהמנהל יאשר את הבקשה</div>' +
+      '</div>' +
+
+      '<div style="font-size:11px;color:#475569;text-align:center;margin-bottom:14px;padding:10px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)">' +
+        'במידה ומדובר בפנייה חדשה ושונה — לחץ "בקשה חדשה"' +
+      '</div>' +
+
+      '<button class="help-action-btn secondary" style="margin-bottom:8px" onclick="APP._garageClearPending();APP.helpGarage()">&#x1F504; בקשה חדשה</button>' +
+      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+    '</div></div>'
   );
 };
 
@@ -3058,14 +3107,44 @@ APP._garageConfirmAppointment = async function(eventId) {
     if (result && result.ok) {
       APP._garageClearPending();
       APP._garageClearApproved();
+      var _dateFmt = dateVal.split('-').reverse().join('/');
+      var _calUrl  = _buildGoogleCalendarUrl(dateVal, STATE.vehicle);
       _showHelpCard(
-        '<div class="help-card" style="text-align:center;padding:32px 20px">' +
-        '<div style="font-size:48px;margin-bottom:12px">🎉</div>' +
-        '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">תור נקבע!</div>' +
-        '<div style="font-size:14px;color:#94a3b8;margin-bottom:6px">תאריך: <b style="color:#f1f5f9">' + dateVal.split('-').reverse().join('/') + '</b></div>' +
-        '<div style="font-size:13px;color:#64748b;margin-bottom:20px">מנהל הצי קיבל עדכון</div>' +
-        '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
-        '</div>'
+        '<div class="help-card" style="padding:0;overflow:hidden">' +
+
+        '<div style="background:linear-gradient(135deg,#052e16,#064e3b,#059669);padding:30px 20px 24px;text-align:center">' +
+          '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);margin-bottom:12px;animation:notif-approved-glow 2.5s ease infinite">' +
+            '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+          '</div>' +
+          '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px">תור נקבע!</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,.85)">תאריך: <b>' + _dateFmt + '</b></div>' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px">מנהל הצי קיבל עדכון</div>' +
+        '</div>' +
+
+        '<div style="padding:20px">' +
+
+          '<a href="' + _calUrl + '" target="_blank" style="display:flex;align-items:center;gap:12px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);border-radius:14px;padding:14px 16px;margin-bottom:10px;text-decoration:none;cursor:pointer;transition:background .2s" onclick="this.style.background=\'rgba(59,130,246,.2)\'">' +
+            '<div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+            '</div>' +
+            '<div style="text-align:right">' +
+              '<div style="font-size:14px;font-weight:700;color:#93c5fd">הוסף ליומן Google</div>' +
+              '<div style="font-size:11px;color:#64748b;margin-top:2px">פותח את Google Calendar</div>' +
+            '</div>' +
+          '</a>' +
+
+          '<button onclick="APP._garageShowReminderPicker(\'' + dateVal + '\')" style="display:flex;align-items:center;gap:12px;width:100%;background:rgba(139,92,246,.10);border:1px solid rgba(139,92,246,.22);border-radius:14px;padding:14px 16px;margin-bottom:18px;cursor:pointer;transition:background .2s" onmouseover="this.style.background=\'rgba(139,92,246,.2)\'" onmouseout="this.style.background=\'rgba(139,92,246,.10)\'">' +
+            '<div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6d28d9,#8b5cf6);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+            '</div>' +
+            '<div style="text-align:right">' +
+              '<div style="font-size:14px;font-weight:700;color:#c4b5fd">קבע תזכורת</div>' +
+              '<div style="font-size:11px;color:#64748b;margin-top:2px">התראה לפני מועד התור</div>' +
+            '</div>' +
+          '</button>' +
+
+          '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+        '</div></div>'
       );
     } else {
       if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
@@ -3086,6 +3165,111 @@ APP._garageConfirmAppointment = async function(eventId) {
     if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
     showToast('שגיאה — נסה שוב');
   }
+};
+
+function _buildGoogleCalendarUrl(dateVal, vehicle) {
+  var d       = dateVal.replace(/-/g, '');
+  var dt      = new Date(dateVal + 'T12:00:00');
+  dt.setDate(dt.getDate() + 1);
+  var nextDay = dt.toISOString().slice(0, 10).replace(/-/g, '');
+  var vNum    = (vehicle && vehicle.num)  || '';
+  var gName   = (vehicle && vehicle.garage && vehicle.garage.name)    || 'מוסך';
+  var gAddr   = (vehicle && vehicle.garage && vehicle.garage.address) || '';
+  var title   = encodeURIComponent('תור במוסך — ' + vNum);
+  var details = encodeURIComponent('תור במוסך ' + gName + '\nרכב: ' + vNum);
+  var loc     = encodeURIComponent(gAddr);
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + title +
+    '&dates=' + d + '/' + nextDay + '&details=' + details + '&location=' + loc + '&sf=true&output=xml';
+}
+
+APP._garageShowReminderPicker = function(dateVal) {
+  var dateFmt = dateVal.split('-').reverse().join('/');
+  var opts = [
+    { days: 7, label: 'שבוע לפני התור' },
+    { days: 3, label: '3 ימים לפני' },
+    { days: 2, label: 'יומיים לפני' },
+    { days: 1, label: 'יום לפני' }
+  ];
+  _showHelpCard(
+    '<div class="help-card">' +
+    '<button class="help-back-btn" onclick="APP.closeHelpMenu()">&#x25C4; חזרה</button>' +
+    '<div class="help-card-title">קבע תזכורת</div>' +
+    '<div class="help-card-sub">תאריך התור: ' + dateFmt + '</div>' +
+    '<hr class="help-card-divider">' +
+    '<div style="font-size:13px;color:#94a3b8;margin-bottom:14px">מתי לשלוח תזכורת?</div>' +
+    opts.map(function(opt) {
+      return '<button onclick="APP._saveGarageReminder(\'' + dateVal + '\',' + opt.days + ')" ' +
+        'style="display:flex;align-items:center;gap:12px;width:100%;background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.22);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:background .2s" ' +
+        'onmouseover="this.style.background=\'rgba(168,85,247,.2)\'" onmouseout="this.style.background=\'rgba(168,85,247,.10)\'">' +
+        '<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+        '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#f1f5f9;text-align:right">' + opt.label + '</div>' +
+        '</button>';
+    }).join('') +
+    '<div style="font-size:11px;color:#475569;text-align:center;margin-top:4px">התזכורת תופיע בפתיחת האפליקציה</div>' +
+    '</div>'
+  );
+};
+
+APP._saveGarageReminder = function(appointmentDate, daysBefore) {
+  try {
+    var apptMs   = new Date(appointmentDate + 'T09:00:00').getTime();
+    var remindMs = apptMs - (daysBefore * 86400000);
+    var reminders = [];
+    try { reminders = JSON.parse(localStorage.getItem('driver_garage_reminders') || '[]'); } catch(_) {}
+    reminders = reminders.filter(function(r) { return r.appointmentDate !== appointmentDate; });
+    reminders.push({
+      appointmentDate: appointmentDate,
+      remindAt:        remindMs,
+      daysBefore:      daysBefore,
+      vehicleNum:      (STATE.vehicle && STATE.vehicle.num) || '',
+      shown:           false
+    });
+    localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
+    _showHelpCard(
+      '<div class="help-card" style="text-align:center;padding:32px 20px">' +
+      '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);margin-bottom:14px;animation:notif-approved-glow 2.5s ease infinite">' +
+        '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+      '</div>' +
+      '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:6px">תזכורת נקבעה!</div>' +
+      '<div style="font-size:13px;color:#94a3b8;margin-bottom:20px">' + daysBefore + (daysBefore === 1 ? ' יום' : ' ימים') + ' לפני התור · ' + appointmentDate.split('-').reverse().join('/') + '</div>' +
+      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+      '</div>'
+    );
+  } catch(e) {
+    console.error('_saveGarageReminder:', e);
+    showToast('שגיאה בשמירת תזכורת');
+  }
+};
+
+APP._checkGarageReminders = function() {
+  try {
+    var reminders = JSON.parse(localStorage.getItem('driver_garage_reminders') || '[]');
+    if (!reminders.length) return;
+    var now = Date.now(); var updated = false;
+    reminders.forEach(function(r) {
+      if (!r.shown && now >= r.remindAt) {
+        r.shown  = true;
+        updated  = true;
+        var apptFmt = r.appointmentDate.split('-').reverse().join('/');
+        var payload = {
+          notification: {
+            title: 'תזכורת — תור במוסך',
+            body: 'התור שלך ' + (r.daysBefore === 1 ? 'מחר' : 'בעוד ' + r.daysBefore + ' ימים') + ' · ' + apptFmt
+          },
+          data: { alertType: 'plan', vehicleNum: r.vehicleNum },
+          ts: now
+        };
+        if (typeof showInAppNotification === 'function') showInAppNotification(payload);
+      }
+    });
+    reminders = reminders.filter(function(r) {
+      var apptMs = new Date(r.appointmentDate + 'T23:59:00').getTime();
+      return now < apptMs + (3 * 86400000);
+    });
+    if (updated) localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
+  } catch(e) { console.warn('_checkGarageReminders:', e); }
 };
 
 APP._garageAppointmentNo = function() {
