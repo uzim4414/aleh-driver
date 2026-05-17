@@ -166,6 +166,8 @@ function saveNotifToHistory(payload) {
     var list = getNotifHistory();
     // Dedup by ts
     if (list.some(function(n) { return n.ts === ts; })) return;
+    // Dedup by eventId — prevents duplicate when same push arrives via two code paths
+    if (meta.eventId && list.some(function(n) { return n.eventId === meta.eventId && n.alertType === alertType; })) return;
     list.unshift({
       id:        ts,
       title:     notif.title || 'עלה — התראה',
@@ -1386,6 +1388,8 @@ function renderNotifHistory() {
     return;
   }
 
+  var SEV_LABEL = { critical:'דחוף!', urgent:'דחוף', plan:'תזכורת', info:'מידע', approved:'אושר' };
+
   var itemsHtml = history.map(function(n, i) {
     var type     = n.alertType || 'plan';
     var severity = SEVERITY_MAP[type] || 'plan';
@@ -1393,35 +1397,55 @@ function renderNotifHistory() {
     var iconHtml = (SEVERITY_ICONS[severity] || SEVERITY_ICONS.plan)
       .replace('width="22"', 'width="20"').replace('height="22"', 'height="20"');
 
-    // Meta rows
-    var metaHtml = '';
-    var metaItems = [];
-    if (n.requestNumber) metaItems.push('בקשה #' + _escHtml(n.requestNumber));
-    if (n.reasonLabel)   metaItems.push(_escHtml(n.reasonLabel));
+    // Expandable meta rows
+    var metaRowsHtml = '';
+    var metaRows = [];
+    if (n.vehicleId)     metaRows.push(['רכב', _escHtml(n.vehicleId)]);
+    if (n.requestNumber) metaRows.push(['בקשה', '#' + _escHtml(n.requestNumber)]);
+    if (n.reasonLabel)   metaRows.push(['סיבה', _escHtml(n.reasonLabel)]);
+    if (n.originalDescription) metaRows.push(['תיאור', _escHtml(n.originalDescription)]);
+    if (n.managerNote)   metaRows.push(['הערת מנהל', _escHtml(n.managerNote)]);
     if (type === 'fuel_high' && n.fuelConsumption)
-      metaItems.push('צריכה: ' + _escHtml(n.fuelConsumption) + ' ל/100קמ');
+      metaRows.push(['צריכת דלק', _escHtml(n.fuelConsumption) + ' ל׳/100קמ']);
     if (type === 'fuel_km_high' && n.costPerKm)
-      metaItems.push('עלות: ₪' + _escHtml(n.costPerKm) + '/קמ');
-    if (n.managerNote)   metaItems.push(_escHtml(n.managerNote));
-    if (metaItems.length) {
-      metaHtml = '<div class="notif-meta">' +
-        metaItems.map(function(m) { return '<span>' + m + '</span>'; }).join('') +
-        '</div>';
+      metaRows.push(['עלות לק״מ', '₪' + _escHtml(n.costPerKm)]);
+    if (metaRows.length) {
+      metaRowsHtml = '<div class="nh-meta-rows">' +
+        metaRows.map(function(r) {
+          return '<div class="nh-meta-row">' +
+            '<span class="nh-meta-label">' + r[0] + '</span>' +
+            '<span class="nh-meta-value">'  + r[1] + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
     }
+
+    var chevronSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
 
     return '<div class="notif-history-item notif-card notif-' + severity + '" ' +
         'data-id="' + safeId + '" data-type="' + type + '" ' +
-        'style="animation:card-enter 0.35s var(--ease-out) both;animation-delay:' + (i * 0.05) + 's;margin-bottom:10px;cursor:pointer" ' +
-        'onclick="navigateForAlertType(\'' + type + '\',' + JSON.stringify(n) + ')">' +
-      '<div class="notif-icon">' + iconHtml + '</div>' +
-      '<div class="notif-content">' +
-        '<div class="notif-title">' + _escHtml(n.title) + '</div>' +
-        '<div class="notif-body">'  + _escHtml(n.body)  + '</div>' +
-        metaHtml +
+        'style="animation:card-enter 0.35s var(--ease-out) both;animation-delay:' + (i * 0.05) + 's;margin-bottom:10px;display:block;padding:12px 14px">' +
+
+      '<div class="nh-header-row" onclick="APP._toggleNotif(this)">' +
+        '<div class="notif-icon" style="flex-shrink:0;margin-top:1px">' + iconHtml + '</div>' +
+        '<div class="nh-header-info">' +
+          '<div class="nh-title-line">' +
+            '<span class="notif-title" style="flex:1;min-width:0">' + _escHtml(n.title) + '</span>' +
+            '<span class="nh-sev-badge nh-sev-' + severity + '">' + (SEV_LABEL[severity] || severity) + '</span>' +
+          '</div>' +
+          '<div class="notif-time" style="margin-top:3px">' + _notifTimeLabel(n.ts) + '</div>' +
+        '</div>' +
+        '<div class="nh-chevron">' + chevronSvg + '</div>' +
       '</div>' +
-      '<div class="notif-time">' + _notifTimeLabel(n.ts) + '</div>' +
-      '<div class="notif-swipe-reveal">' +
-        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>' +
+
+      '<div class="nh-expand-body">' +
+        '<div class="nh-divider"></div>' +
+        (n.body ? '<div class="nh-body-text">' + _escHtml(n.body) + '</div>' : '') +
+        metaRowsHtml +
+        '<button class="nh-delete-btn" onclick="APP.deleteNotif(\'' + safeId + '\');event.stopPropagation()">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>' +
+          'מחק התראה' +
+        '</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1430,6 +1454,20 @@ function renderNotifHistory() {
   container.appendChild(section);
   _initSwipeDelete(section);
 }
+
+APP._toggleNotif = function(headerEl) {
+  var card = headerEl.closest('.notif-history-item');
+  if (!card) return;
+  var isOpen = card.classList.contains('is-open');
+  // Close siblings first
+  var section = card.closest('#nh-section');
+  if (section) {
+    section.querySelectorAll('.notif-history-item.is-open').forEach(function(el) {
+      if (el !== card) el.classList.remove('is-open');
+    });
+  }
+  card.classList.toggle('is-open', !isOpen);
+};
 
 function renderAlerts() {
   const container = document.getElementById('alerts-content');
@@ -1843,8 +1881,7 @@ const APP = {
 };
 
 function _initSwipeDelete(container) {
-  // Wrap each .nh-item in a swipe-wrap that holds a red reveal layer behind it
-  container.querySelectorAll('.nh-item').forEach(function(item) {
+  container.querySelectorAll('.notif-history-item').forEach(function(item) {
     if (item.parentNode && item.parentNode.classList.contains('nh-swipe-wrap')) return;
     var wrap = document.createElement('div');
     wrap.className = 'nh-swipe-wrap';
@@ -1874,7 +1911,7 @@ function _initSwipeDelete(container) {
 
   function onStart(e) {
     var t = e.touches ? e.touches[0] : e;
-    var item = e.target.closest && e.target.closest('.nh-item');
+    var item = e.target.closest && e.target.closest('.notif-history-item');
     if (!item) return;
     activeItem = item;
     activeWrap = item.parentNode;
@@ -2785,7 +2822,7 @@ APP._garageSubmitRequest = async function() {
     var result = await _fireFieldEvent('garage_request', details);
     if (result.ok) {
       var eventId = result.eventId || '';
-      try { localStorage.setItem('pendingGarageRequest', JSON.stringify({ eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, submittedAt: Date.now() })); } catch(e) {}
+      try { localStorage.setItem('pendingGarageRequest', JSON.stringify({ eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() })); } catch(e) {}
       _showHelpCard(
         '<div class="help-card" style="text-align:center;padding:32px 20px">' +
         '<div style="font-size:48px;margin-bottom:12px">📤</div>' +
@@ -2802,6 +2839,7 @@ APP._garageSubmitRequest = async function() {
           eventId:     dupEventId,
           reason:      ctx2.reasonId    || '',
           reasonLabel: ctx2.reasonLabel || '',
+          description: ctx2.description || '',
           submittedAt: Date.now()
         }));
       } catch(_e) {}
@@ -2919,9 +2957,11 @@ APP._garageShowPending = function(pending) {
     '<div class="help-card" style="padding:0;overflow:hidden">' +
 
     '<div style="background:linear-gradient(135deg,#78350f,#b45309,#d97706);padding:26px 20px 20px;text-align:center;position:relative">' +
-      '<button class="help-back-btn" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);margin:0" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
-      '<div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);margin:8px 0 10px;animation:notif-approved-glow 3s ease infinite">' +
-        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+      '<button class="help-back-btn" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:6px 14px;margin:0" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+      '<div class="hourglass-wrap">' +
+        '<span class="hourglass-spin">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>' +
+        '</span>' +
       '</div>' +
       '<div style="font-size:17px;font-weight:900;color:#fff;margin-bottom:3px">בקשה בהמתנה</div>' +
       '<div style="font-size:12px;color:rgba(255,255,255,.75)">ממתינה לאישור מנהל הצי</div>' +
@@ -2941,6 +2981,10 @@ APP._garageShowPending = function(pending) {
         (reasonLabel ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
           '<span style="font-size:11px;color:#64748b">סיבה</span>' +
           '<span style="font-size:12px;font-weight:600;color:#f1f5f9">' + _escHtml(reasonLabel) + '</span>' +
+        '</div>' : '') +
+        (pending.description ? '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);gap:10px">' +
+          '<span style="font-size:11px;color:#64748b;flex-shrink:0;padding-top:2px">תיאור</span>' +
+          '<span style="font-size:12px;font-weight:600;color:#f1f5f9;text-align:start;line-height:1.4">' + _escHtml(pending.description) + '</span>' +
         '</div>' : '') +
         (since ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0">' +
           '<span style="font-size:11px;color:#64748b">נשלח</span>' +

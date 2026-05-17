@@ -1076,6 +1076,164 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   color: var(--notif-text-muted);
 }
 
+/* ── Hourglass animation (pending garage screen) ── */
+@keyframes hourglass-flip {
+  0%,40%  { transform: rotate(0deg); }
+  50%,90% { transform: rotate(180deg); }
+  100%    { transform: rotate(360deg); }
+}
+@keyframes hourglass-glow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); }
+  50%     { box-shadow: 0 0 18px 6px rgba(251,191,36,.35); }
+}
+.hourglass-spin {
+  animation: hourglass-flip 2.6s cubic-bezier(.4,0,.6,1) infinite;
+  transform-origin: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.hourglass-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.3);
+  margin: 8px 0 12px;
+  animation: hourglass-glow 2.6s ease infinite;
+}
+
+/* ── Notification history — expandable cards ── */
+.nh-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.nh-header-info {
+  flex: 1;
+  min-width: 0;
+}
+.nh-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nh-sev-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: .2px;
+}
+.nh-sev-badge.nh-sev-critical { background: rgba(239,68,68,.18);  color: #f87171; }
+.nh-sev-badge.nh-sev-urgent   { background: rgba(245,158,11,.18); color: #fbbf24; }
+.nh-sev-badge.nh-sev-plan     { background: rgba(59,130,246,.18); color: #60a5fa; }
+.nh-sev-badge.nh-sev-info     { background: rgba(139,92,246,.18); color: #a78bfa; }
+.nh-sev-badge.nh-sev-approved { background: rgba(34,197,94,.18);  color: #4ade80; }
+.nh-chevron {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--notif-text-muted);
+  transition: transform 0.32s cubic-bezier(.4,0,.2,1);
+  border-radius: 50%;
+  background: rgba(255,255,255,.05);
+}
+.notif-history-item.is-open .nh-chevron { transform: rotate(180deg); }
+
+/* expandable body */
+.nh-expand-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.38s cubic-bezier(.4,0,.2,1), padding-top 0.28s ease, opacity 0.25s ease;
+  padding-top: 0;
+  opacity: 0;
+}
+.notif-history-item.is-open .nh-expand-body {
+  max-height: 420px;
+  padding-top: 10px;
+  opacity: 1;
+}
+.nh-divider {
+  height: 1px;
+  background: rgba(255,255,255,.07);
+  margin-bottom: 10px;
+}
+.nh-body-text {
+  font-size: 12.5px;
+  color: var(--notif-text-secondary);
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+.nh-meta-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.nh-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 5px 8px;
+  background: rgba(255,255,255,.04);
+  border-radius: 8px;
+  gap: 10px;
+}
+.nh-meta-label {
+  font-size: 10.5px;
+  color: var(--notif-text-muted);
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.nh-meta-value {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--notif-text-primary);
+  text-align: start;
+  line-height: 1.4;
+}
+.nh-delete-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(239,68,68,.09);
+  border: 1px solid rgba(239,68,68,.2);
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nh-delete-btn:active { background: rgba(239,68,68,.2); transform: scale(.97); }
+
+/* Swipe wrap also targets notif-history-item */
+.nh-swipe-wrap > .notif-history-item {
+  margin: 0 !important;
+  position: relative;
+  z-index: 1;
+  border-radius: 16px;
+  will-change: transform, opacity;
+}
+
 /* --- Reduced Motion Override --- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
