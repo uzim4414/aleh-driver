@@ -330,6 +330,7 @@ function _initFbGarageSync() {
       try {
         var data    = snap.val();
         var prevRaw = localStorage.getItem('pendingGarageRequest');
+        console.log('[fbSync] pendingGarage fired | fbVal:', data ? JSON.stringify(data).slice(0,60) : 'null', '| localHas:', !!prevRaw, '| helpOpen:', STATE.helpMenuOpen, '| garageView:', APP._garageView);
         if (data) {
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
@@ -338,13 +339,16 @@ function _initFbGarageSync() {
           }
         } else {
           if (prevRaw) {
+            console.log('[fbSync] pendingGarage: removing stale localStorage entry');
             localStorage.removeItem('pendingGarageRequest');
             if (APP._garagePollTimer) APP._garageStopPoll();
             if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+          } else {
+            console.log('[fbSync] pendingGarage: both Firebase and localStorage are empty — nothing to do');
           }
         }
-      } catch(e) { console.warn('[fbSync] pendingGarage onValue:', e.message); }
-    });
+      } catch(e) { console.warn('[fbSync] pendingGarage onValue ERROR:', e.message); }
+    }, function(err) { console.error('[fbSync] pendingGarage listener PERMISSION ERROR:', err.message); });
   }
 
   // Approved garage — פרטי מוסך מאושר
