@@ -330,7 +330,6 @@ function _initFbGarageSync() {
       try {
         var data    = snap.val();
         var prevRaw = localStorage.getItem('pendingGarageRequest');
-        console.log('[fbSync] pendingGarage fired | fbVal:', data ? JSON.stringify(data).slice(0,60) : 'null', '| localHas:', !!prevRaw, '| helpOpen:', STATE.helpMenuOpen, '| garageView:', APP._garageView);
         if (data) {
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
@@ -339,12 +338,9 @@ function _initFbGarageSync() {
           }
         } else {
           if (prevRaw) {
-            console.log('[fbSync] pendingGarage: removing stale localStorage entry');
             localStorage.removeItem('pendingGarageRequest');
             if (APP._garagePollTimer) APP._garageStopPoll();
             if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
-          } else {
-            console.log('[fbSync] pendingGarage: both Firebase and localStorage are empty — nothing to do');
           }
         }
       } catch(e) { console.warn('[fbSync] pendingGarage onValue ERROR:', e.message); }
@@ -3185,7 +3181,25 @@ APP._garageSubmitRequest = async function() {
       } catch(_e) {}
       if (btn) { btn.disabled = false; }
       var dup = APP._garageGetPending();
-      if (dup) { APP._garageShowPending(dup); APP._garagePollStatus(dup); }
+      // מסך הסבר ברור לנהג במקום להציג ישירות את מסך ההמתנה
+      _showHelpCard(
+        '<div class="help-card" style="text-align:center;padding:28px 20px">' +
+        '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#d97706,#f59e0b);margin-bottom:14px">' +
+          '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+        '</div>' +
+        '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:8px">יש בקשה פתוחה</div>' +
+        '<div style="font-size:13px;color:#94a3b8;margin-bottom:16px;line-height:1.6">הבקשה הקודמת שלך עדיין ממתינה לאישור המנהל.<br>לא ניתן לשלוח בקשה חדשה עד שתאושר או תידחה.</div>' +
+        (dup && dup.reasonLabel ? '<div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;text-align:right">' +
+          '<div style="color:#94a3b8;margin-bottom:3px">סיבת הבקשה הקודמת</div>' +
+          '<div style="color:#f1f5f9;font-weight:600">' + _escHtml(dup.reasonLabel) + '</div>' +
+          (dup.description ? '<div style="color:#94a3b8;margin-top:4px">' + _escHtml(dup.description) + '</div>' : '') +
+        '</div>' : '') +
+        '<button class="help-action-btn" style="margin-bottom:8px" onclick="(function(){' +
+          'var d=APP._garageGetPending();if(d){APP._garageShowPending(d);APP._garagePollStatus(d);}' +
+        '})()">&#x23F3; המתן לאישור מנהל</button>' +
+        '<button class="help-action-btn secondary" onclick="APP._garageClearPending();APP.helpGarage();">&#x1F5D1; מחק בקשה ישנה — שלח חדשה</button>' +
+        '</div>'
+      );
     } else {
       if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
       showToast('שגיאה בשליחה: ' + ((result && result.error) || 'נסה שוב'));
