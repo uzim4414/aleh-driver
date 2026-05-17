@@ -19,7 +19,7 @@ const SESSION_TTL = 24 * 60 * 60 * 1000;
 const FIREBASE_CONFIG = {
   apiKey:            'AIzaSyCG49bXyT8wZ7Z6tU-fM9zzAJoMmAPUfuA',
   authDomain:        'aleh-fleet.firebaseapp.com',
-  databaseURL:       'PLACEHOLDER_DATABASE_URL',   // ← תחליף ברגע שתשלח את ה-URL
+  databaseURL:       'https://aleh-fleet-default-rtdb.europe-west1.firebasedatabase.app',
   projectId:         'aleh-fleet',
   storageBucket:     'aleh-fleet.firebasestorage.app',
   messagingSenderId: '247079131404',
