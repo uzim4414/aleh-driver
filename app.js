@@ -3370,7 +3370,7 @@ APP._garageCancelAndReset = async function(btn) {
   var eventId = pending && pending.eventId;
   if (eventId && String(eventId).indexOf('queued') === -1) {
     try {
-      await gasPost('garage_request_action', { action: 'cancel', eventId: eventId }, { silent: true });
+      await gasPost('garage_request_action', { requestAction: 'cancel', eventId: eventId }, { silent: true });
     } catch(e) {}
   }
   // Write cancelled marker to Firebase so all other devices clear their state too
