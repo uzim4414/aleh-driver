@@ -330,9 +330,18 @@ function _initFbGarageSync() {
       try {
         var data    = snap.val();
         var prevRaw = localStorage.getItem('pendingGarageRequest');
-        // Only sync when Firebase has data — null means "not written yet", not "no request"
-        // Deletion only happens when GAS poll returns approved/rejected
         if (data) {
+          // Cancelled on another device — clear everywhere and remove the marker
+          if (data.status === 'cancelled') {
+            if (prevRaw) {
+              localStorage.removeItem('pendingGarageRequest');
+              if (APP._garagePollTimer) APP._garageStopPoll();
+              if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
+            }
+            _fbClearPendingGarage();
+            return;
+          }
+          // Normal cross-device sync
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
             localStorage.setItem('pendingGarageRequest', newStr);
@@ -3364,7 +3373,14 @@ APP._garageCancelAndReset = async function(btn) {
       await gasPost('garage_request_action', { action: 'cancel', eventId: eventId }, { silent: true });
     } catch(e) {}
   }
-  APP._garageClearPending();
+  // Write cancelled marker to Firebase so all other devices clear their state too
+  var cancelRef = _fbRef('pendingGarage');
+  if (cancelRef) {
+    try { cancelRef.set({ status: 'cancelled', ts: Date.now() }); } catch(e) {}
+  }
+  // Clear local state
+  try { localStorage.removeItem('pendingGarageRequest'); } catch(e) {}
+  APP._garageStopPoll();
   APP.helpGarage();
 };
 
