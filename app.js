@@ -608,15 +608,7 @@ async function _fbSignIn(googleIdToken) {
   }
 }
 
-function _sessionExpired() {
-  // Firebase signOut — מנתק listener + מנקה session
-  try { if (_fbAuth) _fbAuth.signOut(); } catch(_e) {}
-  STATE.firebaseUid = null;
-  localStorage.removeItem(SESSION_KEY);
-  STATE.idToken = null;
-  STATE.vehicle = null;
-  STATE.user = null;
-  // Show re-login overlay
+function _showSessionExpiredOverlay() {
   var el = document.getElementById('session-expired-overlay');
   if (!el) {
     el = document.createElement('div');
@@ -630,6 +622,38 @@ function _sessionExpired() {
     document.body.appendChild(el);
   }
   el.style.display = 'flex';
+}
+
+function _sessionExpired() {
+  // Firebase signOut — מנתק listener + מנקה session
+  try { if (_fbAuth) _fbAuth.signOut(); } catch(_e) {}
+  STATE.firebaseUid = null;
+  localStorage.removeItem(SESSION_KEY);
+  STATE.idToken = null;
+  STATE.vehicle = null;
+  STATE.user = null;
+
+  // Try silent Google token refresh — if user's Google session is still active,
+  // handleGoogleCredential will fire automatically and re-login without user interaction.
+  if (window.google && google.accounts && google.accounts.id && GOOGLE_CLIENT_ID) {
+    var _fallbackTimer = setTimeout(_showSessionExpiredOverlay, 4000);
+    try {
+      google.accounts.id.prompt(function(notification) {
+        // prompt was suppressed or dismissed — give up and show overlay
+        if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+          clearTimeout(_fallbackTimer);
+          _showSessionExpiredOverlay();
+        }
+        // If displayed and user accepts → handleGoogleCredential fires → re-login succeeds → overlay never shown
+      });
+    } catch(e) {
+      clearTimeout(_fallbackTimer);
+      _showSessionExpiredOverlay();
+    }
+    return;
+  }
+
+  _showSessionExpiredOverlay();
 }
 
 async function gasPost(action, extra, opts) {
