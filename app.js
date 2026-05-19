@@ -1184,6 +1184,7 @@ function startApp() {
   renderAll();
   initSwipe();
   setTimeout(APP._checkGarageReminders, 1500);
+  setInterval(APP._checkGarageReminders, 60000); // re-check every 60s while app is open
 
   // Handle cold-start from OS notification tap (SW encoded notif in URL)
   try {
@@ -1269,6 +1270,7 @@ function renderHomeScreen() {
   }
 
   renderServiceProgress();
+  renderGarageApptWidget();
   renderFuelWidget();
 
   const homeAlert = document.getElementById('home-alert');
@@ -1367,6 +1369,106 @@ function renderFuelWidget() {
 function _heMonthLabel(monthKey) {
   var labels = {'01':'ינואר','02':'פברואר','03':'מרץ','04':'אפריל','05':'מאי','06':'יוני','07':'יולי','08':'אוגוסט','09':'ספטמבר','10':'אוקטובר','11':'נובמבר','12':'דצמבר'};
   return labels[(monthKey + '').slice(5,7)] || monthKey;
+}
+
+/* ══ Garage Appointment Widget ══ */
+
+function _loadActiveAppointment() {
+  try {
+    var raw = localStorage.getItem('activeGarageAppointment');
+    return raw ? JSON.parse(raw) : null;
+  } catch(_) { return null; }
+}
+
+function _hebrewDayName(dateObj) {
+  var days = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'];
+  return days[dateObj.getDay()] || '';
+}
+
+function renderGarageApptWidget() {
+  var mount = document.getElementById('garage-appt-widget-mount');
+  if (!mount) return;
+
+  var appt = _loadActiveAppointment();
+  if (!appt || !appt.appointmentDate) { mount.innerHTML = ''; return; }
+
+  var now    = Date.now();
+  var tStr   = appt.appointmentTime || '09:00';
+  var apptMs = new Date(appt.appointmentDate + 'T' + tStr + ':00').getTime();
+
+  // Auto-expire: hide widget 24 hours after appointment has passed
+  if (now > apptMs + 86400000) {
+    mount.innerHTML = '';
+    try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
+    return;
+  }
+
+  var diffMs   = apptMs - now;
+  var diffDays = diffMs / 86400000;
+
+  var tier, bg, accent, ringAnim, badgeLabel;
+  if (diffMs < 0) {
+    tier = 'missed';   bg = '#111';    accent = '#555';    ringAnim = 'none';                              badgeLabel = 'עבר המועד';
+  } else if (diffDays < 1) {
+    tier = 'imminent'; bg = '#1f0505'; accent = '#ff3b3b'; ringAnim = 'gwPulse 0.8s ease-in-out infinite'; badgeLabel = 'היום!';
+  } else if (diffDays < 3) {
+    tier = 'urgent';   bg = '#1f1400'; accent = '#ff9800'; ringAnim = 'gwPulse 2s ease-in-out infinite';   badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+  } else if (diffDays < 7) {
+    tier = 'soon';     bg = '#0a1f0a'; accent = '#4caf50'; ringAnim = 'gwPulse 3s ease-in-out infinite';   badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+  } else {
+    tier = 'normal';   bg = '#0a1929'; accent = '#4a9eff'; ringAnim = 'none';                              badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+  }
+
+  var dateFmt    = appt.appointmentDate.split('-').reverse().join('/');
+  var dayName    = _hebrewDayName(new Date(apptMs));
+  var garageName = appt.garageName || 'המוסך';
+
+  mount.innerHTML =
+    '<div class="gaw-widget" data-tier="' + tier + '" ' +
+    '  style="--gaw-bg:' + bg + ';--gaw-accent:' + accent + ';--gaw-ring-anim:' + ringAnim + '" ' +
+    '  onclick="_openGarageInfoFromWidget()" role="button" tabindex="0" aria-label="תור במוסך ' + garageName + '">' +
+    '  <div class="gaw-icon-wrap">' +
+    '    <div class="gaw-icon-ring">' +
+    '      <svg class="gaw-icon-svg" viewBox="0 0 24 24">' +
+    '        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' +
+    '      </svg>' +
+    '    </div>' +
+    '  </div>' +
+    '  <div class="gaw-body">' +
+    '    <div class="gaw-title">תור במוסך</div>' +
+    '    <div class="gaw-garage">' + garageName + '</div>' +
+    '    <div class="gaw-date">' + dayName + ' · ' + dateFmt + ' · ' + tStr + '</div>' +
+    '  </div>' +
+    '  <div class="gaw-badge">⏱ ' + badgeLabel + '</div>' +
+    '  <div class="gaw-actions">' +
+    '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageCalendarLink()">📅 יומן</button>' +
+    '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageWaze()">🗺 ניווט</button>' +
+    '  </div>' +
+    '</div>';
+}
+
+function _openGarageInfoFromWidget() {
+  if (typeof APP !== 'undefined' && typeof APP.nav === 'function') {
+    APP.nav('service');
+    setTimeout(function() {
+      if (typeof APP._garageShowApprovedFromStorage === 'function') {
+        APP._garageShowApprovedFromStorage();
+      }
+    }, 80);
+  }
+}
+
+function _openGarageWaze() {
+  var appt = _loadActiveAppointment();
+  if (!appt || !appt.garageAddress) { showToast('כתובת המוסך לא זמינה'); return; }
+  window.open('https://waze.com/ul?q=' + encodeURIComponent(appt.garageAddress) + '&navigate=yes', '_blank');
+}
+
+function _openGarageCalendarLink() {
+  var appt = _loadActiveAppointment();
+  if (!appt || !appt.appointmentDate) return;
+  var url = _buildGoogleCalendarUrl(appt.appointmentDate, appt.appointmentTime || '09:00', STATE.vehicle);
+  window.open(url, '_blank');
 }
 
 function openFuelModal() {
@@ -3525,33 +3627,65 @@ APP._garageShowApproved = function(garageInfo, eventId, reasonLabel, requestNumb
 };
 
 APP._garageAppointmentYes = function(eventId) {
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var inputStyle = 'width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#f1f5f9;font-size:14px;box-sizing:border-box';
+  var labelStyle = 'font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;display:block';
   _showHelpCard(
     '<div class="help-card">' +
-    '<div class="help-card-title">📅 קביעת תאריך תור</div>' +
+    '<div class="help-card-title">📅 קביעת מועד תור</div>' +
     '<hr class="help-card-divider">' +
-    '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">מתי התור שלך במוסך?</div>' +
-    '<input type="date" id="garage-appt-date" style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#f1f5f9;font-size:14px;margin-bottom:14px" min="' + new Date().toISOString().slice(0,10) + '">' +
-    '<button class="help-action-btn" onclick="APP._garageConfirmAppointment(\'' + (eventId||'') + '\')">&#x1F4E8; אשר תאריך תור</button>' +
+    '<div style="font-size:13px;color:#94a3b8;margin-bottom:12px">מתי התור שלך במוסך?</div>' +
+    '<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px">' +
+      '<div style="flex:1">' +
+        '<label style="' + labelStyle + '">תאריך</label>' +
+        '<input type="date" id="garage-appt-date" min="' + todayStr + '" style="' + inputStyle + '">' +
+      '</div>' +
+      '<div style="flex:0 0 110px">' +
+        '<label style="' + labelStyle + '">שעת הגעה</label>' +
+        '<input type="time" id="garage-appt-time" value="09:00" style="' + inputStyle + '">' +
+      '</div>' +
+    '</div>' +
+    '<button class="help-action-btn" onclick="APP._garageConfirmAppointment(\'' + (eventId || '') + '\')">&#x1F4E8; אשר מועד תור</button>' +
     '</div>'
   );
 };
 
 APP._garageConfirmAppointment = async function(eventId) {
   var dateVal = ((document.getElementById('garage-appt-date') || {}).value || '').trim();
+  var timeVal = ((document.getElementById('garage-appt-time') || {}).value || '09:00').trim();
   if (!dateVal) { showToast('יש לבחור תאריך'); return; }
   if (!eventId) { showToast('מזהה אירוע חסר — פנה למנהל'); return; }
   var btn = document.querySelector('.help-action-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
   try {
     var result = await gasPost('garage_set_appointment',
-      { eventId: eventId, appointmentDate: dateVal },
+      { eventId: eventId, appointmentDate: dateVal, appointmentTime: timeVal },
       { silent: true }
     );
     if (result && result.ok) {
       APP._garageClearPending();
       APP._garageClearApproved();
-      var _dateFmt = dateVal.split('-').reverse().join('/');
-      var _calUrl  = _buildGoogleCalendarUrl(dateVal, STATE.vehicle);
+
+      // Save appointment data for home-screen widget
+      var _garageCtx = APP._garageCtx || {};
+      try {
+        localStorage.setItem('activeGarageAppointment', JSON.stringify({
+          eventId:         eventId,
+          appointmentDate: dateVal,
+          appointmentTime: timeVal,
+          garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
+          garageAddress: _garageCtx.garageAddress || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
+          garagePhone:   _garageCtx.garagePhone   || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+        }));
+      } catch(lsErr) { console.warn('activeGarageAppointment save:', lsErr); }
+
+      // Refresh home screen widget immediately
+      if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+
+      var _dateFmt  = dateVal.split('-').reverse().join('/');
+      var _timeDisp = timeVal || '09:00';
+      var _calUrl   = _buildGoogleCalendarUrl(dateVal, timeVal, STATE.vehicle);
+
       _showHelpCard(
         '<div class="help-card" style="padding:0;overflow:hidden">' +
 
@@ -3560,7 +3694,7 @@ APP._garageConfirmAppointment = async function(eventId) {
             '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
           '</div>' +
           '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px">תור נקבע!</div>' +
-          '<div style="font-size:14px;color:rgba(255,255,255,.85)">תאריך: <b>' + _dateFmt + '</b></div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,.85)">תאריך: <b>' + _dateFmt + '</b> · <b>' + _timeDisp + '</b></div>' +
           '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px">מנהל הצי קיבל עדכון</div>' +
         '</div>' +
 
@@ -3576,7 +3710,7 @@ APP._garageConfirmAppointment = async function(eventId) {
             '</div>' +
           '</a>' +
 
-          '<button onclick="APP._garageShowReminderPicker(\'' + dateVal + '\')" style="display:flex;align-items:center;gap:12px;width:100%;background:rgba(139,92,246,.10);border:1px solid rgba(139,92,246,.22);border-radius:14px;padding:14px 16px;margin-bottom:18px;cursor:pointer;transition:background .2s" onmouseover="this.style.background=\'rgba(139,92,246,.2)\'" onmouseout="this.style.background=\'rgba(139,92,246,.10)\'">' +
+          '<button onclick="APP._garageShowReminderPicker(\'' + dateVal + '\',\'' + timeVal + '\')" style="display:flex;align-items:center;gap:12px;width:100%;background:rgba(139,92,246,.10);border:1px solid rgba(139,92,246,.22);border-radius:14px;padding:14px 16px;margin-bottom:18px;cursor:pointer;transition:background .2s" onmouseover="this.style.background=\'rgba(139,92,246,.2)\'" onmouseout="this.style.background=\'rgba(139,92,246,.10)\'">' +
             '<div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6d28d9,#8b5cf6);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
               '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
             '</div>' +
@@ -3590,7 +3724,7 @@ APP._garageConfirmAppointment = async function(eventId) {
         '</div></div>'
       );
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
+      if (btn) { btn.disabled = false; btn.textContent = '📨 אשר מועד תור'; }
       var errCode = (result && result.error) || 'unknown';
       console.error('[garageAppt] GAS error:', errCode);
       if (errCode === 'session_expired') {
@@ -3605,27 +3739,33 @@ APP._garageConfirmAppointment = async function(eventId) {
     }
   } catch(e) {
     console.error('_garageConfirmAppointment:', e);
-    if (btn) { btn.disabled = false; btn.textContent = '📨 אשר תאריך תור'; }
+    if (btn) { btn.disabled = false; btn.textContent = '📨 אשר מועד תור'; }
     showToast('שגיאה — נסה שוב');
   }
 };
 
-function _buildGoogleCalendarUrl(dateVal, vehicle) {
-  var d       = dateVal.replace(/-/g, '');
-  var dt      = new Date(dateVal + 'T12:00:00');
-  dt.setDate(dt.getDate() + 1);
-  var nextDay = dt.toISOString().slice(0, 10).replace(/-/g, '');
-  var vNum    = (vehicle && vehicle.num)  || '';
-  var gName   = (vehicle && vehicle.garage && vehicle.garage.name)    || 'מוסך';
-  var gAddr   = (vehicle && vehicle.garage && vehicle.garage.address) || '';
+function _buildGoogleCalendarUrl(dateVal, timeVal, vehicle) {
+  // Build a 1-hour timed event at the driver's chosen time
+  var tStr  = (timeVal && timeVal.length >= 5) ? timeVal : '09:00';
+  var hh    = parseInt(tStr.split(':')[0], 10);
+  var mm    = tStr.split(':')[1] || '00';
+  var hhEnd = hh + 1;
+  if (hhEnd >= 24) { hhEnd = 23; mm = '59'; }
+  var dateFlat  = dateVal.replace(/-/g, '');
+  var startTime = dateFlat + 'T' + String(hh).padStart(2, '0') + mm + '00';
+  var endTime   = dateFlat + 'T' + String(hhEnd).padStart(2, '0') + mm + '00';
+  var vNum  = (vehicle && vehicle.num)  || '';
+  var gName = (vehicle && vehicle.garage && vehicle.garage.name)    || 'מוסך';
+  var gAddr = (vehicle && vehicle.garage && vehicle.garage.address) || '';
   var title   = encodeURIComponent('תור במוסך — ' + vNum);
-  var details = encodeURIComponent('תור במוסך ' + gName + '\nרכב: ' + vNum);
+  var details = encodeURIComponent('תור במוסך ' + gName + '\nרכב: ' + vNum + '\nשעה: ' + tStr);
   var loc     = encodeURIComponent(gAddr);
   return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + title +
-    '&dates=' + d + '/' + nextDay + '&details=' + details + '&location=' + loc + '&sf=true&output=xml';
+    '&dates=' + startTime + '/' + endTime + '&details=' + details + '&location=' + loc + '&sf=true&output=xml';
 }
 
-APP._garageShowReminderPicker = function(dateVal) {
+APP._garageShowReminderPicker = function(dateVal, timeVal) {
+  var tVal    = timeVal || '09:00';
   var dateFmt = dateVal.split('-').reverse().join('/');
   var opts = [
     { days: 7, label: 'שבוע לפני התור' },
@@ -3637,11 +3777,11 @@ APP._garageShowReminderPicker = function(dateVal) {
     '<div class="help-card">' +
     '<button class="help-back-btn" onclick="APP.closeHelpMenu()">&#x25C4; חזרה</button>' +
     '<div class="help-card-title">קבע תזכורת</div>' +
-    '<div class="help-card-sub">תאריך התור: ' + dateFmt + '</div>' +
+    '<div class="help-card-sub">מועד התור: ' + dateFmt + ' · ' + tVal + '</div>' +
     '<hr class="help-card-divider">' +
     '<div style="font-size:13px;color:#94a3b8;margin-bottom:14px">מתי לשלוח תזכורת?</div>' +
     opts.map(function(opt) {
-      return '<button onclick="APP._saveGarageReminder(\'' + dateVal + '\',' + opt.days + ')" ' +
+      return '<button onclick="APP._saveGarageReminder(\'' + dateVal + '\',' + opt.days + ',\'' + tVal + '\')" ' +
         'style="display:flex;align-items:center;gap:12px;width:100%;background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.22);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:background .2s" ' +
         'onmouseover="this.style.background=\'rgba(168,85,247,.2)\'" onmouseout="this.style.background=\'rgba(168,85,247,.10)\'">' +
         '<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
@@ -3650,36 +3790,56 @@ APP._garageShowReminderPicker = function(dateVal) {
         '<div style="font-size:14px;font-weight:700;color:#f1f5f9;text-align:right">' + opt.label + '</div>' +
         '</button>';
     }).join('') +
-    '<div style="font-size:11px;color:#475569;text-align:center;margin-top:4px">התזכורת תופיע בפתיחת האפליקציה</div>' +
+    '<div style="font-size:11px;color:#475569;text-align:center;margin-top:4px">תזכורת תישלח בהתראת מערכת</div>' +
     '</div>'
   );
 };
 
-APP._saveGarageReminder = function(appointmentDate, daysBefore) {
+APP._saveGarageReminder = function(appointmentDate, daysBefore, appointmentTime) {
   try {
-    var apptMs   = new Date(appointmentDate + 'T09:00:00').getTime();
+    var tStr     = appointmentTime || '09:00';
+    var apptMs   = new Date(appointmentDate + 'T' + tStr + ':00').getTime();
     var remindMs = apptMs - (daysBefore * 86400000);
     var reminders = [];
     try { reminders = JSON.parse(localStorage.getItem('driver_garage_reminders') || '[]'); } catch(_) {}
+    // Replace any existing reminder for the same appointment date
     reminders = reminders.filter(function(r) { return r.appointmentDate !== appointmentDate; });
+    var _garageName = (APP._garageCtx && APP._garageCtx.garageName) ||
+                      (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name) || 'המוסך';
     var _newReminder = {
-      id:              remindMs,
+      id:              'GR-' + remindMs,
       appointmentDate: appointmentDate,
+      appointmentTime: tStr,
       remindAt:        remindMs,
       daysBefore:      daysBefore,
       vehicleNum:      (STATE.vehicle && STATE.vehicle.num) || '',
+      garageName:      _garageName,
       shown:           false
     };
     reminders.push(_newReminder);
     localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
     _fbSaveReminder(_newReminder);
+
+    // Post to GAS so server-side push fires on the right day
+    gasPost('save_garage_reminder', {
+      remindAt:        remindMs,
+      appointmentDate: appointmentDate,
+      appointmentTime: tStr,
+      garageName:      _garageName,
+      daysBefore:      daysBefore
+    }, { silent: true }).catch(function(e) { console.warn('save_garage_reminder GAS:', e); });
+
+    var _dFmt = appointmentDate.split('-').reverse().join('/');
     _showHelpCard(
       '<div class="help-card" style="text-align:center;padding:32px 20px">' +
       '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);margin-bottom:14px;animation:notif-approved-glow 2.5s ease infinite">' +
         '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
       '</div>' +
       '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:6px">תזכורת נקבעה!</div>' +
-      '<div style="font-size:13px;color:#94a3b8;margin-bottom:20px">' + daysBefore + (daysBefore === 1 ? ' יום' : ' ימים') + ' לפני התור · ' + appointmentDate.split('-').reverse().join('/') + '</div>' +
+      '<div style="font-size:13px;color:#94a3b8;margin-bottom:4px">' +
+        daysBefore + (daysBefore === 1 ? ' יום' : ' ימים') + ' לפני התור' +
+      '</div>' +
+      '<div style="font-size:12px;color:#475569;margin-bottom:20px">' + _dFmt + ' בשעה ' + tStr + '</div>' +
       '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
       '</div>'
     );
@@ -3693,43 +3853,77 @@ APP._checkGarageReminders = function() {
   try {
     var reminders = JSON.parse(localStorage.getItem('driver_garage_reminders') || '[]');
     if (!reminders.length) return;
-    var now = Date.now(); var updated = false;
+    var now = Date.now();
+    var updated = false;
+
     reminders.forEach(function(r) {
-      if (!r.shown && now >= r.remindAt) {
-        r.shown  = true;
-        updated  = true;
-        var apptFmt = r.appointmentDate.split('-').reverse().join('/');
-        var payload = {
-          notification: {
-            title: 'תזכורת — תור במוסך',
-            body: 'התור שלך ' + (r.daysBefore === 1 ? 'מחר' : 'בעוד ' + r.daysBefore + ' ימים') + ' · ' + apptFmt
-          },
-          data: { alertType: 'plan', vehicleNum: r.vehicleNum },
-          ts: now
-        };
-        if (typeof showInAppNotification === 'function') showInAppNotification(payload);
-        _fbSaveReminder(r);
+      if (r.shown || now < r.remindAt) return;
+      r.shown = true;
+      updated  = true;
+
+      var apptFmt = r.appointmentDate.split('-').reverse().join('/');
+      var tStr    = r.appointmentTime || '09:00';
+      var daysLbl = r.daysBefore === 1 ? 'מחר' : 'בעוד ' + r.daysBefore + ' ימים';
+      var body    = 'התור שלך ' + daysLbl + ' · ' + apptFmt + ' ' + tStr;
+
+      // Layer 1: OS notification via service worker (if permission granted)
+      if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+        navigator.serviceWorker.ready.then(function(reg) {
+          reg.showNotification('🔧 תזכורת תור מוסך', {
+            body:               body,
+            icon:               './icons/icon-192.png',
+            badge:              './icons/badge-blue.png',
+            dir:                'rtl',
+            lang:               'he',
+            tag:                'garage-reminder-' + (r.id || r.remindAt),
+            vibrate:            [300, 100, 300],
+            requireInteraction: true
+          });
+        }).catch(function(e) { console.warn('showNotification:', e); });
       }
+
+      // Layer 2: in-app notification toast (always shown when app is open)
+      var payload = {
+        notification: { title: '🔧 תזכורת תור מוסך', body: body },
+        data: { alertType: 'plan', vehicleNum: r.vehicleNum || '' },
+        ts: now
+      };
+      if (typeof showInAppNotification === 'function') showInAppNotification(payload);
     });
+
+    // Prune reminders older than 3 days after appointment time
     reminders = reminders.filter(function(r) {
-      var apptMs = new Date(r.appointmentDate + 'T23:59:00').getTime();
+      var apptMs = new Date((r.appointmentDate || '2000-01-01') + 'T23:59:00').getTime();
       var keep = now < apptMs + (3 * 86400000);
-      if (!keep && r.id) { _fbDeleteReminder(r.id); }
+      if (!keep && r.id) { try { _fbDeleteReminder(r.id); } catch(_) {} }
       return keep;
     });
+
     if (updated) localStorage.setItem('driver_garage_reminders', JSON.stringify(reminders));
   } catch(e) { console.warn('_checkGarageReminders:', e); }
 };
 
 APP._garageAppointmentNo = function() {
-  _showHelpCard(
-    '<div class="help-card" style="text-align:center;padding:28px 20px">' +
-    '<div style="font-size:40px;margin-bottom:10px">⏰</div>' +
-    '<div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">בסדר!</div>' +
-    '<div style="font-size:13px;color:#94a3b8;margin-bottom:20px">נשלח לך תזכורת בעוד 3 ימים לקביעת תור</div>' +
-    '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
-    '</div>'
-  );
+  // Try to create a real 3-day reminder using any stored appointment data
+  var apptData = null;
+  try { apptData = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+  var appointmentDate = (apptData && apptData.appointmentDate) || '';
+  var appointmentTime = (apptData && apptData.appointmentTime) || '09:00';
+
+  if (appointmentDate) {
+    // Create actual 3-day-before reminder
+    APP._saveGarageReminder(appointmentDate, 3, appointmentTime);
+  } else {
+    // No appointment date yet — show informational card only
+    _showHelpCard(
+      '<div class="help-card" style="text-align:center;padding:28px 20px">' +
+      '<div style="font-size:40px;margin-bottom:10px">⏰</div>' +
+      '<div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">בסדר!</div>' +
+      '<div style="font-size:13px;color:#94a3b8;margin-bottom:20px">כשתקבע תאריך תור, תוכל להגדיר תזכורת.</div>' +
+      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+      '</div>'
+    );
+  }
 };
 
 
