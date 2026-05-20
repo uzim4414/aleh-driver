@@ -242,6 +242,20 @@ function _fbClearApprovedGarage() {
   ref.remove().catch(function(e) { console.warn('[fbSync] clearApprovedGarage:', e.message); });
 }
 
+/** שמירת תור פעיל — סנכרון בין מכשירי הנהג */
+function _fbSetActiveAppointment(data) {
+  var ref = _fbRef('activeAppointment');
+  if (!ref) return;
+  ref.set(data).catch(function(e) { console.warn('[fbSync] setActiveAppointment:', e.message); });
+}
+
+/** מחיקת תור פעיל */
+function _fbClearActiveAppointment() {
+  var ref = _fbRef('activeAppointment');
+  if (!ref) return;
+  ref.remove().catch(function(e) { console.warn('[fbSync] clearActiveAppointment:', e.message); });
+}
+
 /* ── Reminders ── */
 
 /** שמירת תזכורת בודדת — id = createdAt timestamp */
@@ -372,6 +386,27 @@ function _initFbGarageSync() {
           }
         }
       } catch(e) { console.warn('[fbSync] approvedGarage onValue:', e.message); }
+    });
+  }
+
+  // Active appointment — תור פעיל, סנכרון בין מכשירים
+  var apptRef = _fbRef('activeAppointment');
+  if (apptRef) {
+    apptRef.on('value', function(snap) {
+      try {
+        var data    = snap.val();
+        var prevRaw = localStorage.getItem('activeGarageAppointment');
+        if (data) {
+          var newStr = JSON.stringify(data);
+          if (prevRaw !== newStr) {
+            localStorage.setItem('activeGarageAppointment', newStr);
+            if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+          }
+        } else if (prevRaw) {
+          localStorage.removeItem('activeGarageAppointment');
+          if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+        }
+      } catch(e) { console.warn('[fbSync] activeAppointment onValue:', e.message); }
     });
   }
 }
@@ -1446,6 +1481,7 @@ function renderGarageApptWidget() {
   if (now > apptMs + 86400000) {
     mount.innerHTML = '';
     try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
+    _fbClearActiveAppointment();
     return;
   }
 
@@ -1489,6 +1525,7 @@ function renderGarageApptWidget() {
     '  <div class="gaw-actions">' +
     '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageCalendarLink()">📅 יומן</button>' +
     '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageWaze()">🗺 ניווט</button>' +
+    '    <button class="gaw-btn" style="color:#f87171" onclick="event.stopPropagation();APP._garageCancelAppointment(\'' + (appt.eventId||'') + '\')">✕ בטל</button>' +
     '  </div>' +
     '</div>';
 }
@@ -3556,6 +3593,33 @@ APP._garageCancelAndReset = async function(btn) {
   APP.helpGarage();
 };
 
+APP._garageCancelAppointment = function(eventId) {
+  var html =
+    '<div style="text-align:center;padding:32px 20px">' +
+    '<div style="font-size:36px;margin-bottom:12px">⚠️</div>' +
+    '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:8px">ביטול תור</div>' +
+    '<div style="font-size:13px;color:#94a3b8;margin-bottom:24px">האם לבטל את התור שנקבע? תוכל לקבוע מועד חדש.</div>' +
+    '<button class="help-action-btn" style="background:#dc2626;margin-bottom:8px" onclick="APP._garageDoCancelAppointment(\'' + (eventId||'') + '\',this)">כן, בטל תור</button>' +
+    '<button class="help-action-btn secondary" onclick="APP.helpGarage()">חזרה</button>' +
+    '</div>';
+  _showHelpCard(html);
+};
+
+APP._garageDoCancelAppointment = async function(eventId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ מבטל...'; }
+  try {
+    if (eventId) await gasPost('cancel_appointment', { eventId: eventId }, { silent: true });
+    try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
+    _fbClearActiveAppointment();
+    if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+    showToast('התור בוטל');
+    APP.helpGarage();
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'כן, בטל תור'; }
+    showToast('שגיאה — נסה שוב');
+  }
+};
+
 APP._garageStopPoll = function() {
   if (APP._garagePollTimer) { clearInterval(APP._garagePollTimer); APP._garagePollTimer = null; }
 };
@@ -3714,15 +3778,17 @@ APP._garageConfirmAppointment = async function(eventId) {
 
       // Save appointment data for home-screen widget
       var _garageCtx = APP._garageCtx || {};
+      var _apptData = {
+        eventId:         eventId,
+        appointmentDate: dateVal,
+        appointmentTime: timeVal,
+        garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
+        garageAddress: _garageCtx.garageAddress || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
+        garagePhone:   _garageCtx.garagePhone   || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+      };
       try {
-        localStorage.setItem('activeGarageAppointment', JSON.stringify({
-          eventId:         eventId,
-          appointmentDate: dateVal,
-          appointmentTime: timeVal,
-          garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
-          garageAddress: _garageCtx.garageAddress || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
-          garagePhone:   _garageCtx.garagePhone   || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
-        }));
+        localStorage.setItem('activeGarageAppointment', JSON.stringify(_apptData));
+        _fbSetActiveAppointment(_apptData);
       } catch(lsErr) { console.warn('activeGarageAppointment save:', lsErr); }
 
       // Refresh home screen widget immediately
@@ -3766,6 +3832,7 @@ APP._garageConfirmAppointment = async function(eventId) {
             '</div>' +
           '</button>' +
 
+          '<button class="help-action-btn secondary" style="color:#f87171;border-color:rgba(248,113,113,.3);margin-bottom:8px" onclick="APP._garageCancelAppointment(\'' + eventId + '\')">✕ בטל תור</button>' +
           '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
         '</div></div>'
       );
