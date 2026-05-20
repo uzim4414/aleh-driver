@@ -1025,6 +1025,51 @@ async function loadFullData() {
   fetchGovData();
   if ('serviceWorker' in navigator && GAS_URL) registerPush();
   loadNotifHistoryFromGAS();
+  _initFbGarageStatusSync();
+}
+
+/* ── Listener: garageSync/{vehicleId} — כתיבה ישירה מ-GAS בעת אישור/דחייה ── */
+function _initFbGarageStatusSync() {
+  if (!_fbDb) return;
+  var vehicleId = STATE.vehicle && (STATE.vehicle.num || STATE.vehicle.id);
+  if (!vehicleId) return;
+  var vehKey = String(vehicleId).replace(/[^0-9A-Za-z_-]/g, '_');
+  _fbDb.ref('garageSync/' + vehKey).on('value', function(snap) {
+    try {
+      var data = snap.val();
+      if (!data || !data.status || !data.eventId) return;
+      // ודא שזו הבקשה הנוכחית (לא ישנה)
+      var prevRaw = localStorage.getItem('pendingGarageRequest');
+      if (!prevRaw) return;
+      var pending;
+      try { pending = JSON.parse(prevRaw); } catch(e) { return; }
+      if (String(pending.eventId) !== String(data.eventId)) return;
+      if (data.status === 'approved') {
+        localStorage.setItem('approvedGarageRequest', JSON.stringify({
+          eventId: data.eventId,
+          requestNumber: data.requestNumber,
+          reasonLabel: data.reasonLabel,
+          managerNote: data.managerNote,
+          garageInfo: data.garageInfo || {},
+          approvedAt: data.updatedAt
+        }));
+        localStorage.removeItem('pendingGarageRequest');
+        _fbClearPendingGarage();
+        if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
+          if (APP.switchTab) APP.switchTab('garage');
+        }
+      } else if (data.status === 'rejected') {
+        localStorage.removeItem('pendingGarageRequest');
+        _fbClearPendingGarage();
+        if (typeof showToast === 'function') {
+          showToast('בקשת המוסך נדחתה' + (data.managerNote ? ': ' + data.managerNote : ''));
+        }
+        if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
+          if (APP.switchTab) APP.switchTab('garage');
+        }
+      }
+    } catch(e) { console.warn('[fbSync] garageStatusSync onValue:', e.message); }
+  }, function(err) { console.warn('[fbSync] garageStatusSync listener:', err.message); });
 }
 
 async function loadNotifHistoryFromGAS() {
