@@ -1073,7 +1073,35 @@ function _initFbGarageStatusSync() {
     try {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
-      // ודא שזו הבקשה הנוכחית (לא ישנה)
+
+      // ── מנהל ביטל תור פעיל ──
+      if (data.status === 'cancelled') {
+        localStorage.removeItem('activeGarageAppointment');
+        _fbClearActiveAppointment();
+        if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+        if (typeof showToast === 'function') showToast('❌ התור בוטל על ידי המנהל');
+        return;
+      }
+
+      // ── מנהל קבע תור מהיומן ──
+      if (data.status === 'appointment_set' && data.appointmentDate) {
+        var _aSet = {
+          eventId:         data.eventId         || '',
+          appointmentDate: data.appointmentDate,
+          appointmentTime: data.appointmentTime || '09:00',
+          managerNote:     data.managerNote     || '',
+          garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
+          garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
+          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+        };
+        localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
+        _fbSetActiveAppointment(_aSet);
+        if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+        if (typeof showToast === 'function') showToast('📅 תור נקבע: ' + data.appointmentDate + ' ' + (data.appointmentTime || ''));
+        return;
+      }
+
+      // ── אישור/דחייה של בקשה ממתינה ──
       var prevRaw = localStorage.getItem('pendingGarageRequest');
       if (!prevRaw) return;
       var pending;
@@ -3594,19 +3622,28 @@ APP._garageCancelAndReset = async function(btn) {
 };
 
 APP._garageCancelAppointment = function(eventId) {
-  var html =
-    '<div style="text-align:center;padding:32px 20px">' +
+  var existing = document.getElementById('_gcancel_overlay');
+  if (existing) existing.remove();
+  var ol = document.createElement('div');
+  ol.id = '_gcancel_overlay';
+  ol.setAttribute('style', 'position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .15s ease');
+  ol.innerHTML =
+    '<div style="background:#1e293b;border-radius:20px;padding:32px 24px;max-width:320px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)">' +
     '<div style="font-size:36px;margin-bottom:12px">⚠️</div>' +
     '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:8px">ביטול תור</div>' +
-    '<div style="font-size:13px;color:#94a3b8;margin-bottom:24px">האם לבטל את התור שנקבע? תוכל לקבוע מועד חדש.</div>' +
-    '<button class="help-action-btn" style="background:#dc2626;margin-bottom:8px" onclick="APP._garageDoCancelAppointment(\'' + (eventId||'') + '\',this)">כן, בטל תור</button>' +
-    '<button class="help-action-btn secondary" onclick="APP.helpGarage()">חזרה</button>' +
+    '<div style="font-size:13px;color:#94a3b8;margin-bottom:24px">האם לבטל את התור שנקבע?<br>תוכל לקבוע מועד חדש.</div>' +
+    '<button style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px" ' +
+    'onclick="APP._garageDoCancelAppointment(\'' + (eventId||'') + '\',this)">כן, בטל תור</button>' +
+    '<button style="width:100%;padding:14px;background:transparent;color:#94a3b8;border:1px solid rgba(148,163,184,.3);border-radius:12px;font-size:15px;cursor:pointer" ' +
+    'onclick="document.getElementById(\'_gcancel_overlay\').remove()">חזרה</button>' +
     '</div>';
-  _showHelpCard(html);
+  document.body.appendChild(ol);
 };
 
 APP._garageDoCancelAppointment = async function(eventId, btn) {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ מבטל...'; }
+  var _ol = document.getElementById('_gcancel_overlay');
+  if (_ol) _ol.remove();
   try {
     if (eventId) await gasPost('cancel_appointment', { eventId: eventId }, { silent: true });
     try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
