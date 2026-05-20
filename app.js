@@ -4340,21 +4340,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.src = 'https://accounts.google.com/gsi/client';
   script.onload = function() {
     initGoogleAuth();
-    // Render fallback button (works on all mobile browsers)
-    var fallbackDiv = document.getElementById('g-btn-fallback');
-    if (fallbackDiv) {
-      google.accounts.id.renderButton(fallbackDiv, {
-        type: 'standard', theme: 'outline', size: 'large',
-        text: 'signin_with', locale: 'he', width: 280
-      });
-    }
     document.getElementById('login-btn').addEventListener('click', function() {
-      google.accounts.id.prompt(function(notification) {
-        // If One Tap was skipped/blocked — show fallback Google button
-        if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
-          if (fallbackDiv) fallbackDiv.style.display = 'flex';
-        }
-      });
+      google.accounts.id.prompt();
     });
   };
   document.head.appendChild(script);
