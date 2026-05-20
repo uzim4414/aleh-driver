@@ -910,7 +910,7 @@ function initGoogleAuth() {
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
-    auto_select: false,
+    auto_select: true,
     cancel_on_tap_outside: false
   });
 }
