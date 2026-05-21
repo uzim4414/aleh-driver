@@ -1147,7 +1147,11 @@ function _initFbGarageStatusSync() {
           garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
         };
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
+        localStorage.removeItem('approvedGarageRequest');
+        localStorage.removeItem('pendingGarageRequest');
         _fbSetActiveAppointment(_aSet);
+        if (typeof _fbClearApprovedGarage === 'function') _fbClearApprovedGarage();
+        if (typeof _fbClearPendingGarage === 'function') _fbClearPendingGarage();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
         if (typeof showToast === 'function') showToast('📅 תור נקבע: ' + data.appointmentDate + ' ' + (data.appointmentTime || ''));
         snap.ref.update({ consumed: true, consumedAt: Date.now() });
@@ -3284,6 +3288,20 @@ APP.helpGarage = function() {
   var garageAddr = (g && g.address) ? g.address : '';
   var garageId   = (g && g.id) ? g.id : '';
 
+  // אם יש תור פעיל — הצג מסך תור נקבע (עדיפות על approved)
+  var activeAppt = _loadActiveAppointment && _loadActiveAppointment();
+  if (activeAppt && activeAppt.appointmentDate) {
+    // ודא שהתור לא פג תוקף (24 שעות אחרי)
+    var apptMs = new Date(activeAppt.appointmentDate + 'T' + (activeAppt.appointmentTime || '09:00') + ':00').getTime();
+    if (Date.now() <= apptMs + 86400000) {
+      APP._garageShowActiveAppointment(activeAppt);
+      return;
+    }
+    // תור פג — נקה
+    try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
+    if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
+  }
+
   // אם יש אישור פעיל — הצג מסך מוסך מאושר עם פרטי קשר מלאים
   var approved = APP._garageGetApproved && APP._garageGetApproved();
   if (approved) { APP._garageShowApprovedFromStorage(); return; }
@@ -3525,6 +3543,60 @@ APP._garageGetApproved = function() {
 APP._garageClearApproved = function() {
   try { localStorage.removeItem('approvedGarageRequest'); } catch(e) {}
   _fbClearApprovedGarage();
+};
+
+// מציג מסך תור פעיל (appointment_set) בתפריט עזרה > מוסך
+APP._garageShowActiveAppointment = function(appt) {
+  APP._garageView = 'active_appointment';
+  var dateFmt = (appt.appointmentDate || '').split('-').reverse().join('/');
+  var tStr    = appt.appointmentTime || '09:00';
+  try {
+    var _apptMs = new Date(appt.appointmentDate + 'T' + tStr + ':00').getTime();
+    var _dayName = _hebrewDayName ? _hebrewDayName(new Date(_apptMs)) : '';
+    dateFmt = _dayName ? _dayName + ' · ' + dateFmt : dateFmt;
+  } catch(_e) {}
+  var garageName    = appt.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name) || 'המוסך';
+  var garageAddress = appt.garageAddress || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '';
+  var garagePhone   = appt.garagePhone   || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone) || '';
+  var managerNote   = appt.managerNote   || '';
+  var eventId       = appt.eventId       || '';
+
+  _showHelpCard(
+    '<div class="help-card" style="padding:0;overflow:hidden">' +
+    '<div style="background:linear-gradient(135deg,#064e3b,#065f46,#047857);padding:26px 20px 20px;text-align:center;position:relative">' +
+      '<button class="help-back-btn" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:6px 14px;margin:0" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button>' +
+      '<div style="font-size:36px;margin-bottom:8px">&#x1F4C5;</div>' +
+      '<div style="font-size:17px;font-weight:900;color:#fff;margin-bottom:3px">תור נקבע!</div>' +
+      '<div style="font-size:13px;color:rgba(255,255,255,.8)">' + dateFmt + ' · ' + tStr + '</div>' +
+    '</div>' +
+    '<div style="padding:20px">' +
+      '<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:14px 16px;margin-bottom:14px">' +
+        '<div style="font-size:12px;font-weight:700;color:#34d399;margin-bottom:10px">&#x2705; פרטי התור</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-size:11px;color:#64748b">מוסך</span>' +
+          '<span style="font-size:13px;font-weight:700;color:#f1f5f9">' + _escHtml(garageName) + '</span>' +
+        '</div>' +
+        (garageAddress ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<span style="font-size:11px;color:#64748b">כתובת</span>' +
+          '<span style="font-size:12px;color:#f1f5f9">' + _escHtml(garageAddress) + '</span>' +
+        '</div>' : '') +
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0' + (managerNote ? ';border-bottom:1px solid rgba(255,255,255,.06)' : '') + '">' +
+          '<span style="font-size:11px;color:#64748b">תאריך ושעה</span>' +
+          '<span style="font-size:13px;font-weight:700;color:#34d399">' + dateFmt + ' ' + tStr + '</span>' +
+        '</div>' +
+        (managerNote ? '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;gap:10px">' +
+          '<span style="font-size:11px;color:#64748b;flex-shrink:0;padding-top:2px">הערה</span>' +
+          '<span style="font-size:12px;color:#f1f5f9;text-align:start;line-height:1.4">' + _escHtml(managerNote) + '</span>' +
+        '</div>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:12px">' +
+        (garagePhone ? '<button onclick="window.open('tel:' + garagePhone + '')" style="flex:1;padding:11px 0;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:10px;color:#34d399;font-size:13px;font-weight:700;cursor:pointer">&#x1F4DE; התקשר</button>' : '') +
+        '<button onclick="_openGarageWaze && _openGarageWaze()" style="flex:1;padding:11px 0;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:700;cursor:pointer">&#x1F5FA; ניווט</button>' +
+      '</div>' +
+      (eventId ? '<button onclick="APP._garageCancelAppointment('' + eventId + '')" style="width:100%;padding:10px 0;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:13px;font-weight:600;cursor:pointer">&#x2715; בטל תור</button>' : '') +
+    '</div>' +
+    '</div>'
+  );
 };
 
 // בונה אובייקט garageInfo מלא מ-STATE.vehicle.garage עבור מסך מוסך מאושר
