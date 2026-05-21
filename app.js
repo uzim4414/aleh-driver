@@ -3645,10 +3645,30 @@ APP._garageShowApprovedFromStorage = function(meta) {
   var approvedAt    = approved.approvedAt    || 0;
   APP._garageShowApproved(info, eventId, reason, requestNumber, approvedAt);
 
-  // רענון אופציונלי מהשרת — silent: לא מפעיל _sessionExpired אם נכשל
+  // רענון מהשרת — מזהה אם כבר נקבע תור על ידי המנהל
   if (eventId && typeof gasPost === 'function') {
     gasPost('get_garage_status', { eventId: eventId }, { silent: true }).then(function(r) {
-      if (r && r.ok && String(r.status||'').toLowerCase() === 'approved' && r.garageInfo) {
+      if (!r || !r.ok) return;
+      var status = String(r.status || '').toLowerCase();
+      if (status === 'appointment_set' && r.appointmentDate) {
+        // מנהל כבר קבע תור — עדכן localStorage והצג מסך תור פעיל
+        var _aSet = {
+          eventId:         eventId,
+          appointmentDate: r.appointmentDate,
+          appointmentTime: r.appointmentTime || '09:00',
+          managerNote:     r.managerNote     || '',
+          garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
+          garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
+          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+        };
+        localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
+        localStorage.removeItem('approvedGarageRequest');
+        localStorage.removeItem('pendingGarageRequest');
+        if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(_aSet);
+        if (typeof _fbClearApprovedGarage  === 'function') _fbClearApprovedGarage();
+        if (typeof renderGarageApptWidget  === 'function') renderGarageApptWidget();
+        APP._garageShowActiveAppointment(_aSet);
+      } else if (status === 'approved' && r.garageInfo) {
         APP._garageShowApproved(r.garageInfo, eventId, r.reasonLabel || reason);
       }
     }).catch(function() {});
