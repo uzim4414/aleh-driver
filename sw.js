@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v86';
+const CACHE_NAME = 'aleh-driver-v87';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
@@ -100,6 +100,7 @@ const TYPE_CONFIG = {
   garage_approved:         { vibrate: [200,100,200],             requireInteraction: true,  badge: './icons/badge-blue.png' },
   garage_rejected:         { vibrate: [400,100,400],             requireInteraction: true,  badge: './icons/badge-red.png' },
   garage_appointment_set:  { vibrate: [200,100,200,100,200],     requireInteraction: true,  badge: './icons/badge-blue.png' },
+  garage_appointment_cancelled: { vibrate: [300,100,300],            requireInteraction: false, badge: './icons/badge-blue.png' },
   fuel_high:       { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
   fuel_km_high:    { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' }
 };
@@ -168,6 +169,7 @@ self.addEventListener('push', e => {
       garage_approved:        '✅ תור מוסך אושר',
       garage_rejected:        '❌ תור מוסך נדחה',
       garage_appointment_set: '📅 תור מוסך נקבע',
+      garage_appointment_cancelled: '📅 תור בוטל',
       fuel_high:       '⛽ צריכת דלק חריגה',
       fuel_km_high:    '📊 עלות לקמ חריגה'
     };

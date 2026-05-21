@@ -99,6 +99,19 @@ function navigateForAlertType(alertType, meta) {
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
       break;
+    // BUG-03: dedicated cancel routing
+    case 'garage_appointment_cancelled':
+      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
+      setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
+      break;
+    // BUG-09: appointment set — navigate to home widget
+    case 'garage_appointment_set':
+      if (typeof APP.nav === 'function') APP.nav('vehicle');
+      setTimeout(function() {
+        var el = document.getElementById('garage-appt-widget-mount');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+      break;
     case 'fuel_high':
       APP.nav('vehicle');
       setTimeout(function() {
@@ -508,6 +521,17 @@ function saveNotifToHistory(payload) {
         if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(_apptData);
         if (typeof renderGarageApptWidget  === 'function') renderGarageApptWidget();
       } catch(_e) {}
+    }
+
+    // BUG-03: מנהל ביטל תור — נקה widget וstate
+    if (alertType === 'garage_appointment_cancelled') {
+      try {
+        localStorage.removeItem('activeGarageAppointment');
+        if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
+        if (typeof renderGarageApptWidget   === 'function') renderGarageApptWidget();
+        var _helpView = document.getElementById('help-garage-view');
+        if (_helpView && typeof helpGarage === 'function') helpGarage();
+      } catch(_e2) {}
     }
 
     var list = getNotifHistory();
@@ -1090,7 +1114,12 @@ function _initFbGarageStatusSync() {
   var vehicleId = STATE.vehicle && (STATE.vehicle.id || STATE.vehicle.num);
   if (!vehicleId) return;
   var vehKey = String(vehicleId).replace(/[^0-9A-Za-z_-]/g, '_');
-  _fbDb.ref('garageSync/' + vehKey).on('value', function(snap) {
+  /* BUG-05: detach previous listener before re-attaching */
+  if (STATE._garageStatusRef) {
+    try { STATE._garageStatusRef.off(); } catch(_) {}
+  }
+  STATE._garageStatusRef = _fbDb.ref('garageSync/' + vehKey);
+  STATE._garageStatusRef.on('value', function(snap) {
     try {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
@@ -1154,6 +1183,7 @@ function _initFbGarageStatusSync() {
       }
     } catch(e) { console.warn('[fbSync] garageStatusSync onValue:', e.message); }
   }, function(err) { console.warn('[fbSync] garageStatusSync listener:', err.message); });
+  /* reference stored in STATE._garageStatusRef for cleanup */
 }
 
 async function loadNotifHistoryFromGAS() {
