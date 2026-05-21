@@ -1123,6 +1123,7 @@ function _initFbGarageStatusSync() {
     try {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
+      if (data.consumed) return;
 
       // ── מנהל ביטל תור פעיל ──
       if (data.status === 'cancelled') {
@@ -1130,6 +1131,7 @@ function _initFbGarageStatusSync() {
         _fbClearActiveAppointment();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
         if (typeof showToast === 'function') showToast('❌ התור בוטל על ידי המנהל');
+        snap.ref.update({ consumed: true, consumedAt: Date.now() });
         return;
       }
 
@@ -1148,6 +1150,7 @@ function _initFbGarageStatusSync() {
         _fbSetActiveAppointment(_aSet);
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
         if (typeof showToast === 'function') showToast('📅 תור נקבע: ' + data.appointmentDate + ' ' + (data.appointmentTime || ''));
+        snap.ref.update({ consumed: true, consumedAt: Date.now() });
         return;
       }
 
@@ -1168,12 +1171,14 @@ function _initFbGarageStatusSync() {
         }));
         localStorage.removeItem('pendingGarageRequest');
         _fbClearPendingGarage();
+        snap.ref.update({ consumed: true, consumedAt: Date.now() });
         if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
           if (APP.switchTab) APP.switchTab('garage');
         }
       } else if (data.status === 'rejected') {
         localStorage.removeItem('pendingGarageRequest');
         _fbClearPendingGarage();
+        snap.ref.update({ consumed: true, consumedAt: Date.now() });
         if (typeof showToast === 'function') {
           showToast('בקשת המוסך נדחתה' + (data.managerNote ? ': ' + data.managerNote : ''));
         }
