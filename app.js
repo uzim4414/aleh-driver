@@ -293,6 +293,8 @@ function _initFbSync() {
   _initFbNotifSync();
   _initFbGarageSync();
   _initFbReminderSync();
+  // Re-attach garageSync status listener with auth context (vehicle must already be loaded)
+  if (STATE.vehicle) _initFbGarageStatusSync();
 }
 
 /* ── Listener: Notifications ── */
