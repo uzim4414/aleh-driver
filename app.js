@@ -1108,6 +1108,37 @@ async function loadFullData() {
   if ('serviceWorker' in navigator && GAS_URL) registerPush();
   loadNotifHistoryFromGAS();
   _initFbGarageStatusSync();
+  // Reliable fallback: poll GAS for active appointment (bypasses Firebase garageSync)
+  _syncActiveAppointmentFromGAS();
+}
+
+async function _syncActiveAppointmentFromGAS() {
+  try {
+    var r = await gasPost('get_active_appointment', {}, { silent: true });
+    if (!r || !r.ok) return;
+    var appt = r.appointment;
+    var existing = _loadActiveAppointment();
+    if (appt && appt.appointmentDate) {
+      var _aSet = {
+        eventId:         appt.eventId         || '',
+        appointmentDate: appt.appointmentDate,
+        appointmentTime: appt.appointmentTime || '09:00',
+        managerNote:     appt.managerNote     || '',
+        garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
+        garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
+        garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+      };
+      var changed = !existing || existing.eventId !== _aSet.eventId || existing.appointmentDate !== _aSet.appointmentDate;
+      if (changed) {
+        localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
+        if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+      }
+    } else if (!appt && existing) {
+      // Admin cleared appointment — remove widget
+      localStorage.removeItem('activeGarageAppointment');
+      if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+    }
+  } catch(_e) {}
 }
 
 /* ── Listener: garageSync/{vehicleId} — כתיבה ישירה מ-GAS בעת אישור/דחייה ── */
