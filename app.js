@@ -1123,17 +1123,20 @@ function _initFbGarageStatusSync() {
     try {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
-      if (data.consumed) return;
 
-      // ── מנהל ביטל תור פעיל ──
+      // ── מנהל ביטל תור פעיל — בדוק לפני consumed ──
       if (data.status === 'cancelled') {
-        localStorage.removeItem('activeGarageAppointment');
-        _fbClearActiveAppointment();
-        if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-        if (typeof showToast === 'function') showToast('❌ התור בוטל על ידי המנהל');
-        snap.ref.update({ consumed: true, consumedAt: Date.now() });
+        if (!data.consumed) {
+          localStorage.removeItem('activeGarageAppointment');
+          _fbClearActiveAppointment();
+          if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+          if (typeof showToast === 'function') showToast('❌ התור בוטל על ידי המנהל');
+          snap.ref.update({ consumed: true, consumedAt: Date.now() });
+        }
         return;
       }
+
+      if (data.consumed) return;
 
       // ── מנהל קבע תור מהיומן ──
       if (data.status === 'appointment_set' && data.appointmentDate) {
