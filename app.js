@@ -488,6 +488,27 @@ function saveNotifToHistory(payload) {
         _fbSetApprovedGarage(_approvedData);
       } catch(_e) {}
     }
+    // מנהל קבע תור ישירות מהיומן — עדכן activeGarageAppointment ונקה approved/pending
+    if (alertType === 'garage_appointment_set') {
+      try {
+        localStorage.removeItem('pendingGarageRequest');
+        localStorage.removeItem('approvedGarageRequest');
+        if (typeof _fbClearPendingGarage  === 'function') _fbClearPendingGarage();
+        if (typeof _fbClearApprovedGarage === 'function') _fbClearApprovedGarage();
+        var _apptData = {
+          eventId:         meta.eventId         || '',
+          appointmentDate: meta.appointmentDate || '',
+          appointmentTime: meta.appointmentTime || '09:00',
+          managerNote:     meta.managerNote     || '',
+          garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
+          garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
+          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+        };
+        localStorage.setItem('activeGarageAppointment', JSON.stringify(_apptData));
+        if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(_apptData);
+        if (typeof renderGarageApptWidget  === 'function') renderGarageApptWidget();
+      } catch(_e) {}
+    }
 
     var list = getNotifHistory();
     // Dedup by ts
@@ -1066,7 +1087,7 @@ async function loadFullData() {
 /* ── Listener: garageSync/{vehicleId} — כתיבה ישירה מ-GAS בעת אישור/דחייה ── */
 function _initFbGarageStatusSync() {
   if (!_fbDb) return;
-  var vehicleId = STATE.vehicle && (STATE.vehicle.num || STATE.vehicle.id);
+  var vehicleId = STATE.vehicle && (STATE.vehicle.id || STATE.vehicle.num);
   if (!vehicleId) return;
   var vehKey = String(vehicleId).replace(/[^0-9A-Za-z_-]/g, '_');
   _fbDb.ref('garageSync/' + vehKey).on('value', function(snap) {
@@ -1303,9 +1324,12 @@ function startApp() {
       var payload = JSON.parse(decodeURIComponent(notifParam));
       saveNotifToHistory(payload);
       var alertType = (payload.data && payload.data.alertType) || 'plan';
-      setTimeout(function() { navigateForAlertType(alertType, payload.data || {}); }, 600);
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
+      // Show stunning full-screen landing, then navigate to the target screen
+      showNotifLanding(payload, function() {
+        navigateForAlertType(alertType, payload.data || {});
+      });
     }
   } catch(e) {}
 }
@@ -3645,7 +3669,15 @@ APP._garageDoCancelAppointment = async function(eventId, btn) {
   var _ol = document.getElementById('_gcancel_overlay');
   if (_ol) _ol.remove();
   try {
-    if (eventId) await gasPost('cancel_appointment', { eventId: eventId }, { silent: true });
+    if (eventId) {
+      var _r = await gasPost('cancel_appointment', { eventId: eventId }, { silent: true });
+      if (_r && _r.error === 'session_expired') {
+        if (btn) { btn.disabled = false; btn.textContent = 'כן, בטל תור'; }
+        _sessionExpired();
+        return;
+      }
+      if (!_r || !_r.ok) throw new Error((_r && _r.error) || 'cancel_failed');
+    }
     try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
     _fbClearActiveAppointment();
     if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
@@ -4296,6 +4328,58 @@ var SEVERITY_ICONS = {
 
 var _activeToast = null;
 
+// Emoji icons for the full-screen notification landing overlay
+var SEVERITY_LANDING_EMOJI = {
+  critical: '🔴', urgent: '🟠', plan: '🔵',
+  info: '💜', approved: '✅'
+};
+
+// Full-screen "notification landing" shown when the app cold-starts from an OS notification tap
+function showNotifLanding(payload, onDone) {
+  var notif = payload.notification || {};
+  var meta = payload.data || {};
+  var alertType = meta.alertType || 'plan';
+  var severity = SEVERITY_MAP[alertType] || 'plan';
+
+  var BG_COLORS = {
+    critical: 'rgba(239,68,68,0.2)',
+    urgent:   'rgba(245,158,11,0.2)',
+    plan:     'rgba(59,130,246,0.2)',
+    info:     'rgba(139,92,246,0.2)',
+    approved: 'rgba(34,197,94,0.2)'
+  };
+
+  var landing = document.getElementById('notif-landing');
+  if (!landing) { if (onDone) onDone(); return; }
+
+  landing.innerHTML =
+    '<div class="nl-icon" style="background:' + (BG_COLORS[severity] || BG_COLORS.plan) + '">' +
+      (SEVERITY_LANDING_EMOJI[severity] || '🔔') +
+    '</div>' +
+    '<div class="nl-title">' + _escHtml(notif.title || 'התראה חדשה') + '</div>' +
+    '<div class="nl-body">' + _escHtml(notif.body || '') + '</div>' +
+    '<button class="nl-cta" onclick="_notifLandingContinue()">פתח ←</button>';
+
+  landing.style.display = 'flex';
+  landing.style.animation = 'notif-landing-in 0.6s cubic-bezier(0.22,1,0.36,1) both';
+
+  var _done = false;
+  window._notifLandingContinue = function() {
+    if (_done) return;
+    _done = true;
+    landing.style.animation = 'notif-landing-out 0.4s ease both';
+    setTimeout(function() {
+      landing.style.display = 'none';
+      if (onDone) onDone();
+    }, 380);
+  };
+
+  // Auto-advance after 4 seconds
+  setTimeout(function() {
+    if (landing.style.display !== 'none') window._notifLandingContinue();
+  }, 4000);
+}
+
 function showInAppNotification(payload) {
   var notif     = payload.notification || {};
   var meta      = payload.data || {};
@@ -4315,6 +4399,7 @@ function showInAppNotification(payload) {
   var el = document.createElement('div');
   el.className = 'notif-toast notif-card notif-' + severity;
   el.setAttribute('role', 'alert');
+  el.style.setProperty('--notif-duration', (duration / 1000) + 's');
   el.innerHTML =
     '<div class="notif-icon">' + icon + '</div>' +
     '<div class="notif-content">' +
@@ -4322,7 +4407,15 @@ function showInAppNotification(payload) {
       '<div class="notif-body">' + (notif.body || '') + '</div>' +
     '</div>' +
     '<button class="notif-action">פרטים ›</button>' +
-    '<button class="notif-dismiss" aria-label="סגור">×</button>';
+    '<button class="notif-dismiss" aria-label="סגור">✕</button>';
+
+  // Subtle backdrop blur overlay — appears briefly behind the toast then fades
+  var backdrop = document.createElement('div');
+  backdrop.className = 'notif-backdrop';
+  document.body.appendChild(backdrop);
+  setTimeout(function() {
+    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+  }, 550);
 
   document.body.appendChild(el);
   _activeToast = el;

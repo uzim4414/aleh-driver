@@ -1,4 +1,4 @@
-// SW build: 2026-05-15T20:00:00Z // v84
+// SW build: 2026-05-21T14:00:00Z // v86
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v84';
+const CACHE_NAME = 'aleh-driver-v86';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
@@ -97,8 +97,9 @@ const TYPE_CONFIG = {
   km_update:   { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' },
   test_due:        { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
   test_urgent:     { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
-  garage_approved: { vibrate: [200,100,200],         requireInteraction: true,  badge: './icons/badge-blue.png' },
-  garage_rejected: { vibrate: [400,100,400],         requireInteraction: true,  badge: './icons/badge-red.png' },
+  garage_approved:         { vibrate: [200,100,200],             requireInteraction: true,  badge: './icons/badge-blue.png' },
+  garage_rejected:         { vibrate: [400,100,400],             requireInteraction: true,  badge: './icons/badge-red.png' },
+  garage_appointment_set:  { vibrate: [200,100,200,100,200],     requireInteraction: true,  badge: './icons/badge-blue.png' },
   fuel_high:       { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
   fuel_km_high:    { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' }
 };
@@ -145,30 +146,52 @@ self.addEventListener('push', e => {
       _pendingNotifs = _pendingNotifs.filter(n => Date.now() - n.ts < 300000);
     }, 300000);
 
-    // Also relay to any currently open driver clients
+    // Relay to any currently open driver clients
     const openClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: false });
     for (const c of openClients) {
       c.postMessage({ type: 'push-foreground', payload: relayPayload });
     }
 
-    // App is open — in-app card already shown via push-foreground, skip OS notification
-    if (openClients.length > 0) return;
+    // App is in foreground (focused) — in-app card handles it, skip OS notification
+    // When app is in BACKGROUND (open but not focused), show OS notification too so
+    // the pull-down panel notifies the user properly.
+    const focusedClients = openClients.filter(c => c.focused);
+    if (focusedClients.length > 0) return;
 
-    return self.registration.showNotification(notif.title || 'עלה', {
-      body: notif.body || '',
-      icon: './icons/icon-192.png',
-      badge: cfg.badge || './icons/icon-192.png',
-      dir: 'rtl',
-      lang: 'he',
-      tag: 'maint-' + (meta.vehicleId || ('t' + Date.now())),
-      renotify: true,
-      vibrate: cfg.vibrate,
-      requireInteraction: cfg.requireInteraction,
+    const LABEL = {
+      overdue:         '🔴 טיפול באיחור',
+      urgent:          '🟠 טיפול דחוף',
+      plan:            '🔵 תכנית טיפולים',
+      km_update:       '🟣 עדכון קילומטרז\'',
+      test_due:        '🟠 טסט בקרוב',
+      test_urgent:     '🔴 טסט דחוף',
+      garage_approved:        '✅ תור מוסך אושר',
+      garage_rejected:        '❌ תור מוסך נדחה',
+      garage_appointment_set: '📅 תור מוסך נקבע',
+      fuel_high:       '⛽ צריכת דלק חריגה',
+      fuel_km_high:    '📊 עלות לקמ חריגה'
+    };
+    const notifTitle = notif.title || LABEL[alertType] || 'עלה — התראה';
+    const notifBody  = notif.body  || 'פתח את האפליקציה לפרטים';
+
+    return self.registration.showNotification(notifTitle, {
+      body:  notifBody,
+      icon:  './icons/icon-512.png',
+      image: './icons/icon-512.png',
+      badge: './icons/icon-192.png',
+      dir:   'rtl',
+      lang:  'he',
+      tag:   'aleh-' + (alertType || 'notif') + '-' + (meta.vehicleId || ''),
+      renotify:            true,
+      vibrate:             cfg.vibrate,
+      requireInteraction:  cfg.requireInteraction,
+      silent:              false,
+      timestamp:           Date.now(),
       data: Object.assign({}, meta, { _pushTs: relayPayload.ts }),
-      actions: alertType ? [
-        { action: 'open',    title: 'פתח באפליקציה' },
+      actions: [
+        { action: 'open',    title: '▶ פתח עכשיו' },
         { action: 'dismiss', title: 'הבנתי' }
-      ] : []
+      ]
     });
   })());
 });
