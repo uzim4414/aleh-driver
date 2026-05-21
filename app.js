@@ -530,7 +530,7 @@ function saveNotifToHistory(payload) {
         if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
         if (typeof renderGarageApptWidget   === 'function') renderGarageApptWidget();
         var _helpView = document.getElementById('help-garage-view');
-        if (_helpView && typeof helpGarage === 'function') helpGarage();
+        if (_helpView) APP.helpGarage();
       } catch(_e2) {}
     }
 
@@ -1162,30 +1162,38 @@ function _initFbGarageStatusSync() {
       }
 
       // ── אישור/דחייה של בקשה ממתינה ──
-      var prevRaw = localStorage.getItem('pendingGarageRequest');
-      if (!prevRaw) return;
-      var pending;
-      try { pending = JSON.parse(prevRaw); } catch(e) { return; }
-      if (String(pending.eventId) !== String(data.eventId)) return;
+      var prevRaw  = localStorage.getItem('pendingGarageRequest');
+      var _pending = null;
+      var _localMatch = false;
+      if (prevRaw) {
+        try {
+          _pending = JSON.parse(prevRaw);
+          _localMatch = (String(_pending.eventId) === String(data.eventId));
+        } catch(e) {}
+      }
+      // Mark consumed regardless — prevents infinite replay if FCM already handled this
+      snap.ref.update({ consumed: true, consumedAt: Date.now() });
       if (data.status === 'approved') {
-        localStorage.setItem('approvedGarageRequest', JSON.stringify({
-          eventId: data.eventId,
-          requestNumber: data.requestNumber,
-          reasonLabel: data.reasonLabel,
-          managerNote: data.managerNote,
-          garageInfo: data.garageInfo || {},
-          approvedAt: data.updatedAt
-        }));
-        localStorage.removeItem('pendingGarageRequest');
-        _fbClearPendingGarage();
-        snap.ref.update({ consumed: true, consumedAt: Date.now() });
+        if (_localMatch) {
+          localStorage.setItem('approvedGarageRequest', JSON.stringify({
+            eventId: data.eventId,
+            requestNumber: data.requestNumber,
+            reasonLabel: data.reasonLabel,
+            managerNote: data.managerNote,
+            garageInfo: data.garageInfo || {},
+            approvedAt: data.updatedAt
+          }));
+          localStorage.removeItem('pendingGarageRequest');
+          _fbClearPendingGarage();
+        }
         if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
           if (APP.switchTab) APP.switchTab('garage');
         }
       } else if (data.status === 'rejected') {
-        localStorage.removeItem('pendingGarageRequest');
-        _fbClearPendingGarage();
-        snap.ref.update({ consumed: true, consumedAt: Date.now() });
+        if (_localMatch) {
+          localStorage.removeItem('pendingGarageRequest');
+          _fbClearPendingGarage();
+        }
         if (typeof showToast === 'function') {
           showToast('בקשת המוסך נדחתה' + (data.managerNote ? ': ' + data.managerNote : ''));
         }
@@ -3593,10 +3601,10 @@ APP._garageShowActiveAppointment = function(appt) {
         '</div>' : '') +
       '</div>' +
       '<div style="display:flex;gap:10px;margin-bottom:12px">' +
-        (garagePhone ? '<button onclick="window.open('tel:' + garagePhone + '')" style="flex:1;padding:11px 0;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:10px;color:#34d399;font-size:13px;font-weight:700;cursor:pointer">&#x1F4DE; התקשר</button>' : '') +
+        (garagePhone ? '<button onclick="window.open(\'tel:' + garagePhone + '\')" style="flex:1;padding:11px 0;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:10px;color:#34d399;font-size:13px;font-weight:700;cursor:pointer">&#x1F4DE; התקשר</button>' : '') +
         '<button onclick="_openGarageWaze && _openGarageWaze()" style="flex:1;padding:11px 0;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:700;cursor:pointer">&#x1F5FA; ניווט</button>' +
       '</div>' +
-      (eventId ? '<button onclick="APP._garageCancelAppointment('' + eventId + '')" style="width:100%;padding:10px 0;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:13px;font-weight:600;cursor:pointer">&#x2715; בטל תור</button>' : '') +
+      (eventId ? '<button onclick="APP._garageCancelAppointment(\'' + eventId + '\')" style="width:100%;padding:10px 0;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:13px;font-weight:600;cursor:pointer">&#x2715; בטל תור</button>' : '') +
     '</div>' +
     '</div>'
   );
@@ -3669,6 +3677,7 @@ APP._garageShowApprovedFromStorage = function(meta) {
         localStorage.removeItem('pendingGarageRequest');
         if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(_aSet);
         if (typeof _fbClearApprovedGarage  === 'function') _fbClearApprovedGarage();
+        if (typeof _fbClearPendingGarage   === 'function') _fbClearPendingGarage();
         if (typeof renderGarageApptWidget  === 'function') renderGarageApptWidget();
         APP._garageShowActiveAppointment(_aSet);
       } else if (status === 'approved' && r.garageInfo) {
