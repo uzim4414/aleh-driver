@@ -218,7 +218,8 @@ self.addEventListener('notificationclose', e => {
   const tag = e.notification.tag;
   if (tag) {
     _pendingNotifs = _pendingNotifs.filter(n => {
-      const nTag = 'aleh-' + ((n.data && n.data.alertType) || 'notif') + '-' + ((n.data && n.data.vehicleId) || '');
+      if (!n.data) return true;
+      const nTag = 'aleh-' + (n.data.alertType || 'notif') + '-' + (n.data.vehicleId || '');
       return nTag !== tag;
     });
   }
