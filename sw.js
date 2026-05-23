@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v87';
+const CACHE_NAME = 'aleh-driver-v88';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
@@ -116,22 +116,8 @@ self.addEventListener('push', e => {
       meta  = payload.data || {};
     }
 
-    // Empty push — fetch latest pending notification from GAS
-    if (!notif && self.GAS_URL) {
-      try {
-        const r = await fetch(self.GAS_URL + '?action=driver_pending_notifications', { mode: 'cors' });
-        const list = await r.json();
-        if (list && list.ok && list.notifications && list.notifications.length) {
-          const first = list.notifications[0];
-          notif = first.notification || first;
-          meta  = first.data || meta;
-        }
-      } catch(_) {}
-    }
-
-    if (!notif) {
-      notif = { title: 'עלה — התראה', body: 'יש התראה חדשה. פתח את האפליקציה.' };
-    }
+    // No payload — silent no-op (empty pushes are FCM keep-alives, not real notifications)
+    if (!notif) return;
 
     const alertType = meta.alertType || '';
     const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
@@ -226,4 +212,14 @@ self.addEventListener('notificationclick', e => {
       return clients.openWindow(url);
     })
   );
+});
+
+self.addEventListener('notificationclose', e => {
+  const tag = e.notification.tag;
+  if (tag) {
+    _pendingNotifs = _pendingNotifs.filter(n => {
+      const nTag = 'aleh-' + ((n.data && n.data.alertType) || 'notif') + '-' + ((n.data && n.data.vehicleId) || '');
+      return nTag !== tag;
+    });
+  }
 });
