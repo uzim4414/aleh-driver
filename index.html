@@ -1963,46 +1963,6 @@ window.fcmDebug = async function() {
     pruneOverflow();
     if (duration > 0) setTimeout(function(){ dismissCard(card); }, duration + 50);
   }
-  window.showInAppNotification = showInAppNotification;
-
-  /* ── SW message listener ── */
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', function(ev){
-      var msg = ev.data || {};
-      if (msg.type === 'notification-click' && msg.data) {
-        navigateForNotif(msg.data);
-      } else if ((msg.type === 'push-foreground' || msg.type === 'push-received') && msg.payload) {
-        if (typeof saveNotifToHistory === 'function') saveNotifToHistory(msg.payload);
-        playNotifSound();
-        showInAppNotification(msg.payload);
-      } else if (msg.type === 'pending-notifs' && msg.notifs && msg.notifs.length) {
-        msg.notifs.forEach(function(p){ if (typeof saveNotifToHistory === 'function') saveNotifToHistory(p); });
-        showInAppNotification(msg.notifs[0]);
-      }
-    });
-    navigator.serviceWorker.ready.then(function(reg){
-      if (reg.active) reg.active.postMessage({ type: 'get-pending-notifs' });
-    }).catch(function(){});
-  }
-
-  /* ── Read notification from URL (app opened via OS notification tap) ── */
-  try {
-    var _raw = new URLSearchParams(location.search).get('_notif');
-    if (_raw) {
-      var _nd = JSON.parse(decodeURIComponent(_raw));
-      // Stamp original ts so clearedAt guard in saveNotifToHistory works correctly
-      if (!_nd.ts) _nd.ts = (_nd.data && _nd.data.originalTs) || Date.now();
-      history.replaceState({}, '', location.pathname + location.hash);
-      if (typeof saveNotifToHistory === 'function') saveNotifToHistory(_nd);
-      setTimeout(function(){ showInAppNotification(_nd); }, 800);
-    }
-  } catch(e) {}
-
-  /* ── Restore badge on load ── */
-  try {
-    var _n = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10) || 0;
-    if (typeof _applyBadgeCount === 'function') _applyBadgeCount(_n);
-  } catch(e) {}
 })();
 </script>
 <script src="aleh-logo-data.js?v=1"></script>
