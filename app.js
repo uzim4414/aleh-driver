@@ -552,7 +552,20 @@ function saveNotifToHistory(payload) {
       originalDescription: meta.originalDescription || '',
       managerNote:         meta.managerNote || '',
       eventId:             meta.eventId || '',
-      ts:                  ts
+      ts:                  ts,
+      appointmentDate:     meta.appointmentDate     || '',
+      appointmentTime:     meta.appointmentTime     || '',
+      fuelConsumption:     meta.fuelConsumption  != null ? meta.fuelConsumption  : '',
+      costPerKm:           meta.costPerKm        != null ? meta.costPerKm        : '',
+      fleetAverage:        meta.fleetAverage     != null ? meta.fleetAverage     : '',
+      threshold:           meta.threshold        != null ? meta.threshold        : '',
+      garageInfo:          meta.garageInfo          || '',
+      testDate:            meta.testDate            || '',
+      daysLeft:            meta.daysLeft         != null ? meta.daysLeft         : '',
+      kmLeft:              meta.kmLeft           != null ? meta.kmLeft           : '',
+      estKm:               meta.estKm            != null ? meta.estKm            : '',
+      nextKm:              meta.nextKm           != null ? meta.nextKm           : '',
+      daysSinceUpdate:     meta.daysSinceUpdate  != null ? meta.daysSinceUpdate  : ''
     };
     list.unshift(newItem);
     if (list.length > 30) list = list.slice(0, 30);
@@ -4519,7 +4532,9 @@ var SEVERITY_MAP = {
   km_update:       'plan',
   fuel_km_high:    'info',
   garage_rejected: 'info',
-  garage_approved: 'approved'
+  garage_approved:              'approved',
+  garage_appointment_set:       'plan',
+  garage_appointment_cancelled: 'info'
 };
 
 var TOAST_DURATION = {
@@ -4684,8 +4699,34 @@ if ('serviceWorker' in navigator) {
       );
     } else if (msg.type === 'notification-click' && msg.data) {
       navigateForAlertType(msg.data.alertType || 'plan', msg.data);
+    } else if (msg.type === 'pending-notifs' && msg.notifs && msg.notifs.length) {
+      msg.notifs.forEach(function(p) { saveNotifToHistory(p); });
+      showInAppNotification(msg.notifs[0]);
     }
   });
+
+  // Request buffered notifications from SW (app just opened)
+  navigator.serviceWorker.ready.then(function(reg) {
+    if (reg.active) reg.active.postMessage({ type: 'get-pending-notifs' });
+  }).catch(function() {});
+
+  // Handle cold-start from OS notification tap (?_notif=...)
+  try {
+    var _notifRaw = new URLSearchParams(location.search).get('_notif');
+    if (_notifRaw) {
+      var _notifData = JSON.parse(decodeURIComponent(_notifRaw));
+      if (!_notifData.ts) _notifData.ts = (_notifData.data && _notifData.data.originalTs) || Date.now();
+      history.replaceState({}, '', location.pathname + location.hash);
+      saveNotifToHistory(_notifData);
+      setTimeout(function() { showInAppNotification(_notifData); }, 800);
+    }
+  } catch(_) {}
+
+  // Restore unread badge on load
+  try {
+    var _savedUnread = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10) || 0;
+    if (_savedUnread > 0) _applyBadgeCount(_savedUnread);
+  } catch(_) {}
 }
 
 /* ══ Greeting ══ */
