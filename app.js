@@ -4538,11 +4538,11 @@ var SEVERITY_MAP = {
 };
 
 var TOAST_DURATION = {
-  critical: 8000,
-  urgent:   6000,
-  plan:     4000,
-  info:     3000,
-  approved: 5000
+  critical: 10000,
+  urgent:   8000,
+  plan:     6000,
+  info:     6000,
+  approved: 0
 };
 
 var SEVERITY_ICONS = {
@@ -4607,77 +4607,191 @@ function showNotifLanding(payload, onDone) {
   }, 4000);
 }
 
+function _buildToastChips(alertType, meta) {
+  var chips = [];
+  var c = function(label, val, unit) {
+    if (val === '' || val == null) return;
+    chips.push('<div class="nt-chip"><span class="nt-chip-label">' + _escHtml(label) + '</span><span class="nt-chip-val">' + _escHtml(String(val)) + (unit ? ' ' + unit : '') + '</span></div>');
+  };
+  switch (alertType) {
+    case 'overdue': case 'urgent':
+      c('נותר', meta.kmLeft, 'ק"מ'); c('מד נוכחי', meta.estKm); c('הבא לטיפול', meta.nextKm); break;
+    case 'plan':
+      c('נותר', meta.kmLeft, 'ק"מ'); c('הבא ב', meta.nextKm); break;
+    case 'km_update':
+      c('לפני', meta.daysSinceUpdate, 'ימים'); c('מד אחרון', meta.lastKm); break;
+    case 'test_due': case 'test_urgent':
+      c('תאריך טסט', meta.testDate); c('נותרו', meta.daysLeft, 'ימים'); break;
+    case 'garage_approved':
+      if (meta.garageInfo) c('מוסך', meta.garageInfo); break;
+    case 'garage_rejected':
+      if (meta.reasonLabel) c('סיבה', meta.reasonLabel); break;
+    case 'garage_appointment_set':
+      c('תאריך', meta.appointmentDate); c('שעה', meta.appointmentTime); if (meta.garageInfo) c('מוסך', meta.garageInfo); break;
+    case 'garage_appointment_cancelled':
+      c('תאריך שבוטל', meta.appointmentDate); if (meta.appointmentTime) c('שעה', meta.appointmentTime); break;
+    case 'fuel_high':
+      if (meta.fuelConsumption != null) c('צריכה', meta.fuelConsumption, 'ל׳/100ק"מ');
+      if (meta.threshold != null) c('סף', meta.threshold, 'ל׳');
+      if (meta.fleetAverage != null) c('ממוצע', meta.fleetAverage, 'ל׳'); break;
+    case 'fuel_km_high':
+      if (meta.costPerKm != null) c('עלות לק"מ', '₪' + meta.costPerKm);
+      if (meta.fleetAverage != null) c('ממוצע ציי', '₪' + meta.fleetAverage); break;
+  }
+  return chips.length ? '<div class="nt-chips">' + chips.join('') + '</div>' : '';
+}
+
+function _buildToastActions(alertType, meta) {
+  var primary = null, secondary = null;
+  switch (alertType) {
+    case 'overdue': case 'urgent':
+      primary = { label: 'בקש מוסך', fn: function() { navigateForAlertType(alertType, meta); } }; break;
+    case 'plan':
+      primary = { label: 'צפה בפרטים', fn: function() { navigateForAlertType(alertType, meta); } }; break;
+    case 'km_update':
+      primary = { label: 'עדכן עכשיו', fn: function() { navigateForAlertType(alertType, meta); } }; break;
+    case 'test_due':
+      primary = { label: 'הגדר תזכורת', fn: function() { navigateForAlertType(alertType, meta); } }; break;
+    case 'test_urgent':
+      primary = { label: 'בצע טסט', fn: function() { navigateForAlertType(alertType, meta); } }; break;
+    case 'garage_approved':
+      primary = { label: 'קבע מועד', fn: function() { navigateForAlertType('garage_approved', meta); } };
+      secondary = { label: 'מאוחר יותר' }; break;
+    case 'garage_rejected':
+      primary = { label: 'שלח בקשה חדשה', fn: function() { navigateForAlertType('garage_rejected', meta); } }; break;
+    case 'garage_appointment_set':
+      primary = { label: 'הוסף ליומן', fn: function() {
+        var d = meta.appointmentDate || ''; var t = meta.appointmentTime || '00:00';
+        if (d) {
+          var parts = d.split('/');
+          if (parts.length === 3) {
+            var iso = parts[2] + '-' + parts[1] + '-' + parts[0] + 'T' + t + ':00';
+            var start = new Date(iso); var end = new Date(start.getTime() + 90 * 60000);
+            if (!isNaN(start.getTime())) {
+              var fmt = function(dt) { return dt.toISOString().replace(/[-:]/g,'').replace('.000',''); };
+              window.open('https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent('תור מוסך') + '&dates=' + fmt(start) + '/' + fmt(end), '_blank');
+            }
+          }
+        }
+      }};
+      secondary = { label: 'בסדר' }; break;
+    case 'garage_appointment_cancelled':
+      primary = { label: 'קבע מועד חדש', fn: function() { navigateForAlertType('garage_appointment_cancelled', meta); } };
+      secondary = { label: 'לא כרגע' }; break;
+    case 'fuel_high': case 'fuel_km_high':
+      primary = { label: 'דוח צריכה', fn: function() { navigateForAlertType(alertType, meta); } }; break;
+  }
+  if (!primary) primary = { label: 'פרטים', fn: function() { navigateForAlertType(alertType, meta); } };
+  return { primary: primary, secondary: secondary };
+}
+
 function showInAppNotification(payload) {
   var notif     = payload.notification || {};
   var meta      = payload.data || {};
   var alertType = meta.alertType || 'plan';
   var severity  = SEVERITY_MAP[alertType] || 'plan';
-  var duration  = TOAST_DURATION[severity] || 4000;
+  var duration  = TOAST_DURATION[severity] || 6000;
   var icon      = SEVERITY_ICONS[severity] || SEVERITY_ICONS.plan;
 
   // Save to history
   saveNotifToHistory(payload);
 
-  // Remove existing toast
+  // Remove existing toast with exit animation
   if (_activeToast && _activeToast.parentNode) {
-    _activeToast.parentNode.removeChild(_activeToast);
+    _activeToast.classList.add('nt-leaving');
+    var _old = _activeToast;
+    setTimeout(function() { if (_old.parentNode) _old.parentNode.removeChild(_old); }, 280);
   }
 
-  var el = document.createElement('div');
-  el.className = 'notif-toast notif-card notif-' + severity;
-  el.setAttribute('role', 'alert');
-  el.style.setProperty('--notif-duration', (duration / 1000) + 's');
-  el.innerHTML =
-    '<div class="notif-icon">' + icon + '</div>' +
-    '<div class="notif-content">' +
-      '<div class="notif-title">' + (notif.title || 'עלה — התראה') + '</div>' +
-      '<div class="notif-body">' + (notif.body || '') + '</div>' +
-    '</div>' +
-    '<button class="notif-action">פרטים ›</button>' +
-    '<button class="notif-dismiss" aria-label="סגור">✕</button>';
+  var SEV_LABEL = { critical: 'קריטי', urgent: 'דחוף', plan: 'תזכורת', info: 'מידע', approved: 'אושר' };
+  var chipsHtml   = _buildToastChips(alertType, meta);
+  var actionsObj  = _buildToastActions(alertType, meta);
 
-  // Subtle backdrop blur overlay — appears briefly behind the toast then fades
+  var progressHtml = duration > 0
+    ? '<div class="nt-progress"><div class="nt-progress-fill" style="animation-duration:' + (duration / 1000) + 's"></div></div>'
+    : '';
+
+  var actionsHtml = '<div class="nt-actions">' +
+    '<button class="nt-btn-primary">' + _escHtml(actionsObj.primary.label) + '</button>' +
+    (actionsObj.secondary ? '<button class="nt-btn-secondary">' + _escHtml(actionsObj.secondary.label) + '</button>' : '') +
+    '</div>';
+
+  var el = document.createElement('div');
+  el.className = 'notif-toast nt-sev-' + severity;
+  el.setAttribute('role', 'alert');
+  el.innerHTML =
+    '<div class="nt-header">' +
+      '<div class="nt-icon">' + icon + '</div>' +
+      '<div class="nt-meta">' +
+        '<div class="nt-title">' + _escHtml(notif.title || 'עלה — התראה') + '</div>' +
+        '<div class="nt-time">כרגע</div>' +
+      '</div>' +
+      '<span class="nt-badge">' + _escHtml(SEV_LABEL[severity] || severity) + '</span>' +
+      '<button class="nt-close" aria-label="סגור">✕</button>' +
+    '</div>' +
+    (notif.body ? '<div class="nt-body">' + _escHtml(notif.body) + '</div>' : '') +
+    chipsHtml +
+    actionsHtml +
+    progressHtml;
+
   var backdrop = document.createElement('div');
   backdrop.className = 'notif-backdrop';
   document.body.appendChild(backdrop);
-  setTimeout(function() {
-    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-  }, 550);
+  setTimeout(function() { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); }, 550);
 
   document.body.appendChild(el);
   _activeToast = el;
 
-  // Sound
   _playNotifSound(alertType);
 
-  // "פרטים" button
-  el.querySelector('.notif-action').addEventListener('click', function(e) {
+  // Critical pulse ring
+  if (severity === 'critical') {
+    var ring = document.createElement('div');
+    ring.className = 'nt-pulse-ring';
+    el.querySelector('.nt-icon').appendChild(ring);
+  }
+
+  // Primary CTA
+  var primaryBtn = el.querySelector('.nt-btn-primary');
+  if (primaryBtn) {
+    primaryBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      dismissToast(el);
+      if (actionsObj.primary.fn) actionsObj.primary.fn();
+    });
+  }
+
+  // Secondary CTA
+  var secondaryBtn = el.querySelector('.nt-btn-secondary');
+  if (secondaryBtn) {
+    secondaryBtn.addEventListener('click', function(e) { e.stopPropagation(); dismissToast(el); });
+  }
+
+  // Close button
+  el.querySelector('.nt-close').addEventListener('click', function(e) {
     e.stopPropagation();
     dismissToast(el);
-    navigateForAlertType(alertType, meta);
   });
 
-  // Dismiss button
-  el.querySelector('.notif-dismiss').addEventListener('click', function(e) {
-    e.stopPropagation();
-    dismissToast(el);
-  });
+  // Swipe right to dismiss (RTL — right swipe = dismiss)
+  var _swipeStartX = null;
+  el.addEventListener('touchstart', function(e) { _swipeStartX = e.touches[0].clientX; }, { passive: true });
+  el.addEventListener('touchend', function(e) {
+    if (_swipeStartX === null) return;
+    var dx = e.changedTouches[0].clientX - _swipeStartX;
+    if (dx > 80) dismissToast(el);
+    _swipeStartX = null;
+  }, { passive: true });
 
-  // Tap anywhere on toast
-  el.addEventListener('click', function() {
-    dismissToast(el);
-    navigateForAlertType(alertType, meta);
-  });
-
-  // Auto-dismiss
-  var _dismissTimer = setTimeout(function() { dismissToast(el); }, duration);
-  el._dismissTimer = _dismissTimer;
+  if (duration > 0) {
+    el._dismissTimer = setTimeout(function() { dismissToast(el); }, duration);
+  }
 }
 
 function dismissToast(el) {
   if (!el || !el.parentNode) return;
   clearTimeout(el._dismissTimer);
-  el.classList.add('leaving');
+  el.classList.add('nt-leaving');
   setTimeout(function() {
     if (el.parentNode) el.parentNode.removeChild(el);
     if (_activeToast === el) _activeToast = null;
