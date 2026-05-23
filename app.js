@@ -1110,6 +1110,8 @@ async function loadFullData() {
   _initFbGarageStatusSync();
   // Reliable fallback: poll GAS for active appointment (bypasses Firebase garageSync)
   _syncActiveAppointmentFromGAS();
+  // Continuous safety net — catches admin-set appointments missed by Firebase listener
+  _startActiveAppointmentPoll();
 }
 
 async function _syncActiveAppointmentFromGAS() {
@@ -1128,17 +1130,41 @@ async function _syncActiveAppointmentFromGAS() {
         garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
         garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
       };
-      var changed = !existing || existing.eventId !== _aSet.eventId || existing.appointmentDate !== _aSet.appointmentDate;
+      var changed = !existing || existing.eventId !== _aSet.eventId
+        || existing.appointmentDate !== _aSet.appointmentDate
+        || existing.appointmentTime !== _aSet.appointmentTime;
       if (changed) {
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
+        // Clear pending/approved — admin-set appointment supersedes any in-flight request
+        try { localStorage.removeItem('pendingGarageRequest'); } catch(_) {}
+        try { localStorage.removeItem('approvedGarageRequest'); } catch(_) {}
+        if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(_aSet);
+        if (typeof _fbClearPendingGarage   === 'function') _fbClearPendingGarage();
+        if (typeof _fbClearApprovedGarage  === 'function') _fbClearApprovedGarage();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
       }
     } else if (!appt && existing) {
       // Admin cleared appointment — remove widget
       localStorage.removeItem('activeGarageAppointment');
+      if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
       if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
     }
   } catch(_e) {}
+}
+
+/* Periodic poll — covers cases where Firebase listener missed the update
+   (e.g. admin set appointment while driver app was open, but garageSync had
+   stale `consumed:true` from a previous event on this device). */
+var _APPT_POLL_INTERVAL = 30 * 1000; // 30s
+var _apptPollTimer = null;
+function _startActiveAppointmentPoll() {
+  if (_apptPollTimer) return;
+  _apptPollTimer = setInterval(function() {
+    if (document.visibilityState !== 'visible') return;
+    if (!STATE.idToken || !STATE.vehicle) return;
+    if (_isTokenExpired(STATE.idToken)) return;
+    _syncActiveAppointmentFromGAS();
+  }, _APPT_POLL_INTERVAL);
 }
 
 /* ── Listener: garageSync/{vehicleId} — כתיבה ישירה מ-GAS בעת אישור/דחייה ── */
@@ -1169,10 +1195,22 @@ function _initFbGarageStatusSync() {
         return;
       }
 
-      if (data.consumed) return;
-
       // ── מנהל קבע תור מהיומן ──
+      // NOTE: process appointment_set even when consumed:true if our local copy
+      // is missing or stale (eventId differs) — this covers the case where a
+      // previous session marked consumed but the appointment is still active
+      // and the current device hasn't reflected it yet.
       if (data.status === 'appointment_set' && data.appointmentDate) {
+        if (data.consumed) {
+          var _existAppt = null;
+          try { _existAppt = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+          var _haveSame = _existAppt
+            && String(_existAppt.eventId) === String(data.eventId || '')
+            && _existAppt.appointmentDate === data.appointmentDate
+            && (_existAppt.appointmentTime || '') === (data.appointmentTime || '');
+          if (_haveSame) return; // already reflected — nothing to do
+          // else fall through and apply the appointment locally
+        }
         var _aSet = {
           eventId:         data.eventId         || '',
           appointmentDate: data.appointmentDate,
@@ -1195,6 +1233,8 @@ function _initFbGarageStatusSync() {
       }
 
       // ── אישור/דחייה של בקשה ממתינה ──
+      // For approved/rejected, skip if already consumed — avoid replaying handled state
+      if (data.consumed) return;
       var prevRaw  = localStorage.getItem('pendingGarageRequest');
       var _pending = null;
       var _localMatch = false;
@@ -4770,6 +4810,9 @@ document.addEventListener('visibilitychange', async function() {
   if (document.visibilityState !== 'visible') return;
   if (!STATE.idToken || !STATE.vehicle) return;
   if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
+  // Always sync active appointment on refocus — admin may have set it while app was hidden.
+  // Cheap GAS call, no full reload.
+  try { _syncActiveAppointmentFromGAS(); } catch(_) {}
   if (Date.now() - _lastRefresh < _REFRESH_MIN) return;
   try {
     await loadFullData();
