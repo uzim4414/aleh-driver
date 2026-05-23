@@ -2117,15 +2117,44 @@ function renderNotifHistory() {
     // Expandable meta rows
     var metaRowsHtml = '';
     var metaRows = [];
-    if (n.vehicleId)     metaRows.push(['רכב', _escHtml(n.vehicleId)]);
+    if (n.vehicleId) metaRows.push(['רכב', _escHtml(n.vehicleId)]);
     if (n.requestNumber) metaRows.push(['בקשה', '#' + _escHtml(n.requestNumber)]);
-    if (n.reasonLabel)   metaRows.push(['סיבה', _escHtml(n.reasonLabel)]);
+    switch (type) {
+      case 'overdue': case 'urgent': case 'plan':
+        if (n.kmLeft != null && n.kmLeft !== '') metaRows.push(['נותר', _escHtml(String(n.kmLeft)) + ' ק"מ']);
+        if (n.nextKm != null && n.nextKm !== '') metaRows.push(['הבא לטיפול', _escHtml(String(n.nextKm))]);
+        if (n.estKm  != null && n.estKm  !== '') metaRows.push(['צפי', _escHtml(String(n.estKm))]);
+        break;
+      case 'km_update':
+        if (n.daysSinceUpdate != null && n.daysSinceUpdate !== '') metaRows.push(['לפני', _escHtml(String(n.daysSinceUpdate)) + ' ימים']);
+        break;
+      case 'test_due': case 'test_urgent':
+        if (n.testDate) metaRows.push(['תאריך טסט', _escHtml(n.testDate)]);
+        if (n.daysLeft != null && n.daysLeft !== '') metaRows.push(['נותרו', _escHtml(String(n.daysLeft)) + ' ימים']);
+        break;
+      case 'garage_approved':
+        if (n.garageInfo) metaRows.push(['מוסך מאושר', _escHtml(n.garageInfo)]);
+        break;
+      case 'garage_rejected':
+        if (n.reasonLabel) metaRows.push(['סיבה', _escHtml(n.reasonLabel)]);
+        break;
+      case 'garage_appointment_set': case 'garage_appointment_cancelled':
+        if (n.appointmentDate) metaRows.push(['תאריך', _escHtml(n.appointmentDate)]);
+        if (n.appointmentTime) metaRows.push(['שעה', _escHtml(n.appointmentTime)]);
+        if (n.garageInfo) metaRows.push(['מוסך', _escHtml(n.garageInfo)]);
+        break;
+      case 'fuel_high':
+        if (n.fuelConsumption != null && n.fuelConsumption !== '') metaRows.push(['צריכה', _escHtml(String(n.fuelConsumption)) + ' ל׳/100ק"מ']);
+        if (n.threshold != null && n.threshold !== '') metaRows.push(['סף', _escHtml(String(n.threshold)) + ' ל׳']);
+        if (n.fleetAverage != null && n.fleetAverage !== '') metaRows.push(['ממוצע ציי', _escHtml(String(n.fleetAverage)) + ' ל׳']);
+        break;
+      case 'fuel_km_high':
+        if (n.costPerKm != null && n.costPerKm !== '') metaRows.push(['עלות לק"מ', '₪' + _escHtml(String(n.costPerKm))]);
+        if (n.fleetAverage != null && n.fleetAverage !== '') metaRows.push(['ממוצע ציי', '₪' + _escHtml(String(n.fleetAverage))]);
+        break;
+    }
     if (n.originalDescription) metaRows.push(['תיאור', _escHtml(n.originalDescription)]);
-    if (n.managerNote)   metaRows.push(['הערת מנהל', _escHtml(n.managerNote)]);
-    if (type === 'fuel_high' && n.fuelConsumption)
-      metaRows.push(['צריכת דלק', _escHtml(n.fuelConsumption) + ' ל׳/100קמ']);
-    if (type === 'fuel_km_high' && n.costPerKm)
-      metaRows.push(['עלות לק״מ', '₪' + _escHtml(n.costPerKm)]);
+    if (n.managerNote) metaRows.push(['הערת מנהל', _escHtml(n.managerNote)]);
     if (metaRows.length) {
       metaRowsHtml = '<div class="nh-meta-rows">' +
         metaRows.map(function(r) {
@@ -2135,6 +2164,18 @@ function renderNotifHistory() {
           '</div>';
         }).join('') +
       '</div>';
+    }
+
+    var nhCtaHtml = '';
+    switch (type) {
+      case 'overdue': case 'urgent':
+        nhCtaHtml = '<button class="nh-cta-btn" onclick="navigateForAlertType(\'' + type + '\',{});event.stopPropagation()">בקש מוסך</button>'; break;
+      case 'km_update':
+        nhCtaHtml = '<button class="nh-cta-btn" onclick="navigateForAlertType(\'km_update\',{});event.stopPropagation()">עדכן ק"מ</button>'; break;
+      case 'garage_approved':
+        nhCtaHtml = '<button class="nh-cta-btn" onclick="if(APP&&APP.helpGarage)APP.helpGarage();event.stopPropagation()">קבע מועד</button>'; break;
+      case 'fuel_high': case 'fuel_km_high':
+        nhCtaHtml = '<button class="nh-cta-btn" onclick="navigateForAlertType(\'' + type + '\',{});event.stopPropagation()">דוח צריכה</button>'; break;
     }
 
     var chevronSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -2159,6 +2200,7 @@ function renderNotifHistory() {
         '<div class="nh-divider"></div>' +
         (n.body ? '<div class="nh-body-text">' + _escHtml(n.body) + '</div>' : '') +
         metaRowsHtml +
+        nhCtaHtml +
         '<button class="nh-delete-btn" onclick="APP.deleteNotif(\'' + safeId + '\');event.stopPropagation()">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>' +
           'מחק התראה' +
