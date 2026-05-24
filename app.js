@@ -476,7 +476,10 @@ function saveNotifToHistory(payload) {
   try {
     var notif = payload.notification || {};
     var meta  = payload.data || {};
-    var ts    = payload.ts || Date.now();
+    // Prefer GAS-canonical ts embedded in push data — ensures ts-dedup works when
+    // loadNotifHistoryFromGAS later pulls the same notification (same ts from GAS).
+    // Fallback: relay ts set by SW at delivery time, then Date.now().
+    var ts    = (meta.ts && typeof meta.ts === 'number' ? meta.ts : 0) || payload.ts || Date.now();
 
     // Respect "clear all" — drop notifications older than last clear
     var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
@@ -1313,15 +1316,54 @@ async function loadNotifHistoryFromGAS() {
       return;
     }
 
-    // Merge GAS data into localStorage (dedup by ts)
+    // Merge GAS data into localStorage — dedup by ts, eventId, and alertType+requestNumber
     var existing = [];
     try { existing = JSON.parse(localStorage.getItem('driver_notif_history') || '[]'); } catch(e) {}
-    var existingIds = new Set(existing.map(function(n) { return n.ts; }));
+    var existingTsSet  = new Set(existing.map(function(n) { return n.ts; }));
+    var existingEvtSet = new Set(
+      existing.filter(function(n) { return n.eventId && n.alertType; })
+              .map(function(n) { return n.alertType + '|' + n.eventId; })
+    );
+    var existingReqSet = new Set(
+      existing.filter(function(n) { return n.requestNumber && n.alertType; })
+              .map(function(n) { return n.alertType + '|' + n.requestNumber; })
+    );
     var merged = existing.slice();
     gasNotifs.forEach(function(n) {
-      if (!existingIds.has(n.ts)) {
-        merged.push({ title: n.title, body: n.body, alertType: n.alertType, ts: n.ts, id: n.ts });
-      }
+      // Skip if already saved by push delivery (ts match)
+      if (existingTsSet.has(n.ts)) return;
+      // Skip if same event already saved via a different ts (eventId dedup)
+      if (n.eventId && n.alertType && existingEvtSet.has(n.alertType + '|' + n.eventId)) return;
+      // Skip if same requestNumber+alertType combo (catches garage approval duplicates)
+      if (n.requestNumber && n.alertType && existingReqSet.has(n.alertType + '|' + n.requestNumber)) return;
+      // New notification — copy all available fields
+      var entry = {
+        id: n.ts, ts: n.ts,
+        title: n.title || '', body: n.body || '',
+        alertType: n.alertType || 'plan',
+        vehicleId: n.vehicleId || '',
+        requestNumber: n.requestNumber || '',
+        eventId: n.eventId || '',
+        reasonLabel: n.reasonLabel || '',
+        managerNote: n.managerNote || '',
+        garageInfo: (function(g){ return !g ? '' : (typeof g === 'string' ? g : (g.name || g.garageName || '')); })(n.garageInfo),
+        appointmentDate: n.appointmentDate || '',
+        appointmentTime: n.appointmentTime || '',
+        testDate: n.testDate || '',
+        daysLeft: n.daysLeft != null ? n.daysLeft : '',
+        kmLeft:   n.kmLeft   != null ? n.kmLeft   : '',
+        nextKm:   n.nextKm   != null ? n.nextKm   : '',
+        estKm:    n.estKm    != null ? n.estKm    : '',
+        daysSinceUpdate: n.daysSinceUpdate != null ? n.daysSinceUpdate : '',
+        fuelConsumption: n.fuelConsumption != null ? n.fuelConsumption : '',
+        costPerKm:  n.costPerKm  != null ? n.costPerKm  : '',
+        fleetAverage: n.fleetAverage != null ? n.fleetAverage : '',
+        threshold:  n.threshold  != null ? n.threshold  : ''
+      };
+      merged.push(entry);
+      existingTsSet.add(n.ts);
+      if (n.eventId && n.alertType) existingEvtSet.add(n.alertType + '|' + n.eventId);
+      if (n.requestNumber && n.alertType) existingReqSet.add(n.alertType + '|' + n.requestNumber);
     });
     merged.sort(function(a, b) { return b.ts - a.ts; });
     if (merged.length > 30) merged = merged.slice(0, 30);
