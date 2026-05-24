@@ -559,7 +559,7 @@ function saveNotifToHistory(payload) {
       costPerKm:           meta.costPerKm        != null ? meta.costPerKm        : '',
       fleetAverage:        meta.fleetAverage     != null ? meta.fleetAverage     : '',
       threshold:           meta.threshold        != null ? meta.threshold        : '',
-      garageInfo:          meta.garageInfo          || '',
+      garageInfo:          (function(g){ return !g ? '' : (typeof g === 'string' ? g : (g.name || g.garageName || '')); })(meta.garageInfo),
       testDate:            meta.testDate            || '',
       daysLeft:            meta.daysLeft         != null ? meta.daysLeft         : '',
       kmLeft:              meta.kmLeft           != null ? meta.kmLeft           : '',
@@ -2115,15 +2115,31 @@ function renderNotifHistory() {
       .replace('width="22"', 'width="20"').replace('height="22"', 'height="20"');
 
     // Expandable meta rows
+    // Normalize garageInfo — may be stored as object {name,address,phone} from old saves
+    var _garageName = (function(g) {
+      if (!g) return '';
+      if (typeof g === 'string') return g;
+      return g.name || g.garageName || '';
+    })(n.garageInfo);
+
+    // Vehicle display: show formatted plate when possible
+    var _vehicleDisplay = (function() {
+      if (!n.vehicleId) return '';
+      if (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.num) {
+        return formatPlate(STATE.vehicle.num) || n.vehicleId;
+      }
+      return n.vehicleId;
+    })();
+
     var metaRowsHtml = '';
     var metaRows = [];
-    if (n.vehicleId) metaRows.push(['רכב', _escHtml(n.vehicleId)]);
+    if (_vehicleDisplay) metaRows.push(['רכב', _escHtml(_vehicleDisplay)]);
     if (n.requestNumber) metaRows.push(['בקשה', '#' + _escHtml(n.requestNumber)]);
     switch (type) {
       case 'overdue': case 'urgent': case 'plan':
         if (n.kmLeft != null && n.kmLeft !== '') metaRows.push(['נותר', _escHtml(String(n.kmLeft)) + ' ק"מ']);
-        if (n.nextKm != null && n.nextKm !== '') metaRows.push(['הבא לטיפול', _escHtml(String(n.nextKm))]);
-        if (n.estKm  != null && n.estKm  !== '') metaRows.push(['צפי', _escHtml(String(n.estKm))]);
+        if (n.nextKm != null && n.nextKm !== '') metaRows.push(['הבא לטיפול', _escHtml(String(n.nextKm)) + ' ק"מ']);
+        if (n.estKm  != null && n.estKm  !== '') metaRows.push(['צפי', _escHtml(String(n.estKm)) + ' ק"מ']);
         break;
       case 'km_update':
         if (n.daysSinceUpdate != null && n.daysSinceUpdate !== '') metaRows.push(['לפני', _escHtml(String(n.daysSinceUpdate)) + ' ימים']);
@@ -2133,7 +2149,7 @@ function renderNotifHistory() {
         if (n.daysLeft != null && n.daysLeft !== '') metaRows.push(['נותרו', _escHtml(String(n.daysLeft)) + ' ימים']);
         break;
       case 'garage_approved':
-        if (n.garageInfo) metaRows.push(['מוסך מאושר', _escHtml(n.garageInfo)]);
+        if (_garageName) metaRows.push(['מוסך מאושר', _escHtml(_garageName)]);
         break;
       case 'garage_rejected':
         if (n.reasonLabel) metaRows.push(['סיבה', _escHtml(n.reasonLabel)]);
@@ -2141,7 +2157,7 @@ function renderNotifHistory() {
       case 'garage_appointment_set': case 'garage_appointment_cancelled':
         if (n.appointmentDate) metaRows.push(['תאריך', _escHtml(n.appointmentDate)]);
         if (n.appointmentTime) metaRows.push(['שעה', _escHtml(n.appointmentTime)]);
-        if (n.garageInfo) metaRows.push(['מוסך', _escHtml(n.garageInfo)]);
+        if (_garageName) metaRows.push(['מוסך', _escHtml(_garageName)]);
         break;
       case 'fuel_high':
         if (n.fuelConsumption != null && n.fuelConsumption !== '') metaRows.push(['צריכה', _escHtml(String(n.fuelConsumption)) + ' ל׳/100ק"מ']);

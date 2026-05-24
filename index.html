@@ -821,7 +821,8 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   overflow: hidden;
   will-change: max-height, opacity, margin;
 }
-.nh-swipe-wrap > .nh-item {
+.nh-swipe-wrap > .nh-item,
+.nh-swipe-wrap > .notif-history-item {
   margin: 0 !important;
   position: relative;
   z-index: 2;
@@ -1433,11 +1434,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
 /* Swipe wrap also targets notif-history-item */
 .nh-swipe-wrap > .notif-history-item {
-  margin: 0 !important;
-  position: relative;
-  z-index: 1;
   border-radius: 16px;
-  will-change: transform, opacity;
 }
 
 /* ══ Rich Toast — new layout ══ */
