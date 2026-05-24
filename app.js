@@ -1704,8 +1704,15 @@ function renderGarageApptWidget() {
   if (!appt || !appt.appointmentDate) { mount.innerHTML = ''; return; }
 
   var now    = Date.now();
-  var tStr   = appt.appointmentTime || '09:00';
-  var apptMs = new Date(appt.appointmentDate + 'T' + tStr + ':00').getTime();
+  // Normalize time — GAS may return "1899-12-30 09:00:00" or ISO string; extract HH:MM
+  var tStr   = (function(t) {
+    if (!t) return '09:00';
+    var m = String(t).match(/(\d{1,2}):(\d{2})/);
+    return m ? (('0'+m[1]).slice(-2) + ':' + m[2]) : '09:00';
+  })(appt.appointmentTime);
+  // Normalize date — take only yyyy-MM-dd part
+  var apptDateStr = String(appt.appointmentDate || '').split('T')[0].split(' ')[0];
+  var apptMs = new Date(apptDateStr + 'T' + tStr + ':00').getTime();
 
   // Auto-expire: hide widget 24 hours after appointment has passed
   if (now > apptMs + 86400000) {
@@ -1731,7 +1738,7 @@ function renderGarageApptWidget() {
     tier = 'normal';   bg = '#0a1929'; accent = '#4a9eff'; ringAnim = 'none';                              badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
   }
 
-  var dateFmt    = appt.appointmentDate.split('-').reverse().join('/');
+  var dateFmt    = apptDateStr.split('-').reverse().join('/');
   var dayName    = _hebrewDayName(new Date(apptMs));
   var garageName = appt.garageName || 'המוסך';
 
@@ -3745,8 +3752,13 @@ APP._garageClearApproved = function() {
 // מציג מסך תור פעיל (appointment_set) בתפריט עזרה > מוסך
 APP._garageShowActiveAppointment = function(appt) {
   APP._garageView = 'active_appointment';
-  var dateFmt = (appt.appointmentDate || '').split('-').reverse().join('/');
-  var tStr    = appt.appointmentTime || '09:00';
+  var tStr    = (function(t) {
+    if (!t) return '09:00';
+    var m = String(t).match(/(\d{1,2}):(\d{2})/);
+    return m ? (('0'+m[1]).slice(-2) + ':' + m[2]) : '09:00';
+  })(appt.appointmentTime);
+  var _apptDate = String(appt.appointmentDate || '').split('T')[0].split(' ')[0];
+  var dateFmt = _apptDate.split('-').reverse().join('/');
   try {
     var _apptMs = new Date(appt.appointmentDate + 'T' + tStr + ':00').getTime();
     var _dayName = _hebrewDayName ? _hebrewDayName(new Date(_apptMs)) : '';
