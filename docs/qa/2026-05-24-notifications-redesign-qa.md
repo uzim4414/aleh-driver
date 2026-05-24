@@ -124,6 +124,28 @@ Single path. All 12 types supported.
 
 ---
 
+## Bug #7 — Android OS Notification: Red App Logo + Missing Monochrome Icon
+
+**Symptom:** Android status bar showed a red square/circle (the app logo) as the notification icon. Expanded notification displayed a huge red circle as a large preview image. Both looked terrible ("גועל נפש").
+
+**Root causes:**
+- `icon` field: `'./icons/icon-512.png'` — the colored app logo. Android requires monochrome white-on-transparent for notification icons.
+- `image` field: `'./icons/icon-512.png'` — same red logo; Android shows this as a large preview banner in expanded notifications.
+- `badge` refs in `TYPE_CONFIG`: `badge-red.png`, `badge-amber.png`, etc. — files that didn't exist.
+
+**Fix:**
+- Created `icons/notif-bell.png` (192×192 monochrome white bell, transparent bg) via `make_bell_icons.py` (pure stdlib — struct + zlib, no dependencies).
+- Created `icons/notif-badge.png` (96×96 same).
+- Changed `icon` → `'./icons/notif-bell.png'`.
+- Removed `image` field entirely.
+- Changed `badge` → `BADGE_ICON` constant `'./icons/notif-badge.png'` for all types.
+- Added `_buildOsNotifContent()`: builds OS-level title + body per `alertType` with actual data fields (kmLeft, testDate, appointmentDate, vehicleId, garageInfo, costPerKm, etc.) instead of generic fallback text.
+- Updated action labels: `'פתח עכשיו'` / `'סגור'`.
+
+**Commit:** `7ad18cd`
+
+---
+
 ## Verification (2026-05-24)
 
 | Check | Result |
@@ -134,7 +156,10 @@ Single path. All 12 types supported.
 | saveNotifToHistory new fields | 14 fields added ✅ |
 | Toast CSS (nt-sev-*, animations) | All present ✅ |
 | CACHE_NAME | aleh-driver-v88 ✅ |
-| Pushed to GitHub | 437f5f3 → main ✅ |
+| notif-bell.png / notif-badge.png | Created ✅ |
+| `image` field in showNotification | Removed ✅ |
+| `_buildOsNotifContent` — all 12 types | Implemented ✅ |
+| Pushed to GitHub | 7ad18cd → main ✅ |
 
 ---
 
@@ -143,3 +168,5 @@ Single path. All 12 types supported.
 - **Two listeners = two toasts.** Always grep for `serviceWorker.addEventListener('message'` in ALL app files before adding a new one.
 - **Non-existent GAS endpoints fail silently in SW** — the catch block hides the error and triggers fallback. Always verify endpoint exists before referencing in SW.
 - **`saveNotifToHistory` newItem must be kept in sync with payload schema.** When Cloud Run adds a new field to the push payload, add it here too.
+- **Android Web Push icon must be monochrome white-on-transparent.** Never use a colored app icon as `icon` or `badge`. The `image` field shows as a large preview banner — only use it if you have a real contextual image, otherwise remove it.
+- **Always verify referenced icon files actually exist** before deploying SW changes — missing files fail silently, leaving broken fallbacks.
