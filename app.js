@@ -1738,15 +1738,15 @@ function renderGarageApptWidget() {
 
   var tier, bg, accent, ringAnim, badgeLabel;
   if (diffMs < 0) {
-    tier = 'missed';   bg = '#111';    accent = '#555';    ringAnim = 'none';                              badgeLabel = 'עבר המועד';
+    tier = 'missed';   bg = '#111';    accent = '#555';    ringAnim = 'none';                                badgeLabel = 'עבר המועד';
   } else if (diffDays < 1) {
-    tier = 'imminent'; bg = '#1f0505'; accent = '#ff3b3b'; ringAnim = 'gwPulse 0.8s ease-in-out infinite'; badgeLabel = 'היום!';
-  } else if (diffDays < 3) {
-    tier = 'urgent';   bg = '#1f1400'; accent = '#ff9800'; ringAnim = 'gwPulse 2s ease-in-out infinite';   badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
-  } else if (diffDays < 7) {
-    tier = 'soon';     bg = '#0a1f0a'; accent = '#4caf50'; ringAnim = 'gwPulse 3s ease-in-out infinite';   badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+    tier = 'today';    bg = '#1f0505'; accent = '#ef4444'; ringAnim = 'gwPulse 0.8s ease-in-out infinite';  badgeLabel = 'היום!';
+  } else if (diffDays <= 2) {
+    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+  } else if (diffDays <= 7) {
+    tier = 'soon';     bg = '#1f1700'; accent = '#f59e0b'; ringAnim = 'gwPulse 2.4s ease-in-out infinite';  badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
   } else {
-    tier = 'normal';   bg = '#0a1929'; accent = '#4a9eff'; ringAnim = 'none';                              badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+    tier = 'normal';   bg = '#0a1f0a'; accent = '#22c55e'; ringAnim = 'none';                               badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
   }
 
   var dateFmt    = apptDateStr.split('-').reverse().join('/');
