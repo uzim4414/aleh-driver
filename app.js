@@ -1227,9 +1227,8 @@ function _initFbGarageStatusSync() {
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
           if (typeof showToast === 'function') {
             var _cToast = data.setBy === 'driver'
-              ? null // driver cancelled themselves - no toast (they already know)
-              : (data.setBy === 'admin' || !data.setBy)
-              ? '❌ התור בוטל על ידי המנהל' : null;
+              ? '✅ התור בוטל' // driver cancelled - soft confirm on all devices
+              : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
             if (_cToast) showToast(_cToast);
           }
           snap.ref.update({ consumed: true, consumedAt: Date.now() });
@@ -1248,8 +1247,11 @@ function _initFbGarageStatusSync() {
         try { _localApptCheck = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
         var _fbAge   = data.updatedAt    || 0;
         var _localAge = _localApptCheck && _localApptCheck.updatedAt ? _localApptCheck.updatedAt : 0;
-        if (_localAge > _fbAge && _localApptCheck.eventId === (data.eventId || '')) {
-          // Local is strictly newer AND same event — Firebase is stale, mark consumed and skip
+        var _sameApptData = _localApptCheck
+          && _localApptCheck.appointmentDate === data.appointmentDate
+          && (_localApptCheck.appointmentTime || '') === (data.appointmentTime || '');
+      if (_localAge > _fbAge && _localApptCheck.eventId === (data.eventId || '') && _sameApptData) {
+          // Local is strictly newer AND same event AND same date/time — Firebase is stale, mark consumed and skip
           if (!data.consumed) snap.ref.update({ consumed: true, consumedAt: Date.now() });
           return;
         }
@@ -1284,9 +1286,10 @@ function _initFbGarageStatusSync() {
           var _dateChanged = _prevHadAppt &&
             (_localApptCheck.appointmentDate !== _aSet.appointmentDate ||
              (_localApptCheck.appointmentTime || '') !== _aSet.appointmentTime);
-          var _toastMsg = _dateChanged
-            ? '🔄 המנהל שינה את התור שלך ל-' + _aSet.appointmentDate + ' בשעה ' + _aSet.appointmentTime
-            : '✅ תור נקבע ל-' + _aSet.appointmentDate + ' בשעה ' + _aSet.appointmentTime;
+          var _isAdminChange = data.setBy !== 'driver';
+          var _toastMsg = (_dateChanged && _isAdminChange)
+            ? '🔄 המנהל שינה את התור שלך ל-' + _aSet.appointmentDate + ' בשעה ' + (_aSet.appointmentTime || '')
+            : '✅ תור נקבע ל-' + _aSet.appointmentDate + ' בשעה ' + (_aSet.appointmentTime || '');
           showToast(_toastMsg);
         }
         snap.ref.update({ consumed: true, consumedAt: Date.now() });
