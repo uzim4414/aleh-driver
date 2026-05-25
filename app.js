@@ -411,6 +411,7 @@ function _initFbGarageSync() {
       try {
         var data    = snap.val();
         var prevRaw = localStorage.getItem('activeGarageAppointment');
+        console.log('[WIDGET-DBG] activeAppointment FB fired. data=', data ? JSON.stringify({date:data.appointmentDate,time:data.appointmentTime,id:data.eventId}) : 'NULL', 'prevRaw=', prevRaw ? JSON.parse(prevRaw).appointmentDate + ' ' + JSON.parse(prevRaw).appointmentTime : 'null');
         if (data) {
           // Normalize time — guard against poisoned "Sat Dec 30 1899..." strings from GAS
           if (data.appointmentTime) {
@@ -425,10 +426,12 @@ function _initFbGarageSync() {
           }
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
+            console.log('[WIDGET-DBG] activeAppointment listener OVERWRITING localStorage. newDate=', data.appointmentDate, 'newTime=', data.appointmentTime);
             localStorage.setItem('activeGarageAppointment', newStr);
             if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
           }
         } else if (prevRaw) {
+          console.log('[WIDGET-DBG] activeAppointment listener got NULL — CLEARING widget!');
           localStorage.removeItem('activeGarageAppointment');
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
         }
@@ -1162,7 +1165,9 @@ async function _syncActiveAppointmentFromGAS() {
       var changed = !existing
         || String(existing.eventId) !== String(_aSet.eventId)
         || existing.appointmentDate !== _aSet.appointmentDate;
+      console.log('[WIDGET-DBG] _syncActiveAppointmentFromGAS: existing=', existing ? existing.appointmentDate+' '+existing.appointmentTime : 'null', 'gas=', _aSet.appointmentDate+' '+_aSet.appointmentTime, 'changed=', changed);
       if (changed) {
+        console.log('[WIDGET-DBG] _syncActiveAppointmentFromGAS OVERWRITING localStorage');
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
         // Clear pending/approved — admin-set appointment supersedes any in-flight request
         try { localStorage.removeItem('pendingGarageRequest'); } catch(_) {}
@@ -1174,6 +1179,7 @@ async function _syncActiveAppointmentFromGAS() {
       }
     } else if (!appt && existing) {
       // Admin cleared appointment — remove widget
+      console.log('[WIDGET-DBG] _syncActiveAppointmentFromGAS: GAS returned null appointment — CLEARING widget!');
       localStorage.removeItem('activeGarageAppointment');
       if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
       if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
@@ -1214,7 +1220,9 @@ function _initFbGarageStatusSync() {
 
       // ── מנהל ביטל תור פעיל — בדוק לפני consumed ──
       if (data.status === 'cancelled') {
+        console.log('[WIDGET-DBG] garageSync cancelled fired. consumed=', data.consumed, 'eventId=', data.eventId);
         if (!data.consumed) {
+          console.log('[WIDGET-DBG] garageSync CLEARING appointment (cancelled+unconsumed)');
           localStorage.removeItem('activeGarageAppointment');
           _fbClearActiveAppointment();
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
@@ -1230,6 +1238,7 @@ function _initFbGarageStatusSync() {
       // previous session marked consumed but the appointment is still active
       // and the current device hasn't reflected it yet.
       if (data.status === 'appointment_set' && data.appointmentDate) {
+        console.log('[WIDGET-DBG] garageSync appointment_set fired. consumed=', data.consumed, 'date=', data.appointmentDate, 'time=', data.appointmentTime, 'id=', data.eventId);
         if (data.consumed) {
           var _existAppt = null;
           try { _existAppt = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
@@ -1237,7 +1246,8 @@ function _initFbGarageStatusSync() {
             && String(_existAppt.eventId) === String(data.eventId || '')
             && _existAppt.appointmentDate === data.appointmentDate
             && (_existAppt.appointmentTime || '') === (data.appointmentTime || '');
-          if (_haveSame) return; // already reflected — nothing to do
+          if (_haveSame) { console.log('[WIDGET-DBG] garageSync appointment_set already reflected, skipping'); return; } // already reflected — nothing to do
+          console.log('[WIDGET-DBG] garageSync appointment_set consumed:true but local differs, applying');
           // else fall through and apply the appointment locally
         }
         var _aSet = {
@@ -1714,6 +1724,7 @@ function renderGarageApptWidget() {
   if (!mount) return;
 
   var appt = _loadActiveAppointment();
+  console.log('[WIDGET-DBG] renderGarageApptWidget: appt=', appt ? JSON.stringify({date:appt.appointmentDate,time:appt.appointmentTime,id:appt.eventId}) : 'null', new Error().stack.split('\n')[1]);
   if (!appt || !appt.appointmentDate) { mount.innerHTML = ''; return; }
 
   var now    = Date.now();
