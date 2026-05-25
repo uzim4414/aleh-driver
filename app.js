@@ -1291,7 +1291,16 @@ function _initFbGarageStatusSync() {
         if (typeof _fbClearApprovedGarage === 'function') _fbClearApprovedGarage();
         if (typeof _fbClearPendingGarage === 'function') _fbClearPendingGarage();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-        if (typeof showToast === 'function') showToast('📅 תור נקבע: ' + data.appointmentDate + ' ' + (data.appointmentTime || ''));
+        if (typeof showToast === 'function') {
+          var _prevHadAppt = _localApptCheck && _localApptCheck.appointmentDate;
+          var _dateChanged = _prevHadAppt &&
+            (_localApptCheck.appointmentDate !== _aSet.appointmentDate ||
+             (_localApptCheck.appointmentTime || '') !== _aSet.appointmentTime);
+          var _toastMsg = _dateChanged
+            ? '🔄 המנהל שינה את התור שלך ל-' + _aSet.appointmentDate + ' בשעה ' + _aSet.appointmentTime
+            : '✅ תור נקבע ל-' + _aSet.appointmentDate + ' בשעה ' + _aSet.appointmentTime;
+          showToast(_toastMsg);
+        }
         snap.ref.update({ consumed: true, consumedAt: Date.now() });
         return;
       }
