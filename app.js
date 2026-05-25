@@ -534,7 +534,8 @@ function saveNotifToHistory(payload) {
           managerNote:     meta.managerNote     || '',
           garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
           garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
-          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || '',
+          updatedAt:     Date.now()
         };
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_apptData));
         if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(_apptData);
@@ -1153,12 +1154,13 @@ async function _syncActiveAppointmentFromGAS() {
     if (appt && appt.appointmentDate) {
       var _aSet = {
         eventId:         appt.eventId         || '',
-        appointmentDate: appt.appointmentDate,
-        appointmentTime: appt.appointmentTime || '09:00',
+        appointmentDate: String(appt.appointmentDate || '').split('T')[0].split(' ')[0],
+        appointmentTime: (function(t) { if (!t) return '09:00'; var m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? (('0'+m[1]).slice(-2)+':'+m[2]) : '09:00'; })(appt.appointmentTime),
         managerNote:     appt.managerNote     || '',
         garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
         garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
-        garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+        garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || '',
+        updatedAt:     Date.now()
       };
       // BUG-6 fix: compare by eventId+date only — don't overwrite locally-set
       // appointment just because time format differs ("09:00" vs "9:00" etc.)
@@ -1179,6 +1181,12 @@ async function _syncActiveAppointmentFromGAS() {
       }
     } else if (!appt && existing) {
       // Admin cleared appointment — remove widget
+      // Guard: if local data is very fresh (<10 min), GAS might still be propagating — don't clear
+      var _localFreshness = Date.now() - (existing.updatedAt || 0);
+      if (_localFreshness < 600000) {
+        console.log('[WIDGET-DBG] _syncActiveAppointmentFromGAS: GAS returned null but local is fresh (' + Math.round(_localFreshness/1000) + 's) — NOT clearing');
+        return;
+      }
       console.log('[WIDGET-DBG] _syncActiveAppointmentFromGAS: GAS returned null appointment — CLEARING widget!');
       localStorage.removeItem('activeGarageAppointment');
       if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
@@ -1238,10 +1246,20 @@ function _initFbGarageStatusSync() {
       // previous session marked consumed but the appointment is still active
       // and the current device hasn't reflected it yet.
       if (data.status === 'appointment_set' && data.appointmentDate) {
-        console.log('[WIDGET-DBG] garageSync appointment_set fired. consumed=', data.consumed, 'date=', data.appointmentDate, 'time=', data.appointmentTime, 'id=', data.eventId);
+        console.log('[WIDGET-DBG] garageSync appointment_set fired. consumed=', data.consumed, 'date=', data.appointmentDate, 'time=', data.appointmentTime, 'id=', data.eventId, 'fbUpdatedAt=', data.updatedAt);
+        // ── Staleness guard: if local appointment was set MORE RECENTLY than Firebase data, keep local ──
+        var _localApptCheck = null;
+        try { _localApptCheck = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+        var _fbAge   = data.updatedAt    || 0;
+        var _localAge = _localApptCheck && _localApptCheck.updatedAt ? _localApptCheck.updatedAt : 0;
+        if (_localAge > _fbAge && _localApptCheck.eventId === (data.eventId || '')) {
+          // Local is strictly newer AND same event — Firebase is stale, mark consumed and skip
+          console.log('[WIDGET-DBG] garageSync: LOCAL is newer than Firebase (local=', _localAge, 'fb=', _fbAge, ') — keeping local, marking consumed');
+          if (!data.consumed) snap.ref.update({ consumed: true, consumedAt: Date.now() });
+          return;
+        }
         if (data.consumed) {
-          var _existAppt = null;
-          try { _existAppt = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+          var _existAppt = _localApptCheck;
           var _haveSame = _existAppt
             && String(_existAppt.eventId) === String(data.eventId || '')
             && _existAppt.appointmentDate === data.appointmentDate
@@ -1252,12 +1270,13 @@ function _initFbGarageStatusSync() {
         }
         var _aSet = {
           eventId:         data.eventId         || '',
-          appointmentDate: data.appointmentDate,
-          appointmentTime: data.appointmentTime || '09:00',
+          appointmentDate: String(data.appointmentDate || '').split('T')[0].split(' ')[0],
+          appointmentTime: (function(t) { if (!t) return '09:00'; var m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? (('0'+m[1]).slice(-2)+':'+m[2]) : '09:00'; })(data.appointmentTime),
           managerNote:     data.managerNote     || '',
           garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
           garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
-          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || '',
+          updatedAt:     data.updatedAt || Date.now()
         };
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
         localStorage.removeItem('approvedGarageRequest');
@@ -3887,12 +3906,13 @@ APP._garageShowApprovedFromStorage = function(meta) {
         // מנהל כבר קבע תור — עדכן localStorage והצג מסך תור פעיל
         var _aSet = {
           eventId:         eventId,
-          appointmentDate: r.appointmentDate,
-          appointmentTime: r.appointmentTime || '09:00',
+          appointmentDate: String(r.appointmentDate || '').split('T')[0].split(' ')[0],
+          appointmentTime: (function(t) { if (!t) return '09:00'; var m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? (('0'+m[1]).slice(-2)+':'+m[2]) : '09:00'; })(r.appointmentTime),
           managerNote:     r.managerNote     || '',
           garageName:    (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
           garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
-          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+          garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || '',
+          updatedAt:     Date.now()
         };
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
         localStorage.removeItem('approvedGarageRequest');
@@ -4214,7 +4234,8 @@ APP._garageConfirmAppointment = async function(eventId) {
         appointmentTime: timeVal,
         garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
         garageAddress: _garageCtx.garageAddress || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
-        garagePhone:   _garageCtx.garagePhone   || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
+        garagePhone:   _garageCtx.garagePhone   || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || '',
+        updatedAt:     Date.now()
       };
       try {
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_apptData));
