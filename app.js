@@ -1157,9 +1157,11 @@ async function _syncActiveAppointmentFromGAS() {
         garageAddress: (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.address) || '',
         garagePhone:   (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.phone)   || ''
       };
-      var changed = !existing || existing.eventId !== _aSet.eventId
-        || existing.appointmentDate !== _aSet.appointmentDate
-        || existing.appointmentTime !== _aSet.appointmentTime;
+      // BUG-6 fix: compare by eventId+date only — don't overwrite locally-set
+      // appointment just because time format differs ("09:00" vs "9:00" etc.)
+      var changed = !existing
+        || String(existing.eventId) !== String(_aSet.eventId)
+        || existing.appointmentDate !== _aSet.appointmentDate;
       if (changed) {
         localStorage.setItem('activeGarageAppointment', JSON.stringify(_aSet));
         // Clear pending/approved — admin-set appointment supersedes any in-flight request
