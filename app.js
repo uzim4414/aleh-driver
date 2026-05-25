@@ -412,6 +412,17 @@ function _initFbGarageSync() {
         var data    = snap.val();
         var prevRaw = localStorage.getItem('activeGarageAppointment');
         if (data) {
+          // Normalize time — guard against poisoned "Sat Dec 30 1899..." strings from GAS
+          if (data.appointmentTime) {
+            var _tmMatch = String(data.appointmentTime).match(/(\d{1,2}):(\d{2})/);
+            data.appointmentTime = _tmMatch
+              ? (('0'+_tmMatch[1]).slice(-2) + ':' + _tmMatch[2])
+              : '09:00';
+          }
+          // Normalize date — strip time component if present
+          if (data.appointmentDate) {
+            data.appointmentDate = String(data.appointmentDate).split('T')[0].split(' ')[0];
+          }
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
             localStorage.setItem('activeGarageAppointment', newStr);
