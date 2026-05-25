@@ -1234,7 +1234,13 @@ function _initFbGarageStatusSync() {
           localStorage.removeItem('activeGarageAppointment');
           _fbClearActiveAppointment();
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-          if (typeof showToast === 'function') showToast('❌ התור בוטל על ידי המנהל');
+          if (typeof showToast === 'function') {
+            var _cToast = data.setBy === 'driver'
+              ? null // driver cancelled themselves - no toast (they already know)
+              : (data.setBy === 'admin' || !data.setBy)
+              ? '❌ התור בוטל על ידי המנהל' : null;
+            if (_cToast) showToast(_cToast);
+          }
           snap.ref.update({ consumed: true, consumedAt: Date.now() });
         }
         return;
