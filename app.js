@@ -1859,7 +1859,7 @@ function renderGarageApptWidget() {
     '  <div class="gaw-actions">' +
     '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageCalendarLink()">📅 יומן</button>' +
     '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageWaze()">🗺 ניווט</button>' +
-    '    <button class="gaw-btn" onclick="event.stopPropagation();APP._garageEditAppointment(\'" + (appt.eventId||'') + "\')">✏ שנה</button>' +
+    '    <button class="gaw-btn" onclick="event.stopPropagation();APP._garageEditAppointment(\'' + (appt.eventId||'') + '\')">✏ שנה</button>' +
     '    <button class="gaw-btn" style="color:#f87171" onclick="event.stopPropagation();APP._garageCancelAppointment(\'' + (appt.eventId||'') + '\')">✕ בטל</button>' +
     '  </div>' +
     '</div>';
@@ -3900,7 +3900,7 @@ APP._garageShowActiveAppointment = function(appt) {
         (garagePhone ? '<button onclick="window.open(\'tel:' + garagePhone + '\')" style="flex:1;padding:11px 0;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:10px;color:#34d399;font-size:13px;font-weight:700;cursor:pointer">&#x1F4DE; התקשר</button>' : '') +
         '<button onclick="_openGarageWaze && _openGarageWaze()" style="flex:1;padding:11px 0;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:700;cursor:pointer">&#x1F5FA; ניווט</button>' +
       '</div>' +
-      (eventId ? '<button onclick="APP._garageEditAppointment(\'" + eventId + "\')" style="width:100%;margin-bottom:8px;padding:10px 0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer">✏ ערוך תור</button>' : '') +
+      (eventId ? '<button onclick="APP._garageEditAppointment(\'' + eventId + '\')" style="width:100%;margin-bottom:8px;padding:10px 0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer">✏ ערוך תור</button>' : '') +
       (eventId ? '<button onclick="APP._garageCancelAppointment(\'' + eventId + '\')" style="width:100%;padding:10px 0;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:13px;font-weight:600;cursor:pointer">&#x2715; בטל תור</button>' : '') +
     '</div>' +
     '</div>'
