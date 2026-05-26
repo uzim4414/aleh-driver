@@ -1859,6 +1859,7 @@ function renderGarageApptWidget() {
     '  <div class="gaw-actions">' +
     '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageCalendarLink()">📅 יומן</button>' +
     '    <button class="gaw-btn" onclick="event.stopPropagation();_openGarageWaze()">🗺 ניווט</button>' +
+    '    <button class="gaw-btn" onclick="event.stopPropagation();APP._garageEditAppointment(\'" + (appt.eventId||'') + "\')">✏ שנה</button>' +
     '    <button class="gaw-btn" style="color:#f87171" onclick="event.stopPropagation();APP._garageCancelAppointment(\'' + (appt.eventId||'') + '\')">✕ בטל</button>' +
     '  </div>' +
     '</div>';
@@ -3899,6 +3900,7 @@ APP._garageShowActiveAppointment = function(appt) {
         (garagePhone ? '<button onclick="window.open(\'tel:' + garagePhone + '\')" style="flex:1;padding:11px 0;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:10px;color:#34d399;font-size:13px;font-weight:700;cursor:pointer">&#x1F4DE; התקשר</button>' : '') +
         '<button onclick="_openGarageWaze && _openGarageWaze()" style="flex:1;padding:11px 0;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:700;cursor:pointer">&#x1F5FA; ניווט</button>' +
       '</div>' +
+      (eventId ? '<button onclick="APP._garageEditAppointment(\'" + eventId + "\')" style="width:100%;margin-bottom:8px;padding:10px 0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:10px;color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer">✏ ערוך תור</button>' : '') +
       (eventId ? '<button onclick="APP._garageCancelAppointment(\'' + eventId + '\')" style="width:100%;padding:10px 0;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:13px;font-weight:600;cursor:pointer">&#x2715; בטל תור</button>' : '') +
     '</div>' +
     '</div>'
@@ -4097,6 +4099,60 @@ APP._garageCancelAppointment = function(eventId) {
     'onclick="document.getElementById(\'_gcancel_overlay\').remove()">חזרה</button>' +
     '</div>';
   document.body.appendChild(ol);
+};
+
+APP._garageEditAppointment = function(eventId) {
+  var appt = JSON.parse(localStorage.getItem('activeGarageAppointment') || '{}');
+  var curDate = appt.appointmentDate || '';
+  var curTime = appt.appointmentTime || '';
+  var today = new Date().toISOString().slice(0,10);
+  var el = document.getElementById('garage-detail-body');
+  if (!el) el = document.getElementById('help-body');
+  if (!el) return;
+  el.innerHTML = (
+    '<div style="padding:16px;direction:rtl">' +
+    '<h3 style="margin:0 0 16px;color:#f8fafc;font-size:16px">עריכת תור מוסך</h3>' +
+    '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">תאריך</label>' +
+    '<input type="date" id="_gedit-date" min="' + today + '" value="' + curDate + '" 
+     style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+     border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:12px">' +
+    '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">שעה</label>' +
+    '<input type="time" id="_gedit-time" value="' + curTime + '" 
+     style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+     border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:16px">' +
+    '<button id="_gedit-save" onclick="APP._garageConfirmEditAppointment(\'' + eventId + '\')" 
+     style="width:100%;padding:12px;background:#3b82f6;border:none;border-radius:10px;
+     color:#fff;font-size:14px;font-weight:700;cursor:pointer">שמור שינוי</button>' +
+    '<button onclick="APP._garageShowActiveAppointment()" 
+     style="width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid #334155;
+     border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer">ביטול</button>' +
+    '</div>'
+  );
+};
+
+APP._garageConfirmEditAppointment = function(eventId) {
+  var dateVal = (document.getElementById('_gedit-date') || {}).value || '';
+  var timeVal = (document.getElementById('_gedit-time') || {}).value || '';
+  if (!dateVal || !timeVal) {
+    showToast('יש לבחור תאריך ושעה', 'error'); return;
+  }
+  var btn = document.getElementById('_gedit-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  callGAS('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal, appointmentTime: timeVal })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error || 'error');
+      var appt = JSON.parse(localStorage.getItem('activeGarageAppointment') || '{}');
+      appt.appointmentDate = dateVal;
+      appt.appointmentTime = timeVal;
+      localStorage.setItem('activeGarageAppointment', JSON.stringify(appt));
+      showToast('✅ תור עודכן ל-' + dateVal + ' ' + timeVal);
+      if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+      APP._garageShowActiveAppointment();
+    })
+    .catch(function(e) {
+      showToast('שגיאה: ' + e.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'שמור שינוי'; }
+    });
 };
 
 APP._garageDoCancelAppointment = async function(eventId, btn) {
