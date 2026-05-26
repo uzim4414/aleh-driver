@@ -4106,53 +4106,87 @@ APP._garageEditAppointment = function(eventId) {
   var curDate = appt.appointmentDate || '';
   var curTime = appt.appointmentTime || '';
   var today = new Date().toISOString().slice(0,10);
+  var reqNum = appt.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId);
+  var garageName = appt.garageName || '';
+  var curDateFmt = curDate ? curDate.split('-').reverse().join('/') : '--';
+  var curTimeFmt = curTime || '--:--';
   var existing = document.getElementById('_gedit_overlay');
   if (existing) existing.remove();
+  if (!document.getElementById('_gedit_kf')) {
+    var _kf = document.createElement('style');
+    _kf.id = '_gedit_kf';
+    _kf.textContent = '@keyframes _geditSlideUp{from{transform:translateY(100%);opacity:.4}to{transform:translateY(0);opacity:1}}@keyframes _geditFade{from{opacity:0}to{opacity:1}}';
+    document.head.appendChild(_kf);
+  }
   var ol = document.createElement('div');
   ol.id = '_gedit_overlay';
-  ol.setAttribute('style', 'position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;direction:rtl');
+  ol.setAttribute('style', 'position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;direction:rtl;animation:_geditFade .2s ease');
+  var reqChip = reqNum ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:3px 10px;letter-spacing:.3px">&#x1F527; #' + reqNum + '</span>' : '';
+  var garageRow = garageName ? '<div style="display:flex;align-items:center;gap:8px;background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.15);border-radius:12px;padding:10px 12px;margin-bottom:14px"><span style="font-size:16px">&#x1F527;</span><div style="flex:1;min-width:0"><div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:.4px">מוסך</div><div style="font-size:13px;color:#e2e8f0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + garageName.replace(/</g,"&lt;") + '</div></div></div>' : '';
   ol.innerHTML =
-    '<div style="background:#1e293b;width:100%;border-radius:20px 20px 0 0;padding:24px 16px 32px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">' +
-    '<h3 style="margin:0;color:#f8fafc;font-size:16px;font-weight:700">✏ עריכת תור מוסך</h3>' +
-    '<button onclick="document.getElementById(\'_gedit_overlay\').remove()" style="background:rgba(255,255,255,.1);border:none;border-radius:50%;width:32px;height:32px;color:#94a3b8;font-size:18px;cursor:pointer">&#x2715;</button>' +
+    '<div style="background:linear-gradient(180deg,#1e293b 0%,#172033 100%);width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:0;box-shadow:0 -20px 60px rgba(0,0,0,.6);animation:_geditSlideUp .28s cubic-bezier(.2,.9,.3,1.2);max-height:92vh;overflow-y:auto;border-top:1px solid rgba(148,163,184,.15)">' +
+    '<div style="background:linear-gradient(135deg,#3b82f6 0%,#6366f1 60%,#8b5cf6 100%);padding:20px 18px 18px;border-radius:24px 24px 0 0;position:relative;overflow:hidden">' +
+      '<div style="position:absolute;top:-30px;left:-30px;width:120px;height:120px;background:radial-gradient(circle,rgba(255,255,255,.15) 0%,transparent 70%);border-radius:50%"></div>' +
+      '<div style="position:absolute;bottom:-40px;right:-40px;width:140px;height:140px;background:radial-gradient(circle,rgba(255,255,255,.08) 0%,transparent 70%);border-radius:50%"></div>' +
+      '<button onclick="document.getElementById(\'_gedit_overlay\').remove()" style="position:absolute;top:14px;left:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.2);border-radius:50%;width:32px;height:32px;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-weight:700;z-index:2" aria-label="סגור">&#x2715;</button>' +
+      '<div style="display:flex;align-items:center;gap:12px;position:relative;z-index:1">' +
+        '<div style="width:46px;height:46px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;backdrop-filter:blur(8px)">&#x1F4C5;</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:.2px;line-height:1.2">עריכת תור מוסך</div>' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.85);margin-top:4px;display:flex;align-items:center;gap:6px">' + (reqChip || '<span style="opacity:.85">שינוי תאריך / שעה</span>') + '</div>' +
+        '</div>' +
+      '</div>' +
     '</div>' +
-    '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">תאריך</label>' +
-    '<input type="date" id="_gedit-date" min="' + today + '" value="' + curDate + '" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f8fafc;font-size:15px;margin-bottom:12px">' +
-    '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">שעה</label>' +
-    '<input type="time" id="_gedit-time" value="' + curTime + '" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f8fafc;font-size:15px;margin-bottom:16px">' +
-    '<button id="_gedit-save" onclick="APP._garageConfirmEditAppointment(\'' + eventId + '\')" style="width:100%;padding:12px;background:#3b82f6;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">שמור שינוי</button>' +
-    '<button onclick="document.getElementById(\'_gedit_overlay\').remove()" style="width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid #334155;border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer">ביטול</button>' +
+    '<div style="padding:18px 18px 24px">' +
+      garageRow +
+      '<div style="display:flex;gap:10px;margin-bottom:18px">' +
+        '<div style="flex:1;background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.15);border-radius:12px;padding:10px 12px"><div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:.4px;margin-bottom:2px">תאריך נוכחי</div><div style="font-size:14px;color:#cbd5e1;font-weight:700">' + curDateFmt + '</div></div>' +
+        '<div style="flex:1;background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.15);border-radius:12px;padding:10px 12px"><div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:.4px;margin-bottom:2px">שעה נוכחית</div><div style="font-size:14px;color:#cbd5e1;font-weight:700">' + curTimeFmt + '</div></div>' +
+      '</div>' +
+      '<label style="display:block;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:.4px;margin-bottom:6px;text-transform:uppercase">&#x1F4C6; תאריך חדש</label>' +
+      '<input type="date" id="_gedit-date" min="' + today + '" value="' + curDate + '" style="width:100%;box-sizing:border-box;padding:14px 14px;border-radius:14px;border:1.5px solid rgba(59,130,246,.25);background:#0f172a;color:#f8fafc;font-size:16px;font-weight:600;margin-bottom:14px;outline:none;transition:all .15s ease;font-family:inherit" onfocus="this.style.borderColor=\'#3b82f6\';this.style.boxShadow=\'0 0 0 4px rgba(59,130,246,.15)\'" onblur="this.style.borderColor=\'rgba(59,130,246,.25)\';this.style.boxShadow=\'none\'">' +
+      '<label style="display:block;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:.4px;margin-bottom:6px;text-transform:uppercase">&#x23F0; שעה חדשה</label>' +
+      '<input type="time" id="_gedit-time" value="' + curTime + '" style="width:100%;box-sizing:border-box;padding:14px 14px;border-radius:14px;border:1.5px solid rgba(59,130,246,.25);background:#0f172a;color:#f8fafc;font-size:16px;font-weight:600;margin-bottom:22px;outline:none;transition:all .15s ease;font-family:inherit" onfocus="this.style.borderColor=\'#3b82f6\';this.style.boxShadow=\'0 0 0 4px rgba(59,130,246,.15)\'" onblur="this.style.borderColor=\'rgba(59,130,246,.25)\';this.style.boxShadow=\'none\'">' +
+      '<button id="_gedit-save" onclick="APP._garageConfirmEditAppointment(\'' + eventId + '\')" style="width:100%;padding:16px;background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:800;letter-spacing:.3px;cursor:pointer;box-shadow:0 8px 20px rgba(59,130,246,.35),inset 0 1px 0 rgba(255,255,255,.2);transition:transform .1s ease" onmousedown="this.style.transform=\'scale(.98)\'" onmouseup="this.style.transform=\'scale(1)\'" ontouchstart="this.style.transform=\'scale(.98)\'" ontouchend="this.style.transform=\'scale(1)\'">&#x1F4BE; שמור שינוי</button>' +
+      '<button onclick="document.getElementById(\'_gedit_overlay\').remove()" style="width:100%;margin-top:10px;padding:13px;background:transparent;border:1px solid rgba(148,163,184,.25);border-radius:14px;color:#94a3b8;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s ease" onmouseover="this.style.background=\'rgba(148,163,184,.08)\'" onmouseout="this.style.background=\'transparent\'">ביטול</button>' +
+    '</div>' +
     '</div>';
   ol.addEventListener('click', function(e) { if (e.target === ol) ol.remove(); });
   document.body.appendChild(ol);
 };
 
-APP._garageConfirmEditAppointment = function(eventId) {
+APP._garageConfirmEditAppointment = async function(eventId) {
   var dateVal = (document.getElementById('_gedit-date') || {}).value || '';
   var timeVal = (document.getElementById('_gedit-time') || {}).value || '';
   if (!dateVal || !timeVal) {
     showToast('יש לבחור תאריך ושעה', 'error'); return;
   }
+  if (!eventId) { showToast('מזהה אירוע חסר', 'error'); return; }
   var btn = document.getElementById('_gedit-save');
-  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
-  callGAS('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal, appointmentTime: timeVal })
-    .then(function(res) {
-      if (!res.ok) throw new Error(res.error || 'error');
-      var appt = JSON.parse(localStorage.getItem('activeGarageAppointment') || '{}');
-      appt.appointmentDate = dateVal;
-      appt.appointmentTime = timeVal;
-      localStorage.setItem('activeGarageAppointment', JSON.stringify(appt));
-      var _eol = document.getElementById('_gedit_overlay');
-      if (_eol) _eol.remove();
-      showToast('✅ תור עודכן ל-' + dateVal + ' ' + timeVal);
-      if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-      if (APP._garageView === 'active_appointment') APP._garageShowActiveAppointment(_loadActiveAppointment() || {});
-    })
-    .catch(function(e) {
-      showToast('שגיאה: ' + e.message, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = 'שמור שינוי'; }
-    });
+  var origText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '\u23F3 שומר...'; btn.style.opacity = '.75'; }
+  try {
+    var res = await gasPost('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal, appointmentTime: timeVal }, { silent: true });
+    if (res && res.error === 'session_expired') { _sessionExpired(); return; }
+    if (!res || !res.ok) throw new Error((res && res.error) || 'error');
+    var appt = JSON.parse(localStorage.getItem('activeGarageAppointment') || '{}');
+    appt.appointmentDate = dateVal;
+    appt.appointmentTime = timeVal;
+    appt.updatedAt = Date.now();
+    localStorage.setItem('activeGarageAppointment', JSON.stringify(appt));
+    try { if (typeof _fbSetActiveAppointment === 'function') _fbSetActiveAppointment(appt); } catch(_fbE) {}
+    var _eol = document.getElementById('_gedit_overlay');
+    if (_eol) _eol.remove();
+    var _dFmt = dateVal.split('-').reverse().join('/');
+    showToast('\u2705 התור עודכן ל-' + _dFmt + ' בשעה ' + timeVal);
+    if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+    if (APP._garageView === 'active_appointment' && typeof APP._garageShowActiveAppointment === 'function') {
+      APP._garageShowActiveAppointment((typeof _loadActiveAppointment === 'function' ? _loadActiveAppointment() : null) || appt);
+    }
+  } catch(e) {
+    showToast('שגיאה בעדכון: ' + (e && e.message ? e.message : e), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = origText || '\uD83D\uDCBE שמור שינוי'; btn.style.opacity = '1'; }
+  }
 };
 
 APP._garageDoCancelAppointment = async function(eventId, btn) {
