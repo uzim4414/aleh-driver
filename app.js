@@ -4113,19 +4113,11 @@ APP._garageEditAppointment = function(eventId) {
     '<div style="padding:16px;direction:rtl">' +
     '<h3 style="margin:0 0 16px;color:#f8fafc;font-size:16px">עריכת תור מוסך</h3>' +
     '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">תאריך</label>' +
-    '<input type="date" id="_gedit-date" min="' + today + '" value="' + curDate + '" 
-     style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
-     border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:12px">' +
+    '<input type="date" id="_gedit-date" min="' + today + '" value="' + curDate + '" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:12px">' +
     '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">שעה</label>' +
-    '<input type="time" id="_gedit-time" value="' + curTime + '" 
-     style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
-     border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:16px">' +
-    '<button id="_gedit-save" onclick="APP._garageConfirmEditAppointment(\'' + eventId + '\')" 
-     style="width:100%;padding:12px;background:#3b82f6;border:none;border-radius:10px;
-     color:#fff;font-size:14px;font-weight:700;cursor:pointer">שמור שינוי</button>' +
-    '<button onclick="APP._garageShowActiveAppointment()" 
-     style="width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid #334155;
-     border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer">ביטול</button>' +
+    '<input type="time" id="_gedit-time" value="' + curTime + '" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:16px">' +
+    '<button id="_gedit-save" onclick="APP._garageConfirmEditAppointment(\'' + eventId + '\')" style="width:100%;padding:12px;background:#3b82f6;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">שמור שינוי</button>' +
+    '<button onclick="APP._garageShowActiveAppointment()" style="width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid #334155;border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer">ביטול</button>' +
     '</div>'
   );
 };
