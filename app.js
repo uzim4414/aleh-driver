@@ -4106,10 +4106,7 @@ APP._garageEditAppointment = function(eventId) {
   var curDate = appt.appointmentDate || '';
   var curTime = appt.appointmentTime || '';
   var today = new Date().toISOString().slice(0,10);
-  var el = document.getElementById('garage-detail-body');
-  if (!el) el = document.getElementById('help-body');
-  if (!el) return;
-  el.innerHTML = (
+  var html = (
     '<div style="padding:16px;direction:rtl">' +
     '<h3 style="margin:0 0 16px;color:#f8fafc;font-size:16px">עריכת תור מוסך</h3>' +
     '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">תאריך</label>' +
@@ -4117,9 +4114,15 @@ APP._garageEditAppointment = function(eventId) {
     '<label style="display:block;color:#94a3b8;font-size:12px;margin-bottom:4px">שעה</label>' +
     '<input type="time" id="_gedit-time" value="' + curTime + '" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#f8fafc;font-size:15px;margin-bottom:16px">' +
     '<button id="_gedit-save" onclick="APP._garageConfirmEditAppointment(\'' + eventId + '\')" style="width:100%;padding:12px;background:#3b82f6;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">שמור שינוי</button>' +
-    '<button onclick="APP._garageShowActiveAppointment()" style="width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid #334155;border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer">ביטול</button>' +
+    '<button onclick="APP._garageShowActiveAppointment(_loadActiveAppointment()||{})" style="width:100%;margin-top:8px;padding:10px;background:transparent;border:1px solid #334155;border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer">ביטול</button>' +
     '</div>'
   );
+  if (APP._garageView === 'active_appointment') {
+    _showHelpCard(html);
+  } else {
+    if (typeof APP.nav === 'function') APP.nav('service');
+    setTimeout(function() { _showHelpCard(html); }, 80);
+  }
 };
 
 APP._garageConfirmEditAppointment = function(eventId) {
@@ -4139,7 +4142,7 @@ APP._garageConfirmEditAppointment = function(eventId) {
       localStorage.setItem('activeGarageAppointment', JSON.stringify(appt));
       showToast('✅ תור עודכן ל-' + dateVal + ' ' + timeVal);
       if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-      APP._garageShowActiveAppointment();
+      APP._garageShowActiveAppointment(_loadActiveAppointment() || {});
     })
     .catch(function(e) {
       showToast('שגיאה: ' + e.message, 'error');
