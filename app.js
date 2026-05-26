@@ -564,6 +564,7 @@ function saveNotifToHistory(payload) {
         if (typeof _fbClearApprovedGarage === 'function') _fbClearApprovedGarage();
         var _apptData = {
           eventId:         meta.eventId         || '',
+          requestNumber:   meta.requestNumber   || '',
           appointmentDate: meta.appointmentDate || '',
           appointmentTime: meta.appointmentTime || '09:00',
           managerNote:     meta.managerNote     || '',
@@ -1189,6 +1190,7 @@ async function _syncActiveAppointmentFromGAS() {
     if (appt && appt.appointmentDate) {
       var _aSet = {
         eventId:         appt.eventId         || '',
+        requestNumber:   appt.requestNumber   || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(appt.eventId),
         appointmentDate: String(appt.appointmentDate || '').split('T')[0].split(' ')[0],
         appointmentTime: (function(t) { if (!t) return '09:00'; var m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? (('0'+m[1]).slice(-2)+':'+m[2]) : '09:00'; })(appt.appointmentTime),
         managerNote:     appt.managerNote     || '',
@@ -1306,6 +1308,7 @@ function _initFbGarageStatusSync() {
         }
         var _aSet = {
           eventId:         data.eventId         || '',
+          requestNumber:   data.requestNumber   || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(data.eventId),
           appointmentDate: String(data.appointmentDate || '').split('T')[0].split(' ')[0],
           appointmentTime: (function(t) { if (!t) return '09:00'; var m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? (('0'+m[1]).slice(-2)+':'+m[2]) : '09:00'; })(data.appointmentTime),
           managerNote:     data.managerNote     || '',
@@ -1833,6 +1836,8 @@ function renderGarageApptWidget() {
   var dateFmt    = apptDateStr.split('-').reverse().join('/');
   var dayName    = _hebrewDayName(new Date(apptMs));
   var garageName = appt.garageName || 'המוסך';
+  var reqNumWidget = appt.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(appt.eventId);
+  var reqNumChipHtml = reqNumWidget ? '<span class="gaw-reqnum" style="display:inline-block;font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:middle">#' + reqNumWidget + '</span>' : '';
 
   mount.innerHTML =
     '<div class="gaw-widget" data-tier="' + tier + '" ' +
@@ -1847,7 +1852,7 @@ function renderGarageApptWidget() {
     '  </div>' +
     '  <div class="gaw-body">' +
     '    <div class="gaw-title">תור במוסך</div>' +
-    '    <div class="gaw-garage">' + garageName + '</div>' +
+    '    <div class="gaw-garage">' + reqNumChipHtml + garageName + '</div>' +
     '    <div class="gaw-date">' + dayName + ' · ' + dateFmt + ' · ' + tStr + '</div>' +
     '  </div>' +
     '  <div class="gaw-badge">⏱ ' + badgeLabel + '</div>' +
@@ -4198,7 +4203,10 @@ APP._garageShowApproved = function(garageInfo, eventId, reasonLabel, requestNumb
   }
 
   var metaRows = '<div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px">';
-  if (requestNumber) metaRows += '<div style="color:#94a3b8;margin-bottom:3px">מספר אישור: <b style="color:#f1f5f9">#' + requestNumber + '</b></div>';
+  if (!requestNumber && eventId) {
+    try { var _m = String(eventId).match(/-(\d+)$/); if (_m) requestNumber = String(parseInt(_m[1], 10)); } catch(_) {}
+  }
+  if (requestNumber) metaRows += '<div style="color:#94a3b8;margin-bottom:3px">מספר תקלה: <b style="color:#f1f5f9">#' + requestNumber + '</b></div>';
   if (reasonLabel)   metaRows += '<div style="color:#94a3b8;margin-bottom:3px">סיבה: <b style="color:#f1f5f9">' + _escHtml(reasonLabel) + '</b></div>';
   if (approvedDateStr) metaRows += '<div style="color:#64748b">אושר: ' + approvedDateStr + '</div>';
   metaRows += '</div>';
@@ -4279,6 +4287,7 @@ APP._garageConfirmAppointment = async function(eventId) {
       var _garageCtx = APP._garageCtx || {};
       var _apptData = {
         eventId:         eventId,
+        requestNumber:   _reqNumConfirm || '',
         appointmentDate: dateVal,
         appointmentTime: timeVal,
         garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
@@ -4297,6 +4306,7 @@ APP._garageConfirmAppointment = async function(eventId) {
       var _dateFmt  = dateVal.split('-').reverse().join('/');
       var _timeDisp = timeVal || '09:00';
       var _calUrl   = _buildGoogleCalendarUrl(dateVal, timeVal, STATE.vehicle);
+      var _reqNumConfirm = (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId);
 
       _showHelpCard(
         '<div class="help-card" style="padding:0;overflow:hidden">' +
@@ -4306,6 +4316,7 @@ APP._garageConfirmAppointment = async function(eventId) {
             '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
           '</div>' +
           '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px">תור נקבע!</div>' +
+          (_reqNumConfirm ? '<div style="display:inline-block;font-size:11px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:2px 10px;margin-bottom:6px">מספר תקלה #' + _reqNumConfirm + '</div>' : '') +
           '<div style="font-size:14px;color:rgba(255,255,255,.85)">תאריך: <b>' + _dateFmt + '</b> · <b>' + _timeDisp + '</b></div>' +
           '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px">מנהל הצי קיבל עדכון</div>' +
         '</div>' +
@@ -4829,12 +4840,16 @@ function _buildToastChips(alertType, meta) {
     case 'test_due': case 'test_urgent':
       c('תאריך טסט', meta.testDate); c('נותרו', meta.daysLeft, 'ימים'); break;
     case 'garage_approved':
+      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
       if (meta.garageInfo) c('מוסך', meta.garageInfo); break;
     case 'garage_rejected':
+      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
       if (meta.reasonLabel) c('סיבה', meta.reasonLabel); break;
     case 'garage_appointment_set':
+      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
       c('תאריך', meta.appointmentDate); c('שעה', meta.appointmentTime); if (meta.garageInfo) c('מוסך', meta.garageInfo); break;
     case 'garage_appointment_cancelled':
+      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
       c('תאריך שבוטל', meta.appointmentDate); if (meta.appointmentTime) c('שעה', meta.appointmentTime); break;
     case 'fuel_high':
       if (meta.fuelConsumption != null) c('צריכה', meta.fuelConsumption, 'ל׳/100ק"מ');
@@ -4948,7 +4963,18 @@ function showInAppNotification(payload) {
       '<span class="nt-badge">' + _escHtml(SEV_LABEL[severity] || severity) + '</span>' +
       '<button class="nt-close" aria-label="סגור">✕</button>' +
     '</div>' +
-    (notif.body ? '<div class="nt-body">' + _escHtml(notif.body) + '</div>' : '') +
+    (function() {
+      var _b = notif.body || '';
+      var _rn = meta && meta.requestNumber ? meta.requestNumber : '';
+      if (!_rn && meta && meta.eventId) {
+        try { var _mm = String(meta.eventId).match(/-(\d+)$/); if (_mm) _rn = String(parseInt(_mm[1], 10)); } catch(_) {}
+      }
+      var _isGarage = /^garage_/.test(alertType);
+      if (!_b && !(_isGarage && _rn)) return '';
+      var _bodyHtml = _b ? _escHtml(_b) : '';
+      var _rnHtml = (_isGarage && _rn) ? ' <span style="display:inline-block;font-size:11px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:1px 8px;margin-right:4px;vertical-align:middle">מספר תקלה #' + _rn + '</span>' : '';
+      return '<div class="nt-body">' + _bodyHtml + _rnHtml + '</div>';
+    })() +
     chipsHtml +
     actionsHtml +
     progressHtml;
