@@ -483,6 +483,44 @@ function getNotifHistory() {
   } catch(e) { return []; }
 }
 
+/* ──────────────────────────────────────────────────────────────
+   Cross-channel notif dedup: FCM (SW→push-foreground) and Firebase
+   garageSync listener can fire for the same event. First channel wins,
+   second is silenced for TTL_MS. Keyed by alertType+eventId normalized
+   to a logical event (see _normGarageEventKey).
+   ────────────────────────────────────────────────────────────── */
+var _GARAGE_DEDUP_TTL_MS = 12000;
+var _garageDedupMap = {};
+function _normGarageEventKey(typeOrStatus, eventId) {
+  if (!eventId) return '';
+  var t = String(typeOrStatus || '').toLowerCase();
+  // map FB statuses ↔ FCM alertTypes to a single canonical key
+  var map = {
+    'cancelled':                  'cancelled',
+    'garage_appointment_cancelled':'cancelled',
+    'appointment_set':            'appointment_set',
+    'garage_appointment_set':     'appointment_set',
+    'approved':                   'approved',
+    'garage_approved':            'approved',
+    'rejected':                   'rejected',
+    'garage_rejected':            'rejected'
+  };
+  var canon = map[t] || t;
+  return canon + '|' + String(eventId);
+}
+function _garageDedupSeen(key) {
+  if (!key) return false;
+  var now = Date.now();
+  // GC expired
+  var keys = Object.keys(_garageDedupMap);
+  for (var i = 0; i < keys.length; i++) {
+    if (now - _garageDedupMap[keys[i]] > _GARAGE_DEDUP_TTL_MS) delete _garageDedupMap[keys[i]];
+  }
+  if (_garageDedupMap[key] && (now - _garageDedupMap[key]) <= _GARAGE_DEDUP_TTL_MS) return true;
+  _garageDedupMap[key] = now;
+  return false;
+}
+
 function saveNotifToHistory(payload) {
   try {
     var notif = payload.notification || {};
@@ -1225,7 +1263,9 @@ function _initFbGarageStatusSync() {
           localStorage.removeItem('activeGarageAppointment');
           _fbClearActiveAppointment();
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-          if (typeof showToast === 'function') {
+          // Cross-channel dedup: skip toast if FCM already showed this event
+          var _cDupKey = _normGarageEventKey('cancelled', data.eventId);
+          if (typeof showToast === 'function' && !_garageDedupSeen(_cDupKey)) {
             var _cToast = data.setBy === 'driver'
               ? '✅ התור בוטל' // driver cancelled - soft confirm on all devices
               : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
@@ -1281,7 +1321,9 @@ function _initFbGarageStatusSync() {
         if (typeof _fbClearApprovedGarage === 'function') _fbClearApprovedGarage();
         if (typeof _fbClearPendingGarage === 'function') _fbClearPendingGarage();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-        if (typeof showToast === 'function') {
+        // Cross-channel dedup: skip toast if FCM already showed this event
+        var _setDupKey = _normGarageEventKey('appointment_set', data.eventId);
+        if (typeof showToast === 'function' && !_garageDedupSeen(_setDupKey)) {
           var _prevHadAppt = _localApptCheck && _localApptCheck.appointmentDate;
           var _dateChanged = _prevHadAppt &&
             (_localApptCheck.appointmentDate !== _aSet.appointmentDate ||
@@ -1331,7 +1373,9 @@ function _initFbGarageStatusSync() {
           localStorage.removeItem('pendingGarageRequest');
           _fbClearPendingGarage();
         }
-        if (typeof showToast === 'function') {
+        // Cross-channel dedup: skip toast if FCM already showed this event
+        var _rjDupKey = _normGarageEventKey('rejected', data.eventId);
+        if (typeof showToast === 'function' && !_garageDedupSeen(_rjDupKey)) {
           showToast('בקשת המוסך נדחתה' + (data.managerNote ? ': ' + data.managerNote : ''));
         }
         if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
@@ -4854,6 +4898,19 @@ function showInAppNotification(payload) {
   var severity  = SEVERITY_MAP[alertType] || 'plan';
   var duration  = TOAST_DURATION[severity] || 6000;
   var icon      = SEVERITY_ICONS[severity] || SEVERITY_ICONS.plan;
+
+  // Cross-channel dedup: if Firebase listener already showed a toast for this
+  // garage event, skip the rich notification toast. Also mark this event as
+  // "shown" so a later Firebase listener fire is suppressed.
+  if (meta && meta.eventId && /^garage_(appointment_(cancelled|set)|approved|rejected)$/.test(alertType)) {
+    var _fcmDupKey = _normGarageEventKey(alertType, meta.eventId);
+    if (_garageDedupSeen(_fcmDupKey)) {
+      // Still save to history so the bell badge/list reflects the event,
+      // but skip the visible toast — Firebase already showed one.
+      saveNotifToHistory(payload);
+      return;
+    }
+  }
 
   // Save to history
   saveNotifToHistory(payload);
