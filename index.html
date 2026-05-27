@@ -285,7 +285,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .tc-lbl { font-size:12px; color:var(--t2); }
 .tc-tag { display:inline-block; border:1.5px solid rgba(255,255,255,0.18); border-radius:100px; padding:5px 14px; font-size:12px; font-weight:600; margin-top:10px; }
 
-/* KM MODAL - redesigned */
+/* KM MODAL - redesigned (compact) */
 #km-modal-form.hidden, #km-modal-success.hidden { display:none !important; }
 
 .km-modal-overlay {
@@ -303,7 +303,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   background:linear-gradient(180deg, #0f1729 0%, #0a0f1e 100%);
   border-top:1px solid rgba(99,102,241,0.30);
   border-radius:28px 28px 0 0;
-  padding:14px 22px 30px;
+  padding:10px 16px 22px;
   box-shadow:0 -20px 60px rgba(0,0,0,0.55), 0 -2px 0 rgba(99,102,241,0.18) inset;
   animation:kmSlideUp .42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   position:relative;
@@ -319,60 +319,99 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .km-drag-handle {
   width:40px; height:4px; border-radius:2px;
   background:rgba(255,255,255,0.20);
-  margin:0 auto 18px;
+  margin:0 auto 12px;
 }
 
 .km-modal-header {
-  display:flex; align-items:center; gap:14px;
-  padding:14px 16px;
-  background:linear-gradient(135deg, #1a1f35 0%, #0f172a 100%);
-  border:1px solid rgba(99,102,241,0.18);
-  border-radius:20px;
-  margin-bottom:16px;
+  display:flex; align-items:center; gap:12px;
+  padding:0 2px;
+  margin-bottom:14px;
   position:relative;
   z-index:1;
 }
 .km-modal-icon-tile {
-  width:60px; height:60px; flex-shrink:0;
-  border-radius:18px;
+  width:48px; height:48px; flex-shrink:0;
+  border-radius:14px;
   background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   display:flex; align-items:center; justify-content:center;
-  box-shadow:0 10px 24px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.10) inset;
+  box-shadow:0 8px 20px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.10) inset;
 }
+.km-modal-icon-tile svg { width:26px; height:26px; }
 .km-modal-header-text { flex:1; min-width:0; }
 .km-modal-title {
-  font-size:20px; font-weight:800; color:#f8fafc;
+  font-size:18px; font-weight:800; color:#f8fafc;
   letter-spacing:-0.02em; line-height:1.15;
 }
 .km-modal-subtitle {
-  font-size:13px; color:#94a3b8; margin-top:3px;
+  font-size:12px; color:#94a3b8; margin-top:2px;
   font-weight:500;
 }
+
+.km-modal-close {
+  flex-shrink:0;
+  width:36px; height:36px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.10);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+  color:#cbd5e1;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  transition:background .18s ease, color .18s ease, transform .15s ease, border-color .18s ease;
+  padding:0;
+}
+.km-modal-close:hover {
+  background:rgba(255,255,255,0.12);
+  border-color:rgba(255,255,255,0.20);
+  color:#f8fafc;
+}
+.km-modal-close:active { transform:scale(0.92); }
+.km-modal-close svg { width:18px; height:18px; }
 
 .km-modal-prev {
   display:flex; align-items:center; justify-content:space-between;
   background:rgba(15,23,42,0.6);
   border:1px solid rgba(99,102,241,0.15);
   border-right:3px solid #8b5cf6;
-  border-radius:14px;
-  padding:12px 16px;
-  margin-bottom:14px;
-  font-size:13px; color:#cbd5e1;
+  border-radius:12px;
+  padding:9px 14px;
+  margin-bottom:10px;
+  font-size:12px; color:#cbd5e1;
   position:relative; z-index:1;
 }
 .km-modal-prev strong {
-  color:#f8fafc; font-weight:800; font-size:15px;
+  color:#f8fafc; font-weight:800; font-size:14px;
   letter-spacing:-0.01em;
+}
+
+.km-modal-input-wrap {
+  position:relative;
+  z-index:1;
+}
+.km-modal-input-wrap::before {
+  content:""; position:absolute; inset:-2px;
+  border-radius:18px;
+  background:radial-gradient(circle at 50% 50%, rgba(99,102,241,0.35), rgba(168,85,247,0.20) 45%, transparent 75%);
+  opacity:0;
+  filter:blur(14px);
+  transition:opacity .35s ease;
+  pointer-events:none;
+  z-index:-1;
+}
+.km-modal-input-wrap.focused::before {
+  opacity:1;
+  animation:kmGlowPulse 2.2s ease-in-out infinite;
 }
 
 .km-modal-input {
   width:100%; box-sizing:border-box;
   background:rgba(15,23,42,0.80);
   border:2px solid rgba(99,102,241,0.30);
-  border-radius:20px;
-  padding:20px;
+  border-radius:16px;
+  padding:14px;
   color:#f8fafc;
-  font-size:42px; font-weight:900;
+  font-size:36px; font-weight:900;
   font-family:inherit;
   text-align:center;
   outline:none;
@@ -387,16 +426,16 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .km-modal-input:focus {
   border-color:rgba(99,102,241,0.75);
   background:rgba(15,23,42,0.95);
-  box-shadow:0 0 0 4px rgba(99,102,241,0.20), 0 0 30px rgba(99,102,241,0.10);
+  box-shadow:0 0 0 3px rgba(99,102,241,0.18);
 }
 
 .km-modal-error {
   background:rgba(255,59,48,0.10);
   border:1px solid rgba(255,59,48,0.30);
-  border-radius:12px;
-  padding:10px 14px;
-  margin-top:10px;
-  color:#fca5a5; font-size:13px; font-weight:600;
+  border-radius:10px;
+  padding:8px 12px;
+  margin-top:8px;
+  color:#fca5a5; font-size:12px; font-weight:600;
   text-align:center;
   animation:kmErrSlide .25s ease both;
   position:relative; z-index:1;
@@ -404,35 +443,23 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .km-modal-error.hidden { display:none !important; }
 
 .km-modal-submit {
-  width:100%; margin-top:16px;
-  height:58px;
+  width:100%; margin-top:12px;
+  height:50px;
   background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
   border:none;
-  border-radius:18px;
+  border-radius:14px;
   color:#fff;
-  font-size:16px; font-weight:800; font-family:inherit;
+  font-size:15px; font-weight:800; font-family:inherit;
   cursor:pointer;
   letter-spacing:0.01em;
   display:flex; align-items:center; justify-content:center; gap:10px;
-  box-shadow:0 14px 30px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.10) inset;
+  box-shadow:0 12px 26px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.10) inset;
   transition:transform .15s ease, box-shadow .25s ease, filter .2s ease;
   position:relative; z-index:1;
 }
 .km-modal-submit:hover { filter:brightness(1.08); }
 .km-modal-submit:active { transform:scale(0.97); box-shadow:0 6px 18px rgba(99,102,241,0.35); }
 .km-modal-submit:disabled { opacity:.6; cursor:not-allowed; transform:none; filter:none; }
-
-.km-modal-cancel {
-  width:100%; margin-top:10px;
-  background:transparent; border:none;
-  color:#64748b;
-  font-size:14px; font-weight:600; font-family:inherit;
-  padding:10px;
-  cursor:pointer;
-  transition:color .2s ease;
-  position:relative; z-index:1;
-}
-.km-modal-cancel:hover { color:#cbd5e1; }
 
 .km-modal-spinner {
   width:22px; height:22px;
@@ -533,6 +560,10 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   to   { opacity:1; transform:translateY(0); }
 }
 @keyframes kmDraw { to { stroke-dashoffset:0; } }
+@keyframes kmGlowPulse {
+  0%,100% { opacity:.55; transform:scale(0.98); }
+  50%     { opacity:1;   transform:scale(1.04); }
+}
 @keyframes kmGlow {
   0%,100% { opacity:.6; transform:scale(1); }
   50%     { opacity:1;  transform:scale(1.08); }
@@ -2294,7 +2325,7 @@ window.fcmDebug = async function() {
     <div id="km-modal-form">
       <div class="km-modal-header">
         <div class="km-modal-icon-tile">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 14l4-4"/>
             <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
             <circle cx="12" cy="14" r="1.5" fill="#fff"/>
@@ -2304,15 +2335,24 @@ window.fcmDebug = async function() {
           <div class="km-modal-title">עדכון ק"מ</div>
           <div class="km-modal-subtitle" id="km-modal-vehicle">עדכון קילומטרז</div>
         </div>
+        <button type="button" class="km-modal-close" aria-label="סגירה" onclick="APP.closeKmModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 6l12 12"/>
+            <path d="M18 6L6 18"/>
+          </svg>
+        </button>
       </div>
       <div class="km-modal-prev" id="km-modal-prev">ק"מ אחרון: <strong>—</strong></div>
-      <input class="km-modal-input" id="km-modal-input" type="number" placeholder="0" inputmode="numeric">
+      <div class="km-modal-input-wrap" id="km-modal-input-wrap">
+        <input class="km-modal-input" id="km-modal-input" type="number" placeholder="0" inputmode="numeric"
+               onfocus="this.parentNode.classList.add('focused')"
+               onblur="this.parentNode.classList.remove('focused')">
+      </div>
       <div class="km-modal-error hidden" id="km-modal-error"></div>
       <button class="km-modal-submit" id="km-modal-submit" onclick="APP.submitKm()">
         <span id="km-modal-btn-text">עדכן ק"מ ←</span>
         <div class="km-modal-spinner hidden" id="km-modal-spinner"></div>
       </button>
-      <button class="km-modal-cancel" onclick="APP.closeKmModal()">ביטול</button>
     </div>
     <div class="km-modal-success hidden" id="km-modal-success">
       <div class="km-success-burst">
