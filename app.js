@@ -1708,6 +1708,7 @@ function _initHelpFabDrag() {
   restorePos();
 
   function onDown(e) {
+    if (e.type === 'touchstart') { try { e.preventDefault(); } catch(_){} }
     var pt = e.touches ? e.touches[0] : e;
     startX = pt.clientX; startY = pt.clientY;
     var r = fab.getBoundingClientRect();
@@ -1769,7 +1770,7 @@ function _initHelpFabDrag() {
     }, 360);
   }
 
-  fab.addEventListener('touchstart', onDown, { passive: true });
+  fab.addEventListener('touchstart', onDown, { passive: false });
   fab.addEventListener('mousedown', onDown);
   fab.addEventListener('click', function(e) { if (moved) { e.preventDefault(); e.stopPropagation(); } });
   window.addEventListener('resize', function() {
