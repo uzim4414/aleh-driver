@@ -901,7 +901,6 @@ function mockResponse(action) {
     };
   }
   if (action === 'driver_update_km') return { ok: true, km: 45000 };
-  if (action === 'driver_report_fault') return { ok: true };
   if (action === 'driver_register_fcm') return { ok: true };
   if (action === 'get_service_providers') {
     return { ok: true, providers: [{ id:'SP001', name:'פנצריה מורשית עלה', category:'puncture', address:'רחוב הרצל 14, בני ברק', phone:'03-1234567', contactName:'יוסי כהן', googlePlaceId:'ChIJtest123', notes:'' }] };
@@ -2783,21 +2782,6 @@ const APP = {
   updateKm: async function() {
     // legacy — redirect to modal
     APP.openKmModal();
-  },
-
-  reportFault: async function() {
-    const desc = document.getElementById('fault-text').value.trim();
-    if (!desc) { showToast('תאר את התקלה'); return; }
-    showLoader();
-    try {
-      await gasPost('driver_report_fault', { description: desc });
-      document.getElementById('fault-text').value = '';
-      showToast('דיווח נשלח בהצלחה ✓');
-    } catch(e) {
-      showToast('שגיאה: ' + e.message);
-    } finally {
-      hideLoader();
-    }
   }
 };
 
