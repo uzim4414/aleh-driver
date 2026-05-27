@@ -2692,6 +2692,8 @@ const APP = {
       ? Number(v.currentKm).toLocaleString('he') + ' ק"מ'
       : (v.lastServiceKm ? Number(v.lastServiceKm).toLocaleString('he') + ' ק"מ' : '—');
     document.getElementById('km-modal-prev').textContent = 'ק"מ אחרון: ' + prev;
+    var _veh = document.getElementById('km-modal-vehicle');
+    if (_veh) _veh.textContent = v.id ? ('רכב: ' + v.id) : 'עדכון קילומטרז';
     const inp = document.getElementById('km-modal-input');
     inp.value = '';
     // reset to form state
