@@ -143,15 +143,31 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .fab { position:fixed; bottom:calc(90px + env(safe-area-inset-bottom,0px)); left:20px; background:var(--red); color:#fff; border-radius:100px; padding:13px 20px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; cursor:pointer; font-family:inherit; letter-spacing:-0.2px; z-index:50; white-space:nowrap; animation:fabPulse 2.5s ease-in-out infinite; border:none; }
 .fab:active{transform:scale(0.96)}
 .help-fab {
-  position: fixed; bottom: 24px; left: 24px; z-index: 50;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  background: #1F8A3D; border: none; border-radius: 50%;
-  width: 56px; height: 56px; cursor: pointer; box-shadow: 0 4px 16px rgba(31,138,61,0.45);
-  animation: fabPulse 2.5s ease-in-out infinite;
-  padding: 0; justify-content: center;
+  position: fixed; bottom: calc(90px + env(safe-area-inset-bottom,0px)); right: 18px; left: auto; z-index: 299;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a855f7 100%);
+  border: none; border-radius: 50%;
+  width: 64px; height: 64px; cursor: pointer;
+  box-shadow: 0 8px 24px rgba(99,102,241,.5), 0 4px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.2);
+  padding: 0;
+  touch-action: none;
+  user-select: none; -webkit-user-select: none;
+  transition: transform .15s ease;
 }
-.help-fab-label { font-size:9px; font-weight:700; color:white; letter-spacing:.5px; margin-top:-2px; }
-.help-fab.open { animation:none; background:#155e2a; }
+.help-fab::before {
+  content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid rgba(255,255,255,.35); pointer-events:none;
+  animation: fabRingPulse 2s ease-out infinite;
+}
+.help-fab svg { animation: fabIconFloat 3s ease-in-out infinite; transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+.help-fab.dragging { transform: scale(1.1); }
+.help-fab.dragging::before { animation: none; opacity: 0; }
+.help-fab-label { font-size:10px; font-weight:700; color:white; letter-spacing:.3px; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.help-fab.open { background: linear-gradient(135deg,#4338ca 0%,#6d28d9 100%); }
+.help-fab.open::before { animation: none; opacity: 0; }
+.help-fab.open svg { transform: rotate(90deg); }
+@keyframes fabIconFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes fabRingPulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
 .help-overlay {
   position:fixed; inset:0; z-index:200;
   background:rgba(0,0,0,.75); backdrop-filter:blur(12px);
@@ -1960,10 +1976,12 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     </div>
   </div>
 
-  <!-- Help FAB -->
-  <button class="help-fab" id="help-fab" onclick="APP.openHelpMenu()" aria-label="צריך עזרה">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  <!-- Help FAB (draggable) -->
+  <button class="help-fab" id="help-fab" aria-label="צריך עזרה">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4"/>
+      <circle cx="12" cy="17" r="0.6" fill="white" stroke="none"/>
     </svg>
     <span class="help-fab-label">עזרה</span>
   </button>

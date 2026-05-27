@@ -1579,12 +1579,211 @@ function initSwipe() {
   }, { passive: true });
 }
 
+
+/* === Android Back Button: double-press to exit === */
+var _lastBackPress = 0;
+var _backToastEl = null;
+function _ensureBackStyles() {
+  if (document.getElementById('back-btn-styles')) return;
+  var st = document.createElement('style');
+  st.id = 'back-btn-styles';
+  st.textContent = 
+    '@keyframes backToastIn { from { opacity:0; transform:translate(-50%, 12px); } to { opacity:1; transform:translate(-50%, 0); } }' +
+    '@keyframes backToastOut { from { opacity:1; transform:translate(-50%, 0); } to { opacity:0; transform:translate(-50%, 8px); } }' +
+    '@keyframes exitModalFade { from { opacity:0; } to { opacity:1; } }' +
+    '@keyframes exitModalSlide { from { opacity:0; transform: translateY(20px) scale(.96); } to { opacity:1; transform: translateY(0) scale(1); } }' +
+    '.back-exit-backdrop { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.8); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:24px; animation: exitModalFade .2s ease-out; }' +
+    '.back-exit-card { width:100%; max-width:320px; background:linear-gradient(135deg,#1e293b,#0f172a); border-radius:24px; border:1px solid rgba(239,68,68,.3); padding:28px 22px; box-shadow: 0 24px 48px rgba(0,0,0,.5), 0 0 0 1px rgba(239,68,68,.15); direction:rtl; text-align:center; animation: exitModalSlide .3s cubic-bezier(.34,1.56,.64,1); }' +
+    '.back-exit-icon { width:60px; height:60px; margin:0 auto 14px; background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.3); border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:30px; }' +
+    '.back-exit-title { font-size:18px; font-weight:800; color:#f1f5f9; margin:0 0 6px; }' +
+    '.back-exit-sub { font-size:14px; color:#94a3b8; margin:0 0 20px; }' +
+    '.back-exit-btn { display:block; width:100%; height:54px; border:none; border-radius:16px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; }' +
+    '.back-exit-btn.primary { background:linear-gradient(135deg,#dc2626,#ef4444); color:white; box-shadow: 0 8px 20px rgba(239,68,68,.4), inset 0 1px 0 rgba(255,255,255,.2); }' +
+    '.back-exit-btn.primary:active { transform:scale(.98); }' +
+    '.back-exit-btn.ghost { margin-top:10px; background:rgba(148,163,184,.1); color:#cbd5e1; border:1px solid rgba(148,163,184,.2); }' +
+    '.back-toast-pill { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); z-index:9999; background:rgba(30,41,59,.95); border:1px solid rgba(255,255,255,.15); border-radius:999px; padding:12px 22px; color:white; font-size:14px; font-weight:600; box-shadow: 0 12px 28px rgba(0,0,0,.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display:flex; align-items:center; gap:8px; direction:rtl; animation: backToastIn .2s ease-out; pointer-events:none; }' +
+    '.back-toast-pill.out { animation: backToastOut .2s ease-in forwards; }';
+  document.head.appendChild(st);
+}
+function _showBackToast() {
+  _ensureBackStyles();
+  if (_backToastEl && _backToastEl.parentNode) _backToastEl.parentNode.removeChild(_backToastEl);
+  var el = document.createElement('div');
+  el.className = 'back-toast-pill';
+  el.innerHTML = '<span style="font-size:16px">\ud83d\udeaa</span><span>\u05dc\u05d7\u05e5 \u05e9\u05d5\u05d1 \u05dc\u05e6\u05d0\u05ea \u05de\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4</span>';
+  document.body.appendChild(el);
+  _backToastEl = el;
+  setTimeout(function() {
+    if (!el.parentNode) return;
+    el.classList.add('out');
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+  }, 1800);
+}
+function _doExitApp() {
+  try { window.history.go(-(history.length - 1)); } catch(_){}
+  try { window.close(); } catch(_){}
+  setTimeout(function() {
+    try { document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#94a3b8;font-family:inherit;font-size:14px;direction:rtl">\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4 \u05e0\u05e1\u05d2\u05e8\u05d4. \u05e1\u05d2\u05d5\u05e8 \u05d0\u05ea \u05d4\u05d8\u05d0\u05d1.</div>'; } catch(_){}
+    try { window.location.href = 'about:blank'; } catch(_){}
+  }, 100);
+}
+function _showExitModal() {
+  _ensureBackStyles();
+  var existing = document.getElementById('back-exit-modal');
+  if (existing) return;
+  var wrap = document.createElement('div');
+  wrap.id = 'back-exit-modal';
+  wrap.className = 'back-exit-backdrop';
+  wrap.innerHTML =
+    '<div class="back-exit-card" role="dialog" aria-modal="true">' +
+      '<div class="back-exit-icon">\ud83d\udeaa</div>' +
+      '<h3 class="back-exit-title">\u05d9\u05e6\u05d9\u05d0\u05d4 \u05de\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4</h3>' +
+      '<p class="back-exit-sub">\u05d4\u05d0\u05dd \u05d1\u05e8\u05e6\u05d5\u05e0\u05da \u05dc\u05e6\u05d0\u05ea?</p>' +
+      '<button type="button" class="back-exit-btn primary" id="back-exit-yes">\u05d9\u05e6\u05d9\u05d0\u05d4</button>' +
+      '<button type="button" class="back-exit-btn ghost" id="back-exit-no">\u05d4\u05d9\u05e9\u05d0\u05e8</button>' +
+    '</div>';
+  document.body.appendChild(wrap);
+  function close(rePush) {
+    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    if (rePush) { try { history.pushState({ pwa: true }, ''); } catch(_){} }
+  }
+  wrap.addEventListener('click', function(e) { if (e.target === wrap) close(true); });
+  var yes = document.getElementById('back-exit-yes');
+  var no  = document.getElementById('back-exit-no');
+  if (yes) yes.addEventListener('click', function() { close(false); _doExitApp(); });
+  if (no)  no.addEventListener('click', function() { close(true); });
+}
+function _onBackPress() {
+  var modal = document.getElementById('back-exit-modal');
+  if (modal) { /* user pressed back while modal open: treat as cancel */ if (modal.parentNode) modal.parentNode.removeChild(modal); try { history.pushState({ pwa: true }, ''); } catch(_){} return; }
+  if (typeof STATE !== 'undefined' && STATE && STATE.helpMenuOpen) {
+    try { APP.closeHelpMenu(); } catch(_){}
+    try { history.pushState({ pwa: true }, ''); } catch(_){}
+    return;
+  }
+  /* Close any open overlay/modal */
+  var openOverlay = document.querySelector('.modal.open, .overlay.open, .sheet.open, .help-overlay.open');
+  if (openOverlay) {
+    openOverlay.classList.remove('open');
+    try { history.pushState({ pwa: true }, ''); } catch(_){}
+    return;
+  }
+  var now = Date.now();
+  if (now - _lastBackPress < 2000) {
+    _showExitModal();
+    _lastBackPress = 0;
+  } else {
+    _lastBackPress = now;
+    _showBackToast();
+    try { history.pushState({ pwa: true }, ''); } catch(_){}
+  }
+}
+function _initBackButtonHandler() {
+  try { history.pushState({ pwa: true }, ''); } catch(_){}
+  window.addEventListener('popstate', _onBackPress);
+}
+/* === Draggable Help FAB === */
+function _initHelpFabDrag() {
+  var fab = document.getElementById('help-fab');
+  if (!fab) return;
+  var dragging = false, moved = false;
+  var startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  var FAB_SIZE = 64;
+
+  function restorePos() {
+    try {
+      var raw = localStorage.getItem('helpFabPos');
+      if (raw) {
+        var p = JSON.parse(raw);
+        var y = Math.max(8, Math.min(window.innerHeight - FAB_SIZE - 8, p.y || 0));
+        fab.style.top = y + 'px';
+        fab.style.bottom = 'auto';
+        if (p.side === 'left') { fab.style.left = '18px'; fab.style.right = 'auto'; }
+        else { fab.style.right = '18px'; fab.style.left = 'auto'; }
+      }
+    } catch(e) {}
+  }
+  restorePos();
+
+  function onDown(e) {
+    var pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX; startY = pt.clientY;
+    var r = fab.getBoundingClientRect();
+    startLeft = r.left; startTop = r.top;
+    dragging = true; moved = false;
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchend', onUp);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    var pt = e.touches ? e.touches[0] : e;
+    var dx = pt.clientX - startX;
+    var dy = pt.clientY - startY;
+    if (!moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      moved = true;
+      fab.classList.add('dragging');
+      fab.style.transition = 'transform .15s ease';
+    }
+    if (moved) {
+      if (e.cancelable) { try { e.preventDefault(); } catch(_){} }
+      var nx = startLeft + dx;
+      var ny = startTop + dy;
+      nx = Math.max(0, Math.min(window.innerWidth - FAB_SIZE, nx));
+      ny = Math.max(0, Math.min(window.innerHeight - FAB_SIZE, ny));
+      fab.style.left = nx + 'px';
+      fab.style.top = ny + 'px';
+      fab.style.right = 'auto';
+      fab.style.bottom = 'auto';
+    }
+  }
+
+  function onUp(e) {
+    if (!dragging) return;
+    dragging = false;
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchend', onUp);
+    document.removeEventListener('mouseup', onUp);
+    if (!moved) {
+      fab.classList.remove('dragging');
+      try { APP.openHelpMenu(); } catch(_){}
+      return;
+    }
+    var r = fab.getBoundingClientRect();
+    var centerX = r.left + r.width / 2;
+    var snapLeft = centerX < window.innerWidth / 2;
+    var y = r.top;
+    fab.style.transition = 'left .3s cubic-bezier(.34,1.56,.64,1), right .3s cubic-bezier(.34,1.56,.64,1), top .3s ease, transform .15s ease';
+    fab.style.top = y + 'px';
+    if (snapLeft) { fab.style.left = '18px'; fab.style.right = 'auto'; }
+    else { fab.style.right = '18px'; fab.style.left = 'auto'; }
+    try { localStorage.setItem('helpFabPos', JSON.stringify({ side: snapLeft ? 'left' : 'right', y: y })); } catch(_){}
+    setTimeout(function() {
+      fab.style.transition = 'transform .15s ease';
+      fab.classList.remove('dragging');
+    }, 360);
+  }
+
+  fab.addEventListener('touchstart', onDown, { passive: true });
+  fab.addEventListener('mousedown', onDown);
+  fab.addEventListener('click', function(e) { if (moved) { e.preventDefault(); e.stopPropagation(); } });
+  window.addEventListener('resize', function() {
+    var r = fab.getBoundingClientRect();
+    if (r.top + FAB_SIZE > window.innerHeight) { fab.style.top = (window.innerHeight - FAB_SIZE - 8) + 'px'; }
+  });
+}
+
 /* ══ Start App ══ */
 function startApp() {
   hideLoader();
   document.getElementById('app').classList.remove('hidden');
   renderAll();
   initSwipe();
+  try { _initHelpFabDrag(); } catch(e) { console.warn('fab drag init', e); }
+  try { _initBackButtonHandler(); } catch(e) { console.warn('back btn init', e); }
   setTimeout(APP._checkGarageReminders, 1500);
   setInterval(APP._checkGarageReminders, 60000); // re-check every 60s while app is open
 
