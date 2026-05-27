@@ -781,6 +781,7 @@ function _sessionExpired() {
   STATE.idToken = null;
   STATE.vehicle = null;
   STATE.user = null;
+  var _hfab2 = document.getElementById('help-fab'); if (_hfab2) _hfab2.style.display = 'none';
 
   // Try silent Google token refresh — if user's Google session is still active,
   // handleGoogleCredential will fire automatically and re-login without user interaction.
@@ -1670,6 +1671,7 @@ function _onBackPress() {
   }
   var now = Date.now();
   if (now - _lastBackPress < 2000) {
+    try { history.pushState({ pwa: true }, ''); } catch(_){}
     _showExitModal();
     _lastBackPress = 0;
   } else {
@@ -1722,7 +1724,7 @@ function _initHelpFabDrag() {
     var pt = e.touches ? e.touches[0] : e;
     var dx = pt.clientX - startX;
     var dy = pt.clientY - startY;
-    if (!moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+    if (!moved && (Math.abs(dx) > 15 || Math.abs(dy) > 15)) {
       moved = true;
       fab.classList.add('dragging');
       fab.style.transition = 'transform .15s ease';
@@ -1780,6 +1782,8 @@ function _initHelpFabDrag() {
 function startApp() {
   hideLoader();
   document.getElementById('app').classList.remove('hidden');
+  var _hfab = document.getElementById('help-fab'); if (_hfab) _hfab.style.display = '';
+  try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function(){}); } catch(_){}
   renderAll();
   initSwipe();
   try { _initHelpFabDrag(); } catch(e) { console.warn('fab drag init', e); }
@@ -5405,10 +5409,6 @@ function hideGreeting() {
 
 /* ══ Boot ══ */
 document.addEventListener('DOMContentLoaded', async function() {
-  /* פתח נעילת orientation — עוקף manifest ישן ומאפשר סיבוב */
-  try {
-    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
-  } catch(e) {}
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(function(reg) {
