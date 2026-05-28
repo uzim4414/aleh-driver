@@ -2816,6 +2816,270 @@ function renderGovSection() {
   '</div>';
 }
 
+/* ══ Insurance Tab ══ */
+function _insGetStatus(dateStr) {
+  if (!dateStr) return 'expired';
+  var d = new Date(dateStr);
+  var now = new Date();
+  if (d < now) return 'expired';
+  var diffDays = Math.floor((d - now) / 86400000);
+  if (diffDays <= 30) return 'expiring';
+  return 'valid';
+}
+
+function _insStatusLabel(status) {
+  if (status === 'expired')  return 'פג תוקף';
+  if (status === 'expiring') return 'פג בקרוב';
+  return 'בתוקף';
+}
+
+function _insCheckRenewed(key, currentExp) {
+  var storageKey = '_prevIns_' + key;
+  var prev = localStorage.getItem(storageKey) || '';
+  var isRenewed = false;
+  if (currentExp && prev && currentExp !== prev && new Date(currentExp) > new Date(prev)) {
+    isRenewed = true;
+    var tsKey = '_insRenewedTs_' + key;
+    if (!localStorage.getItem(tsKey)) {
+      localStorage.setItem(tsKey, Date.now().toString());
+    }
+  }
+  if (currentExp) localStorage.setItem(storageKey, currentExp);
+  var renewedTs = parseInt(localStorage.getItem('_insRenewedTs_' + key) || '0', 10);
+  if (renewedTs && Date.now() - renewedTs < 86400000) return true;
+  localStorage.removeItem('_insRenewedTs_' + key);
+  return false;
+}
+
+function _insDetailRow(iconHref, iconColor, label, valueId, valueText, extraClass) {
+  var cls = extraClass ? ' ' + extraClass : '';
+  return '<div class="ins-detail-row">' +
+    '<div class="ins-detail-icon"><svg width="18" height="18"><use href="' + iconHref + '" color="' + iconColor + '"/></svg></div>' +
+    '<div class="ins-detail-body">' +
+      '<div class="ins-detail-label">' + label + '</div>' +
+      '<div class="ins-detail-value' + cls + '"' + (valueId ? ' id="' + valueId + '"' : '') + '>' + (valueText || '—') + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderInsuranceTab() {
+  var v = STATE.vehicle || {};
+  var ins = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[STATE.insurance.length - 1] : null;
+  var company = (ins && ins.company) ? ins.company : '—';
+
+  var compExp  = v.insCompExp || '';
+  var fullExp  = v.insFullExp || '';
+  var compLink = v.insCompLink || '';
+  var fullLink = v.insFullLink || '';
+
+  var compStatus  = _insGetStatus(compExp);
+  var fullStatus  = _insGetStatus(fullExp);
+  var compRenewed = _insCheckRenewed('comp', compExp);
+  var fullRenewed = _insCheckRenewed('full', fullExp);
+
+  var compExpFormatted = compExp ? formatDate(compExp) : '—';
+  var fullExpFormatted = fullExp ? formatDate(fullExp) : '—';
+
+  function statusChip(status, renewed) {
+    var label = _insStatusLabel(status);
+    var badge = renewed ? '<span class="ins-renewed-badge">✓ חודש!</span>' : '';
+    return badge +
+      '<div class="ins-status ' + status + '">' +
+        '<div class="ins-status-dot"></div>' +
+        label +
+      '</div>';
+  }
+
+  /* ── ביטוח חובה ── */
+  var compSection =
+    '<div class="ins-section">' +
+      '<div class="ins-section-header comp">' +
+        '<div class="ins-shield-icon comp">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' +
+        '</div>' +
+        '<div class="ins-section-titles">' +
+          '<div class="ins-section-title comp">ביטוח חובה</div>' +
+          '<div class="ins-section-subtitle">Third-Party Liability</div>' +
+        '</div>' +
+        statusChip(compStatus, compRenewed) +
+      '</div>' +
+      '<div class="ins-detail-list">' +
+        _insDetailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',   'ins-comp-company',  company) +
+        _insDetailRow('#ic-hash',   '#64748b', 'מספר פוליסה',   'ins-comp-policy',   '<span style="color:#94a3b8;font-style:italic;font-size:13px">טוען...</span>') +
+        _insDetailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '') +
+        _insDetailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה', 'ins-comp-minage',   '<span style="color:#94a3b8;font-style:italic;font-size:13px">טוען...</span>') +
+        _insDetailRow('#ic-star',   '#64748b', 'השתתפות עצמית', 'ins-comp-deduct',   '<span style="color:#94a3b8;font-style:italic;font-size:13px">טוען...</span>') +
+      '</div>' +
+      '<div class="ins-cta-row">' +
+        '<button class="ins-cta-btn primary" id="ins-comp-call-btn" onclick="' +
+          'var ph=document.getElementById(\'ins-emergency-phone\') && document.getElementById(\'ins-emergency-phone\').dataset.phone;' +
+          'if(ph){window.open(\'tel:\'+ph);}else{alert(\'מספר חירום לא זמין.\');}">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+          'פניה לחברה' +
+        '</button>' +
+        (compLink
+          ? '<a class="ins-cta-btn ghost" href="' + compLink + '" target="_blank" rel="noopener">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+              'הצג פוליסה' +
+            '</a>'
+          : '') +
+      '</div>' +
+    '</div>';
+
+  /* ── ביטוח מקיף ── */
+  var fullSection =
+    '<div class="ins-section">' +
+      '<div class="ins-section-header full">' +
+        '<div class="ins-shield-icon full">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' +
+        '</div>' +
+        '<div class="ins-section-titles">' +
+          '<div class="ins-section-title full">ביטוח מקיף</div>' +
+          '<div class="ins-section-subtitle">Comprehensive Coverage</div>' +
+        '</div>' +
+        statusChip(fullStatus, fullRenewed) +
+      '</div>' +
+      '<div class="ins-detail-list">' +
+        _insDetailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',   'ins-full-company',  company) +
+        _insDetailRow('#ic-hash',   '#64748b', 'מספר פוליסה',  'ins-full-policy',   '<span style="color:#94a3b8;font-style:italic;font-size:13px">טוען...</span>') +
+        _insDetailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '') +
+        _insDetailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה', 'ins-full-minage',   '<span style="color:#94a3b8;font-style:italic;font-size:13px">טוען...</span>') +
+        _insDetailRow('#ic-star',   '#64748b', 'השתתפות עצמית', 'ins-full-deduct',   '<span style="color:#94a3b8;font-style:italic;font-size:13px">טוען...</span>') +
+      '</div>' +
+      /* Services */
+      '<div class="ins-services-divider"><span class="ins-services-label">שירותים כלולים בפוליסה</span></div>' +
+      '<div class="ins-chips">' +
+        '<div class="ins-chip full-chip">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>' +
+          'גרירה' +
+        '</div>' +
+        '<div class="ins-chip full-chip">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>' +
+          'שמשות' +
+        '</div>' +
+        '<div class="ins-chip full-chip" id="ins-rental-chip" style="display:none">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>' +
+          'רכב חלופי' +
+        '</div>' +
+      '</div>' +
+      /* Towing service card */
+      '<div class="ins-service-card">' +
+        '<div class="ins-service-card-header">' +
+          '<div class="ins-service-card-icon towing">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>' +
+          '</div>' +
+          '<div>' +
+            '<div class="ins-service-card-title">שירות גרירה</div>' +
+            '<div class="ins-service-card-sub" id="ins-towing-km">כיסוי גרירה — טוען...</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ins-service-card-body">' +
+          '<div class="ins-service-card-detail">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+            'זמין 24/7 — הפעל דרך כפתור הסיוע' +
+          '</div>' +
+          '<button class="ins-service-action-btn towing-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpTowing();},350)">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>' +
+            'הפעל שירות גרירה' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      /* Windshield service card */
+      '<div class="ins-service-card">' +
+        '<div class="ins-service-card-header">' +
+          '<div class="ins-service-card-icon glass">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>' +
+          '</div>' +
+          '<div>' +
+            '<div class="ins-service-card-title">שירות שמשות</div>' +
+            '<div class="ins-service-card-sub" id="ins-wd-provider">ספק — טוען...</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ins-service-card-body">' +
+          '<div class="ins-service-card-detail" id="ins-wd-phone-row" style="display:none">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+            '<span id="ins-wd-phone-text"></span>' +
+          '</div>' +
+          '<button class="ins-service-action-btn glass-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpWindshield();},350)">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>' +
+            'פתח תביעת שמשה' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      /* Emergency phone hidden element for tel: calls */
+      '<div id="ins-emergency-phone" data-phone="" style="display:none"></div>' +
+      /* CTA */
+      '<div class="ins-cta-row">' +
+        '<button class="ins-cta-btn primary" onclick="' +
+          'var ph=document.getElementById(\'ins-emergency-phone\').dataset.phone;' +
+          'if(ph){window.open(\'tel:\'+ph);}else{alert(\'מספר חירום לא זמין.\');}">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+          'פניה לחברת הביטוח' +
+        '</button>' +
+        (fullLink
+          ? '<a class="ins-cta-btn ghost" href="' + fullLink + '" target="_blank" rel="noopener">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+              'הצג פוליסה' +
+            '</a>'
+          : '') +
+      '</div>' +
+    '</div>';
+
+  setTimeout(function() { _loadInsuranceDetails(); }, 50);
+
+  return '<div class="ins-wrap">' + compSection + fullSection + '</div>';
+}
+
+async function _loadInsuranceDetails() {
+  try {
+    var res = await gasPost('get_vehicle_insurance_details', {});
+    if (!res || !res.ok) return;
+    var ins = res.insurance || {};
+    var wd  = res.windshieldCoverage || {};
+
+    function _setEl(id, html) {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    }
+    function _setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text || '—';
+    }
+
+    var policy   = ins.policyNumber   || '—';
+    var phone    = ins.emergencyPhone  || '';
+    var towKm    = ins.towingCoverageKm ? ins.towingCoverageKm + ' ק"מ כיסוי' : null;
+    var rental   = ins.includesRentalCar;
+    var company  = ins.company || '';
+    var wdProv   = wd.provider || '';
+    var wdPhone  = wd.phone    || '';
+
+    _setText('ins-comp-policy',  policy);
+    _setText('ins-full-policy',  policy);
+    _setText('ins-comp-minage',  '—');
+    _setText('ins-full-minage',  '—');
+    _setText('ins-comp-deduct',  '—');
+    _setText('ins-full-deduct',  '—');
+    if (company) { _setText('ins-comp-company', company); _setText('ins-full-company', company); }
+    if (towKm) { _setText('ins-towing-km', 'כיסוי גרירה: ' + towKm); }
+    if (wdProv) { _setText('ins-wd-provider', 'ספק: ' + wdProv); }
+    if (wdPhone) {
+      _setText('ins-wd-phone-text', wdPhone);
+      var row = document.getElementById('ins-wd-phone-row');
+      if (row) row.style.display = 'flex';
+    }
+    if (rental) {
+      var chip = document.getElementById('ins-rental-chip');
+      if (chip) chip.style.display = 'flex';
+    }
+    var phoneClean = phone.replace(/[^0-9+]/g, '');
+    var phoneEl = document.getElementById('ins-emergency-phone');
+    if (phoneEl && phoneClean) phoneEl.dataset.phone = phoneClean;
+  } catch(e) {
+    console.warn('[InsuranceDetails]', e.message);
+  }
+}
+
 function renderVehicleScreen(tab) {
   const v = STATE.vehicle;
   if (!v) return;
@@ -2872,19 +3136,7 @@ function renderVehicleScreen(tab) {
     }
 
   } else if (tab === 'insurance') {
-    if (!STATE.insurance.length) {
-      content.innerHTML = '<div class="empty">אין נתוני ביטוח</div>';
-    } else {
-      content.innerHTML = STATE.insurance.map(function(ins, i) {
-        return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's">' +
-          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-shield" color="#1F8A3D"/></svg></div>' +
-          '<div class="dr-body">' +
-            '<div class="dr-title">ביטוח ' + (ins.year || '') + ' — ' + (ins.company || '') + '</div>' +
-            '<div class="dr-sub">חובה: ₪' + Number(ins.compCost || 0).toLocaleString('he') + ' | מקיף: ₪' + Number(ins.fullCost || 0).toLocaleString('he') + '</div>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-    }
+    content.innerHTML = renderInsuranceTab();
 
   } else if (tab === 'history') {
     renderHistory();

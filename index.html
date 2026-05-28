@@ -923,6 +923,260 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 }
 .gar-waze-btn:active { transform: scale(0.97); }
 
+/* ══ Insurance Screen — 2026-05-28 ══ */
+@keyframes insCardEnter {
+  0%   { transform: translateY(18px); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+@keyframes insShieldPulseBlue {
+  0%,100% { box-shadow: 0 0 0 0 rgba(14,165,233,0); }
+  50%     { box-shadow: 0 0 16px 4px rgba(14,165,233,0.55); }
+}
+@keyframes insShieldPulseGold {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  50%     { box-shadow: 0 0 16px 4px rgba(245,158,11,0.55); }
+}
+@keyframes insRenewFlash {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes insStatusBlink {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0.3; }
+}
+@keyframes insChipTap {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(0.93); }
+}
+@keyframes insServiceCardIn {
+  0%   { transform: scaleY(0.85) translateY(-8px); opacity: 0; }
+  100% { transform: scaleY(1) translateY(0);       opacity: 1; }
+}
+
+/* Wrapper */
+.ins-wrap { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Section card */
+.ins-section {
+  border-radius: 22px; overflow: hidden;
+  border: 1px solid var(--border);
+  animation: insCardEnter .45s ease both;
+}
+.ins-section:nth-child(2) { animation-delay: .1s; }
+
+/* Section header */
+.ins-section-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px 14px;
+  position: relative; overflow: hidden;
+}
+.ins-section-header.comp {
+  background: linear-gradient(135deg, rgba(3,105,161,0.22) 0%, rgba(14,165,233,0.1) 100%);
+  border-bottom: 1px solid rgba(14,165,233,0.2);
+}
+.ins-section-header.full {
+  background: linear-gradient(135deg, rgba(180,83,9,0.22) 0%, rgba(245,158,11,0.1) 100%);
+  border-bottom: 1px solid rgba(245,158,11,0.2);
+}
+
+/* Shield icon */
+.ins-shield-icon {
+  width: 52px; height: 52px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ins-shield-icon.comp {
+  background: linear-gradient(135deg, #0369a1, #0ea5e9);
+  animation: insShieldPulseBlue 2.8s ease-in-out infinite;
+}
+.ins-shield-icon.full {
+  background: linear-gradient(135deg, #b45309, #f59e0b);
+  animation: insShieldPulseGold 2.8s ease-in-out 0.4s infinite;
+}
+
+/* Section titles */
+.ins-section-titles { flex: 1; min-width: 0; }
+.ins-section-title { font-size: 17px; font-weight: 800; letter-spacing: -0.4px; }
+.ins-section-title.comp { color: #7dd3fc; }
+.ins-section-title.full { color: #fcd34d; }
+.ins-section-subtitle { font-size: 11px; color: var(--t2); margin-top: 2px; font-weight: 500; }
+
+/* Status chip */
+.ins-status {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.ins-status.valid {
+  background: rgba(34,197,94,0.15); color: #4ade80;
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.ins-status.expiring {
+  background: rgba(245,158,11,0.15); color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.3);
+}
+.ins-status.expired {
+  background: rgba(239,68,68,0.15); color: #f87171;
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.ins-status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor;
+}
+.ins-status.expiring .ins-status-dot { animation: insStatusBlink 1.2s ease-in-out infinite; }
+
+/* Renewed badge */
+.ins-renewed-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-right: 8px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 10.5px; font-weight: 800;
+  background: linear-gradient(90deg, #16a34a, #22c55e, #16a34a);
+  background-size: 200% auto;
+  color: #fff;
+  animation: insRenewFlash 1.8s linear infinite;
+  box-shadow: 0 2px 10px rgba(34,197,94,0.4);
+}
+
+/* Detail list */
+.ins-detail-list {
+  background: var(--card); padding: 4px 0;
+}
+.ins-detail-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.ins-detail-row:last-child { border-bottom: none; }
+.ins-detail-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--card2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ins-detail-body { flex: 1; min-width: 0; }
+.ins-detail-label {
+  font-size: 10px; color: var(--t2); font-weight: 600;
+  letter-spacing: 0.4px; text-transform: uppercase;
+}
+.ins-detail-value {
+  font-size: 14px; font-weight: 700; margin-top: 2px;
+  color: var(--t1); letter-spacing: -0.2px;
+}
+.ins-detail-value.loading {
+  color: var(--t2); font-weight: 400; font-style: italic; font-size: 13px;
+}
+.ins-detail-value.warn { color: #fbbf24; }
+.ins-detail-value.expired { color: #f87171; }
+
+/* Services section */
+.ins-services-divider {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px 8px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.ins-services-label {
+  font-size: 11px; font-weight: 700; color: var(--t2);
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+
+/* Service chips */
+.ins-chips { display: flex; gap: 8px; padding: 0 18px 14px; background: var(--card); flex-wrap: wrap; }
+.ins-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 20px;
+  background: var(--card2); border: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--t1);
+  cursor: pointer;
+  transition: transform .15s, background .15s;
+}
+.ins-chip:active { animation: insChipTap .2s ease both; }
+.ins-chip.comp-chip { border-color: rgba(14,165,233,0.3); }
+.ins-chip.full-chip { border-color: rgba(245,158,11,0.3); }
+
+/* Service cards */
+.ins-service-card {
+  background: var(--card2); margin: 0 18px 14px;
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border);
+  animation: insServiceCardIn .3s ease both;
+}
+.ins-service-card-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ins-service-card-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ins-service-card-icon.towing  { background: linear-gradient(135deg,#1e3a5f,#1d4ed8); }
+.ins-service-card-icon.glass   { background: linear-gradient(135deg,#134e4a,#0d9488); }
+.ins-service-card-icon.rental  { background: linear-gradient(135deg,#3b1f5e,#7c3aed); }
+.ins-service-card-title { font-size: 14px; font-weight: 800; color: var(--t1); }
+.ins-service-card-sub   { font-size: 11px; color: var(--t2); margin-top: 1px; }
+.ins-service-card-body { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ins-service-card-detail {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--t2);
+}
+.ins-service-action-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 12px 16px;
+  border: none; border-radius: 12px;
+  font-size: 13.5px; font-weight: 800; font-family: inherit;
+  cursor: pointer; transition: transform .15s;
+}
+.ins-service-action-btn:active { transform: scale(0.96); }
+.ins-service-action-btn.towing-btn {
+  background: linear-gradient(135deg,#1d4ed8,#3b82f6);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+}
+.ins-service-action-btn.glass-btn {
+  background: linear-gradient(135deg,#0d9488,#14b8a6);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(20,184,166,0.35);
+}
+.ins-service-action-btn.tel-btn {
+  background: rgba(255,255,255,0.07);
+  color: var(--t1);
+  border: 1px solid var(--border);
+}
+
+/* CTA row */
+.ins-cta-row {
+  display: flex; gap: 10px; padding: 14px 18px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.ins-cta-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 14px; border-radius: 14px;
+  font-size: 13px; font-weight: 700; font-family: inherit;
+  cursor: pointer; border: none; text-decoration: none;
+  transition: transform .15s;
+}
+.ins-cta-btn:active { transform: scale(0.96); }
+.ins-cta-btn.primary {
+  background: linear-gradient(135deg,#1F8A3D,#25a34a);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(31,138,61,0.3);
+}
+.ins-cta-btn.ghost {
+  background: rgba(255,255,255,0.06);
+  color: var(--t1);
+  border: 1px solid var(--border);
+}
+
+/* Empty state */
+.ins-empty {
+  padding: 40px 24px; text-align: center; color: var(--t2);
+  font-size: 14px; background: var(--card); border-radius: 22px;
+  border: 1px solid var(--border);
+}
+
 /* ── Fuel Widget ── */
 .fuel-widget { margin:12px 16px 0; background:var(--card); border-radius:22px; padding:16px 18px 14px; border:1px solid var(--border); animation:fadeUp .55s cubic-bezier(.16,1,.3,1) .25s both; cursor:pointer; transition:transform .15s,background .15s; -webkit-tap-highlight-color:transparent; }
 .fuel-widget:active { transform:scale(0.98); background:var(--card2); }
