@@ -3059,13 +3059,23 @@ async function _loadInsuranceDetails() {
       _insShowError('שגיאה בטעינת נתוני ביטוח: ' + errMsg);
       return;
     }
-    try { console.log('[_loadInsuranceDetails] res:', JSON.stringify(res).substring(0, 400)); } catch(_) {}
+    try {
+      console.log('[_loadInsuranceDetails] res:', JSON.stringify(res).substring(0, 600));
+      if (res._debug) console.table(res._debug);
+    } catch(_) {}
 
     var comp = res.comp || null;
     var full = res.full || null;
 
     if (!comp && !full) {
-      _insShowError('לא נמצאו נתוני ביטוח לרכב זה');
+      // Only show error banner if STATE also has no sync data — otherwise sync data is already visible
+      var hasSyncData = (STATE.vehicle && (STATE.vehicle.insCompExp || STATE.vehicle.insFullExp)) ||
+                        (STATE.insurance && STATE.insurance.length);
+      if (!hasSyncData) {
+        _insShowError('לא נמצאו נתוני ביטוח לרכב זה');
+      } else {
+        console.warn('[_loadInsuranceDetails] API returned null sections — showing sync STATE data only. Check GAS logs for _debug.');
+      }
       return;
     }
 
