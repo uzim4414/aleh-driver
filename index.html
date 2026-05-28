@@ -62,6 +62,9 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 @keyframes scrimFade     { from{opacity:0} to{opacity:1} }
 @keyframes auroraGlow    { 0%,100%{opacity:0.4;transform:scale(1)} 50%{opacity:0.9;transform:scale(1.08)} }
 @keyframes barRiseUp     { from{height:0;opacity:0} to{height:var(--fm-bar-h,40%);opacity:1} }
+@keyframes warningBeat   { 0%,60%,100%{transform:scale(1);filter:drop-shadow(0 0 0px rgba(255,220,0,0))} 15%{transform:scale(1.2) translateY(-2px);filter:drop-shadow(0 0 10px rgba(255,220,0,0.95))} 32%{transform:scale(1.08);filter:drop-shadow(0 0 5px rgba(255,170,0,0.55))} }
+@keyframes fabYellowRing { 0%{transform:scale(1);opacity:.9} 100%{transform:scale(1.45);opacity:0} }
+@keyframes landscapeWobble { 0%,100%{transform:rotate(0deg)} 28%{transform:rotate(-22deg)} 72%{transform:rotate(22deg)} }
 @keyframes curBarPulse   { 0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,0.5)} 60%{box-shadow:0 0 0 8px rgba(48,209,88,0)} }
 @keyframes insightBeam    { 0%{transform:translateX(-160%) skewX(-18deg);opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{transform:translateX(300%) skewX(-18deg);opacity:0} }
 @keyframes insightGlow    { 0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,0),0 2px 20px rgba(0,212,255,0.06);border-color:rgba(0,212,255,0.22)} 50%{box-shadow:0 0 0 1px rgba(0,212,255,0.08),0 4px 40px rgba(0,212,255,0.22);border-color:rgba(0,212,255,0.52)} }
@@ -144,30 +147,29 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .fab:active{transform:scale(0.96)}
 .help-fab {
   position: fixed; bottom: calc(90px + env(safe-area-inset-bottom,0px)); right: 18px; left: auto; z-index: 299;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a855f7 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: linear-gradient(150deg,#FFE600 0%,#FFC200 55%,#FF8C00 100%);
   border: none; border-radius: 50%;
-  width: 64px; height: 64px; cursor: pointer;
-  box-shadow: 0 8px 24px rgba(99,102,241,.5), 0 4px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.2);
+  width: 68px; height: 68px; cursor: pointer;
+  box-shadow: 0 8px 28px rgba(255,185,0,.65), 0 4px 10px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.4);
   padding: 0;
   touch-action: none;
   user-select: none; -webkit-user-select: none;
   transition: transform .15s ease;
 }
 .help-fab::before {
-  content:""; position:absolute; inset:-4px; border-radius:50%;
-  border:2px solid rgba(255,255,255,.35); pointer-events:none;
-  animation: fabRingPulse 2s ease-out infinite;
+  content:""; position:absolute; inset:-6px; border-radius:50%;
+  border:2.5px solid rgba(255,220,0,.55); pointer-events:none;
+  animation: fabYellowRing 1.8s ease-out infinite;
 }
-.help-fab svg { animation: fabIconFloat 3s ease-in-out infinite; transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+.help-fab svg { animation: warningBeat 2.4s ease-in-out infinite; transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
 .help-fab.dragging { transform: scale(1.1); }
 .help-fab.dragging::before { animation: none; opacity: 0; }
-.help-fab-label { font-size:10px; font-weight:700; color:white; letter-spacing:.3px; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
-.help-fab.open { background: linear-gradient(135deg,#4338ca 0%,#6d28d9 100%); }
+.help-fab-label-main { font-size:9.5px; font-weight:800; color:#1a0f00; letter-spacing:.15px; line-height:1.15; }
+.help-fab-label-sub  { font-size:7.5px;  font-weight:600; color:rgba(0,0,0,.58); letter-spacing:.1px;  line-height:1.15; }
+.help-fab.open { background: linear-gradient(150deg,#FFB700 0%,#E08000 100%); box-shadow: 0 8px 24px rgba(200,120,0,.5), 0 4px 8px rgba(0,0,0,.3); }
 .help-fab.open::before { animation: none; opacity: 0; }
-.help-fab.open svg { transform: rotate(90deg); }
-@keyframes fabIconFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-@keyframes fabRingPulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+.help-fab.open svg { transform: scale(0.85); opacity: 0.65; }
 .help-overlay {
   position:fixed; inset:0; z-index:200;
   background:rgba(0,0,0,.75); backdrop-filter:blur(12px);
@@ -180,24 +182,36 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   border-radius:28px 28px 0 0;
   padding:0 0 env(safe-area-inset-bottom,20px) 0;
   transform:translateY(110%); transition:transform 380ms cubic-bezier(0.34,1.56,0.64,1);
-  max-height:88vh; overflow-y:auto; direction:rtl;
-  box-shadow:0 -4px 60px rgba(99,102,241,.25), 0 -1px 0 rgba(255,255,255,.06);
+  max-height:88vh; overflow:hidden; direction:rtl;
+  box-shadow:0 -4px 60px rgba(255,185,0,.18), 0 -1px 0 rgba(255,220,0,.08);
 }
 .help-menu.open { transform:translateY(0); }
-.help-menu-drag-handle { width:40px; height:4px; background:rgba(255,255,255,.18); border-radius:2px; margin:10px auto 0; }
+.help-menu-scroll { overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.help-menu-scroll::-webkit-scrollbar { display:none; }
+.help-menu-drag-handle { width:38px; height:4px; background:rgba(0,0,0,.25); border-radius:2px; margin:10px auto 8px; }
 .help-menu-header {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:14px 20px 14px;
-  background:linear-gradient(135deg,rgba(99,102,241,.18) 0%,rgba(168,85,247,.12) 100%);
-  border-bottom:1px solid rgba(255,255,255,.08);
-  position:relative;
+  display:flex; flex-direction:column; align-items:stretch;
+  background:linear-gradient(150deg,rgba(255,214,0,.22) 0%,rgba(255,140,0,.14) 100%);
+  border-bottom:1px solid rgba(255,200,0,.14);
+  border-radius:28px 28px 0 0;
+  position:relative; overflow:hidden;
 }
-.help-menu-header::after { content:''; position:absolute; inset:0; border-radius:0; background:linear-gradient(135deg,rgba(99,102,241,.06),transparent); pointer-events:none; }
+.help-menu-header-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:2px 20px 14px;
+}
+.help-menu-header::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,220,0,.06),transparent); pointer-events:none; }
 .help-menu-title { font-size:18px; font-weight:800; color:#f1f5f9; letter-spacing:-0.3px; display:flex; align-items:center; gap:10px; }
-.help-menu-title-icon { width:36px; height:36px; background:linear-gradient(135deg,#6366f1,#a855f7); border-radius:10px; display:flex; align-items:center; justify-content:center; }
-.help-menu-close { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#94a3b8; transition:background .15s ease,color .15s ease; }
+.help-menu-title-icon { width:36px; height:36px; background:linear-gradient(135deg,#FFD700,#F59E0B); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.help-menu-close { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#94a3b8; transition:background .15s ease,color .15s ease; flex-shrink:0; }
 .help-menu-close:active { background:rgba(255,255,255,.2); color:#f1f5f9; }
 .help-menu-items { padding:10px 14px 14px; display:flex; flex-direction:column; gap:8px; }
+/* ══ Landscape Blocker ══ */
+#landscape-blocker { display:none; position:fixed; inset:0; z-index:99999; background:#080808; flex-direction:column; align-items:center; justify-content:center; gap:20px; direction:rtl; }
+#landscape-blocker .ls-icon { animation:landscapeWobble 1.9s ease-in-out infinite; }
+#landscape-blocker .ls-title { color:#f1f5f9; font-size:16px; font-weight:700; }
+#landscape-blocker .ls-sub { color:#64748b; font-size:13px; }
+@media screen and (orientation:landscape) and (max-height:520px) { #landscape-blocker { display:flex; } }
 .help-item {
   display:flex; align-items:center; gap:14px;
   background:rgba(30,41,59,.8); border:1px solid rgba(255,255,255,.08);
@@ -2020,25 +2034,29 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   </div>
 
   <!-- Help FAB (draggable) -->
-  <button class="help-fab" id="help-fab" aria-label="צריך עזרה" style="display:none">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4"/>
-      <circle cx="12" cy="17" r="0.6" fill="white" stroke="none"/>
+  <button class="help-fab" id="help-fab" aria-label="עלה בקשר" style="display:none">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
-    <span class="help-fab-label">עזרה</span>
+    <span class="help-fab-label-main">עלה בקשר</span>
+    <span class="help-fab-label-sub">סיוע לנהג</span>
   </button>
 
   <!-- Help Menu Overlay -->
   <div class="help-overlay" id="help-overlay" onclick="APP.closeHelpMenu()"></div>
   <div class="help-menu" id="help-menu">
-    <div class="help-menu-drag-handle"></div>
     <div class="help-menu-header">
-      <span class="help-menu-title"><span class="help-menu-title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4"/><circle cx="12" cy="17" r=".6" fill="white" stroke="none"/></svg></span>במה נוכל לעזור?</span>
-      <button class="help-menu-close" onclick="APP.closeHelpMenu()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <div class="help-menu-drag-handle"></div>
+      <div class="help-menu-header-row">
+        <span class="help-menu-title"><span class="help-menu-title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>במה נוכל לעזור?</span>
+        <button class="help-menu-close" onclick="APP.closeHelpMenu()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="help-menu-scroll">
     <div class="help-menu-items" id="help-menu-items">
       <button class="help-item" id="hitem-puncture" onclick="APP.helpPuncture()">
         <span class="help-item-icon" style="background:linear-gradient(135deg,#1F8A3D,#16652e)">
@@ -2102,6 +2120,17 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       </button>
     </div>
     <div class="help-card-wrap" id="help-card-wrap" style="display:none"></div>
+    </div><!-- /help-menu-scroll -->
+  </div>
+
+  <!-- Landscape Blocker -->
+  <div id="landscape-blocker">
+    <svg class="ls-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#FFD000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="2" width="14" height="20" rx="2"/>
+      <path d="M12 18h.01"/>
+    </svg>
+    <div class="ls-title">סובב את המסך</div>
+    <div class="ls-sub">האפליקציה עובדת בצילום זקוף בלבד</div>
   </div>
 
   <div class="bnav">
