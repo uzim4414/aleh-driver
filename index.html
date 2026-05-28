@@ -253,10 +253,30 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .help-textarea:focus { outline:none; border-color:#1F8A3D; }
 
 
-.tabs { display:flex; background:#000; padding:0 16px; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
-.tabs::-webkit-scrollbar{display:none}
-.tab { padding:12px 14px; font-size:13px; font-weight:500; color:var(--t2); white-space:nowrap; border-bottom:2px solid transparent; cursor:pointer; flex-shrink:0; transition:color .2s; }
-.tab.active { color:#fff; font-weight:700; border-bottom-color:var(--red); }
+/* ── Vehicle Tab Bar Redesign ── */
+@keyframes tabActivate {
+  0%   { transform: translateY(4px) scale(0.9); opacity: 0.4; }
+  65%  { transform: translateY(-1px) scale(1.03); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes tabLineExpand {
+  0%   { width: 0%; opacity: 0; }
+  100% { width: 70%; opacity: 1; }
+}
+@keyframes tabIconPop {
+  0%,100% { transform: scale(1); }
+  40%     { transform: scale(1.22) rotate(-8deg); }
+  70%     { transform: scale(1.08) rotate(4deg); }
+}
+.tabs { display:flex; background:#000; padding:8px 10px 0; border-bottom:1px solid rgba(31,138,61,0.2); overflow-x:auto; scrollbar-width:none; flex-shrink:0; gap:2px; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab { display:flex; flex-direction:column; align-items:center; gap:5px; padding:7px 11px 10px; font-size:10.5px; font-weight:600; color:#52616b; white-space:nowrap; cursor:pointer; flex-shrink:0; border-radius:12px 12px 0 0; border-bottom:2.5px solid transparent; transition:color .2s, background .25s, border-color .2s; position:relative; }
+.tab-icon { display:flex; align-items:center; justify-content:center; width:22px; height:22px; transition:transform .25s; }
+.tab-label { transition:color .2s; letter-spacing:0.1px; }
+.tab.active { color:#1F8A3D; border-bottom-color:#1F8A3D; background:linear-gradient(180deg,rgba(31,138,61,0.15) 0%,rgba(31,138,61,0.06) 100%); animation:tabActivate .35s cubic-bezier(.34,1.56,.64,1) both; }
+.tab.active .tab-label { color:#e8f5ec; font-weight:700; }
+.tab.active .tab-icon { animation:tabIconPop .5s ease both; }
+.tab.active::after { content:''; position:absolute; bottom:-1px; left:50%; transform:translateX(-50%); height:2.5px; background:linear-gradient(90deg,transparent,#1F8A3D,transparent); border-radius:2px; box-shadow:0 0 10px rgba(31,138,61,0.9),0 0 4px rgba(31,138,61,0.5); animation:tabLineExpand .35s ease both; }
 
 .igrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:16px; }
 .ig-card { background:var(--card); border-radius:18px; padding:16px; border:1px solid var(--border); animation:fadeUp .4s ease both; }
@@ -2151,11 +2171,11 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       <div class="ph-sub" id="veh-sub">—</div>
     </div>
     <div class="tabs" id="veh-tabs">
-      <div class="tab active" data-tab="info"      onclick="APP.switchTab('info')">הרכב</div>
-      <div class="tab"        data-tab="history"   onclick="APP.switchTab('history')">היסטוריה</div>
-      <div class="tab"        data-tab="docs"      onclick="APP.switchTab('docs')">מסמכים</div>
-      <div class="tab"        data-tab="insurance" onclick="APP.switchTab('insurance')">ביטוח</div>
-      <div class="tab"        data-tab="garage"    onclick="APP.switchTab('garage')">המוסך</div>
+      <div class="tab active" data-tab="info"      onclick="APP.switchTab('info')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-car"/></svg></span><span class="tab-label">הרכב</span></div>
+      <div class="tab"        data-tab="history"   onclick="APP.switchTab('history')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-clock"/></svg></span><span class="tab-label">היסטוריה</span></div>
+      <div class="tab"        data-tab="docs"      onclick="APP.switchTab('docs')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-file"/></svg></span><span class="tab-label">מסמכים</span></div>
+      <div class="tab"        data-tab="insurance" onclick="APP.switchTab('insurance')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">ביטוח</span></div>
+      <div class="tab"        data-tab="garage"    onclick="APP.switchTab('garage')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-tool"/></svg></span><span class="tab-label">המוסך</span></div>
     </div>
     <div class="content" id="veh-content"></div>
   </div>
