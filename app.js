@@ -2345,56 +2345,93 @@ function phoneToWa(p) {
 }
 
 function renderGarageTab() {
-  const v = STATE.vehicle || {};
-  const g = v.garage;
+  var v = STATE.vehicle || {};
+  var g = v.garage;
   if (!g || (!g.name && !g.address)) {
-    return '<div class="gar-empty"><div class="gar-empty-ic">🔧</div>טרם שויך מוסך לרכב.<br>פנה למנהל הצי לקבלת פרטים.</div>';
+    return '<div class="gar-empty"><div class="gar-empty-ic"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>טרם שויך מוסך לרכב.<br>פנה למנהל הצי לקבלת פרטים.</div>';
   }
 
-  // Only show name + address + Waze — no direct contact details (requires manager approval)
-  let rows = '';
-  if (g.address) {
-    const wazeUrl = 'https://waze.com/ul?q=' + encodeURIComponent(g.address) + '&navigate=yes';
-    rows +=
-      '<div class="gar-row">' +
-        '<div class="gar-row-icn"><svg width="18" height="18"><use href="#ic-pin" color="#1F8A3D"/></svg></div>' +
-        '<div class="gar-row-body">' +
-          '<div class="gar-row-lbl">כתובת</div>' +
-          '<div class="gar-row-val">' + g.address + '</div>' +
+  var gName = g.name || 'המוסך שלך';
+  var gAddr = g.address || '';
+  var wazeUrl = gAddr ? 'https://waze.com/ul?q=' + encodeURIComponent(gAddr) + '&navigate=yes' : '';
+  var mapsEmbedUrl = gAddr ? 'https://maps.google.com/maps?q=' + encodeURIComponent(gAddr) + '&output=embed&hl=he&z=15' : '';
+
+  /* 1 — Warning banner */
+  var warningBanner =
+    '<div class="gar-warning-banner">' +
+      '<div class="gar-warning-banner-icon">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
+          '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="gar-warning-banner-body">' +
+        '<div class="gar-warning-banner-title">לפנייה למוסך נדרש אישור מנהל</div>' +
+        '<div class="gar-warning-banner-sub">כל כניסה למוסך מחייבת אישור מנהל מראש</div>' +
+      '</div>' +
+    '</div>';
+
+  /* 2 — Approval request button */
+  var approvalBtn =
+    '<button class="gar-approval-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpGarage();},350)">' +
+      '<div class="gar-approval-icon">' +
+        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>' +
+          '<polyline points="16 17 21 12 16 7"/>' +
+          '<line x1="21" y1="12" x2="9" y2="12"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="gar-approval-body">' +
+        '<div class="gar-approval-title">בקשה לאישור כניסה למוסך</div>' +
+        '<div class="gar-approval-sub">לחץ לשליחת בקשה למנהל הצי</div>' +
+      '</div>' +
+      '<div class="gar-approval-arrow">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>' +
+      '</div>' +
+    '</button>';
+
+  /* 3 — Garage hero header */
+  var heroCard =
+    '<div class="gar-hero-card">' +
+      '<div class="gar-hero-icon-wrap">' +
+        '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="gar-hero-name">' + gName + '</div>' +
+      '<div class="gar-hero-sub">המוסך המשויך לרכב שלך</div>' +
+    '</div>';
+
+  /* 4 — Address + map card */
+  var addrCard = '';
+  if (gAddr) {
+    addrCard =
+      '<div class="gar-addr-card">' +
+        '<div class="gar-addr-row">' +
+          '<div class="gar-addr-icon">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+              '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>' +
+              '<circle cx="12" cy="10" r="3"/>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="gar-addr-body">' +
+            '<div class="gar-addr-lbl">כתובת</div>' +
+            '<div class="gar-addr-val">' + gAddr + '</div>' +
+          '</div>' +
         '</div>' +
-        '<div class="gar-row-btns">' +
-          '<a class="gar-mini-btn waze" href="' + wazeUrl + '" target="_blank" rel="noopener" title="נווט בוויז">' +
-            '<svg width="20" height="20"><use href="#ic-waze" color="#fff"/></svg>' +
-          '</a>' +
-        '</div>' +
+        (mapsEmbedUrl ? '<iframe class="gar-map-frame" src="' + mapsEmbedUrl + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="מפה"></iframe>' : '') +
+        (wazeUrl
+          ? '<a class="gar-waze-btn" href="' + wazeUrl + '" target="_blank" rel="noopener">' +
+              '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polygon points="3 11 22 2 13 21 11 13 3 11"/>' +
+              '</svg>' +
+              'נווט בוויז' +
+            '</a>'
+          : '') +
       '</div>';
   }
 
-  const noticeRow =
-    '<div style="margin:10px 0 4px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:10px 14px;font-size:12px;color:#f59e0b;display:flex;align-items:center;gap:8px">' +
-    '<span>⚠️</span><span>לפנייה למוסך נדרש אישור מנהל — השתמש בכפתור "מוסך" בתפריט הסיוע</span></div>';
-
-  const wazeUrl2 = g.address ? 'https://waze.com/ul?q=' + encodeURIComponent(g.address) + '&navigate=yes' : '';
-  const cta = wazeUrl2
-    ? '<a class="gar-cta-btn ghost" href="' + wazeUrl2 + '" target="_blank" rel="noopener">' +
-        '<svg width="17" height="17"><use href="#ic-map" color="#fff"/></svg>נווט' +
-      '</a>'
-    : '';
-
-  return '<div class="gar-wrap">' +
-    '<div class="gar-card">' +
-      '<div class="gar-head">' +
-        '<div class="gar-logo"><svg width="28" height="28"><use href="#ic-tool" color="#1F8A3D"/></svg></div>' +
-        '<div>' +
-          '<div class="gar-name">' + (g.name || 'המוסך שלך') + '</div>' +
-          '<div class="gar-tag">המוסך המשויך לרכב</div>' +
-        '</div>' +
-      '</div>' +
-      rows +
-      noticeRow +
-      (cta ? '<div class="gar-cta">' + cta + '</div>' : '') +
-    '</div>' +
-  '</div>';
+  return '<div class="gar-wrap">' + warningBanner + approvalBtn + heroCard + addrCard + '</div>';
 }
 
 function _escHtml(s) {
