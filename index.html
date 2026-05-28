@@ -1054,6 +1054,16 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+.ins-row-icon svg { animation: insIconFloat 3s ease-in-out infinite; }
+.ins-row-icon:nth-child(1) svg { animation-delay: 0s; }
+.ins-row-icon:nth-child(2) svg { animation-delay: 0.4s; }
+.ins-row-icon:nth-child(3) svg { animation-delay: 0.8s; }
+.ins-row-icon:nth-child(4) svg { animation-delay: 1.2s; }
+.ins-row-icon:nth-child(5) svg { animation-delay: 1.6s; }
+@keyframes insIconFloat {
+  0%,100% { transform: translateY(0) scale(1); }
+  50%     { transform: translateY(-3px) scale(1.08); }
+}
 .ins-detail-body { flex: 1; min-width: 0; }
 .ins-detail-label {
   font-size: 10px; color: var(--t2); font-weight: 600;
