@@ -2906,8 +2906,11 @@ function _insDetailRow(iconHref, iconColor, label, valueId, valueText, extraClas
 
 function renderInsuranceTab() {
   var v = STATE.vehicle || {};
-  var stateIns = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[STATE.insurance.length - 1] : null;
-  var fallbackCompany = (stateIns && stateIns.company) ? stateIns.company : '—';
+  var stateIns = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[0] : null;
+  var syncCompany = stateIns ? (stateIns.company || '') : '';
+  var syncYear    = stateIns ? (stateIns.year    || '') : '';
+  var syncSubtitle = syncCompany ? (syncCompany + (syncYear ? ' · ' + syncYear : '')) : '';
+  var fallbackCompany = syncCompany || '—';
 
   var compExp  = v.insCompExp || '';
   var fullExp  = v.insFullExp || '';
@@ -2942,16 +2945,16 @@ function renderInsuranceTab() {
     '<div class="ins-section">' +
       '<div class="ins-section-header comp">' +
         '<div class="ins-shield-icon comp"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
-        '<div class="ins-section-titles"><div class="ins-section-title comp">ביטוח חובה</div><div class="ins-section-subtitle">Third-Party Liability</div></div>' +
+        '<div class="ins-section-titles"><div class="ins-section-title comp">ביטוח חובה</div><div class="ins-section-subtitle">' + (syncSubtitle || 'Third-Party Liability') + '</div></div>' +
         statusChip(compStatus, compRenewed) +
       '</div>' +
       '<div class="ins-detail-list">' +
         detailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',         'ins-comp-company',  fallbackCompany, '', 0) +
-        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '—', '', 0.3) +
+        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
         detailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '', 0.6) +
-        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-comp-minage',   '—', '', 0.9) +
-        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-comp-deduct',   '—', '', 1.2) +
-        detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent',    '—', '', 1.5) +
+        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-comp-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
+        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-comp-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
+        detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent',    '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.5) +
       '</div>' +
       '<div class="ins-cta-row" id="ins-comp-cta"></div>' +
     '</div>';
@@ -2961,15 +2964,15 @@ function renderInsuranceTab() {
     '<div class="ins-section">' +
       '<div class="ins-section-header full">' +
         '<div class="ins-shield-icon full"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>' +
-        '<div class="ins-section-titles"><div class="ins-section-title full">ביטוח מקיף</div><div class="ins-section-subtitle">Comprehensive Coverage</div></div>' +
+        '<div class="ins-section-titles"><div class="ins-section-title full">ביטוח מקיף</div><div class="ins-section-subtitle">' + (syncSubtitle || 'Comprehensive Coverage') + '</div></div>' +
         statusChip(fullStatus, fullRenewed) +
       '</div>' +
       '<div class="ins-detail-list">' +
         detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
-        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '—', '', 0.3) +
+        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
         detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
-        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '—', '', 0.9) +
-        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '—', '', 1.2) +
+        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
+        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
       '</div>' +
       '<div class="ins-services-divider"><span class="ins-services-label">שירותים כלולים בפוליסה</span></div>' +
       '<div class="ins-chips" id="ins-full-chips">' +
@@ -3028,13 +3031,46 @@ function renderInsuranceTab() {
 
   setTimeout(function() { _loadInsuranceDetails(); }, 80);
 
-  return '<div class="ins-wrap">' + compSection + fullSection + '</div>';
+  var skeletonCss =
+    '<style>' +
+      '.ins-skeleton{display:inline-block;background:linear-gradient(90deg,rgba(148,163,184,0.12) 0%,rgba(148,163,184,0.28) 50%,rgba(148,163,184,0.12) 100%);background-size:200% 100%;border-radius:6px;animation:insSkelShimmer 1.2s ease-in-out infinite;vertical-align:middle}' +
+      '.ins-skeleton-text{width:90px;height:14px}' +
+      '@keyframes insSkelShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}' +
+    '</style>';
+
+  var errorBanner = '<div id="ins-load-error" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;direction:rtl;text-align:center;"></div>';
+
+  return '<div class="ins-wrap">' + skeletonCss + errorBanner + compSection + fullSection + '</div>';
+}
+
+function _insShowError(msg) {
+  var el = document.getElementById('ins-load-error');
+  if (!el) return;
+  el.textContent = msg || 'לא ניתן לטעון נתוני ביטוח';
+  el.style.display = 'block';
 }
 
 async function _loadInsuranceDetails() {
   try {
-    var res = await gasPost('get_vehicle_insurance_details', {});
-    if (!res || !res.ok) return;
+    var res = await gasPost('get_vehicle_insurance_details', {}, { silent: true });
+    if (!res || !res.ok) {
+      var errMsg = res && res.error ? res.error : 'שגיאת שרת';
+      console.error('[_loadInsuranceDetails] API error:', errMsg, res);
+      _insShowError('שגיאה בטעינת נתוני ביטוח: ' + errMsg);
+      return;
+    }
+    try { console.log('[_loadInsuranceDetails] res:', JSON.stringify(res).substring(0, 400)); } catch(_) {}
+
+    var comp = res.comp || null;
+    var full = res.full || null;
+
+    if (!comp && !full) {
+      _insShowError('לא נמצאו נתוני ביטוח לרכב זה');
+      return;
+    }
+
+    comp = comp || {};
+    full = full || {};
 
     function _setText(id, text) {
       var el = document.getElementById(id);
@@ -3046,7 +3082,6 @@ async function _loadInsuranceDetails() {
     }
 
     /* ── ביטוח חובה ── */
-    var comp = res.comp || {};
     if (comp.company)      _setText('ins-comp-company', comp.company);
     if (comp.policyNumber) _setText('ins-comp-policy',  comp.policyNumber);
     if (comp.minDriverAge) _setText('ins-comp-minage',  comp.minDriverAge + ' שנים');
@@ -3078,7 +3113,6 @@ async function _loadInsuranceDetails() {
     }
 
     /* ── ביטוח מקיף ── */
-    var full = res.full || {};
     if (full.company)      _setText('ins-full-company', full.company);
     if (full.policyNumber) _setText('ins-full-policy',  full.policyNumber);
     if (full.minDriverAge) _setText('ins-full-minage',  full.minDriverAge + ' שנים');
@@ -3136,7 +3170,8 @@ async function _loadInsuranceDetails() {
     }
 
   } catch(e) {
-    console.warn('[_loadInsuranceDetails]', e.message);
+    console.error('[_loadInsuranceDetails] exception:', e.message, e);
+    _insShowError('לא ניתן לטעון נתוני ביטוח (' + (e.message || 'שגיאת רשת') + ')');
   }
 }
 
