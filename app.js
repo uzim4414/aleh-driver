@@ -832,7 +832,7 @@ async function gasPost(action, extra, opts) {
 }
 
 /* ══ Demo / Mock mode (כשאין GAS_URL) ══ */
-function mockResponse(action) {
+function mockResponse(action, params) {
   const mockVehicle = {
     id: 'V001', num: '123-45-678', cat: 'פרטי', make: 'Toyota', model: 'Highlander',
     year: '2022', color: 'לבן', holder: 'משה כהן', dept: 'אגף שיקום',
@@ -949,6 +949,10 @@ function mockResponse(action) {
   }
   if (action === 'driver_field_event') {
     return { ok: true, eventId: 'EVT-DEMO-' + Date.now() };
+  }
+  if (action === 'insurance_ai_explain') {
+    var q = params && params.question ? params.question : '';
+    return { ok: true, answer: 'על פי פרטי הביטוח שלך: ' + (q ? 'בנוגע ל"' + q + '" — ' : '') + 'הביטוח המקיף כולל גרירה עד 100 ק"מ, החלפת שמשות ורכב חלופי עד 21 יום. ההשתתפות העצמית בנזק עצמי היא ₪3,500.' };
   }
   return { ok: false, error: 'Unknown action' };
 }
@@ -2921,13 +2925,14 @@ function renderInsuranceTab() {
     return badge + '<div class="ins-status ' + status + '"><div class="ins-status-dot"></div>' + _insStatusLabel(status) + '</div>';
   }
 
-  function detailRow(iconHref, iconColor, label, valueId, valueText, extraClass) {
+  function detailRow(iconHref, iconColor, label, valueId, valueText, extraClass, animDelay) {
     var cls = extraClass ? ' ' + extraClass : '';
     var valHtml = valueId
       ? '<div class="ins-detail-value' + cls + '" id="' + valueId + '">' + (valueText || '—') + '</div>'
       : '<div class="ins-detail-value' + cls + '">' + (valueText || '—') + '</div>';
+    var delayStyle = (typeof animDelay === 'number') ? ' style="animation-delay:' + animDelay + 's"' : '';
     return '<div class="ins-detail-row">' +
-      '<div class="ins-detail-icon ins-row-icon"><svg width="18" height="18"><use href="' + iconHref + '" color="' + iconColor + '"/></svg></div>' +
+      '<div class="ins-detail-icon ins-row-icon"' + delayStyle + '><svg width="18" height="18"><use href="' + iconHref + '" color="' + iconColor + '"/></svg></div>' +
       '<div class="ins-detail-body"><div class="ins-detail-label">' + label + '</div>' + valHtml + '</div>' +
       '</div>';
   }
@@ -2941,12 +2946,12 @@ function renderInsuranceTab() {
         statusChip(compStatus, compRenewed) +
       '</div>' +
       '<div class="ins-detail-list">' +
-        detailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',         'ins-comp-company',  fallbackCompany) +
-        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '—') +
-        detailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '') +
-        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-comp-minage',   '—') +
-        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-comp-deduct',   '—') +
-        detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent',    '—') +
+        detailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',         'ins-comp-company',  fallbackCompany, '', 0) +
+        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '—', '', 0.3) +
+        detailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '', 0.6) +
+        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-comp-minage',   '—', '', 0.9) +
+        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-comp-deduct',   '—', '', 1.2) +
+        detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent',    '—', '', 1.5) +
       '</div>' +
       '<div class="ins-cta-row" id="ins-comp-cta"></div>' +
     '</div>';
@@ -2960,16 +2965,16 @@ function renderInsuranceTab() {
         statusChip(fullStatus, fullRenewed) +
       '</div>' +
       '<div class="ins-detail-list">' +
-        detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany) +
-        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '—') +
-        detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '') +
-        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '—') +
-        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '—') +
+        detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
+        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '—', '', 0.3) +
+        detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
+        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '—', '', 0.9) +
+        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '—', '', 1.2) +
       '</div>' +
       '<div class="ins-services-divider"><span class="ins-services-label">שירותים כלולים בפוליסה</span></div>' +
       '<div class="ins-chips" id="ins-full-chips">' +
-        '<div class="ins-chip full-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>גרירה</div>' +
-        '<div class="ins-chip full-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>שמשות</div>' +
+        '<div class="ins-chip full-chip" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpTowing();},350)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>גרירה</div>' +
+        '<div class="ins-chip full-chip" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpWindshield();},350)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>שמשות</div>' +
         '<div class="ins-chip full-chip" id="ins-rental-chip" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>רכב חלופי</div>' +
       '</div>' +
       /* Towing card */
@@ -2999,14 +3004,24 @@ function renderInsuranceTab() {
         '</div>' +
       '</div>' +
       /* AI insight card */
-      '<div class="ins-ai-card" id="ins-ai-card" style="display:none;margin:0 18px 14px;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(109,40,217,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:16px;padding:14px 16px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
-          '<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+      '<div class="ins-ai-card" id="ins-ai-card" style="margin:0 18px 14px;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(109,40,217,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:16px;padding:14px 16px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+          '<div class="ins-ai-spark-icon" style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
           '</div>' +
-          '<span style="font-size:12px;font-weight:800;color:#c4b5fd;letter-spacing:0.3px">תובנת AI</span>' +
+          '<span style="font-size:13px;font-weight:800;color:#c4b5fd;letter-spacing:0.3px">תובנות AI על הביטוח שלך</span>' +
         '</div>' +
-        '<div id="ins-ai-text" style="font-size:13px;color:#e2e8f0;line-height:1.6;font-weight:500"></div>' +
+        '<div id="ins-ai-text" style="font-size:13px;color:#cbd5e1;line-height:1.6;font-weight:500;margin-bottom:10px;display:none"></div>' +
+        '<div class="ins-ai-questions">' +
+          '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה כלול בביטוח שלי?\')">מה כלול בביטוח שלי?</button>' +
+          '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה ההשתתפות העצמית?\')">מה ההשתתפות העצמית?</button>' +
+          '<button class="ins-ai-q-chip" onclick="_insAskAI(\'האם יש גרירה?\')">האם יש גרירה?</button>' +
+        '</div>' +
+        '<div class="ins-ai-input-row">' +
+          '<input id="ins-ai-input" type="text" placeholder="שאל שאלה על הביטוח..." onkeydown="if(event.key===\'Enter\'){_insAskAI();}"/>' +
+          '<button class="ins-ai-ask-btn" onclick="_insAskAI()">שאל</button>' +
+        '</div>' +
+        '<div id="ins-ai-response"></div>' +
       '</div>' +
       '<div id="ins-full-cta-placeholder"></div>' +
     '</div>';
@@ -3039,15 +3054,27 @@ async function _loadInsuranceDetails() {
     var compAgent = [comp.agentName, comp.agentPhone].filter(Boolean).join(' — ');
     if (compAgent) _setText('ins-comp-agent', compAgent);
 
-    /* CTA for חובה: view policy only */
+    /* CTA for חובה: view policy + call company */
     var compCtaEl = document.getElementById('ins-comp-cta');
     if (compCtaEl) {
       var compFileLink = comp.fileLink || (STATE.vehicle && STATE.vehicle.insCompLink) || '';
-      compCtaEl.innerHTML = compFileLink
-        ? '<a class="ins-cta-btn ghost" href="' + compFileLink + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 14px;border-radius:14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-decoration:none;background:rgba(255,255,255,0.06);color:var(--t1);border:1px solid var(--border);transition:transform .15s">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
-            'הצג פוליסה</a>'
-        : '';
+      var compCtaHtml = '';
+      if (compFileLink) {
+        compCtaHtml += '<a class="ins-cta-btn ghost" href="' + compFileLink + '" target="_blank" rel="noopener">' +
+            '<span class="ins-cta-icon">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+            '</span>' +
+            'הצג פוליסה</a>';
+      }
+      if (comp.agentPhone) {
+        var compPhoneClean = String(comp.agentPhone).replace(/[^0-9+]/g,'');
+        compCtaHtml += '<button class="ins-cta-btn primary" onclick="window.open(\'tel:' + compPhoneClean + '\')">' +
+            '<span class="ins-cta-icon">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
+            '</span>' +
+            'פניה לחברה</button>';
+      }
+      compCtaEl.innerHTML = compCtaHtml;
     }
 
     /* ── ביטוח מקיף ── */
@@ -3081,14 +3108,30 @@ async function _loadInsuranceDetails() {
       if (rentalChip) rentalChip.style.display = 'flex';
     }
 
+    /* CTA for מקיף: view policy only (policy doc contains pricing) */
+    var fullCtaEl = document.getElementById('ins-full-cta-placeholder');
+    if (fullCtaEl) {
+      var fullFileLink = full.fileLink || (STATE.vehicle && STATE.vehicle.insFullLink) || '';
+      if (fullFileLink) {
+        fullCtaEl.innerHTML = '<div class="ins-cta-row">' +
+          '<a class="ins-cta-btn ghost" href="' + fullFileLink + '" target="_blank" rel="noopener">' +
+            '<span class="ins-cta-icon">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+            '</span>' +
+            'הצג פוליסה</a>' +
+          '</div>';
+      } else {
+        fullCtaEl.innerHTML = '';
+      }
+    }
+
     /* AI insight */
     var insight = full.summary || comp.summary || '';
     if (insight) {
-      var aiCard = document.getElementById('ins-ai-card');
       var aiText = document.getElementById('ins-ai-text');
-      if (aiCard && aiText) {
+      if (aiText) {
         aiText.textContent = insight;
-        aiCard.style.display = 'block';
+        aiText.style.display = 'block';
       }
     }
 
@@ -3096,6 +3139,37 @@ async function _loadInsuranceDetails() {
     console.warn('[_loadInsuranceDetails]', e.message);
   }
 }
+
+/* ── AI insurance Q&A ── */
+function _insAskAI(question) {
+  var input = document.getElementById('ins-ai-input');
+  var responseEl = document.getElementById('ins-ai-response');
+  var q = question;
+  if (!q && input) q = input.value;
+  q = (q || '').trim();
+  if (!q) return;
+  if (input && !question) input.value = '';
+  if (responseEl) {
+    responseEl.className = '';
+    responseEl.textContent = '⏳ מחשב...';
+  }
+  gasPost('insurance_ai_explain', { question: q }).then(function(res) {
+    if (!responseEl) return;
+    if (res && res.ok && res.answer) {
+      responseEl.textContent = res.answer;
+      responseEl.className = 'fade-in';
+    } else {
+      responseEl.textContent = 'לא ניתן לקבל תובנות כרגע';
+      responseEl.className = 'fade-in';
+    }
+  }).catch(function() {
+    if (responseEl) {
+      responseEl.textContent = 'לא ניתן לקבל תובנות כרגע';
+      responseEl.className = 'fade-in';
+    }
+  });
+}
+window._insAskAI = _insAskAI;
 
 function renderVehicleScreen(tab) {
   const v = STATE.vehicle;
@@ -3848,15 +3922,24 @@ APP.helpWindshield = async function() {
   var insCompany = '', insPolicy = '', wdPhone = '', wdProvider = '';
   try {
     var res = await gasPost('get_vehicle_insurance_details', {});
-    if (res.ok && res.insurance && res.insurance.hasComprehensive) {
-      var ins = res.insurance;
-      insCompany = ins.company || '';
-      insPolicy  = ins.policyNumber || '';
+    var full = (res && res.full) ? res.full : null;
+    if (full) {
+      insCompany = full.company || '';
+      insPolicy  = full.policyNumber || '';
     }
-    /* חפש כיסוי שמשות ב-parsedData — מגיע מ-GAS דרך כיסויים */
-    if (res.windshieldCoverage) {
-      wdProvider = res.windshieldCoverage.provider || 'אילן קארגלס';
-      wdPhone    = res.windshieldCoverage.phone    || '03-6534444';
+    /* חפש כיסוי שמשות ב-coverages של המקיף */
+    var wdCov = null;
+    if (full && full.coverages && full.coverages.length) {
+      for (var wi = 0; wi < full.coverages.length; wi++) {
+        var wc = full.coverages[wi];
+        if (wc && wc.name && (wc.name.indexOf('שמש') >= 0 || wc.name.indexOf('זכוכ') >= 0)) {
+          wdCov = wc; break;
+        }
+      }
+    }
+    if (wdCov) {
+      wdProvider = wdCov.provider || 'אילן קארגלס';
+      wdPhone    = wdCov.phone    || '03-6534444';
     } else {
       wdProvider = 'אילן קארגלס';
       wdPhone    = '03-6534444';
@@ -3970,8 +4053,41 @@ APP.helpTowing = async function() {
   _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-spinner">&#x27F3; טוען פרטי ביטוח...</div></div>');
   try {
     var res = await gasPost('get_vehicle_insurance_details', {});
-    var ins = res.insurance;
-    var garage = res.garage;
+    var full = (res && res.full) ? res.full : null;
+    var garage = (res && res.garage) ? res.garage : ((STATE.vehicle && STATE.vehicle.garage) ? STATE.vehicle.garage : null);
+
+    /* Build a shim "ins" object so the rest of the rendering code keeps working */
+    var ins = null;
+    if (full) {
+      var towingCov = null;
+      if (full.coverages && full.coverages.length) {
+        for (var ci = 0; ci < full.coverages.length; ci++) {
+          var cv = full.coverages[ci];
+          if (cv && cv.name && (cv.name.indexOf('גרירה') >= 0 || cv.name.indexOf('שירותי דרך') >= 0)) {
+            towingCov = cv; break;
+          }
+        }
+      }
+      var rentalCov = null;
+      if (full.coverages && full.coverages.length) {
+        for (var ri = 0; ri < full.coverages.length; ri++) {
+          var rv = full.coverages[ri];
+          if (rv && rv.name && (rv.name.indexOf('חלופי') >= 0 || rv.name.indexOf('שכירות') >= 0)) {
+            rentalCov = rv; break;
+          }
+        }
+      }
+      ins = {
+        hasComprehensive: true,
+        company: full.company || '',
+        policyNumber: full.policyNumber || '',
+        emergencyPhone: (towingCov && towingCov.phone) ? towingCov.phone : '',
+        towingProvider: (towingCov && towingCov.provider) ? towingCov.provider : '',
+        towingLimit:    (towingCov && towingCov.limit)    ? towingCov.limit    : '',
+        includesRentalCar: !!rentalCov,
+        expiryDate: full.endDate || ''
+      };
+    }
 
     if (!ins || !ins.hasComprehensive) {
       var mgrPhone = (STATE.vehicle && STATE.vehicle.fleetManagerPhone) ? STATE.vehicle.fleetManagerPhone : '';
@@ -4048,6 +4164,7 @@ APP.helpTowing = async function() {
             '<div class="tw-provider-label">🔗 ספק גרירה ושירותי דרך</div>' +
             (ins.towingProvider ? '<div class="tw-provider-name">' + ins.towingProvider + '</div>' : '') +
             (ins.emergencyPhone ? '<div class="tw-provider-phone">📞 ' + ins.emergencyPhone + '</div>' : '') +
+            (ins.towingLimit ? '<div class="tw-provider-phone">🛣️ עד ' + ins.towingLimit + '</div>' : '') +
           '</div>' : '') +
         '<div class="tw-info-grid">' +
           '<div class="tw-info-cell"><div class="tw-info-label">רכב חלופי</div><div class="tw-info-val">' + (ins.includesRentalCar ? '✅ כלול' : '❌ לא כלול') + '</div></div>' +
