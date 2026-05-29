@@ -964,6 +964,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   animation: insCardEnter .45s ease both;
 }
 .ins-section:nth-child(2) { animation-delay: .1s; }
+.ins-section:nth-child(3) { animation-delay: .2s; }
 
 /* Section header */
 .ins-section-header {
@@ -1245,6 +1246,26 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 /* AI card icon sparkle */
 .ins-ai-spark-icon {
   display: inline-flex; animation: insAiIconSpark 2s ease-in-out infinite;
+}
+
+/* Vehicle license section (teal/cyan) */
+.ins-section-header.lic {
+  background: linear-gradient(135deg, rgba(8,145,178,0.22) 0%, rgba(6,182,212,0.1) 100%);
+  border-bottom: 1px solid rgba(6,182,212,0.2);
+}
+.ins-shield-icon.lic {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  animation: insShieldPulseCyan 2.8s ease-in-out 0.8s infinite;
+}
+.ins-section-title.lic { color: #67e8f9; }
+@keyframes insShieldPulseCyan {
+  0%,100% { box-shadow: 0 4px 12px rgba(8,145,178,0.25); }
+  50%     { box-shadow: 0 6px 20px rgba(8,145,178,0.5); }
+}
+.ins-cta-btn.lic-primary {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(8,145,178,0.35);
 }
 
 /* Deductible warning card (2026-05-29) */
@@ -2595,8 +2616,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     <div class="tabs" id="veh-tabs">
       <div class="tab active" data-tab="info"      onclick="APP.switchTab('info')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-car"/></svg></span><span class="tab-label">הרכב</span></div>
       <div class="tab"        data-tab="history"   onclick="APP.switchTab('history')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-clock"/></svg></span><span class="tab-label">היסטוריה</span></div>
-      <div class="tab"        data-tab="docs"      onclick="APP.switchTab('docs')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-file"/></svg></span><span class="tab-label">מסמכים</span></div>
-      <div class="tab"        data-tab="insurance" onclick="APP.switchTab('insurance')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">ביטוח</span></div>
+      <div class="tab"        data-tab="insurance" onclick="APP.switchTab('insurance')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">רישיונות וביטוחים</span></div>
       <div class="tab"        data-tab="garage"    onclick="APP.switchTab('garage')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-tool"/></svg></span><span class="tab-label">המוסך</span></div>
     </div>
     <div class="content" id="veh-content"></div>

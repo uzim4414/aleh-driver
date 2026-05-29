@@ -3097,6 +3097,94 @@ function _insTier1Answer(question, comp, full) {
   return null; // no local answer — fall through to AI
 }
 
+/* ── Vehicle License helpers ── */
+function _parseFlexibleDate(raw) {
+  if (!raw) return null;
+  var s = String(raw).trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+
+function _formatDateHe(d) {
+  if (!d) return '—';
+  var day = d.getDate(), month = d.getMonth()+1, year = d.getFullYear();
+  return (day < 10 ? '0'+day : day) + '/' + (month < 10 ? '0'+month : month) + '/' + year;
+}
+
+function renderLicenseSection() {
+  var v = STATE.vehicle || {};
+  var raw = v.licExp || '';
+  var licLink = v.licLink || '';
+  var plateNum = v.num || '';
+
+  var expDate = _parseFlexibleDate(raw);
+  var now = new Date();
+  var status = 'unknown';
+  var daysLeft = null;
+  if (expDate) {
+    daysLeft = Math.floor((expDate - now) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) status = 'expired';
+    else if (daysLeft <= 60) status = 'expiring';
+    else status = 'valid';
+  }
+
+  var expFormatted = expDate ? _formatDateHe(expDate) : '—';
+  var statusLabels = { valid: 'בתוקף', expiring: 'פג בקרוב', expired: 'פג תוקף', unknown: 'לא ידוע' };
+  var chipHtml = '<div class="ins-status ' + status + '"><div class="ins-status-dot"></div>' + (statusLabels[status] || status) + '</div>';
+
+  var daysNote = '';
+  if (status === 'expiring' && daysLeft !== null) daysNote = ' (' + daysLeft + ' יום)';
+  if (status === 'expired' && daysLeft !== null) daysNote = ' (' + Math.abs(daysLeft) + ' ימים)';
+
+  var detailsHtml =
+    '<div class="ins-detail-list">' +
+    (plateNum
+      ? '<div class="ins-detail-row">' +
+          '<div class="ins-detail-icon ins-row-icon"><svg width="18" height="18"><use href="#ic-car" color="#06b6d4"/></svg></div>' +
+          '<div class="ins-detail-body"><div class="ins-detail-label">מספר רכב</div><div class="ins-detail-value">' + plateNum + '</div></div>' +
+        '</div>'
+      : '') +
+    '<div class="ins-detail-row">' +
+      '<div class="ins-detail-icon ins-row-icon"><svg width="18" height="18"><use href="#ic-cal" color="' + (status === 'valid' ? '#22c55e' : '#f87171') + '"/></svg></div>' +
+      '<div class="ins-detail-body"><div class="ins-detail-label">תוקף הרישיון</div><div class="ins-detail-value' + (status !== 'valid' && status !== 'unknown' ? ' ' + status : '') + '">' + expFormatted + daysNote + '</div></div>' +
+    '</div>' +
+    '</div>';
+
+  var ctaHtml = licLink
+    ? '<div class="ins-cta-row">' +
+        '<a href="' + licLink + '" target="_blank" class="ins-cta-btn lic-primary">' +
+          '<span class="ins-cta-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>' +
+          'הצג רישיון רכב' +
+        '</a>' +
+      '</div>'
+    : '';
+
+  return (
+    '<div class="ins-section">' +
+      '<div class="ins-section-header lic" onclick="_insToggleSection(\'ins-lic-body\')" style="cursor:pointer">' +
+        '<div class="ins-shield-icon lic">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h6M7 16h4"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="ins-section-titles">' +
+          '<div class="ins-section-title lic">רישיון רכב</div>' +
+          '<div class="ins-section-subtitle">Vehicle Registration</div>' +
+        '</div>' +
+        chipHtml +
+        '<span id="ins-lic-body-chevron" style="margin-right:auto;font-size:18px;transition:transform 0.3s;color:rgba(255,255,255,0.6)">▼</span>' +
+      '</div>' +
+      '<div id="ins-lic-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
+        detailsHtml +
+        ctaHtml +
+      '</div>' +
+    '</div>'
+  );
+}
+
 function renderInsuranceTab() {
   var v = STATE.vehicle || {};
   var stateIns = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[0] : null;
@@ -3248,7 +3336,7 @@ function renderInsuranceTab() {
       '<div id="ins-ai-response"></div>' +
     '</div>';
 
-  return '<div class="ins-wrap">' + skeletonCss + errorBanner + compSection + fullSection + aiSection + '</div>';
+  return '<div class="ins-wrap">' + skeletonCss + errorBanner + renderLicenseSection() + compSection + fullSection + aiSection + '</div>';
 }
 
 function _insShowError(msg) {
@@ -3486,27 +3574,10 @@ function renderVehicleScreen(tab) {
     }).join('') + '</div>' + renderGovSection();
 
   } else if (tab === 'docs') {
-    if (!STATE.documents.length) {
-      content.innerHTML = '<div class="empty">אין מסמכים</div>';
-    } else {
-      content.innerHTML = STATE.documents.map(function(d, i) {
-        const warn = daysLeftWarn(d.date, 30);
-        const safeLink  = (d.link  || '').replace(/'/g, "\\'");
-        const safeTitle = (d.type || 'מסמך').replace(/'/g, "\\'");
-        const onclick   = 'viewDoc(\'' + safeLink + '\',\'' + safeTitle + '\')';
-        return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's" onclick="' + onclick + '">' +
-          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#1F8A3D"/></svg></div>' +
-          '<div class="dr-body">' +
-            '<div class="dr-title">' + (d.type || 'מסמך') + '</div>' +
-            '<div class="dr-sub' + (warn ? ' warn' : '') + '">' + formatDate(d.date) + '</div>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
-            '<span style="font-size:11px;font-weight:600;color:' + (d.link ? '#30D158' : '#6e6e73') + '">' + (d.link ? 'פתח' : 'אין קישור') + '</span>' +
-            '<svg width="14" height="14" fill="none" stroke="' + (d.link ? '#30D158' : '#4e4e53') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-    }
+    // docs tab removed — redirect to insurance (licenses & insurance)
+    STATE.currentTab = 'insurance';
+    renderVehicleScreen('insurance');
+    return;
 
   } else if (tab === 'insurance') {
     content.innerHTML = renderInsuranceTab();
