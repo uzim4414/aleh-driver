@@ -2998,13 +2998,22 @@ function _insTier1Answer(question, comp, full) {
 
   // ── Towing ──
   if (/גרירה|גרר|תקוע|תקע/.test(q)) {
-    var provider = f.towingProvider || s.towingProvider || '';
-    var phone    = f.towingPhone    || s.towingPhone    || '';
-    var hasTow   = f.hasTowing      || s.hasTowing;
-    if (!hasTow && !provider) return null;
+    // Check top-level v2.0 fields first, then fall back to coverages array
+    var towProvider = f.towingProvider || s.towingProvider || '';
+    var towPhone    = f.towingPhone    || s.towingPhone    || '';
+    if (!towProvider && f.coverages) {
+      var tc = f.coverages.find(function(c){ return c.name && c.name.indexOf('גרירה') >= 0; });
+      if (tc) { towProvider = tc.provider || ''; towPhone = tc.phone || ''; }
+    }
+    if (!towProvider && s.coverages) {
+      var tc2 = s.coverages.find(function(c){ return c.name && c.name.indexOf('גרירה') >= 0; });
+      if (tc2) { towProvider = tc2.provider || ''; towPhone = tc2.phone || ''; }
+    }
+    var hasTow = f.hasTowing || s.hasTowing || !!towProvider;
+    if (!hasTow) return null;
     var ans = 'גרירה מכוסה';
-    if (provider) ans += ' — ספק: ' + provider;
-    if (phone)    ans += ' | טלפון: ' + phone;
+    if (towProvider) ans += ' — ספק: ' + towProvider;
+    if (towPhone)    ans += ' | טלפון: ' + towPhone;
     return ans;
   }
 
@@ -3015,20 +3024,29 @@ function _insTier1Answer(question, comp, full) {
 
   // ── Glass / windshield ──
   if (/שמש|שמשה|זגוגי|windshield|שמשות/.test(q)) {
-    if (!f.hasGlass && !s.hasGlass) return null;
-    var wdProv = '';
-    if (f.coverages) { var wc = f.coverages.find(function(c){ return c.name && c.name.indexOf('שמש') >= 0; }); if (wc && wc.provider) wdProv = wc.provider; }
-    return 'שמשות מכוסות' + (wdProv ? ' — ספק: ' + wdProv : '');
+    var wdCov = null;
+    if (f.coverages) wdCov = f.coverages.find(function(c){ return c.name && (c.name.indexOf('שמש') >= 0 || c.name.indexOf('זגוג') >= 0); });
+    if (!wdCov && s.coverages) wdCov = s.coverages.find(function(c){ return c.name && (c.name.indexOf('שמש') >= 0 || c.name.indexOf('זגוג') >= 0); });
+    if (!wdCov && !f.hasGlass && !s.hasGlass) return null;
+    var wdProv = wdCov && wdCov.provider ? wdCov.provider : '';
+    var wdPhone = wdCov && wdCov.phone ? wdCov.phone : '';
+    return 'שמשות מכוסות' + (wdProv ? ' — ספק: ' + wdProv + (wdPhone ? ' (' + wdPhone + ')' : '') : '');
   }
 
   // ── Headlights ──
   if (/פנס|פנסים|תאורה/.test(q)) {
-    return _yn(f.hasHeadlights || s.hasHeadlights) + ' (פנסים)';
+    var hlCov = null;
+    if (f.coverages) hlCov = f.coverages.find(function(c){ return c.name && c.name.indexOf('פנס') >= 0; });
+    if (!hlCov && !f.hasHeadlights && !s.hasHeadlights) return null;
+    return 'פנסים מכוסים' + (hlCov && hlCov.provider ? ' — ספק: ' + hlCov.provider : '');
   }
 
   // ── Theft ──
   if (/גניב|גנוב|נגנב/.test(q)) {
-    return _yn(f.hasTheft || s.hasTheft) + ' (גניבה)';
+    var theftCov = null;
+    if (f.coverages) theftCov = f.coverages.find(function(c){ return c.name && c.name.indexOf('גניב') >= 0; });
+    if (!theftCov && !f.hasTheft && !s.hasTheft) return null;
+    return 'גניבה מכוסה';
   }
 
   // ── Replacement car ──
