@@ -2904,6 +2904,50 @@ function _insDetailRow(iconHref, iconColor, label, valueId, valueText, extraClas
   '</div>';
 }
 
+function _insToggleSection(id) {
+  var body = document.getElementById(id);
+  var icon = document.getElementById(id + '-chevron');
+  if (!body) return;
+  var isOpen = body.style.maxHeight && body.style.maxHeight !== '0px';
+  body.style.maxHeight = isOpen ? '0px' : '2000px';
+  body.style.overflow = 'hidden';
+  body.style.transition = 'max-height 0.35s ease';
+  if (icon) icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+window._insToggleSection = _insToggleSection;
+
+function _sanitizeForDriver(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/₪[\d,\s]+/g, '')
+    .replace(/[\d,]+\s*₪/g, '')
+    .replace(/[\d,]+\s*שקל[ים]*/g, '')
+    .replace(/פרמי[הת][^\.،؛\n]*/g, '')
+    .replace(/עלות ביטוח[^\.،؛\n]*/g, '')
+    .replace(/תעריף[^\.،؛\n]*/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function _insDeductibleWarningHtml(amount) {
+  return '<div class="ins-deduct-warn">' +
+    '<div class="ins-deduct-warn-head">' +
+      '<div class="ins-deduct-warn-icon">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
+          '<line x1="12" y1="9" x2="12" y2="13"/>' +
+          '<line x1="12" y1="17" x2="12.01" y2="17"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="ins-deduct-warn-title">⚠ השתתפות עצמית: ' + amount + '</div>' +
+    '</div>' +
+    '<div class="ins-deduct-warn-body">' +
+      'כל נזק שייגרם לרכב יחייב תשלום עצמי של ' + amount + ' — ללא קשר לגובה הנזק. נהג בזהירות, שמור על רכב העמותה ועל כספי הציבור.' +
+    '</div>' +
+    '<div class="ins-deduct-warn-footer">ביטוח אינו פטור מאחריות</div>' +
+  '</div>';
+}
+
 function renderInsuranceTab() {
   var v = STATE.vehicle || {};
   var stateIns = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[0] : null;
@@ -2940,40 +2984,53 @@ function renderInsuranceTab() {
       '</div>';
   }
 
+  var chevronHtml = '<span style="margin-right:auto;font-size:18px;transition:transform 0.3s;color:rgba(255,255,255,0.6)">▼</span>';
+  function chevron(id) {
+    return '<span id="' + id + '-chevron" style="margin-right:auto;font-size:18px;transition:transform 0.3s;color:rgba(255,255,255,0.6)">▼</span>';
+  }
+
   /* ── ביטוח חובה ── */
+  /* NOTE: חובה (liability) has NO deductible in Israel and NO min driver age — skip those rows entirely */
   var compSection =
     '<div class="ins-section">' +
-      '<div class="ins-section-header comp">' +
+      '<div class="ins-section-header comp" onclick="_insToggleSection(\'ins-comp-body\')" style="cursor:pointer">' +
         '<div class="ins-shield-icon comp"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
         '<div class="ins-section-titles"><div class="ins-section-title comp">ביטוח חובה</div><div class="ins-section-subtitle">' + (syncSubtitle || 'Third-Party Liability') + '</div></div>' +
         statusChip(compStatus, compRenewed) +
+        chevron('ins-comp-body') +
       '</div>' +
-      '<div class="ins-detail-list">' +
-        detailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',         'ins-comp-company',  fallbackCompany, '', 0) +
-        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
-        detailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '', 0.6) +
-        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-comp-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
-        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-comp-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
-        detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent',    '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.5) +
+      '<div id="ins-comp-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
+        '<div class="ins-detail-list">' +
+          detailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',         'ins-comp-company',  fallbackCompany, '', 0) +
+          detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
+          detailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '', 0.6) +
+          detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent-name',  '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
+          detailRow('#ic-user',   '#64748b', 'טלפון סוכן',           'ins-comp-agent-phone', '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
+        '</div>' +
+        '<div class="ins-cta-row" id="ins-comp-cta"></div>' +
       '</div>' +
-      '<div class="ins-cta-row" id="ins-comp-cta"></div>' +
     '</div>';
 
   /* ── ביטוח מקיף ── */
   var fullSection =
     '<div class="ins-section">' +
-      '<div class="ins-section-header full">' +
+      '<div class="ins-section-header full" onclick="_insToggleSection(\'ins-full-body\')" style="cursor:pointer">' +
         '<div class="ins-shield-icon full"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>' +
         '<div class="ins-section-titles"><div class="ins-section-title full">ביטוח מקיף</div><div class="ins-section-subtitle">' + (syncSubtitle || 'Comprehensive Coverage') + '</div></div>' +
         statusChip(fullStatus, fullRenewed) +
+        chevron('ins-full-body') +
       '</div>' +
-      '<div class="ins-detail-list">' +
-        detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
-        detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
-        detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
-        detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
-        detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
-      '</div>' +
+      '<div id="ins-full-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
+        '<div class="ins-detail-list">' +
+          detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
+          detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
+          detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
+          detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
+          detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
+          detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-full-agent-name',  '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.5) +
+          detailRow('#ic-user',   '#64748b', 'טלפון סוכן',           'ins-full-agent-phone', '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.8) +
+        '</div>' +
+        '<div id="ins-deductible-warning" style="display:none"></div>' +
       '<div class="ins-services-divider"><span class="ins-services-label">שירותים כלולים בפוליסה</span></div>' +
       '<div class="ins-chips" id="ins-full-chips">' +
         '<div class="ins-chip full-chip" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpTowing();},350)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>גרירה</div>' +
@@ -3027,6 +3084,7 @@ function renderInsuranceTab() {
         '<div id="ins-ai-response"></div>' +
       '</div>' +
       '<div id="ins-full-cta-placeholder"></div>' +
+      '</div>' /* close #ins-full-body */ +
     '</div>';
 
   setTimeout(function() { _loadInsuranceDetails(); }, 80);
@@ -3090,14 +3148,22 @@ async function _loadInsuranceDetails() {
       var el = document.getElementById(id);
       if (el) el.innerHTML = html;
     }
+    /* Hide a detail row whose async value came back empty — removes lingering skeletons */
+    function _hideEmptyRow(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var row = el.closest ? el.closest('.ins-detail-row') : null;
+      if (row) row.style.display = 'none';
+    }
 
     /* ── ביטוח חובה ── */
     if (comp.company)      _setText('ins-comp-company', comp.company);
     if (comp.policyNumber) _setText('ins-comp-policy',  comp.policyNumber);
-    if (comp.minDriverAge) _setText('ins-comp-minage',  comp.minDriverAge + ' שנים');
-    if (typeof comp.deductible === 'number') _setText('ins-comp-deduct', comp.deductible === 0 ? 'ללא השתתפות' : '₪' + comp.deductible.toLocaleString('he'));
-    var compAgent = [comp.agentName, comp.agentPhone].filter(Boolean).join(' — ');
-    if (compAgent) _setText('ins-comp-agent', compAgent);
+    else                   _hideEmptyRow('ins-comp-policy');
+    if (comp.agentName)    _setText('ins-comp-agent-name',  comp.agentName);
+    else                   _hideEmptyRow('ins-comp-agent-name');
+    if (comp.agentPhone)   _setText('ins-comp-agent-phone', comp.agentPhone);
+    else                   _hideEmptyRow('ins-comp-agent-phone');
 
     /* CTA for חובה: view policy + call company */
     var compCtaEl = document.getElementById('ins-comp-cta');
@@ -3125,8 +3191,26 @@ async function _loadInsuranceDetails() {
     /* ── ביטוח מקיף ── */
     if (full.company)      _setText('ins-full-company', full.company);
     if (full.policyNumber) _setText('ins-full-policy',  full.policyNumber);
+    else                   _hideEmptyRow('ins-full-policy');
     if (full.minDriverAge) _setText('ins-full-minage',  full.minDriverAge + ' שנים');
+    else                   _hideEmptyRow('ins-full-minage');
     if (typeof full.deductible === 'number') _setText('ins-full-deduct', full.deductible === 0 ? 'ללא השתתפות' : '₪' + full.deductible.toLocaleString('he'));
+    else                   _hideEmptyRow('ins-full-deduct');
+    if (full.agentName)    _setText('ins-full-agent-name',  full.agentName);
+    else                   _hideEmptyRow('ins-full-agent-name');
+    if (full.agentPhone)   _setText('ins-full-agent-phone', full.agentPhone);
+    else                   _hideEmptyRow('ins-full-agent-phone');
+
+    /* Deductible warning (FIX 3): show only when deductible > 0 */
+    var deductNum = parseFloat(full.deductible);
+    if (full.deductible && !isNaN(deductNum) && deductNum > 0) {
+      var warnEl = document.getElementById('ins-deductible-warning');
+      var deductFmt = '₪' + parseInt(deductNum, 10).toLocaleString('he-IL');
+      if (warnEl) {
+        warnEl.innerHTML = _insDeductibleWarningHtml(deductFmt);
+        warnEl.style.display = 'block';
+      }
+    }
 
     /* Coverages */
     var coverages = full.coverages || [];
@@ -3169,8 +3253,8 @@ async function _loadInsuranceDetails() {
       }
     }
 
-    /* AI insight */
-    var insight = full.summary || comp.summary || '';
+    /* AI insight (FIX 4: strip pricing from driver-facing text) */
+    var insight = _sanitizeForDriver(full.summary || comp.summary || '');
     if (insight) {
       var aiText = document.getElementById('ins-ai-text');
       if (aiText) {
@@ -3201,7 +3285,7 @@ function _insAskAI(question) {
   gasPost('insurance_ai_explain', { question: q }).then(function(res) {
     if (!responseEl) return;
     if (res && res.ok && res.answer) {
-      responseEl.textContent = res.answer;
+      responseEl.textContent = _sanitizeForDriver(res.answer);
       responseEl.className = 'fade-in';
     } else {
       responseEl.textContent = 'לא ניתן לקבל תובנות כרגע';
