@@ -3172,7 +3172,7 @@ function renderInsuranceTab() {
       '<div id="ins-full-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
         '<div class="ins-detail-list">' +
           detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
-          /* מקיף: no policy number row — comprehensive policy doc contains pricing */
+          detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
           detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
           detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
           detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
@@ -3343,7 +3343,8 @@ async function _loadInsuranceDetails() {
 
     /* ── ביטוח מקיף ── */
     if (full.company)      _setText('ins-full-company', full.company);
-    /* מקיף: no policy number row (removed — comprehensive doc contains pricing) */
+    if (full.policyNumber) _setText('ins-full-policy',  full.policyNumber);
+    else                   _hideEmptyRow('ins-full-policy');
     if (full.minDriverAge) _setText('ins-full-minage',  full.minDriverAge + ' שנים');
     else                   _hideEmptyRow('ins-full-minage');
     if (typeof full.deductible === 'number') _setText('ins-full-deduct', full.deductible === 0 ? 'ללא השתתפות' : '₪' + full.deductible.toLocaleString('he'));
