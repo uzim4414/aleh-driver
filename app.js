@@ -3023,7 +3023,7 @@ function renderInsuranceTab() {
       '<div id="ins-full-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
         '<div class="ins-detail-list">' +
           detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
-          detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
+          /* מקיף: no policy number row — comprehensive policy doc contains pricing */
           detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
           detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
           detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
@@ -3063,26 +3063,6 @@ function renderInsuranceTab() {
           '</button>' +
         '</div>' +
       '</div>' +
-      /* AI insight card */
-      '<div class="ins-ai-card" id="ins-ai-card" style="margin:0 18px 14px;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(109,40,217,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:16px;padding:14px 16px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
-          '<div class="ins-ai-spark-icon" style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-          '</div>' +
-          '<span style="font-size:13px;font-weight:800;color:#c4b5fd;letter-spacing:0.3px">תובנות AI על הביטוח שלך</span>' +
-        '</div>' +
-        '<div id="ins-ai-text" style="font-size:13px;color:#cbd5e1;line-height:1.6;font-weight:500;margin-bottom:10px;display:none"></div>' +
-        '<div class="ins-ai-questions">' +
-          '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה כלול בביטוח שלי?\')">מה כלול בביטוח שלי?</button>' +
-          '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה ההשתתפות העצמית?\')">מה ההשתתפות העצמית?</button>' +
-          '<button class="ins-ai-q-chip" onclick="_insAskAI(\'האם יש גרירה?\')">האם יש גרירה?</button>' +
-        '</div>' +
-        '<div class="ins-ai-input-row">' +
-          '<input id="ins-ai-input" type="text" placeholder="שאל שאלה על הביטוח..." onkeydown="if(event.key===\'Enter\'){_insAskAI();}"/>' +
-          '<button class="ins-ai-ask-btn" onclick="_insAskAI()">שאל</button>' +
-        '</div>' +
-        '<div id="ins-ai-response"></div>' +
-      '</div>' +
       '<div id="ins-full-cta-placeholder"></div>' +
       '</div>' /* close #ins-full-body */ +
     '</div>';
@@ -3098,7 +3078,28 @@ function renderInsuranceTab() {
 
   var errorBanner = '<div id="ins-load-error" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;direction:rtl;text-align:center;"></div>';
 
-  return '<div class="ins-wrap">' + skeletonCss + errorBanner + compSection + fullSection + '</div>';
+  var aiSection =
+    '<div class="ins-ai-card" id="ins-ai-card" style="margin:0 0 14px;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(109,40,217,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:16px;padding:14px 16px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+        '<div class="ins-ai-spark-icon" style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+        '</div>' +
+        '<span style="font-size:13px;font-weight:800;color:#c4b5fd;letter-spacing:0.3px">שאל AI על הביטוח שלך</span>' +
+      '</div>' +
+      '<div id="ins-ai-text" style="font-size:13px;color:#cbd5e1;line-height:1.6;font-weight:500;margin-bottom:10px;display:none"></div>' +
+      '<div class="ins-ai-questions">' +
+        '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה כלול בביטוח שלי?\')">מה כלול בביטוח שלי?</button>' +
+        '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה ההשתתפות העצמית?\')">מה ההשתתפות העצמית?</button>' +
+        '<button class="ins-ai-q-chip" onclick="_insAskAI(\'האם יש גרירה?\')">האם יש גרירה?</button>' +
+      '</div>' +
+      '<div class="ins-ai-input-row">' +
+        '<input id="ins-ai-input" type="text" placeholder="שאל שאלה על הביטוחים..." onkeydown="if(event.key===\'Enter\'){_insAskAI();}"/>' +
+        '<button class="ins-ai-ask-btn" onclick="_insAskAI()">שאל</button>' +
+      '</div>' +
+      '<div id="ins-ai-response"></div>' +
+    '</div>';
+
+  return '<div class="ins-wrap">' + skeletonCss + errorBanner + compSection + fullSection + aiSection + '</div>';
 }
 
 function _insShowError(msg) {
@@ -3190,8 +3191,7 @@ async function _loadInsuranceDetails() {
 
     /* ── ביטוח מקיף ── */
     if (full.company)      _setText('ins-full-company', full.company);
-    if (full.policyNumber) _setText('ins-full-policy',  full.policyNumber);
-    else                   _hideEmptyRow('ins-full-policy');
+    /* מקיף: no policy number row (removed — comprehensive doc contains pricing) */
     if (full.minDriverAge) _setText('ins-full-minage',  full.minDriverAge + ' שנים');
     else                   _hideEmptyRow('ins-full-minage');
     if (typeof full.deductible === 'number') _setText('ins-full-deduct', full.deductible === 0 ? 'ללא השתתפות' : '₪' + full.deductible.toLocaleString('he'));
@@ -3236,22 +3236,7 @@ async function _loadInsuranceDetails() {
       if (rentalChip) rentalChip.style.display = 'flex';
     }
 
-    /* CTA for מקיף: view policy only (policy doc contains pricing) */
-    var fullCtaEl = document.getElementById('ins-full-cta-placeholder');
-    if (fullCtaEl) {
-      var fullFileLink = full.fileLink || (STATE.vehicle && STATE.vehicle.insFullLink) || '';
-      if (fullFileLink) {
-        fullCtaEl.innerHTML = '<div class="ins-cta-row">' +
-          '<a class="ins-cta-btn ghost" href="' + fullFileLink + '" target="_blank" rel="noopener">' +
-            '<span class="ins-cta-icon">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
-            '</span>' +
-            'הצג פוליסה</a>' +
-          '</div>';
-      } else {
-        fullCtaEl.innerHTML = '';
-      }
-    }
+    /* מקיף: no CTA button — policy doc contains pricing, not shown to driver */
 
     /* AI insight (FIX 4: strip pricing from driver-facing text) */
     var insight = _sanitizeForDriver(full.summary || comp.summary || '');
