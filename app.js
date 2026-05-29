@@ -2948,6 +2948,137 @@ function _insDeductibleWarningHtml(amount) {
   '</div>';
 }
 
+/* ── Insurance policy cache (localStorage, 24h TTL) ── */
+var _INS_CACHE_KEY = 'ins:v2:policy';
+var _INS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function _insCacheSet(comp, full) {
+  try {
+    localStorage.setItem(_INS_CACHE_KEY, JSON.stringify({
+      comp: comp, full: full, ts: Date.now()
+    }));
+  } catch(e) {}
+}
+
+function _insCacheGet() {
+  try {
+    var raw = localStorage.getItem(_INS_CACHE_KEY);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (!obj || Date.now() - (obj.ts || 0) > _INS_CACHE_TTL) { localStorage.removeItem(_INS_CACHE_KEY); return null; }
+    return obj;
+  } catch(e) { return null; }
+}
+
+/* ── Tier 1 router — answer driver questions locally without calling AI ── */
+function _insTier1Answer(question, comp, full) {
+  if (!question) return null;
+  var q = question.trim().toLowerCase();
+  var s = comp || {};
+  var f = full || {};
+
+  function _yn(flag) { return flag ? 'כן, מכוסה' : 'לא מכוסה'; }
+  function _agentSection(sec, label) {
+    var lines = [];
+    if (sec.agentName)  lines.push('שם הסוכן: ' + sec.agentName);
+    if (sec.agentPhone) lines.push('טלפון: ' + sec.agentPhone);
+    if (sec.agentEmail) lines.push('אימייל: ' + sec.agentEmail);
+    return lines.length ? label + ':\n' + lines.join('\n') : '';
+  }
+
+  // ── Agent / contact ──
+  if (/סוכן|סוכנ|agent|ביטוח.*מי|מי.*ביטוח|יצור קשר|ליצור קשר/.test(q)) {
+    var parts = [];
+    var compAgent = _agentSection(s, 'ביטוח חובה');
+    var fullAgent = _agentSection(f, 'ביטוח מקיף');
+    if (compAgent) parts.push(compAgent);
+    if (fullAgent) parts.push(fullAgent);
+    return parts.length ? parts.join('\n\n') : null;
+  }
+
+  // ── Towing ──
+  if (/גרירה|גרר|תקוע|תקע/.test(q)) {
+    var provider = f.towingProvider || s.towingProvider || '';
+    var phone    = f.towingPhone    || s.towingPhone    || '';
+    var hasTow   = f.hasTowing      || s.hasTowing;
+    if (!hasTow && !provider) return null;
+    var ans = 'גרירה מכוסה';
+    if (provider) ans += ' — ספק: ' + provider;
+    if (phone)    ans += ' | טלפון: ' + phone;
+    return ans;
+  }
+
+  // ── Mirrors ──
+  if (/מראה|מראות/.test(q)) {
+    return _yn(f.hasMirrors || s.hasMirrors) + ' (מראות)';
+  }
+
+  // ── Glass / windshield ──
+  if (/שמש|שמשה|זגוגי|windshield|שמשות/.test(q)) {
+    if (!f.hasGlass && !s.hasGlass) return null;
+    var wdProv = '';
+    if (f.coverages) { var wc = f.coverages.find(function(c){ return c.name && c.name.indexOf('שמש') >= 0; }); if (wc && wc.provider) wdProv = wc.provider; }
+    return 'שמשות מכוסות' + (wdProv ? ' — ספק: ' + wdProv : '');
+  }
+
+  // ── Headlights ──
+  if (/פנס|פנסים|תאורה/.test(q)) {
+    return _yn(f.hasHeadlights || s.hasHeadlights) + ' (פנסים)';
+  }
+
+  // ── Theft ──
+  if (/גניב|גנוב|נגנב/.test(q)) {
+    return _yn(f.hasTheft || s.hasTheft) + ' (גניבה)';
+  }
+
+  // ── Replacement car ──
+  if (/רכב חלופי|רכב חליפי|חלופי|תחליף/.test(q)) {
+    var hasR = f.hasReplacementCar || s.hasReplacementCar;
+    if (!hasR) return 'רכב חלופי לא מכוסה בפוליסה זו';
+    var days = f.replacementCarDays || s.replacementCarDays;
+    return 'רכב חלופי מכוסה' + (days ? ' — עד ' + days + ' ימים' : '');
+  }
+
+  // ── Territory ──
+  if (/טריטוריה|אזור כיסוי|מחוץ|חו"ל|סיני|שטחים/.test(q)) {
+    var terr = f.territory || s.territory;
+    return terr ? 'אזור כיסוי: ' + terr : null;
+  }
+
+  // ── Claims phone ──
+  if (/תאונה.*מי|מה.*תאונה|לדווח|לדיווח|תביעה.*טלפון/.test(q)) {
+    var cp = f.claimsPhone || s.claimsPhone;
+    return cp ? 'לדיווח תאונה: ' + cp : null;
+  }
+
+  // ── Driver requirements / age ──
+  if (/גיל|ותק|דרישות נהג|מינימ/.test(q)) {
+    var dr = f.driverRequirements || s.driverRequirements;
+    var age = f.minDriverAge || s.minDriverAge;
+    var exp = f.minDrivingExperience || s.minDrivingExperience;
+    if (!dr && !age && !exp) return null;
+    var rParts = [];
+    if (age) rParts.push('גיל מינימלי: ' + age);
+    if (exp) rParts.push('ותק נהיגה: ' + exp + ' חודשים');
+    return (dr || rParts.join(', ')) || null;
+  }
+
+  // ── Deductible ──
+  if (/השתתפות|השתתפ|deductible/.test(q)) {
+    var ded = typeof f.deductible === 'number' ? f.deductible : null;
+    if (ded === null) return null;
+    return ded === 0 ? 'אין השתתפות עצמית' : 'השתתפות עצמית: ₪' + ded.toLocaleString('he-IL');
+  }
+
+  // ── Dates ──
+  if (/תוקף|מתי פג|פקיעה|תאריך/.test(q)) {
+    var endDate = f.endDate || s.endDate;
+    return endDate ? 'תוקף הביטוח: עד ' + endDate : null;
+  }
+
+  return null; // no local answer — fall through to AI
+}
+
 function renderInsuranceTab() {
   var v = STATE.vehicle || {};
   var stateIns = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[0] : null;
@@ -3141,6 +3272,9 @@ async function _loadInsuranceDetails() {
     comp = comp || {};
     full = full || {};
 
+    // Cache for Tier 1 router
+    _insCacheSet(comp, full);
+
     function _setText(id, text) {
       var el = document.getElementById(id);
       if (el && text !== null && typeof text !== 'undefined' && String(text) !== '') el.textContent = String(text);
@@ -3254,7 +3388,7 @@ async function _loadInsuranceDetails() {
   }
 }
 
-/* ── AI insurance Q&A ── */
+/* ── AI insurance Q&A — Tier 1 (local) → Tier 2 (AI) ── */
 function _insAskAI(question) {
   var input = document.getElementById('ins-ai-input');
   var responseEl = document.getElementById('ins-ai-response');
@@ -3267,6 +3401,21 @@ function _insAskAI(question) {
     responseEl.className = '';
     responseEl.textContent = '⏳ מחשב...';
   }
+
+  // Tier 1: try local cache first (instant, free)
+  var cached = _insCacheGet();
+  if (cached) {
+    var localAnswer = _insTier1Answer(q, cached.comp, cached.full);
+    if (localAnswer) {
+      if (responseEl) {
+        responseEl.textContent = localAnswer;
+        responseEl.className = 'fade-in';
+      }
+      return;
+    }
+  }
+
+  // Tier 2: AI fallback
   gasPost('insurance_ai_explain', { question: q }).then(function(res) {
     if (!responseEl) return;
     if (res && res.ok && res.answer) {
