@@ -2439,9 +2439,15 @@ function renderGarageTab() {
 
   var gName    = g.name || 'המוסך שלך';
   var gAddr    = g.address || '';
-  var gPhone   = g.phone || '';
-  var gContact = g.contactName || g.contact || '';
   var hasPlace = !!g.googlePlaceId;
+
+  // Phone + contact visible ONLY after manager approval
+  var _hasApproval = !!(
+    localStorage.getItem('approvedGarageRequest') ||
+    localStorage.getItem('activeGarageAppointment')
+  );
+  var gPhone   = _hasApproval ? (g.phone || '') : '';
+  var gContact = _hasApproval ? (g.contactName || g.contact || '') : '';
 
   var wazeUrl      = gAddr ? 'https://waze.com/ul?q=' + encodeURIComponent(gAddr) + '&navigate=yes' : '';
   var mapsEmbedUrl = gAddr ? 'https://maps.google.com/maps?q=' + encodeURIComponent(gAddr) + '&output=embed&hl=he&z=15' : '';
