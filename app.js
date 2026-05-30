@@ -3498,7 +3498,11 @@ async function _loadGarageDetails() {
     }
 
     var isOpen   = (typeof res.isOpen === 'boolean') ? res.isOpen : null;
-    var hoursStr = res.openingHours || '';
+    /* openingHours comes from the stored garage record, not from get_place_status
+       (which only returns isOpen/todayHours). Use STATE.vehicle.garage.openingHours. */
+    var v2 = STATE.vehicle || {};
+    var g2 = v2.garage || {};
+    var hoursStr = g2.openingHours || '';
 
     /* Status chip */
     var chip = document.getElementById('gar-status-chip');
@@ -3540,8 +3544,8 @@ async function _loadGarageDetails() {
         /* Hoist today to top */
         if (todayHtml) rowsHtml = todayHtml + rowsHtml.replace(todayHtml, '');
         hoursBody.innerHTML = rowsHtml;
-        /* Auto-open toggle when closed so driver immediately sees hours */
-        if (isOpen === false && hoursToggle) hoursToggle.setAttribute('open', '');
+        /* Auto-open toggle so driver always sees hours */
+        if (hoursToggle) hoursToggle.setAttribute('open', '');
       } else {
         if (hoursToggle) hoursToggle.style.display = 'none';
       }
