@@ -2386,6 +2386,50 @@ function phoneToWa(p) {
   return d;
 }
 
+/* ── Vehicle brand → Simple Icons slug map ── */
+var GAR_BRAND_SLUG_MAP = {
+  'טויוטה': 'toyota', 'הונדה': 'honda',
+  'פולקסווגן': 'volkswagen', 'פולקסוואגן': 'volkswagen',
+  'פורד': 'ford', 'יונדאי': 'hyundai', 'יונדאי מוטור': 'hyundai',
+  'קיה': 'kia', 'מזדה': 'mazda', 'מאזדה': 'mazda',
+  'מיצובישי': 'mitsubishi', 'סובארו': 'subaru', 'ניסן': 'nissan',
+  'בי.מ.וו': 'bmw', 'במוו': 'bmw', 'ב.מ.וו': 'bmw',
+  'מרצדס': 'mercedes', 'מרצדס בנץ': 'mercedes',
+  'אאודי': 'audi', 'סקודה': 'skoda', 'שברולט': 'chevrolet',
+  'אופל': 'opel', "פיג'ו": 'peugeot', 'פיגו': 'peugeot',
+  'סיטרואן': 'citroen', 'רנו': 'renault', 'פיאט': 'fiat',
+  'סוזוקי': 'suzuki', 'לקסוס': 'lexus', 'מיני': 'mini',
+  'וולוו': 'volvo', 'פורשה': 'porsche', "ג'יפ": 'jeep', 'טסלה': 'tesla',
+  'אינפיניטי': 'infiniti', "דאצ'יה": 'dacia', 'סיאט': 'seat'
+};
+
+function _garBrandLogoHtml(make) {
+  var fallback =
+    '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' +
+    '</svg>';
+
+  if (!make) return fallback;
+  var key = String(make).trim();
+  var slug = GAR_BRAND_SLUG_MAP[key];
+  if (!slug) {
+    var simplified = key.replace(/[\s.'׳]/g, '').toLowerCase();
+    var k;
+    for (k in GAR_BRAND_SLUG_MAP) {
+      if (GAR_BRAND_SLUG_MAP.hasOwnProperty(k)) {
+        if (k.replace(/[\s.'׳]/g, '').toLowerCase() === simplified) {
+          slug = GAR_BRAND_SLUG_MAP[k]; break;
+        }
+      }
+    }
+  }
+  if (!slug) return fallback;
+
+  return '<img src="https://cdn.simpleicons.org/' + slug + '/ffffff" width="32" height="32" alt="' + _escHtml(key) + '" ' +
+    'onerror="this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',' +
+      '\'<svg width=&quot;32&quot; height=&quot;32&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;#fff&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z&quot;/></svg>\')">';
+}
+
 function renderGarageTab() {
   var v = STATE.vehicle || {};
   var g = v.garage;
@@ -2393,12 +2437,17 @@ function renderGarageTab() {
     return '<div class="gar-empty"><div class="gar-empty-ic"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>טרם שויך מוסך לרכב.<br>פנה למנהל הצי לקבלת פרטים.</div>';
   }
 
-  var gName = g.name || 'המוסך שלך';
-  var gAddr = g.address || '';
-  var wazeUrl = gAddr ? 'https://waze.com/ul?q=' + encodeURIComponent(gAddr) + '&navigate=yes' : '';
-  var mapsEmbedUrl = gAddr ? 'https://maps.google.com/maps?q=' + encodeURIComponent(gAddr) + '&output=embed&hl=he&z=15' : '';
+  var gName    = g.name || 'המוסך שלך';
+  var gAddr    = g.address || '';
+  var gPhone   = g.phone || '';
+  var gContact = g.contactName || g.contact || '';
+  var hasPlace = !!g.googlePlaceId;
 
-  /* 1 — Warning banner */
+  var wazeUrl      = gAddr ? 'https://waze.com/ul?q=' + encodeURIComponent(gAddr) + '&navigate=yes' : '';
+  var mapsEmbedUrl = gAddr ? 'https://maps.google.com/maps?q=' + encodeURIComponent(gAddr) + '&output=embed&hl=he&z=15' : '';
+  var phoneClean   = gPhone ? String(gPhone).replace(/[^0-9+]/g, '') : '';
+
+  /* 1 — Warning banner (unchanged) */
   var warningBanner =
     '<div class="gar-warning-banner">' +
       '<div class="gar-warning-banner-icon">' +
@@ -2413,7 +2462,7 @@ function renderGarageTab() {
       '</div>' +
     '</div>';
 
-  /* 2 — Approval request button */
+  /* 2 — Approval request button (unchanged) */
   var approvalBtn =
     '<button class="gar-approval-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpGarage();},350)">' +
       '<div class="gar-approval-icon">' +
@@ -2432,19 +2481,95 @@ function renderGarageTab() {
       '</div>' +
     '</button>';
 
-  /* 3 — Garage hero header */
-  var heroCard =
-    '<div class="gar-hero-card">' +
-      '<div class="gar-hero-icon-wrap">' +
-        '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' +
+  /* 3 — Closed banner placeholder */
+  var closedBanner =
+    '<div id="gar-closed-banner" class="gar-closed-banner" style="display:none">' +
+      '<div class="gar-closed-banner-icon">' +
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+          '<circle cx="12" cy="12" r="10"/>' +
+          '<line x1="12" y1="8" x2="12" y2="12"/>' +
+          '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
         '</svg>' +
       '</div>' +
-      '<div class="gar-hero-name">' + gName + '</div>' +
-      '<div class="gar-hero-sub">המוסך המשויך לרכב שלך</div>' +
+      '<div class="gar-closed-banner-body">' +
+        '<div class="gar-closed-banner-title">המוסך סגור כעת</div>' +
+        '<div class="gar-closed-banner-sub">שעות הפעילות מופיעות למטה</div>' +
+      '</div>' +
     '</div>';
 
-  /* 4 — Address + map card */
+  /* 4 — Info card: brand badge + name + status chip + detail rows + hours */
+  var statusChipHtml = hasPlace
+    ? '<span id="gar-status-chip" class="gar-status-chip loading">טוען...</span>'
+    : '';
+
+  var detailRows = '';
+  if (gPhone) {
+    detailRows +=
+      '<div class="gar-detail-row">' +
+        '<div class="gar-detail-icon">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="gar-detail-body">' +
+          '<div class="gar-detail-label">טלפון</div>' +
+          '<div class="gar-detail-value" id="gar-phone-val">' + _escHtml(gPhone) + '</div>' +
+        '</div>' +
+        (phoneClean
+          ? '<button class="gar-call-btn" onclick="window.open(\'tel:' + phoneClean + '\')" aria-label="חייג למוסך">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
+            '</button>'
+          : '') +
+      '</div>';
+  }
+  if (gContact) {
+    detailRows +=
+      '<div class="gar-detail-row">' +
+        '<div class="gar-detail-icon">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>' +
+            '<circle cx="12" cy="7" r="4"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="gar-detail-body">' +
+          '<div class="gar-detail-label">איש קשר</div>' +
+          '<div class="gar-detail-value">' + _escHtml(gContact) + '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  var hoursToggleHtml = hasPlace
+    ? '<details id="gar-hours-toggle" class="gar-hours-toggle">' +
+        '<summary>' +
+          '<span class="gar-hours-toggle-icon">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+          '</span>' +
+          'שעות פעילות' +
+          '<span class="gar-hours-chevron">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+          '</span>' +
+        '</summary>' +
+        '<div id="gar-hours-body" class="gar-hours-body">' +
+          '<div class="gar-hours-empty">טוען שעות פעילות...</div>' +
+        '</div>' +
+      '</details>'
+    : '';
+
+  var infoCard =
+    '<div class="gar-info-card">' +
+      '<div class="gar-info-header">' +
+        '<div class="gar-brand-badge">' + _garBrandLogoHtml(v.make) + '</div>' +
+        '<div class="gar-header-titles">' +
+          '<div class="gar-header-name">' + _escHtml(gName) + '</div>' +
+          '<div class="gar-header-sub">המוסך המשויך לרכב שלך</div>' +
+        '</div>' +
+        statusChipHtml +
+      '</div>' +
+      (detailRows ? '<div class="gar-detail-list">' + detailRows + '</div>' : '') +
+      hoursToggleHtml +
+    '</div>';
+
+  /* 5 — Address + map card (unchanged) */
   var addrCard = '';
   if (gAddr) {
     addrCard =
@@ -2458,7 +2583,7 @@ function renderGarageTab() {
           '</div>' +
           '<div class="gar-addr-body">' +
             '<div class="gar-addr-lbl">כתובת</div>' +
-            '<div class="gar-addr-val">' + gAddr + '</div>' +
+            '<div class="gar-addr-val">' + _escHtml(gAddr) + '</div>' +
           '</div>' +
         '</div>' +
         (mapsEmbedUrl ? '<iframe class="gar-map-frame" src="' + mapsEmbedUrl + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="מפה"></iframe>' : '') +
@@ -2473,7 +2598,9 @@ function renderGarageTab() {
       '</div>';
   }
 
-  return '<div class="gar-wrap">' + warningBanner + approvalBtn + heroCard + addrCard + '</div>';
+  if (hasPlace) setTimeout(function(){ _loadGarageDetails(); }, 80);
+
+  return '<div class="gar-wrap">' + warningBanner + approvalBtn + closedBanner + infoCard + addrCard + '</div>';
 }
 
 function _escHtml(s) {
@@ -3344,6 +3471,78 @@ function _insShowError(msg) {
   if (!el) return;
   el.textContent = msg || 'לא ניתן לטעון נתוני ביטוח';
   el.style.display = 'block';
+}
+
+async function _loadGarageDetails() {
+  try {
+    var v = STATE.vehicle || {};
+    var g = v.garage || {};
+    if (!g.googlePlaceId) return;
+
+    var res = null;
+    try {
+      res = await gasPost('get_place_status', { placeId: g.googlePlaceId }, { silent: true });
+    } catch(e1) {
+      console.warn('[_loadGarageDetails] network error:', e1 && e1.message);
+      return;
+    }
+    if (!res || !res.ok) {
+      console.warn('[_loadGarageDetails] API not ok:', res);
+      return;
+    }
+
+    var isOpen   = (typeof res.isOpen === 'boolean') ? res.isOpen : null;
+    var hoursStr = res.openingHours || '';
+
+    /* Status chip */
+    var chip = document.getElementById('gar-status-chip');
+    if (chip) {
+      if (isOpen === true) {
+        chip.className = 'gar-status-chip open';
+        chip.innerHTML = '<span class="gar-status-dot"></span>פתוח כעת';
+      } else if (isOpen === false) {
+        chip.className = 'gar-status-chip closed';
+        chip.innerHTML = '<span class="gar-status-dot"></span>סגור כעת';
+      } else {
+        chip.style.display = 'none';
+      }
+    }
+
+    /* Closed banner */
+    var banner = document.getElementById('gar-closed-banner');
+    if (banner) {
+      banner.style.display = (isOpen === false) ? 'flex' : 'none';
+    }
+
+    /* Hours body */
+    var hoursBody   = document.getElementById('gar-hours-body');
+    var hoursToggle = document.getElementById('gar-hours-toggle');
+    if (hoursBody) {
+      if (hoursStr && hoursStr.trim()) {
+        var dayNames  = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        var todayName = dayNames[new Date().getDay()];
+        var lines     = hoursStr.split('\n').filter(function(l){ return l && l.trim(); });
+        var todayHtml = '';
+        var rowsHtml  = '';
+        lines.forEach(function(line) {
+          var clean   = String(line).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          var isToday = clean.indexOf(todayName) !== -1;
+          var rowHtml = '<div class="gar-hours-row' + (isToday ? ' today' : '') + '">' + clean + '</div>';
+          if (isToday) todayHtml = rowHtml;
+          rowsHtml += rowHtml;
+        });
+        /* Hoist today to top */
+        if (todayHtml) rowsHtml = todayHtml + rowsHtml.replace(todayHtml, '');
+        hoursBody.innerHTML = rowsHtml;
+        /* Auto-open toggle when closed so driver immediately sees hours */
+        if (isOpen === false && hoursToggle) hoursToggle.setAttribute('open', '');
+      } else {
+        if (hoursToggle) hoursToggle.style.display = 'none';
+      }
+    }
+  } catch(e) {
+    console.error('[_loadGarageDetails] exception:', e && e.message);
+  }
 }
 
 async function _loadInsuranceDetails() {

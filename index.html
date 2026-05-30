@@ -924,6 +924,143 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 }
 .gar-waze-btn:active { transform: scale(0.97); }
 
+/* ══ Garage Tab Enhancement — 2026-05-29 ══ */
+@keyframes garClosedGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239,68,68,0.55), 0 0 22px 2px rgba(239,68,68,0.28), inset 0 0 14px rgba(239,68,68,0.18);
+    border-color: rgba(239,68,68,0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239,68,68,0.0), 0 0 36px 10px rgba(251,146,60,0.45), inset 0 0 22px rgba(251,146,60,0.32);
+    border-color: rgba(251,146,60,0.95);
+  }
+}
+@keyframes garClosedShake {
+  0%   { transform: translateX(0); }
+  12%  { transform: translateX(-8px) rotate(-0.6deg); }
+  24%  { transform: translateX(8px) rotate(0.6deg); }
+  36%  { transform: translateX(-6px) rotate(-0.4deg); }
+  48%  { transform: translateX(6px) rotate(0.4deg); }
+  60%  { transform: translateX(-3px); }
+  72%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+@keyframes garOpenPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.65); transform: scale(1); }
+  50%      { box-shadow: 0 0 0 7px rgba(34,197,94,0); transform: scale(1.18); }
+}
+@keyframes garClosedIconWobble {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-8deg); }
+  75%      { transform: rotate(8deg); }
+}
+@keyframes garCardEnter {
+  0%   { transform: translateY(14px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes garChipFade {
+  0%   { opacity: 0; transform: translateY(-4px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.gar-info-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 22px; overflow: hidden;
+  animation: garCardEnter .5s ease .12s both;
+}
+.gar-info-header {
+  position: relative; padding: 16px 18px 14px;
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, rgba(31,138,61,0.22) 0%, rgba(20,184,166,0.16) 60%, rgba(15,23,42,0) 100%), var(--card2);
+  border-bottom: 1px solid var(--border);
+}
+.gar-brand-badge {
+  width: 48px; height: 48px; flex-shrink: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1a7a36 0%, #25a34a 60%, #14b8a6 100%);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(31,138,61,0.42);
+  padding: 8px;
+}
+.gar-brand-badge img, .gar-brand-badge svg { width: 32px; height: 32px; display: block; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+.gar-header-titles { flex: 1; min-width: 0; }
+.gar-header-name { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; color: var(--t1); line-height: 1.25; word-break: break-word; }
+.gar-header-sub  { font-size: 11px; color: var(--t2); font-weight: 600; margin-top: 3px; }
+.gar-status-chip {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 800;
+  animation: garChipFade .35s ease both;
+}
+.gar-status-chip.open   { background: rgba(34,197,94,0.16); color: #4ade80; border: 1px solid rgba(34,197,94,0.4); }
+.gar-status-chip.closed { background: rgba(239,68,68,0.16); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); }
+.gar-status-chip.loading { background: rgba(255,255,255,0.04); color: var(--t2); border: 1px solid var(--border); font-style: italic; }
+.gar-status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.gar-status-chip.open .gar-status-dot { animation: garOpenPulse 1.6s ease-in-out infinite; }
+.gar-detail-list { padding: 4px 0; }
+.gar-detail-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); }
+.gar-detail-row:last-child { border-bottom: none; }
+.gar-detail-icon { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; background: var(--card2); display: flex; align-items: center; justify-content: center; }
+.gar-detail-body { flex: 1; min-width: 0; }
+.gar-detail-label { font-size: 10px; color: var(--t2); font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; }
+.gar-detail-value { font-size: 14px; font-weight: 700; margin-top: 2px; color: var(--t1); }
+.gar-call-btn {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #1a7a36, #22c55e); color: #fff;
+  cursor: pointer; box-shadow: 0 3px 10px rgba(34,197,94,0.32); transition: transform .15s;
+}
+.gar-call-btn:active { transform: scale(0.92); }
+.gar-hours-toggle { border-top: 1px solid var(--border); }
+.gar-hours-toggle > summary {
+  list-style: none; cursor: pointer;
+  padding: 13px 18px; display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 700; color: var(--t1); user-select: none;
+}
+.gar-hours-toggle > summary::-webkit-details-marker { display: none; }
+.gar-hours-toggle-icon { width: 30px; height: 30px; border-radius: 9px; background: var(--card2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.gar-hours-chevron { margin-right: auto; transition: transform .3s ease; color: var(--t2); }
+.gar-hours-toggle[open] .gar-hours-chevron { transform: rotate(180deg); }
+.gar-hours-body { padding: 4px 18px 14px; display: flex; flex-direction: column; gap: 4px; }
+.gar-hours-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-radius: 10px;
+  font-size: 13px; color: var(--t2); font-weight: 600;
+  border: 1px solid transparent;
+}
+.gar-hours-row.today {
+  background: linear-gradient(135deg, rgba(34,197,94,0.14), rgba(20,184,166,0.10));
+  border: 1px solid rgba(34,197,94,0.32);
+  border-right: 3px solid #22c55e;
+  color: #fff; font-weight: 800;
+  box-shadow: 0 2px 10px rgba(34,197,94,0.12);
+}
+.gar-hours-empty { padding: 10px 4px; font-size: 12px; color: var(--t2); font-style: italic; text-align: center; }
+.gar-closed-banner {
+  position: relative; margin: 0 0 0;
+  padding: 16px 18px; border-radius: 18px;
+  border: 2px solid rgba(239,68,68,0.55);
+  background: linear-gradient(135deg, rgba(239,68,68,0.28) 0%, rgba(251,146,60,0.22) 50%, rgba(220,38,38,0.30) 100%), var(--card);
+  display: flex; align-items: center; gap: 14px;
+  overflow: hidden;
+  animation: garClosedShake 0.7s ease 0s 1, garClosedGlow 1.4s ease-in-out 0.7s infinite;
+}
+.gar-closed-banner::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 80% 30%, rgba(251,146,60,0.22), transparent 60%);
+  pointer-events: none;
+}
+.gar-closed-banner-icon {
+  width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px;
+  background: linear-gradient(135deg, #dc2626, #f97316);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(239,68,68,0.45);
+  animation: garClosedIconWobble 1.4s ease-in-out infinite;
+  position: relative; z-index: 1;
+}
+.gar-closed-banner-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+.gar-closed-banner-title { font-size: 16px; font-weight: 900; color: #fff; letter-spacing: -0.4px; text-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+.gar-closed-banner-sub   { font-size: 11.5px; color: rgba(255,255,255,0.85); margin-top: 4px; font-weight: 600; }
+
 /* ══ Insurance Screen — 2026-05-28 ══ */
 @keyframes insCardEnter {
   0%   { transform: translateY(18px); opacity: 0; }
