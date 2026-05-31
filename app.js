@@ -1354,22 +1354,26 @@ function _initFbGarageStatusSync() {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
 
-      // ── מנהל ביטל תור פעיל — בדוק לפני consumed ──
+      // ── ביטול תור — נקה תמיד אם ה-eventId תואם, ללא תלות ב-consumed ──
+      // (מכשיר שהיה offline בעת הביטול עלול לראות consumed:true ועדיין להחזיק widget ישן)
       if (data.status === 'cancelled') {
-        if (!data.consumed) {
+        var _localCancelAppt = null;
+        try { _localCancelAppt = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+        var _localCancelEid = _localCancelAppt && _localCancelAppt.eventId ? String(_localCancelAppt.eventId) : '';
+        if (_localCancelEid && _localCancelEid === String(data.eventId || '')) {
           localStorage.removeItem('activeGarageAppointment');
           _fbClearActiveAppointment();
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-          // Cross-channel dedup: skip toast if FCM already showed this event
-          var _cDupKey = _normGarageEventKey('cancelled', data.eventId);
-          if (typeof showToast === 'function' && !_garageDedupSeen(_cDupKey)) {
-            var _cToast = data.setBy === 'driver'
-              ? '✅ התור בוטל' // driver cancelled - soft confirm on all devices
-              : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
-            if (_cToast) showToast(_cToast);
-          }
-          snap.ref.update({ consumed: true, consumedAt: Date.now() });
         }
+        // Toast only once across channels, only when we haven't already shown it
+        var _cDupKey = _normGarageEventKey('cancelled', data.eventId);
+        if (!data.consumed && typeof showToast === 'function' && !_garageDedupSeen(_cDupKey)) {
+          var _cToast = data.setBy === 'driver'
+            ? '✅ התור בוטל' // driver cancelled - soft confirm on all devices
+            : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
+          if (_cToast) showToast(_cToast);
+        }
+        if (!data.consumed) snap.ref.update({ consumed: true, consumedAt: Date.now() });
         return;
       }
 
