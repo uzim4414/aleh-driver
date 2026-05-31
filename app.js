@@ -1240,10 +1240,40 @@ async function loadFullData() {
   if ('serviceWorker' in navigator && GAS_URL) registerPush();
   loadNotifHistoryFromGAS();
   _initFbGarageStatusSync();
+  // Safety net: clear stale local widget if it no longer matches an active server request
+  _reconcileGarageStatus();
   // Reliable fallback: poll GAS for active appointment (bypasses Firebase garageSync)
   _syncActiveAppointmentFromGAS();
   // Continuous safety net — catches admin-set appointments missed by Firebase listener
   _startActiveAppointmentPoll();
+}
+
+/* Startup safety net: reconcile the locally-stored activeGarageAppointment
+   against GAS's authoritative active garage_request. Fixes the stale widget
+   bug where a cancelled/closed request still shows (#15) because a Firebase
+   garageSync update was missed while offline. */
+async function _reconcileGarageStatus() {
+  try {
+    var r = await gasPost('driver_garage_status', {}, { silent: true });
+    if (!r || !r.ok) return; /* network/auth issue — don't touch local state */
+    var active = r.active; /* {eventId, requestNumber, status, ...} | null */
+    var local = null;
+    try { local = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+    if (!local || !local.eventId) return; /* nothing local to reconcile */
+
+    var localEventId = String(local.eventId || '');
+    var serverEventId = active ? String(active.eventId || '') : '';
+    var TERMINAL = { closed: 1, rejected: 1, cancelled: 1 };
+    var serverTerminal = active ? !!TERMINAL[String(active.status || '')] : true;
+
+    /* Clear if: no active server row, server row is terminal, or eventIds differ */
+    if (!active || serverTerminal || serverEventId !== localEventId) {
+      try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
+      if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
+      if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+      console.log('[reconcile] cleared stale activeGarageAppointment local=' + localEventId + ' server=' + serverEventId + ' status=' + (active && active.status));
+    }
+  } catch(_e) { /* swallow — reconciliation is best-effort */ }
 }
 
 async function _syncActiveAppointmentFromGAS() {
