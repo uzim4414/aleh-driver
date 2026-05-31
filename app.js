@@ -610,6 +610,14 @@ function saveNotifToHistory(payload) {
     if (list.some(function(n) { return n.ts === ts; })) return;
     // Dedup by eventId — prevents duplicate when same push arrives via two code paths
     if (meta.eventId && list.some(function(n) { return n.eventId === meta.eventId && n.alertType === alertType; })) return;
+    // Dedup by content fingerprint — catches same logical notification arriving via
+    // push path (ts=Date.now()) AND GAS pull path (ts=GAS canonical ts) with no eventId
+    var _incomingKey = _notifDedupKey({
+      eventId: meta.eventId || '', requestNumber: meta.requestNumber || '',
+      alertType: alertType, title: notif.title || '', body: notif.body || '',
+      vehicleId: meta.vehicleId || ''
+    });
+    if (list.some(function(n) { return _notifDedupKey(n) === _incomingKey; })) return;
     var newItem = {
       id:                  ts,
       title:               notif.title || 'עלה — התראה',
