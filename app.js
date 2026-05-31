@@ -309,8 +309,9 @@ function _initFbNotifSync() {
       var items = Object.keys(data)
         .map(function(k) { return data[k]; })
         .filter(function(n) { return n && n.ts; })
-        .sort(function(a, b) { return b.ts - a.ts; })
-        .slice(0, 30);
+        .sort(function(a, b) { return b.ts - a.ts; });
+      // Collapse cross-path duplicates (push ts vs GAS ts) before persisting
+      items = dedupNotifList(items).slice(0, 30);
 
       localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(items));
 
@@ -457,24 +458,38 @@ function _initFbReminderSync() {
 /* ══ Notification History — global functions (called from IIFE + app logic) ══ */
 var _NOTIF_HISTORY_KEY = 'driver_notif_history';
 
+/* Canonical dedup key for a notification.
+   Same logical notification can arrive via push (ts=Date.now) and GAS pull
+   (ts=server canonical) with DIFFERENT ts values. When eventId/requestNumber
+   are absent (plan alerts), fall back to a content fingerprint so the two
+   copies collapse despite differing ts. */
+function _notifDedupKey(n) {
+  if (n.eventId) return 'eid:' + n.eventId + '|' + (n.alertType || '');
+  if (n.requestNumber) return 'req:' + n.requestNumber + '|' + (n.alertType || '');
+  return 'sig:' + (n.alertType || '') + '|' + (n.title || '') + '|' + (n.body || '') + '|' + (n.vehicleId || '');
+}
+
+/* Deduplicate a notification list using the canonical key plus a ts guard.
+   Keeps first occurrence (list is unshifted newest-first / sorted desc by ts). */
+function dedupNotifList(raw) {
+  var seen = {};
+  return raw.filter(function(n) {
+    if (!n) return false;
+    var k = _notifDedupKey(n);
+    if (seen[k]) return false;
+    seen[k] = true;
+    var tsKey = 'ts:' + n.ts;
+    if (seen[tsKey]) return false;
+    seen[tsKey] = true;
+    return true;
+  });
+}
+
 function getNotifHistory() {
   try {
     var raw = JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]');
-    // Deduplicate: prefer first occurrence (highest ts = most recent, since list is unshifted)
-    var seen = {};
-    var cleaned = raw.filter(function(n) {
-      // Primary key: eventId+alertType (most reliable)
-      var eidKey = n.eventId ? (n.eventId + '|' + (n.alertType || '')) : null;
-      if (eidKey) {
-        if (seen[eidKey]) return false;
-        seen[eidKey] = true;
-      }
-      // Fallback key: ts
-      var tsKey = 'ts:' + n.ts;
-      if (seen[tsKey]) return false;
-      seen[tsKey] = true;
-      return true;
-    });
+    // Deduplicate via shared helper (eventId/requestNumber/content-signature + ts guard)
+    var cleaned = dedupNotifList(raw);
     // Write back cleaned list if duplicates were found
     if (cleaned.length !== raw.length) {
       try { localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(cleaned)); } catch(_) {}
@@ -1503,6 +1518,9 @@ async function loadNotifHistoryFromGAS() {
       if (n.requestNumber && n.alertType) existingReqSet.add(n.alertType + '|' + n.requestNumber);
     });
     merged.sort(function(a, b) { return b.ts - a.ts; });
+    // Final safety net: collapse any cross-path duplicates the merge-loop dedup
+    // (ts/eventId/requestNumber) missed — e.g. plan alerts with no eventId.
+    merged = dedupNotifList(merged);
     if (merged.length > 30) merged = merged.slice(0, 30);
     localStorage.setItem('driver_notif_history', JSON.stringify(merged));
 
