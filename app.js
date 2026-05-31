@@ -2113,9 +2113,10 @@ function renderGarageApptWidget() {
   var dateFmt    = apptDateStr.split('-').reverse().join('/');
   var dayName    = _hebrewDayName(new Date(apptMs));
   var garageName = appt.garageName || 'המוסך';
-  // Request number chip removed: eventId trailing digits are an internal DB
-  // sequence counter, not a user-meaningful fault/request number.
-  var reqNumChipHtml = '';
+  var _wReqN = appt.requestNumber || (function(eid){ try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1],10)) : ''; } catch(_){ return ''; } })(appt.eventId);
+  var reqNumChipHtml = _wReqN
+    ? '<span style="display:inline-block;font-size:10px;font-weight:800;color:var(--gaw-accent);background:rgba(255,255,255,.08);border:1px solid var(--gaw-accent);border-radius:6px;padding:1px 7px;margin-left:6px" title="מספר בקשה">בקשה #' + _wReqN + '</span>'
+    : '';
 
   mount.innerHTML =
     '<div class="gaw-widget" data-tier="' + tier + '" ' +
@@ -5184,7 +5185,9 @@ APP._garageShowPending = function(pending) {
     } catch(e) {}
   }
   var reqNum = '';
-  if (pending.eventId) {
+  if (pending.requestNumber !== undefined && pending.requestNumber !== null && pending.requestNumber !== '') {
+    reqNum = String(pending.requestNumber);
+  } else if (pending.eventId) {
     var m = String(pending.eventId).match(/-(\d+)$/);
     if (m) reqNum = String(parseInt(m[1], 10));
   }
@@ -5294,7 +5297,6 @@ APP._garageEditAppointment = function(eventId) {
   var curDate = appt.appointmentDate || '';
   var curTime = appt.appointmentTime || '';
   var today = new Date().toISOString().slice(0,10);
-  var reqNum = appt.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId);
   var garageName = appt.garageName || '';
   var curDateFmt = curDate ? curDate.split('-').reverse().join('/') : '--';
   var curTimeFmt = curTime || '--:--';
@@ -5309,7 +5311,7 @@ APP._garageEditAppointment = function(eventId) {
   var ol = document.createElement('div');
   ol.id = '_gedit_overlay';
   ol.setAttribute('style', 'position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;direction:rtl;animation:_geditFade .2s ease');
-  var reqChip = reqNum ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:3px 10px;letter-spacing:.3px">&#x1F527; #' + reqNum + '</span>' : '';
+  var reqChip = '';
   var garageRow = garageName ? '<div style="display:flex;align-items:center;gap:8px;background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.15);border-radius:12px;padding:10px 12px;margin-bottom:14px"><span style="font-size:16px">&#x1F527;</span><div style="flex:1;min-width:0"><div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:.4px">מוסך</div><div style="font-size:13px;color:#e2e8f0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + garageName.replace(/</g,"&lt;") + '</div></div></div>' : '';
   ol.innerHTML =
     '<div style="background:linear-gradient(180deg,#1e293b 0%,#172033 100%);width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:0;box-shadow:0 -20px 60px rgba(0,0,0,.6);animation:_geditSlideUp .28s cubic-bezier(.2,.9,.3,1.2);max-height:92vh;overflow-y:auto;border-top:1px solid rgba(148,163,184,.15)">' +
@@ -5584,8 +5586,6 @@ APP._garageConfirmAppointment = async function(eventId) {
       var _dateFmt  = dateVal.split('-').reverse().join('/');
       var _timeDisp = timeVal || '09:00';
       var _calUrl   = _buildGoogleCalendarUrl(dateVal, timeVal, STATE.vehicle);
-      var _reqNumConfirm = (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId);
-
       _showHelpCard(
         '<div class="help-card" style="padding:0;overflow:hidden">' +
 
@@ -5594,7 +5594,6 @@ APP._garageConfirmAppointment = async function(eventId) {
             '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
           '</div>' +
           '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px">תור נקבע!</div>' +
-          (_reqNumConfirm ? '<div style="display:inline-block;font-size:11px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:2px 10px;margin-bottom:6px">מספר תקלה #' + _reqNumConfirm + '</div>' : '') +
           '<div style="font-size:14px;color:rgba(255,255,255,.85)">תאריך: <b>' + _dateFmt + '</b> · <b>' + _timeDisp + '</b></div>' +
           '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px">מנהל הצי קיבל עדכון</div>' +
         '</div>' +
