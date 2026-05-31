@@ -2487,21 +2487,7 @@ function renderGarageTab() {
       '</div>' +
     '</button>';
 
-  /* 3 — Closed banner placeholder */
-  var closedBanner =
-    '<div id="gar-closed-banner" class="gar-closed-banner" style="display:none">' +
-      '<div class="gar-closed-banner-icon">' +
-        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-          '<circle cx="12" cy="12" r="10"/>' +
-          '<line x1="12" y1="8" x2="12" y2="12"/>' +
-          '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
-        '</svg>' +
-      '</div>' +
-      '<div class="gar-closed-banner-body">' +
-        '<div class="gar-closed-banner-title">המוסך סגור כעת</div>' +
-        '<div class="gar-closed-banner-sub">שעות הפעילות מופיעות למטה</div>' +
-      '</div>' +
-    '</div>';
+  /* 3 — Closed banner removed; status shown only in chip next to garage name */
 
   /* 4 — Info card: brand badge + name + status chip + detail rows + hours */
   var statusChipHtml = hasPlace
@@ -2606,7 +2592,7 @@ function renderGarageTab() {
 
   if (hasPlace) setTimeout(function(){ _loadGarageDetails(); }, 80);
 
-  return '<div class="gar-wrap">' + warningBanner + approvalBtn + closedBanner + infoCard + addrCard + '</div>';
+  return '<div class="gar-wrap">' + warningBanner + approvalBtn + infoCard + addrCard + '</div>';
 }
 
 function _escHtml(s) {
@@ -3516,12 +3502,6 @@ async function _loadGarageDetails() {
       } else {
         chip.style.display = 'none';
       }
-    }
-
-    /* Closed banner */
-    var banner = document.getElementById('gar-closed-banner');
-    if (banner) {
-      banner.style.display = (isOpen === false) ? 'flex' : 'none';
     }
 
     /* Hours body */

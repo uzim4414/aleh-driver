@@ -992,10 +992,19 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   animation: garChipFade .35s ease both;
 }
 .gar-status-chip.open   { background: rgba(34,197,94,0.16); color: #4ade80; border: 1px solid rgba(34,197,94,0.4); }
-.gar-status-chip.closed { background: rgba(239,68,68,0.16); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); }
+.gar-status-chip.closed { background: rgba(251,146,60,0.18); color: #fb923c; border: 1px solid rgba(251,146,60,0.5); animation: garChipFade .35s ease both, garClosedBlink 1.2s ease-in-out 0.35s infinite; }
 .gar-status-chip.loading { background: rgba(255,255,255,0.04); color: var(--t2); border: 1px solid var(--border); font-style: italic; }
 .gar-status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .gar-status-chip.open .gar-status-dot { animation: garOpenPulse 1.6s ease-in-out infinite; }
+.gar-status-chip.closed .gar-status-dot { animation: garClosedDotBlink 1.2s ease-in-out infinite; }
+@keyframes garClosedBlink {
+  0%,100% { opacity: 1; border-color: rgba(251,146,60,0.5); }
+  50%     { opacity: 0.65; border-color: rgba(251,146,60,1); }
+}
+@keyframes garClosedDotBlink {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%     { opacity: 0.4; transform: scale(0.7); }
+}
 .gar-detail-list { padding: 4px 0; }
 .gar-detail-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); }
 .gar-detail-row:last-child { border-bottom: none; }
