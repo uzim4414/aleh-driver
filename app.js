@@ -2088,27 +2088,34 @@ function renderGarageApptWidget() {
     return;
   }
 
-  var diffMs   = apptMs - now;
-  var diffDays = diffMs / 86400000;
+  var diffMs = apptMs - now;
+  // Use CALENDAR days (midnight-to-midnight) so "היום" = same date only,
+  // not "within 24 hours". At 20:32, tomorrow 09:00 is <24h but calDays=1 → "מחר".
+  var todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+  var apptMidnight  = new Date(apptDateStr + 'T00:00:00');
+  var calDays = Math.round((apptMidnight.getTime() - todayMidnight.getTime()) / 86400000);
 
   var tier, bg, accent, ringAnim, badgeLabel;
   if (diffMs < 0) {
     tier = 'missed';   bg = '#111';    accent = '#555';    ringAnim = 'none';                                badgeLabel = 'עבר המועד';
-  } else if (diffDays < 1) {
+  } else if (calDays <= 0) {
     tier = 'today';    bg = '#1f0505'; accent = '#ef4444'; ringAnim = 'gwPulse 0.8s ease-in-out infinite';  badgeLabel = 'היום!';
-  } else if (diffDays <= 2) {
-    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
-  } else if (diffDays <= 7) {
-    tier = 'soon';     bg = '#1f1700'; accent = '#f59e0b'; ringAnim = 'gwPulse 2.4s ease-in-out infinite';  badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+  } else if (calDays === 1) {
+    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'מחר';
+  } else if (calDays <= 2) {
+    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'עוד ' + calDays + ' ימים';
+  } else if (calDays <= 7) {
+    tier = 'soon';     bg = '#1f1700'; accent = '#f59e0b'; ringAnim = 'gwPulse 2.4s ease-in-out infinite';  badgeLabel = 'עוד ' + calDays + ' ימים';
   } else {
-    tier = 'normal';   bg = '#0a1f0a'; accent = '#22c55e'; ringAnim = 'none';                               badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+    tier = 'normal';   bg = '#0a1f0a'; accent = '#22c55e'; ringAnim = 'none';                               badgeLabel = 'עוד ' + calDays + ' ימים';
   }
 
   var dateFmt    = apptDateStr.split('-').reverse().join('/');
   var dayName    = _hebrewDayName(new Date(apptMs));
   var garageName = appt.garageName || 'המוסך';
-  var reqNumWidget = appt.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(appt.eventId);
-  var reqNumChipHtml = reqNumWidget ? '<span class="gaw-reqnum" style="display:inline-block;font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:middle">#' + reqNumWidget + '</span>' : '';
+  // Request number chip removed: eventId trailing digits are an internal DB
+  // sequence counter, not a user-meaningful fault/request number.
+  var reqNumChipHtml = '';
 
   mount.innerHTML =
     '<div class="gaw-widget" data-tier="' + tier + '" ' +
