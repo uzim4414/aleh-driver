@@ -5602,7 +5602,7 @@ APP._garageConfirmAppointment = async function(eventId) {
       var _garageCtx = APP._garageCtx || {};
       var _apptData = {
         eventId:         eventId,
-        requestNumber:   (function(){ try { var _apg = JSON.parse(localStorage.getItem('approvedGarageRequest')||'null'); if (_apg && _apg.requestNumber) return String(_apg.requestNumber); } catch(_){} var _m = String(eventId||'').match(/-(\d+)$/); return _m ? String(parseInt(_m[1],10)) : ''; })(),
+        requestNumber:   (result.requestNumber ? String(result.requestNumber) : (function(){ try { var _apg = JSON.parse(localStorage.getItem('approvedGarageRequest')||'null'); if (_apg && _apg.requestNumber) return String(_apg.requestNumber); } catch(_){} var _m = String(eventId||'').match(/-(\d+)$/); return _m ? String(parseInt(_m[1],10)) : ''; })()),
         appointmentDate: dateVal,
         appointmentTime: timeVal,
         garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
