@@ -4987,7 +4987,7 @@ APP._garageSubmitRequest = async function() {
     if (result.ok) {
       var eventId = result.eventId || '';
       try {
-        var _pendingData = { eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() };
+        var _pendingData = { eventId: eventId, requestNumber: result.requestNumber || '', reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() };
         localStorage.setItem('pendingGarageRequest', JSON.stringify(_pendingData));
         _fbSetPendingGarage(_pendingData);
       } catch(e) {}
