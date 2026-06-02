@@ -2715,174 +2715,356 @@ var NOTIF_ICON_BY_TYPE = {
   test_urgent:'<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
 };
 
+/* ── Notification redesign helpers (nrd) ── */
+var _NRD_ICONS = {
+  calendar: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="5" width="17.2" height="15.6" rx="4"/><path d="M3.6 9.6h16.8"/><path d="M8 2.6v4M16 2.6v4"/><circle cx="8.2" cy="13.6" r="1.25" fill="currentColor" stroke="none"/><circle cx="12" cy="13.6" r="1.25" fill="currentColor" stroke="none"/><circle cx="15.8" cy="13.6" r="1.25" fill="currentColor" stroke="none"/></svg>',
+  check:    '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.6l4.4 4.4L19 7.2"/></svg>',
+  chart:    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20.5v-7M12 20.5V6M18 20.5v-4.5"/></svg>',
+  x:        '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  warning:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  chev:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  swipe:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
+};
+
+/* alertType -> redesign category */
+var _NRD_CATEGORY = {
+  plan:'reminder', km_update:'reminder', test_due:'reminder', test_urgent:'reminder', garage_appointment_set:'reminder',
+  garage_approved:'approved', overdue:'approved', urgent:'approved', maintenance_overdue:'approved', maintenance_urgent:'approved', maintenance_plan:'approved',
+  garage_rejected:'danger', garage_appointment_cancelled:'danger',
+  fuel_high:'warning', fuel_km_high:'warning'
+};
+function _nrdCategoryFor(alertType) { return _NRD_CATEGORY[alertType] || 'info'; }
+
+var _NRD_BADGE_CLASS = { reminder:'nrd-b-reminder', approved:'nrd-b-approved', danger:'nrd-b-danger', warning:'nrd-b-warning', info:'nrd-b-info' };
+var _NRD_BADGE_ICON  = { reminder:'calendar', approved:'check', danger:'x', warning:'warning', info:'chart' };
+var _NRD_DOT_COLOR   = { reminder:'#4aa8ff', approved:'#22c55e', danger:'#ef4444', warning:'#f97316', info:'#bf5af2' };
+var _NRD_PILL = {
+  reminder:{ c:'nrd-pill-reminder', t:'תזכורת' },
+  approved:{ c:'nrd-pill-approved', t:'אושר' },
+  danger:  { c:'nrd-pill-danger',   t:'נדחה' },
+  warning: { c:'nrd-pill-warning',  t:'אזהרה' },
+  info:    { c:'nrd-pill-info',     t:'עדכון' }
+};
+
+function _nrdAlehPlateHtml(num) {
+  return '<span class="aleh-plate" dir="ltr">' +
+    '<span class="aleh-plate-il">IL</span>' +
+    '<span class="aleh-plate-num">' + _escHtml(formatPlate(num)) + '</span>' +
+  '</span>';
+}
+
+/* Bucket a ts into today / yesterday / earlier. */
+function _nrdGroupOf(ts) {
+  var d = new Date(ts);
+  var now = new Date();
+  var startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  var startYesterday = startToday - 86400000;
+  if (ts >= startToday) return 'today';
+  if (ts >= startYesterday) return 'yesterday';
+  return 'earlier';
+}
+
+/* Build detail rows for one notification. */
+function _nrdDetailRows(n) {
+  var type = n.alertType || 'plan';
+  var rows = [];
+  if (n.requestNumber) rows.push(['מספר בקשה', '<span class="nrd-row-value">#' + _escHtml(String(n.requestNumber)) + '</span>']);
+  if (n.vehicleId)     rows.push(['רכב', _nrdAlehPlateHtml(n.vehicleId)]);
+  var V = function(label, val, unit) {
+    if (val == null || val === '') return;
+    rows.push([label, '<span class="nrd-row-value">' + _escHtml(String(val)) + (unit ? ' ' + unit : '') + '</span>']);
+  };
+  switch (type) {
+    case 'overdue': case 'urgent': case 'plan':
+    case 'maintenance_overdue': case 'maintenance_urgent': case 'maintenance_plan':
+      V('נותר', n.kmLeft, 'ק"מ'); V('הבא לטיפול', n.nextKm, 'ק"מ'); V('צפי', n.estKm, 'ק"מ'); break;
+    case 'km_update':
+      V('לפני', n.daysSinceUpdate, 'ימים'); break;
+    case 'test_due': case 'test_urgent':
+      V('תאריך טסט', n.testDate); V('נותרו', n.daysLeft, 'ימים'); break;
+    case 'garage_approved':
+      if (n.garageInfo) V('מוסך מאושר', n.garageInfo); break;
+    case 'garage_rejected':
+      V('סיבה', n.reasonLabel); break;
+    case 'garage_appointment_set': case 'garage_appointment_cancelled':
+      V('תאריך', n.appointmentDate); V('שעה', n.appointmentTime); if (n.garageInfo) V('מוסך', n.garageInfo); break;
+    case 'fuel_high':
+      V('צריכה', n.fuelConsumption, 'ל׳/100ק"מ'); V('סף', n.threshold, 'ל׳'); V('ממוצע צי', n.fleetAverage, 'ל׳'); break;
+    case 'fuel_km_high':
+      if (n.costPerKm != null && n.costPerKm !== '') rows.push(['עלות לק"מ', '<span class="nrd-row-value">₪' + _escHtml(String(n.costPerKm)) + '</span>']);
+      if (n.fleetAverage != null && n.fleetAverage !== '') rows.push(['ממוצע צי', '<span class="nrd-row-value">₪' + _escHtml(String(n.fleetAverage)) + '</span>']);
+      break;
+  }
+  if (n.originalDescription) V('תיאור', n.originalDescription);
+  if (n.managerNote) V('הערת מנהל', n.managerNote);
+  if (!rows.length) return '';
+  return '<div class="nrd-rows">' + rows.map(function(r) {
+    return '<div class="nrd-detail-row"><span class="nrd-row-label">' + r[0] + '</span>' + r[1] + '</div>';
+  }).join('') + '</div>';
+}
+
+/* Action buttons HTML for one card. */
+function _nrdCardActions(n) {
+  var type = n.alertType || 'plan';
+  var enc = encodeURIComponent(JSON.stringify(n || {}));
+  var call = 'navigateForAlertType(\'' + type + '\',JSON.parse(decodeURIComponent(\'' + enc + '\')));event.stopPropagation()';
+  var primary = '', secondary = '';
+  var btn = function(label, blue) {
+    return '<button class="nrd-btn nrd-btn-primary' + (blue ? ' blue' : '') + '" onclick="' + call + '">' + _escHtml(label) + '</button>';
+  };
+  var ghost = function(label, onclick) {
+    return '<button class="nrd-btn nrd-btn-ghost" onclick="' + onclick + '">' + _escHtml(label) + '</button>';
+  };
+  var wazeClick = 'if(typeof _openGarageWaze===\'function\')_openGarageWaze();event.stopPropagation()';
+  switch (type) {
+    case 'garage_appointment_set':
+      primary = btn('הוסף ליומן', true);
+      secondary = ghost('ניווט למוסך', wazeClick); break;
+    case 'garage_approved':
+      primary = btn('קבע תור', true);
+      secondary = ghost('פרטי מוסך', call); break;
+    case 'garage_rejected':
+      primary = btn('פתח בקשה חדשה'); break;
+    case 'garage_appointment_cancelled':
+      primary = btn('קבע תור חדש'); break;
+    case 'overdue': case 'urgent': case 'maintenance_overdue': case 'maintenance_urgent':
+      primary = btn('תאם טיפול'); break;
+    case 'plan': case 'maintenance_plan':
+      primary = btn('תכנן טיפול', true); break;
+    case 'km_update':
+      primary = btn('עדכן ק"מ', true); break;
+    case 'test_due': case 'test_urgent':
+      primary = btn('בקרוב — מכוני טסט', true); break;
+    case 'fuel_high':
+      primary = btn('דוח צריכה'); break;
+    case 'fuel_km_high':
+      primary = btn('דוח עלויות'); break;
+    default:
+      primary = btn('פרטים', true); break;
+  }
+  return primary + secondary;
+}
+
 function renderNotifHistory() {
   var container = document.getElementById('alerts-content');
   if (!container) return;
 
   var history = getNotifHistory();
 
-  var old = document.getElementById('nh-section');
+  var old = document.getElementById('nrd-section');
   if (old) old.parentNode.removeChild(old);
 
   var section = document.createElement('div');
-  section.id = 'nh-section';
-  section.style.cssText = 'padding:0 0 8px';
+  section.id = 'nrd-section';
 
-  var headerHtml = '<div class="nh-header">' +
-    '<div class="nh-title">הודעות שהתקבלו</div>' +
-    (history.length ? '<button class="nh-clear-btn" onclick="APP.clearNotifHistory()">נקה הכל</button>' : '') +
-    '</div>';
+  var counts = { all: history.length, reminder: 0, approved: 0, info: 0 };
+  history.forEach(function(n) {
+    var cat = _nrdCategoryFor(n.alertType || 'plan');
+    var bucket = (cat === 'reminder') ? 'reminder' : (cat === 'approved') ? 'approved' : 'info';
+    counts[bucket]++;
+  });
+
+  var unread = history.filter(function(n) { return !n.read; }).length;
+  var headHtml =
+    '<div class="nrd-head"><div class="nrd-head-row">' +
+      '<div><div class="nrd-title-h">התראות</div>' +
+        '<div class="nrd-sub-h">' + (unread ? unread + ' חדשות' : 'הכל נקרא') + '</div></div>' +
+      (history.length ?
+        '<button class="nrd-markall" onclick="APP.clearNotifHistory()">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+          'נקה הכל</button>' : '') +
+    '</div></div>';
 
   if (!history.length) {
-    section.innerHTML = headerHtml +
-      '<div class="notif-empty">' +
-        '<svg class="notif-empty-bell" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
-          '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>' +
-        '</svg>' +
-        '<div class="notif-empty-title">אין התראות חדשות</div>' +
-        '<div class="notif-empty-subtitle">נעדכן אותך כשיהיה משהו חשוב</div>' +
+    section.innerHTML = headHtml +
+      '<div class="nrd-empty">' +
+        '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+        '<div class="nrd-empty-title">אין התראות חדשות</div>' +
+        '<div class="nrd-empty-sub">נעדכן אותך כשיהיה משהו חשוב</div>' +
       '</div>';
+    container.innerHTML = '';
     container.appendChild(section);
     return;
   }
 
-  var SEV_LABEL = { critical:'דחוף!', urgent:'דחוף', plan:'תזכורת', info:'מידע', approved:'אושר' };
-
-  var itemsHtml = history.map(function(n, i) {
-    var type     = n.alertType || 'plan';
-    var severity = SEVERITY_MAP[type] || 'plan';
-    var safeId   = String(n.id || n.ts || i);
-    var iconHtml = (SEVERITY_ICONS[severity] || SEVERITY_ICONS.plan)
-      .replace('width="22"', 'width="20"').replace('height="22"', 'height="20"');
-
-    // Expandable meta rows
-    // Normalize garageInfo — may be stored as object {name,address,phone} from old saves
-    var _garageName = (function(g) {
-      if (!g) return '';
-      if (typeof g === 'string') return g;
-      return g.name || g.garageName || '';
-    })(n.garageInfo);
-
-    // Vehicle display: show formatted plate when possible
-    var _vehicleDisplay = (function() {
-      if (!n.vehicleId) return '';
-      if (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.num) {
-        return formatPlate(STATE.vehicle.num) || n.vehicleId;
-      }
-      return n.vehicleId;
-    })();
-
-    var metaRowsHtml = '';
-    var metaRows = [];
-    if (_vehicleDisplay) metaRows.push(['רכב', _escHtml(_vehicleDisplay)]);
-    if (n.requestNumber) metaRows.push(['בקשה', '#' + _escHtml(n.requestNumber)]);
-    switch (type) {
-      case 'overdue': case 'urgent': case 'plan':
-        if (n.kmLeft != null && n.kmLeft !== '') metaRows.push(['נותר', _escHtml(String(n.kmLeft)) + ' ק"מ']);
-        if (n.nextKm != null && n.nextKm !== '') metaRows.push(['הבא לטיפול', _escHtml(String(n.nextKm)) + ' ק"מ']);
-        if (n.estKm  != null && n.estKm  !== '') metaRows.push(['צפי', _escHtml(String(n.estKm)) + ' ק"מ']);
-        break;
-      case 'km_update':
-        if (n.daysSinceUpdate != null && n.daysSinceUpdate !== '') metaRows.push(['לפני', _escHtml(String(n.daysSinceUpdate)) + ' ימים']);
-        break;
-      case 'test_due': case 'test_urgent':
-        if (n.testDate) metaRows.push(['תאריך טסט', _escHtml(n.testDate)]);
-        if (n.daysLeft != null && n.daysLeft !== '') metaRows.push(['נותרו', _escHtml(String(n.daysLeft)) + ' ימים']);
-        break;
-      case 'garage_approved':
-        if (_garageName) metaRows.push(['מוסך מאושר', _escHtml(_garageName)]);
-        break;
-      case 'garage_rejected':
-        if (n.reasonLabel) metaRows.push(['סיבה', _escHtml(n.reasonLabel)]);
-        break;
-      case 'garage_appointment_set': case 'garage_appointment_cancelled':
-        if (n.appointmentDate) metaRows.push(['תאריך', _escHtml(n.appointmentDate)]);
-        if (n.appointmentTime) metaRows.push(['שעה', _escHtml(n.appointmentTime)]);
-        if (_garageName) metaRows.push(['מוסך', _escHtml(_garageName)]);
-        break;
-      case 'fuel_high':
-        if (n.fuelConsumption != null && n.fuelConsumption !== '') metaRows.push(['צריכה', _escHtml(String(n.fuelConsumption)) + ' ל׳/100ק"מ']);
-        if (n.threshold != null && n.threshold !== '') metaRows.push(['סף', _escHtml(String(n.threshold)) + ' ל׳']);
-        if (n.fleetAverage != null && n.fleetAverage !== '') metaRows.push(['ממוצע ציי', _escHtml(String(n.fleetAverage)) + ' ל׳']);
-        break;
-      case 'fuel_km_high':
-        if (n.costPerKm != null && n.costPerKm !== '') metaRows.push(['עלות לק"מ', '₪' + _escHtml(String(n.costPerKm))]);
-        if (n.fleetAverage != null && n.fleetAverage !== '') metaRows.push(['ממוצע ציי', '₪' + _escHtml(String(n.fleetAverage))]);
-        break;
-    }
-    if (n.originalDescription) metaRows.push(['תיאור', _escHtml(n.originalDescription)]);
-    if (n.managerNote) metaRows.push(['הערת מנהל', _escHtml(n.managerNote)]);
-    if (metaRows.length) {
-      metaRowsHtml = '<div class="nh-meta-rows">' +
-        metaRows.map(function(r) {
-          return '<div class="nh-meta-row">' +
-            '<span class="nh-meta-label">' + r[0] + '</span>' +
-            '<span class="nh-meta-value">'  + r[1] + '</span>' +
-          '</div>';
-        }).join('') +
-      '</div>';
-    }
-
-    var nhCtaHtml = '';
-    switch (type) {
-      case 'overdue': case 'urgent':
-        nhCtaHtml = '<button class="nh-cta-btn" onclick="navigateForAlertType(\'' + type + '\',{});event.stopPropagation()">בקש מוסך</button>'; break;
-      case 'km_update':
-        nhCtaHtml = '<button class="nh-cta-btn" onclick="navigateForAlertType(\'km_update\',{});event.stopPropagation()">עדכן ק"מ</button>'; break;
-      case 'garage_approved':
-        nhCtaHtml = '<button class="nh-cta-btn" onclick="if(APP&&APP.helpGarage)APP.helpGarage();event.stopPropagation()">קבע מועד</button>'; break;
-      case 'fuel_high': case 'fuel_km_high':
-        nhCtaHtml = '<button class="nh-cta-btn" onclick="navigateForAlertType(\'' + type + '\',{});event.stopPropagation()">דוח צריכה</button>'; break;
-    }
-
-    var chevronSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-
-    return '<div class="notif-history-item notif-card notif-' + severity + '" ' +
-        'data-id="' + safeId + '" data-type="' + type + '" ' +
-        'style="animation:card-enter 0.35s var(--ease-out) both;animation-delay:' + (i * 0.05) + 's;margin-bottom:10px;display:block;padding:12px 14px">' +
-
-      '<div class="nh-header-row" onclick="_toggleNotifCard(this)">' +
-        '<div class="notif-icon" style="flex-shrink:0;margin-top:1px">' + iconHtml + '</div>' +
-        '<div class="nh-header-info">' +
-          '<div class="nh-title-line">' +
-            '<span class="notif-title" style="flex:1;min-width:0">' + _escHtml(n.title) + '</span>' +
-            '<span class="nh-sev-badge nh-sev-' + severity + '">' + (SEV_LABEL[severity] || severity) + '</span>' +
-          '</div>' +
-          '<div class="notif-time" style="margin-top:3px">' + _notifTimeLabel(n.ts) + '</div>' +
-        '</div>' +
-        '<div class="nh-chevron">' + chevronSvg + '</div>' +
-      '</div>' +
-
-      '<div class="nh-expand-body">' +
-        '<div class="nh-divider"></div>' +
-        (n.body ? '<div class="nh-body-text">' + _escHtml(n.body) + '</div>' : '') +
-        metaRowsHtml +
-        nhCtaHtml +
-        '<button class="nh-delete-btn" onclick="APP.deleteNotif(\'' + safeId + '\');event.stopPropagation()">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>' +
-          'מחק התראה' +
-        '</button>' +
-      '</div>' +
+  var segHtml =
+    '<div class="nrd-seg" id="nrd-seg">' +
+      '<div class="nrd-seg-ind" id="nrd-seg-ind"></div>' +
+      '<button class="nrd-seg-tab on" data-f="all">הכל <span class="nrd-seg-count">' + counts.all + '</span></button>' +
+      '<button class="nrd-seg-tab" data-f="reminder">תזכורות <span class="nrd-seg-count">' + counts.reminder + '</span></button>' +
+      '<button class="nrd-seg-tab" data-f="approved">אושרו <span class="nrd-seg-count">' + counts.approved + '</span></button>' +
+      '<button class="nrd-seg-tab" data-f="info">מידע <span class="nrd-seg-count">' + counts.info + '</span></button>' +
     '</div>';
-  }).join('');
 
-  section.innerHTML = headerHtml + itemsHtml;
+  var GROUPS = [ { k:'today', label:'היום' }, { k:'yesterday', label:'אתמול' }, { k:'earlier', label:'מוקדם יותר' } ];
+  var grouped = { today: [], yesterday: [], earlier: [] };
+  history.forEach(function(n, i) { grouped[_nrdGroupOf(n.ts || n.id || Date.now())].push({ n: n, i: i }); });
+
+  var listHtml = '';
+  GROUPS.forEach(function(g) {
+    var items = grouped[g.k];
+    if (!items.length) return;
+    listHtml += '<div class="nrd-grp">' + g.label + '</div>';
+    items.forEach(function(o) { listHtml += _nrdCardHtml(o.n, o.i); });
+  });
+
+  section.innerHTML = headHtml + segHtml + '<div class="nrd-list" id="nrd-list">' + listHtml + '</div>';
+  container.innerHTML = '';
   container.appendChild(section);
-  _initSwipeDelete(section);
+
+  _nrdInitSwipe(section);
+  _nrdInitSegmented(section);
 }
 
-function _toggleNotifCard(headerEl) {
-  var card = headerEl.closest('.notif-history-item');
-  if (!card) return;
-  var isOpen = card.classList.contains('is-open');
-  var nhSection = card.closest('#nh-section');
-  if (nhSection) {
-    nhSection.querySelectorAll('.notif-history-item.is-open').forEach(function(el) {
-      if (el !== card) el.classList.remove('is-open');
+function _nrdCardHtml(n, idx) {
+  var type = n.alertType || 'plan';
+  var cat  = _nrdCategoryFor(type);
+  var safeId = String(n.id || n.ts || idx);
+  var badgeCls = _NRD_BADGE_CLASS[cat];
+  var iconKey  = _NRD_BADGE_ICON[cat];
+  var pill = _NRD_PILL[cat] || _NRD_PILL.info;
+  var dot  = _NRD_DOT_COLOR[cat] || '#bf5af2';
+  var body = n.body || '';
+  var detailRows = _nrdDetailRows(n);
+  var actions = _nrdCardActions(n);
+
+  return '<div class="nrd-wrap" data-cat="' + cat + '" style="animation-delay:' + (idx * 0.05) + 's">' +
+    '<div class="nrd-swipe-bg-left"><span class="nrd-swipe-label">מחק ✕</span></div>' +
+    '<div class="nrd-swipe-bg-right"><span class="nrd-swipe-label">✓ נקרא</span></div>' +
+    '<div class="nrd-card" data-id="' + safeId + '" data-type="' + type + '" onclick="_nrdToggleCard(this,event)">' +
+      (n.read ? '' : '<span class="nrd-unread-dot" style="background:' + dot + '"></span>') +
+      '<div class="nrd-swipe-hint">' + _NRD_ICONS.swipe + '</div>' +
+      '<div class="nrd-card-top">' +
+        '<div class="nrd-badge ' + badgeCls + '">' + _NRD_ICONS[iconKey] + '</div>' +
+        '<div class="nrd-badge-meta">' +
+          '<div class="nrd-row1">' +
+            '<div class="nrd-c-title">' + _escHtml(n.title || 'עלה — התראה') + '</div>' +
+            '<div class="nrd-c-time">' + _notifTimeLabel(n.ts || n.id || Date.now()) + '</div>' +
+          '</div>' +
+          (body ? '<div class="nrd-row2"><div class="nrd-c-snip">' + _escHtml(body) + '</div></div>' : '') +
+          '<div class="nrd-row2"><span class="nrd-pill ' + pill.c + '"><span class="nrd-pdot"></span>' + pill.t + '</span></div>' +
+        '</div>' +
+        '<span class="nrd-chev">' + _NRD_ICONS.chev + '</span>' +
+      '</div>' +
+      '<div class="nrd-body"><div class="nrd-body-inner">' +
+        '<div class="nrd-divider"></div>' +
+        (body ? '<div class="nrd-full-body">' + _escHtml(body) + '</div>' : '') +
+        detailRows +
+        actions +
+      '</div></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _nrdToggleCard(card, ev) {
+  if (ev && ev.target.closest && ev.target.closest('.nrd-btn')) return;
+  card.classList.toggle('open');
+}
+
+/* Swipe: LEFT = delete (red), RIGHT = mark read (green), threshold 90px. */
+function _nrdInitSwipe(root) {
+  root.querySelectorAll('.nrd-wrap').forEach(function(wrap) {
+    var card = wrap.querySelector('.nrd-card');
+    if (!card) return;
+    var startX = 0, startY = 0, dx = 0, dragging = false, locked = false;
+    card.addEventListener('pointerdown', function(e) {
+      startX = e.clientX; startY = e.clientY; dx = 0; dragging = true; locked = false;
+      try { card.setPointerCapture(e.pointerId); } catch(_) {}
+      card.classList.remove('snapping');
+    });
+    card.addEventListener('pointermove', function(e) {
+      if (!dragging) return;
+      var cx = e.clientX - startX, cy = e.clientY - startY;
+      if (!locked) {
+        if (Math.abs(cy) > Math.abs(cx) + 5) { dragging = false; return; }
+        if (Math.abs(cx) > 8) locked = true; else return;
+      }
+      dx = cx;
+      card.style.transform = 'translateX(' + Math.max(-130, Math.min(130, dx)) + 'px)';
+      var bgL = wrap.querySelector('.nrd-swipe-bg-left');
+      var bgR = wrap.querySelector('.nrd-swipe-bg-right');
+      if (dx < 0) { bgL.style.opacity = Math.min(1, Math.abs(dx) / 90); bgR.style.opacity = 0; }
+      else        { bgR.style.opacity = Math.min(1, dx / 90); bgL.style.opacity = 0; }
+    });
+    function release() {
+      if (!dragging) return; dragging = false;
+      card.classList.add('snapping');
+      var id = card.getAttribute('data-id');
+      if (dx < -90) {
+        card.style.transform = 'translateX(-110%)';
+        setTimeout(function() {
+          wrap.classList.add('removing');
+          setTimeout(function() {
+            wrap.remove();
+            if (typeof APP !== 'undefined' && APP.deleteNotif) APP.deleteNotif(id);
+          }, 320);
+        }, 160);
+      } else if (dx > 90) {
+        card.style.transform = 'translateX(0)';
+        var d = wrap.querySelector('.nrd-unread-dot');
+        if (d) d.style.display = 'none';
+        wrap.querySelector('.nrd-swipe-bg-right').style.opacity = 0;
+        _nrdMarkRead(id);
+      } else {
+        card.style.transform = 'translateX(0)';
+        wrap.querySelector('.nrd-swipe-bg-left').style.opacity = 0;
+        wrap.querySelector('.nrd-swipe-bg-right').style.opacity = 0;
+      }
+    }
+    card.addEventListener('pointerup', release);
+    card.addEventListener('pointercancel', release);
+  });
+}
+
+/* Mark one notification read in localStorage history (best-effort). */
+function _nrdMarkRead(id) {
+  try {
+    var list = getNotifHistory();
+    var changed = false;
+    list.forEach(function(n) {
+      if (String(n.id || n.ts) === String(id) && !n.read) { n.read = true; changed = true; }
+    });
+    if (changed) localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+  } catch(_) {}
+}
+
+/* Segmented control: spring indicator + filter. */
+function _nrdInitSegmented(root) {
+  var seg = root.querySelector('#nrd-seg');
+  var ind = root.querySelector('#nrd-seg-ind');
+  if (!seg || !ind) return;
+  var tabs = [].slice.call(seg.querySelectorAll('.nrd-seg-tab'));
+  function moveInd(tab) {
+    ind.style.width = tab.offsetWidth + 'px';
+    var segRect = seg.getBoundingClientRect();
+    var tRect = tab.getBoundingClientRect();
+    ind.style.transform = 'translateX(' + (-(segRect.right - tRect.right)) + 'px)';
+  }
+  function applyFilter(f) {
+    root.querySelectorAll('.nrd-wrap').forEach(function(el) {
+      var cat = el.getAttribute('data-cat');
+      var bucket = (cat === 'reminder') ? 'reminder' : (cat === 'approved') ? 'approved' : 'info';
+      el.style.display = (f === 'all' || bucket === f) ? '' : 'none';
+    });
+    root.querySelectorAll('.nrd-grp').forEach(function(g) {
+      var sib = g.nextElementSibling, any = false;
+      while (sib && !sib.classList.contains('nrd-grp')) {
+        if (sib.classList.contains('nrd-wrap') && sib.style.display !== 'none') { any = true; break; }
+        sib = sib.nextElementSibling;
+      }
+      g.style.display = any ? '' : 'none';
     });
   }
-  card.classList.toggle('is-open', !isOpen);
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('on'); });
+      tab.classList.add('on');
+      moveInd(tab);
+      applyFilter(tab.getAttribute('data-f'));
+    });
+  });
+  requestAnimationFrame(function() { moveInd(tabs[0]); });
+  setTimeout(function() { moveInd(tabs[0]); }, 60);
 }
 
 function renderAlerts() {
