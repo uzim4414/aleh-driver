@@ -6504,7 +6504,28 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.onload = function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
-      google.accounts.id.prompt();
+      /* Try One Tap (works on mobile). If FedCM fails on desktop, fall back
+         to renderButton popup which bypasses FedCM entirely. */
+      google.accounts.id.prompt(function(notification) {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+          /* FedCM not available — show renderButton in overlay */
+          var existing = document.getElementById('_gsi_fallback');
+          if (existing) { existing.remove(); }
+          var overlay = document.createElement('div');
+          overlay.id = '_gsi_fallback';
+          overlay.setAttribute('style', 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(4px)');
+          var box = document.createElement('div');
+          box.setAttribute('style', 'background:#fff;padding:28px 32px;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 8px 40px rgba(0,0,0,.25)');
+          var title = document.createElement('p');
+          title.setAttribute('style', 'font-size:14px;font-weight:700;color:#1e293b;margin:0');
+          title.textContent = 'כניסה עם חשבון Google';
+          box.appendChild(title);
+          overlay.appendChild(box);
+          overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+          document.body.appendChild(overlay);
+          google.accounts.id.renderButton(box, { theme: 'outline', size: 'large', text: 'signin_with', locale: 'iw' });
+        }
+      });
     });
   };
   document.head.appendChild(script);
