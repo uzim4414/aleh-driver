@@ -68,50 +68,48 @@ function navigateForAlertType(alertType, meta) {
       APP.nav('vehicle');
       setTimeout(function() { if (typeof APP.openKmModal === 'function') APP.openKmModal(); }, 350);
       break;
+
+    case 'plan':
+    case 'maintenance_plan':
     case 'overdue':
     case 'urgent':
+    case 'maintenance_overdue':
+    case 'maintenance_urgent':
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
       break;
-    case 'plan':
-      APP.nav('vehicle');
-      setTimeout(function() { APP.switchTab('info'); }, 350);
-      break;
+
     case 'test_due':
     case 'test_urgent':
-      APP.nav('vehicle');
-      setTimeout(function() { APP.switchTab('info'); }, 350);
+      if (typeof APP.toast === 'function') APP.toast('פיצ\'ר בפיתוח — מכוני טסט בקרוב');
+      else if (typeof showToast === 'function') showToast('פיצ\'ר בפיתוח — מכוני טסט בקרוב');
       break;
+
     case 'garage_approved':
-      // פתח help menu ישירות — בלי nav('vehicle') שגורם לפלאש
-      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') {
-        APP.openHelpMenu();
-      }
+      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
       setTimeout(function() {
-        if (typeof APP._garageShowApprovedFromStorage === 'function') {
-          APP._garageShowApprovedFromStorage(meta);
-        } else if (typeof APP.helpGarage === 'function') {
-          APP.helpGarage();
-        }
+        if (typeof APP._garageShowApprovedFromStorage === 'function') APP._garageShowApprovedFromStorage(meta);
+        else if (typeof APP.helpGarage === 'function') APP.helpGarage();
       }, 350);
       break;
+
     case 'garage_rejected':
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
       break;
-    // BUG-03: dedicated cancel routing
+
     case 'garage_appointment_cancelled':
       if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
       setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
       break;
-    // BUG-09: appointment set — navigate to home widget
+
     case 'garage_appointment_set':
-      if (typeof APP.nav === 'function') APP.nav('vehicle');
-      setTimeout(function() {
-        var el = document.getElementById('garage-appt-widget-mount');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 400);
+      try {
+        var url = _buildGoogleCalendarUrl(meta.appointmentDate, meta.appointmentTime || '09:00', (typeof STATE !== 'undefined' ? STATE.vehicle : null));
+        if (url) window.open(url, '_blank');
+      } catch(_) {}
       break;
+
     case 'fuel_high':
       APP.nav('vehicle');
       setTimeout(function() {
@@ -119,6 +117,7 @@ function navigateForAlertType(alertType, meta) {
         setTimeout(function() { _renderFuelAlertCard(meta); }, 200);
       }, 350);
       break;
+
     case 'fuel_km_high':
       APP.nav('vehicle');
       setTimeout(function() {
@@ -126,6 +125,7 @@ function navigateForAlertType(alertType, meta) {
         setTimeout(function() { _renderCostAlertCard(meta); }, 200);
       }, 350);
       break;
+
     default:
       APP.nav('vehicle');
       setTimeout(function() { APP.switchTab('garage'); }, 350);
