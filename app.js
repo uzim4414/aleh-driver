@@ -6471,13 +6471,14 @@ function hideGreeting() {
 
 /* ══ Boot ══ */
 /* ── Version display — fetches latest commit from GitHub ── */
+var __latestVerLabel = '';
 (function() {
-  var el = document.getElementById('splash-version');
+  var el = document.getElementById('splash-ver-text');
   if (!el) return;
   fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
     headers: { 'Accept': 'application/vnd.github.v3+json' }
   }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data || !data.sha) return;
+    if (!data || !data.sha) { el.textContent = ''; return; }
     var sha = data.sha.slice(0, 7);
     var raw = (data.commit && data.commit.author && data.commit.author.date) || '';
     var dt = raw ? new Date(raw) : null;
@@ -6487,9 +6488,45 @@ function hideGreeting() {
       ('0'+dt.getHours()).slice(-2) + ':' +
       ('0'+dt.getMinutes()).slice(-2)
     ) : '';
+    __latestVerLabel = 'commit ' + sha + (fmt ? ' · ' + fmt : '');
     el.textContent = sha + (fmt ? ' · ' + fmt : '');
   }).catch(function() { el.textContent = ''; });
 })();
+
+/* ── Update banner: stunning slide-up + animated progress, auto-reload ── */
+function showUpdateBanner() {
+  var banner = document.getElementById('splash-update-banner');
+  if (!banner || banner.dataset.shown === '1') return;
+  banner.dataset.shown = '1';
+  var bar   = document.getElementById('sub-progress-bar');
+  var label = document.getElementById('sub-ver-label');
+  if (label) label.innerHTML = (__latestVerLabel || 'מתקין עדכון') + '<span class="blink">▋</span>';
+  banner.classList.remove('hidden');
+  /* kick the progress bar after the slide-up settles */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() { if (bar) bar.style.width = '100%'; });
+  });
+  setTimeout(function() {
+    try { window.location.reload(); } catch (e) {}
+  }, 2700);
+}
+function showUpToDate() {
+  var banner = document.getElementById('splash-update-banner');
+  var title  = document.getElementById('sub-title');
+  if (!banner) return;
+  banner.dataset.shown = '1';
+  banner.classList.add('ver-ok');
+  if (title) title.textContent = '✓ גירסה עדכנית';
+  var wrap = document.getElementById('sub-progress-wrap');
+  var label = document.getElementById('sub-ver-label');
+  if (wrap) wrap.style.display = 'none';
+  if (label) label.textContent = '';
+  banner.classList.remove('hidden');
+  setTimeout(function() {
+    banner.classList.add('fade-out');
+    setTimeout(function() { banner.classList.add('hidden'); }, 500);
+  }, 1400);
+}
 
 document.addEventListener('DOMContentLoaded', async function() {
 
@@ -6500,8 +6537,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       reg.addEventListener('updatefound', function() {
         const sw = reg.installing;
         if (!navigator.serviceWorker.controller) return; /* התקנה ראשונה — לא reload */
+        showUpdateBanner(); /* באנר עדכון מהמם — מבצע reload בעצמו */
         sw.addEventListener('statechange', function() {
-          if (sw.state === 'activated') window.location.reload();
+          if (sw.state === 'redundant') showUpToDate();
         });
       });
     }).catch(function(e) {
