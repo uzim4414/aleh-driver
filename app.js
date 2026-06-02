@@ -392,6 +392,20 @@ function _initFbGarageSync() {
         if (data) {
           var newStr = JSON.stringify(data);
           if (prevRaw !== newStr) {
+            /* Guard: reject Firebase snapshot if it is older than what localStorage
+               already has. Prevents a stale cached snapshot from overwriting a newer
+               approval that just arrived via FCM/saveNotifToHistory. */
+            try {
+              var _prev = JSON.parse(prevRaw || '{}');
+              var _prevAt = _prev.approvedAt || 0;
+              var _newAt  = (data.approvedAt) || 0;
+              if (_prevAt && _newAt && _newAt < _prevAt) {
+                /* Firebase snapshot is older — skip overwrite but still sync Firebase
+                   to match localStorage so future listeners see the newer value. */
+                _fbSetApprovedGarage(_prev);
+                return;
+              }
+            } catch(_e) {}
             localStorage.setItem('approvedGarageRequest', newStr);
             if (STATE.helpMenuOpen && APP._garageView) APP.helpGarage();
           }
@@ -5357,21 +5371,8 @@ APP._garageBuildInfoFromState = function() {
 // אם יש eventId — ננסה לרענן מהשרת ברקע, אבל מציגים מיידית את מה שיש.
 APP._garageShowApprovedFromStorage = function(meta) {
   var approved = APP._garageGetApproved();
-  if (!approved && meta && meta.eventId) {
-    // אם הגענו דרך toast עם meta אבל עדיין לא נשמר — שמור עכשיו
-    try {
-      var _metaApproved = {
-        eventId:       meta.eventId,
-        reasonLabel:   meta.reasonLabel   || '',
-        requestNumber: meta.requestNumber || '',
-        managerNote:   meta.managerNote   || '',
-        approvedAt:    meta.approvedAt    || Date.now()
-      };
-      localStorage.setItem('approvedGarageRequest', JSON.stringify(_metaApproved));
-      _fbSetApprovedGarage(_metaApproved);
-    } catch(e) {}
-    approved = APP._garageGetApproved();
-  }
+  /* Fallback removed: writing stale meta back to storage resurrected cancelled
+     requests. If localStorage is empty the approved state is gone — show helpGarage. */
   if (!approved) {
     // אין נתוני אישור — נפילה חזרה לזרימת הבקשה
     APP.helpGarage();
@@ -5638,6 +5639,7 @@ APP._garageDoCancelAppointment = async function(eventId, btn) {
     }
     try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
     _fbClearActiveAppointment();
+    APP._garageClearApproved();
     if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
     showToast('התור בוטל');
     APP.helpGarage();
