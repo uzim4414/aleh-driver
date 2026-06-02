@@ -687,7 +687,10 @@ function saveNotifToHistory(payload) {
     localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
     incrementUnreadBadge();
     if (typeof STATE !== 'undefined' && STATE.currentScreen === 'alerts') renderNotifHistory();
-    _fbSaveNotif(newItem); // ← Firebase sync
+    /* _fbSaveNotif removed: GAS is the sole Firebase authority for notifications.
+       Client-side write created a second Firebase entry (notifications/T_client)
+       alongside GAS's entry (notifications/T_GAS), causing duplicate cards when
+       title/body differed between GAS storage format and FCM delivery format. */
   } catch(e) {}
 }
 
