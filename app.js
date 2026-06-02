@@ -536,6 +536,25 @@ function _garageDedupSeen(key) {
   return false;
 }
 
+/* Generic cross-channel dedup for ALL notification types that carry an
+   eventId. FCM (SW push) and the Firebase listener can both fire for the
+   same logical event; the first to arrive wins for TTL_MS. Keyed by
+   eventId+alertType so distinct events on the same vehicle are unaffected. */
+var _NOTIF_DEDUP_TTL_MS = 30000;
+var _notifDedupTtlMap = {};
+function _notifDedupTtlSeen(eventId, alertType) {
+  if (!eventId) return false;
+  var key = 'eid:' + String(eventId) + ':' + String(alertType || '');
+  var now = Date.now();
+  var keys = Object.keys(_notifDedupTtlMap);
+  for (var i = 0; i < keys.length; i++) {
+    if (now - _notifDedupTtlMap[keys[i]] > _NOTIF_DEDUP_TTL_MS) delete _notifDedupTtlMap[keys[i]];
+  }
+  if (_notifDedupTtlMap[key] && (now - _notifDedupTtlMap[key]) <= _NOTIF_DEDUP_TTL_MS) return true;
+  _notifDedupTtlMap[key] = now;
+  return false;
+}
+
 function saveNotifToHistory(payload) {
   try {
     var notif = payload.notification || {};
@@ -549,8 +568,13 @@ function saveNotifToHistory(payload) {
     var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
     if (ts <= clearedAt) return;
 
-    // Auto-clear garage pending state when approval/rejection arrives
     var alertType = meta.alertType || '';
+    // Unified cross-channel dedup: every notification with an eventId is
+    // deduped by eventId+alertType for 30s, regardless of type. Prevents the
+    // FCM-vs-Firebase race that produced duplicate cards/toasts.
+    if (meta.eventId && _notifDedupTtlSeen(meta.eventId, alertType)) return;
+
+    // Auto-clear garage pending state when approval/rejection arrives
     if (alertType === 'garage_approved' || alertType === 'garage_rejected') {
       try { localStorage.removeItem('pendingGarageRequest'); } catch(_e) {}
       _fbClearPendingGarage();
