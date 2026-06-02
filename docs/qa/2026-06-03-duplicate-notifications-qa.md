@@ -1,112 +1,138 @@
-# Bug Session — כפילות התראות
+# Bug Session — כפילות התראות (חקירה מלאה)
 **Date:** 2026-06-03  
-**Fixed in commit:** `7ea66be`  
+**תיקון אחרון:** `e3e66ce`  
 **Files touched:** `driver/app.js` only
 
 ---
 
-## תיאור הבעיה
+## תיאור הבעיה שדווחה
 
-משתמשים ראו כפילויות בהתראות — כרטיסים כפולים במסך ההיסטוריה ו/או badge שמציג מספר שגוי.
-
----
-
-## חקירה — מה כבר קיים ועובד
-
-לפני זיהוי הפער, נמצא שמנגנון ה-dedup **כבר מקיף מאוד**:
-
-| שכבה | פונקציה | מה היא בודקת |
-|------|---------|--------------|
-| 1 | `_notifDedupKey` (line 480) | `eventId` → `requestNumber` → `sig:alertType\|title\|body\|vehicleId` |
-| 2 | `_notifDedupTtlSeen` (line 543) | TTL 30s בזיכרון לכל `eventId+alertType` |
-| 3 | `saveNotifToHistory` (line 648–658) | ts + eventId+alertType + sig (שלוש שכבות) |
-| 4 | `dedupNotifList` (line 488) | sig + ts על כל רשימה |
-| 5 | `getNotifHistory` (line 506) | קורא `dedupNotifList` על **כל** קריאה מ-localStorage |
-| 6 | `loadNotifHistoryFromGAS` (line 1605) | `dedupNotifList(merged)` אחרי כל ה-merge |
-| 7 | Firebase listener (line 314) | `dedupNotifList(items)` לפני כתיבה ל-localStorage |
-
-**מסקנה:** כפילויות של כרטיסים במסך ההיסטוריה מוגנות מכל הכיוונים.
+לאחר הגעת התראה: toast אחד (תקין), אבל **מיידית מופיעים 2 כרטיסים זהים** במסך ההיסטוריה. הופיע בכל סוגי ההתראות.
 
 ---
 
-## הפער האמיתי — badge count לא עקבי
+## שלב 1 — מה כבר היה קיים ועובד (לא שונה)
 
-### שורש הבאג
+| שכבה | מיקום | מה בודק |
+|------|-------|---------|
+| TTL 30s | `_notifDedupTtlSeen` (line 543) | `eventId+alertType` ב-30 שניות |
+| ts exact | `saveNotifToHistory` line 648 | timestamp זהה |
+| eventId | `saveNotifToHistory` line 650 | `eventId+alertType` בהיסטוריה |
+| sig | `saveNotifToHistory` line 658 | `alertType\|title\|body\|vehicleId` |
+| `dedupNotifList` | line 488 | sig + ts על כל רשימה |
+| `getNotifHistory` | line 506 | מריץ `dedupNotifList` על כל קריאה |
+| GAS merge | `loadNotifHistoryFromGAS` line 1605 | `dedupNotifList` לאחר merge |
+| Firebase listener | line 314 | `dedupNotifList` לפני כתיבה ל-localStorage |
 
-שתי פונקציות ספרו `unread` בשיטות שונות:
+**מסקנה:** כל שכבות ה-dedup היו קיימות ועובדות. הבעיה הייתה בארכיטקטורה.
 
-**Firebase listener (line 318–320) — שיטה א׳:**
+---
+
+## שלב 2 — חקירת badge count (תוקן ב-`7ea66be`)
+
+### הבעיה
+`loadNotifHistoryFromGAS` חישב badge מ-`gasNotifs` (לפני dedup) עם `lastSeen`:
 ```javascript
-var clearedAt = parseInt(localStorage.getItem('driver_notif_cleared_at') || '0', 10);
-var unread = items.filter(function(n) { return n.ts > clearedAt; }).length;
-// items = dedupNotifList(items) ← לאחר dedup ✓
-// clearedAt = מועד "נקה הכל" האחרון ✓
-```
-
-**`loadNotifHistoryFromGAS` (line 1610–1612 לפני תיקון) — שיטה ב׳:**
-```javascript
-var lastSeen = parseInt(localStorage.getItem('driver_notif_last_seen') || '0', 10);
+// לפני תיקון:
 var unread = gasNotifs.filter(function(n) { return n.ts > lastSeen; }).length;
-// gasNotifs = לפני dedup ✗
-// lastSeen ≠ clearedAt ✗
 ```
 
-**שני כשלים:**
-1. `gasNotifs` — לפני dedup. אם GAS החזיר כפילויות (2 ts שונים לאותה התראה לוגית), `unread` = 2 במקום 1.
-2. `lastSeen` במקום `clearedAt` — גורם לקפיצות badge בין GAS pull ל-Firebase listener.
-
-### דוגמה לתסריט הכשל
-
+Firebase listener חישב מ-`items` (אחרי dedup) עם `clearedAt`:
+```javascript
+var unread = items.filter(function(n) { return n.ts > clearedAt; }).length;
 ```
-1. FCM → saveNotifToHistory → incrementUnreadBadge() → badge = 1
-2. Firebase listener → clearedAt-based count → badge = 1 ✓
-3. loadNotifHistoryFromGAS → lastSeen-based count על pre-dedup list → badge = 2 ✗
-4. Firebase listener → badge = 1 ✓
-→ badge מקפץ 1→2→1 מול עיני המשתמש
+
+שתי שיטות שונות → badge קפץ בין ערכים כשהמקורות ירו בזו אחר זו.
+
+### התיקון (`7ea66be`)
+```javascript
+// אחרי תיקון:
+var unread = merged.filter(function(n) { return n.ts > clearedAt; }).length;
 ```
+`merged` = הרשימה המאוחדת אחרי dedup, `clearedAt` = עקבי עם Firebase listener.
 
 ---
 
-## התיקון
+## שלב 3 — שורש הבעיה העיקרי: כפל כתיבה ל-Firebase (תוקן ב-`e3e66ce`)
 
-**שורות 1609–1611 (אחרי שינוי):**
-```javascript
-/* Badge count from the deduplicated merged list, using clearedAt (same
-   reference point as the Firebase listener) so the two sources agree. */
-var unread = merged.filter(function(n) { return n.ts > clearedAt; }).length;
-localStorage.setItem('driver_notif_unread', String(unread));
-_applyBadgeCount(unread);
+### הארכיטקטורה שגרמה לבעיה
+
+```
+[GAS Server]
+  ↓
+  כותב notifications/T_GAS ל-Firebase
+  ↓
+Firebase listener יורה → localStorage = [item_GAS] → renderNotifHistory → 1 כרטיס ✓
+
+[FCM Push מגיע לאפליקציה]
+  ↓
+  showInAppNotification → saveNotifToHistory:
+    • קורא localStorage = [item_GAS]
+    • ts check: T_client ≠ T_GAS → לא נתפס ✗
+    • eventId: אם אין eventId → לא נתפס ✗
+    • sig: אם title/body שונה בין GAS storage ל-FCM payload → לא נתפס ✗
+    • מוסיף item_T_client → localStorage = [item_GAS, item_T_client]
+    • renderNotifHistory → 2 כרטיסים! ✗
+    • _fbSaveNotif(item_T_client) → Firebase = {T_GAS, T_client}
+  ↓
+Firebase listener יורה שוב → dedupNotifList → localStorage = [item_GAS] → 1 כרטיס
 ```
 
-`clearedAt` כבר מוצהר בשורה 1540 — אין צורך בהצהרה חדשה.
+**המשתמש ראה:** 1 כרטיס → 2 כרטיסים (מיידי) → 1 כרטיס
+
+### למה sig dedup נכשל?
+
+GAS כותב ל-Firebase עם title/body בפורמט אחד.  
+FCM מעביר ל-SW עם title/body בפורמט שיכול להיות שונה.  
+`sig:alertType|title|body|vehicleId` → מפתחות שונים → שניהם עוברים.
+
+### התיקון (`e3e66ce`) — הסרת `_fbSaveNotif` מ-`saveNotifToHistory`
+
+```javascript
+// הוסר מ-saveNotifToHistory:
+_fbSaveNotif(newItem); // ← Firebase sync
+```
+
+**סיבה:** GAS הוא הסמכות הבלעדית לכתיבת התראות ל-Firebase. כאשר GAS יוצר התראה:
+1. כותב ל-Firebase `notifications/T_GAS`
+2. שולח FCM push
+
+הלקוח מקבל את ההתראה דרך FCM ושומר ב-localStorage. אין צורך שהלקוח יכתוב גם ל-Firebase — GAS כבר כתב שם. כתיבת הלקוח יצרה entry שני (`notifications/T_client`) שלא תמיד מוכר כ-duplicate של `notifications/T_GAS`.
+
+### בטיחות השינוי
+
+- **פונקציית `_fbSaveNotif` נשמרת** — לא נמחקה, רק אינה נקראת מ-`saveNotifToHistory`
+- **כל שכבות ה-dedup נשמרות** — לא שונו
+- **Firebase ← GAS**: הכתיבה ל-Firebase ממשיכה דרך GAS כמו תמיד
+- **localStorage ← Firebase listener**: הסנכרון ממשיך כרגיל
+- **אין notification שנוצר בלקוח בלי GAS** — הארכיטקטורה תמיד דורשת GAS
+
+---
+
+## תיקונים בסשן זה לפי סדר
+
+| commit | תיקון |
+|--------|-------|
+| `7ea66be` | badge count מ-`merged` + `clearedAt` עקבי |
+| `e3e66ce` | הסרת `_fbSaveNotif` מ-`saveNotifToHistory` |
 
 ---
 
 ## אימות
 
 ```bash
-node --check app.js  # ← נקי
+node --check app.js
 
 node -e "
 const s = require('fs').readFileSync('app.js','utf8');
+const fn = s.slice(s.indexOf('function saveNotifToHistory'), s.indexOf('function saveNotifToHistory')+3000);
+console.log('fbSaveNotif removed from history:', !fn.includes('_fbSaveNotif(newItem)'));
+console.log('function definition kept:', s.includes('function _fbSaveNotif'));
 const start = s.indexOf('async function loadNotifHistoryFromGAS');
-const fn = s.slice(start, start + 6000);
-console.log('uses merged + clearedAt:', fn.includes('merged.filter(function(n) { return n.ts > clearedAt'));
-console.log('no pre-dedup badge:', !fn.includes('gasNotifs.filter(function(n) { return n.ts > lastSeen'));
+const gas = s.slice(start, start + 6000);
+console.log('badge uses merged+clearedAt:', gas.includes('merged.filter(function(n) { return n.ts > clearedAt'));
 "
-# uses merged + clearedAt: true
-# no pre-dedup badge: true
+# fbSaveNotif removed from history: true
+# function definition kept: true
+# badge uses merged+clearedAt: true
 ```
-
----
-
-## פונקציות שלא שונו
-
-כל מנגנוני ה-dedup הקיימים נשמרו ללא שינוי:
-- `_notifDedupKey` — לא שונה
-- `dedupNotifList` — לא שונה
-- `_notifDedupTtlSeen` — לא שונה
-- `saveNotifToHistory` — לא שונה
-- `getNotifHistory` — לא שונה
-- Firebase listener logic — לא שונה
-- `loadNotifHistoryFromGAS` merge loop — לא שונה (רק חישוב badge בסוף)
