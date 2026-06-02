@@ -309,9 +309,8 @@ function _initFbNotifSync() {
       var items = Object.keys(data)
         .map(function(k) { return data[k]; })
         .filter(function(n) { return n && n.ts; })
-        .sort(function(a, b) { return b.ts - a.ts; });
-      // Collapse cross-path duplicates (push ts vs GAS ts) before persisting
-      items = dedupNotifList(items).slice(0, 30);
+        .sort(function(a, b) { return b.ts - a.ts; })
+        .slice(0, 30);
 
       localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(items));
 
@@ -458,38 +457,24 @@ function _initFbReminderSync() {
 /* ══ Notification History — global functions (called from IIFE + app logic) ══ */
 var _NOTIF_HISTORY_KEY = 'driver_notif_history';
 
-/* Canonical dedup key for a notification.
-   Same logical notification can arrive via push (ts=Date.now) and GAS pull
-   (ts=server canonical) with DIFFERENT ts values. When eventId/requestNumber
-   are absent (plan alerts), fall back to a content fingerprint so the two
-   copies collapse despite differing ts. */
-function _notifDedupKey(n) {
-  if (n.eventId) return 'eid:' + n.eventId + '|' + (n.alertType || '');
-  if (n.requestNumber) return 'req:' + n.requestNumber + '|' + (n.alertType || '');
-  return 'sig:' + (n.alertType || '') + '|' + (n.title || '') + '|' + (n.body || '') + '|' + (n.vehicleId || '');
-}
-
-/* Deduplicate a notification list using the canonical key plus a ts guard.
-   Keeps first occurrence (list is unshifted newest-first / sorted desc by ts). */
-function dedupNotifList(raw) {
-  var seen = {};
-  return raw.filter(function(n) {
-    if (!n) return false;
-    var k = _notifDedupKey(n);
-    if (seen[k]) return false;
-    seen[k] = true;
-    var tsKey = 'ts:' + n.ts;
-    if (seen[tsKey]) return false;
-    seen[tsKey] = true;
-    return true;
-  });
-}
-
 function getNotifHistory() {
   try {
     var raw = JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]');
-    // Deduplicate via shared helper (eventId/requestNumber/content-signature + ts guard)
-    var cleaned = dedupNotifList(raw);
+    // Deduplicate: prefer first occurrence (highest ts = most recent, since list is unshifted)
+    var seen = {};
+    var cleaned = raw.filter(function(n) {
+      // Primary key: eventId+alertType (most reliable)
+      var eidKey = n.eventId ? (n.eventId + '|' + (n.alertType || '')) : null;
+      if (eidKey) {
+        if (seen[eidKey]) return false;
+        seen[eidKey] = true;
+      }
+      // Fallback key: ts
+      var tsKey = 'ts:' + n.ts;
+      if (seen[tsKey]) return false;
+      seen[tsKey] = true;
+      return true;
+    });
     // Write back cleaned list if duplicates were found
     if (cleaned.length !== raw.length) {
       try { localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(cleaned)); } catch(_) {}
@@ -610,14 +595,6 @@ function saveNotifToHistory(payload) {
     if (list.some(function(n) { return n.ts === ts; })) return;
     // Dedup by eventId — prevents duplicate when same push arrives via two code paths
     if (meta.eventId && list.some(function(n) { return n.eventId === meta.eventId && n.alertType === alertType; })) return;
-    // Dedup by content fingerprint — catches same logical notification arriving via
-    // push path (ts=Date.now()) AND GAS pull path (ts=GAS canonical ts) with no eventId
-    var _incomingKey = _notifDedupKey({
-      eventId: meta.eventId || '', requestNumber: meta.requestNumber || '',
-      alertType: alertType, title: notif.title || '', body: notif.body || '',
-      vehicleId: meta.vehicleId || ''
-    });
-    if (list.some(function(n) { return _notifDedupKey(n) === _incomingKey; })) return;
     var newItem = {
       id:                  ts,
       title:               notif.title || 'עלה — התראה',
@@ -804,7 +781,6 @@ function _sessionExpired() {
   STATE.idToken = null;
   STATE.vehicle = null;
   STATE.user = null;
-  var _hfab2 = document.getElementById('help-fab'); if (_hfab2) _hfab2.style.display = 'none';
 
   // Try silent Google token refresh — if user's Google session is still active,
   // handleGoogleCredential will fire automatically and re-login without user interaction.
@@ -855,7 +831,7 @@ async function gasPost(action, extra, opts) {
 }
 
 /* ══ Demo / Mock mode (כשאין GAS_URL) ══ */
-function mockResponse(action, params) {
+function mockResponse(action) {
   const mockVehicle = {
     id: 'V001', num: '123-45-678', cat: 'פרטי', make: 'Toyota', model: 'Highlander',
     year: '2022', color: 'לבן', holder: 'משה כהן', dept: 'אגף שיקום',
@@ -925,57 +901,16 @@ function mockResponse(action, params) {
     };
   }
   if (action === 'driver_update_km') return { ok: true, km: 45000 };
+  if (action === 'driver_report_fault') return { ok: true };
   if (action === 'driver_register_fcm') return { ok: true };
   if (action === 'get_service_providers') {
     return { ok: true, providers: [{ id:'SP001', name:'פנצריה מורשית עלה', category:'puncture', address:'רחוב הרצל 14, בני ברק', phone:'03-1234567', contactName:'יוסי כהן', googlePlaceId:'ChIJtest123', notes:'' }] };
   }
   if (action === 'get_vehicle_insurance_details') {
-    return {
-      ok: true,
-      comp: {
-        company: 'מנורה מבטחים',
-        policyNumber: '70-33-158824-25/5',
-        startDate: '2025-09-01',
-        endDate: '2026-08-31',
-        minDriverAge: 24,
-        minDrivingExperience: 12,
-        deductible: 0,
-        agentName: 'יוסי כהן',
-        agentPhone: '050-1234567',
-        insuredName: 'עמותת עלה',
-        coverages: [],
-        exclusions: [],
-        summary: 'ביטוח חובה לכלי רכב תקף עד 31.08.2026. מכסה נזקי גוף לצד שלישי בתאונות דרכים.',
-        fileLink: ''
-      },
-      full: {
-        company: 'מגדל ביטוח',
-        policyNumber: '12345-67890-01',
-        startDate: '2025-09-01',
-        endDate: '2026-08-31',
-        minDriverAge: 24,
-        minDrivingExperience: 12,
-        deductible: 3500,
-        agentName: 'משה לוי',
-        agentPhone: '052-9876543',
-        insuredName: 'עמותת עלה',
-        coverages: [
-          { name: 'גרירה', included: true, provider: 'שגריר', phone: '1700507507', limit: '100 ק"מ', deductible: '0', details: 'גרירה 24/7 עד 100 ק"מ' },
-          { name: 'שמשות', included: true, provider: 'אילן קארגלס', phone: '036534444', limit: '', deductible: '0', details: 'החלפת שמשות ללא השתתפות עצמית' },
-          { name: 'רכב חלופי', included: true, provider: '', phone: '', limit: '21 יום', deductible: '', details: 'רכב חלופי עד 21 יום' }
-        ],
-        exclusions: [],
-        summary: 'ביטוח מקיף הכולל גרירה עד 100 ק"מ, שמשות ורכב חלופי. השתתפות עצמית בנזק עצמי ₪3,500.',
-        fileLink: ''
-      }
-    };
+    return { ok: true, insurance: { hasComprehensive:true, company:'מגדל ביטוח', policyNumber:'123456789', emergencyPhone:'1-800-123-456', towingCoverageKm:100, includesRentalCar:true, expiryDate:'2027-01-20' }, garage: { name:'מוסך טויוטה תל אביב', address:'רחוב הברזל 12, תל אביב', phone:'03-6789012' } };
   }
   if (action === 'driver_field_event') {
     return { ok: true, eventId: 'EVT-DEMO-' + Date.now() };
-  }
-  if (action === 'insurance_ai_explain') {
-    var q = params && params.question ? params.question : '';
-    return { ok: true, answer: 'על פי פרטי הביטוח שלך: ' + (q ? 'בנוגע ל"' + q + '" — ' : '') + 'הביטוח המקיף כולל גרירה עד 100 ק"מ, החלפת שמשות ורכב חלופי עד 21 יום. ההשתתפות העצמית בנזק עצמי היא ₪3,500.' };
   }
   return { ok: false, error: 'Unknown action' };
 }
@@ -1116,12 +1051,6 @@ function loadSession() {
 }
 
 /* ══ Auth ══ */
-// Desktop Chrome = not mobile AND Chrome (excluding Edge/Opera).
-// FedCM / One Tap is unreliable here, so we render the official OAuth-popup button instead.
-var isDesktopChrome = !(/Android|iPhone|iPad/i.test(navigator.userAgent))
-  && /Chrome/.test(navigator.userAgent)
-  && !/Edg|OPR/.test(navigator.userAgent);
-
 function initGoogleAuth() {
   if (!GOOGLE_CLIENT_ID) {
     // Demo mode — skip Google auth
@@ -1132,67 +1061,11 @@ function initGoogleAuth() {
     callback: handleGoogleCredential,
     auto_select: false,
     cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: false
+    use_fedcm_for_prompt: true
   });
-
-  if (isDesktopChrome) {
-    // Desktop: render the official Google button INSIDE the existing #login-btn container.
-    // Uses the standard OAuth popup (no FedCM), so it works without third-party cookies.
-    var loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-      loginBtn.innerHTML = ''; // clear Hebrew text
-      loginBtn.style.cssText = 'background:white;border:1.5px solid #dadce0;border-radius:100px;padding:4px 12px;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:center';
-      try {
-        google.accounts.id.renderButton(loginBtn, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'signin_with',
-          shape: 'pill',
-          locale: 'iw',
-          width: 240
-        });
-      } catch (e) {
-        console.warn('[auth] renderButton failed:', e && e.message);
-      }
-    }
-  }
-}
-
-// Render the official Google button into a hidden host, then wire #login-btn to click it.
-// renderButton() uses the standard OAuth popup (no One Tap / no FedCM) → works on Chrome Desktop,
-// while still showing the native One Tap card on Android via the same OAuth identity flow.
-function wireGoogleLoginButton() {
-  if (isDesktopChrome) {
-    // Desktop already has the official Google button rendered directly into #login-btn.
-    return;
-  }
-  var host = document.getElementById('gsi-button-host');
-  if (!host) {
-    host = document.createElement('div');
-    host.id = 'gsi-button-host';
-    // Off-screen but renderable (display:none prevents GIS from rendering)
-    host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;left:-9999px;top:-9999px';
-    document.body.appendChild(host);
-  }
-  try {
-    google.accounts.id.renderButton(host, { type: 'standard', theme: 'outline', size: 'large' });
-  } catch (e) {
-    console.warn('[auth] renderButton failed:', e && e.message);
-  }
-  var loginBtn = document.getElementById('login-btn');
-  if (loginBtn) {
-    loginBtn.addEventListener('click', function() {
-      var gBtn = host.querySelector('div[role="button"], div[tabindex]');
-      if (gBtn) { gBtn.click(); }
-      else { try { google.accounts.id.prompt(); } catch(_) {} } // fallback
-    });
-  }
 }
 
 async function handleGoogleCredential(response) {
-  /* Dismiss One Tap overlay immediately so it doesn't block the app */
-  try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.cancel(); } catch(_) {}
   showLoader();
   try {
     STATE.idToken = response.credential;
@@ -1302,40 +1175,10 @@ async function loadFullData() {
   if ('serviceWorker' in navigator && GAS_URL) registerPush();
   loadNotifHistoryFromGAS();
   _initFbGarageStatusSync();
-  // Safety net: clear stale local widget if it no longer matches an active server request
-  _reconcileGarageStatus();
   // Reliable fallback: poll GAS for active appointment (bypasses Firebase garageSync)
   _syncActiveAppointmentFromGAS();
   // Continuous safety net — catches admin-set appointments missed by Firebase listener
   _startActiveAppointmentPoll();
-}
-
-/* Startup safety net: reconcile the locally-stored activeGarageAppointment
-   against GAS's authoritative active garage_request. Fixes the stale widget
-   bug where a cancelled/closed request still shows (#15) because a Firebase
-   garageSync update was missed while offline. */
-async function _reconcileGarageStatus() {
-  try {
-    var r = await gasPost('driver_garage_status', {}, { silent: true });
-    if (!r || !r.ok) return; /* network/auth issue — don't touch local state */
-    var active = r.active; /* {eventId, requestNumber, status, ...} | null */
-    var local = null;
-    try { local = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
-    if (!local || !local.eventId) return; /* nothing local to reconcile */
-
-    var localEventId = String(local.eventId || '');
-    var serverEventId = active ? String(active.eventId || '') : '';
-    var TERMINAL = { closed: 1, rejected: 1, cancelled: 1 };
-    var serverTerminal = active ? !!TERMINAL[String(active.status || '')] : true;
-
-    /* Clear if: no active server row, server row is terminal, or eventIds differ */
-    if (!active || serverTerminal || serverEventId !== localEventId) {
-      try { localStorage.removeItem('activeGarageAppointment'); } catch(_) {}
-      if (typeof _fbClearActiveAppointment === 'function') _fbClearActiveAppointment();
-      if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-      console.log('[reconcile] cleared stale activeGarageAppointment local=' + localEventId + ' server=' + serverEventId + ' status=' + (active && active.status));
-    }
-  } catch(_e) { /* swallow — reconciliation is best-effort */ }
 }
 
 async function _syncActiveAppointmentFromGAS() {
@@ -1416,26 +1259,22 @@ function _initFbGarageStatusSync() {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
 
-      // ── ביטול תור — נקה תמיד אם ה-eventId תואם, ללא תלות ב-consumed ──
-      // (מכשיר שהיה offline בעת הביטול עלול לראות consumed:true ועדיין להחזיק widget ישן)
+      // ── מנהל ביטל תור פעיל — בדוק לפני consumed ──
       if (data.status === 'cancelled') {
-        var _localCancelAppt = null;
-        try { _localCancelAppt = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
-        var _localCancelEid = _localCancelAppt && _localCancelAppt.eventId ? String(_localCancelAppt.eventId) : '';
-        if (_localCancelEid && _localCancelEid === String(data.eventId || '')) {
+        if (!data.consumed) {
           localStorage.removeItem('activeGarageAppointment');
           _fbClearActiveAppointment();
           if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
+          // Cross-channel dedup: skip toast if FCM already showed this event
+          var _cDupKey = _normGarageEventKey('cancelled', data.eventId);
+          if (typeof showToast === 'function' && !_garageDedupSeen(_cDupKey)) {
+            var _cToast = data.setBy === 'driver'
+              ? '✅ התור בוטל' // driver cancelled - soft confirm on all devices
+              : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
+            if (_cToast) showToast(_cToast);
+          }
+          snap.ref.update({ consumed: true, consumedAt: Date.now() });
         }
-        // Toast only once across channels, only when we haven't already shown it
-        var _cDupKey = _normGarageEventKey('cancelled', data.eventId);
-        if (!data.consumed && typeof showToast === 'function' && !_garageDedupSeen(_cDupKey)) {
-          var _cToast = data.setBy === 'driver'
-            ? '✅ התור בוטל' // driver cancelled - soft confirm on all devices
-            : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
-          if (_cToast) showToast(_cToast);
-        }
-        if (!data.consumed) snap.ref.update({ consumed: true, consumedAt: Date.now() });
         return;
       }
 
@@ -1622,9 +1461,6 @@ async function loadNotifHistoryFromGAS() {
       if (n.requestNumber && n.alertType) existingReqSet.add(n.alertType + '|' + n.requestNumber);
     });
     merged.sort(function(a, b) { return b.ts - a.ts; });
-    // Final safety net: collapse any cross-path duplicates the merge-loop dedup
-    // (ts/eventId/requestNumber) missed — e.g. plan alerts with no eventId.
-    merged = dedupNotifList(merged);
     if (merged.length > 30) merged = merged.slice(0, 30);
     localStorage.setItem('driver_notif_history', JSON.stringify(merged));
 
@@ -1744,215 +1580,12 @@ function initSwipe() {
   }, { passive: true });
 }
 
-
-/* === Android Back Button: double-press to exit === */
-var _lastBackPress = 0;
-var _backToastEl = null;
-function _ensureBackStyles() {
-  if (document.getElementById('back-btn-styles')) return;
-  var st = document.createElement('style');
-  st.id = 'back-btn-styles';
-  st.textContent = 
-    '@keyframes backToastIn { from { opacity:0; transform:translate(-50%, 12px); } to { opacity:1; transform:translate(-50%, 0); } }' +
-    '@keyframes backToastOut { from { opacity:1; transform:translate(-50%, 0); } to { opacity:0; transform:translate(-50%, 8px); } }' +
-    '@keyframes exitModalFade { from { opacity:0; } to { opacity:1; } }' +
-    '@keyframes exitModalSlide { from { opacity:0; transform: translateY(20px) scale(.96); } to { opacity:1; transform: translateY(0) scale(1); } }' +
-    '.back-exit-backdrop { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.8); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:24px; animation: exitModalFade .2s ease-out; }' +
-    '.back-exit-card { width:100%; max-width:320px; background:linear-gradient(135deg,#1e293b,#0f172a); border-radius:24px; border:1px solid rgba(239,68,68,.3); padding:28px 22px; box-shadow: 0 24px 48px rgba(0,0,0,.5), 0 0 0 1px rgba(239,68,68,.15); direction:rtl; text-align:center; animation: exitModalSlide .3s cubic-bezier(.34,1.56,.64,1); }' +
-    '.back-exit-icon { width:60px; height:60px; margin:0 auto 14px; background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.3); border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:30px; }' +
-    '.back-exit-title { font-size:18px; font-weight:800; color:#f1f5f9; margin:0 0 6px; }' +
-    '.back-exit-sub { font-size:14px; color:#94a3b8; margin:0 0 20px; }' +
-    '.back-exit-btn { display:block; width:100%; height:54px; border:none; border-radius:16px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; }' +
-    '.back-exit-btn.primary { background:linear-gradient(135deg,#dc2626,#ef4444); color:white; box-shadow: 0 8px 20px rgba(239,68,68,.4), inset 0 1px 0 rgba(255,255,255,.2); }' +
-    '.back-exit-btn.primary:active { transform:scale(.98); }' +
-    '.back-exit-btn.ghost { margin-top:10px; background:rgba(148,163,184,.1); color:#cbd5e1; border:1px solid rgba(148,163,184,.2); }' +
-    '.back-toast-pill { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); z-index:9999; background:rgba(30,41,59,.95); border:1px solid rgba(255,255,255,.15); border-radius:999px; padding:12px 22px; color:white; font-size:14px; font-weight:600; box-shadow: 0 12px 28px rgba(0,0,0,.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display:flex; align-items:center; gap:8px; direction:rtl; animation: backToastIn .2s ease-out; pointer-events:none; }' +
-    '.back-toast-pill.out { animation: backToastOut .2s ease-in forwards; }';
-  document.head.appendChild(st);
-}
-function _showBackToast() {
-  _ensureBackStyles();
-  if (_backToastEl && _backToastEl.parentNode) _backToastEl.parentNode.removeChild(_backToastEl);
-  var el = document.createElement('div');
-  el.className = 'back-toast-pill';
-  el.innerHTML = '<span style="font-size:16px">\ud83d\udeaa</span><span>\u05dc\u05d7\u05e5 \u05e9\u05d5\u05d1 \u05dc\u05e6\u05d0\u05ea \u05de\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4</span>';
-  document.body.appendChild(el);
-  _backToastEl = el;
-  setTimeout(function() {
-    if (!el.parentNode) return;
-    el.classList.add('out');
-    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
-  }, 1800);
-}
-function _doExitApp() {
-  try { window.history.go(-(history.length - 1)); } catch(_){}
-  try { window.close(); } catch(_){}
-  setTimeout(function() {
-    try { document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#94a3b8;font-family:inherit;font-size:14px;direction:rtl">\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4 \u05e0\u05e1\u05d2\u05e8\u05d4. \u05e1\u05d2\u05d5\u05e8 \u05d0\u05ea \u05d4\u05d8\u05d0\u05d1.</div>'; } catch(_){}
-    try { window.location.href = 'about:blank'; } catch(_){}
-  }, 100);
-}
-function _showExitModal() {
-  _ensureBackStyles();
-  var existing = document.getElementById('back-exit-modal');
-  if (existing) return;
-  var wrap = document.createElement('div');
-  wrap.id = 'back-exit-modal';
-  wrap.className = 'back-exit-backdrop';
-  wrap.innerHTML =
-    '<div class="back-exit-card" role="dialog" aria-modal="true">' +
-      '<div class="back-exit-icon">\ud83d\udeaa</div>' +
-      '<h3 class="back-exit-title">\u05d9\u05e6\u05d9\u05d0\u05d4 \u05de\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4</h3>' +
-      '<p class="back-exit-sub">\u05d4\u05d0\u05dd \u05d1\u05e8\u05e6\u05d5\u05e0\u05da \u05dc\u05e6\u05d0\u05ea?</p>' +
-      '<button type="button" class="back-exit-btn primary" id="back-exit-yes">\u05d9\u05e6\u05d9\u05d0\u05d4</button>' +
-      '<button type="button" class="back-exit-btn ghost" id="back-exit-no">\u05d4\u05d9\u05e9\u05d0\u05e8</button>' +
-    '</div>';
-  document.body.appendChild(wrap);
-  function close(rePush) {
-    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-    if (rePush) { try { history.pushState({ pwa: true }, ''); } catch(_){} }
-  }
-  wrap.addEventListener('click', function(e) { if (e.target === wrap) close(true); });
-  var yes = document.getElementById('back-exit-yes');
-  var no  = document.getElementById('back-exit-no');
-  if (yes) yes.addEventListener('click', function() { close(false); _doExitApp(); });
-  if (no)  no.addEventListener('click', function() { close(true); });
-}
-function _onBackPress() {
-  var modal = document.getElementById('back-exit-modal');
-  if (modal) { /* user pressed back while modal open: treat as cancel */ if (modal.parentNode) modal.parentNode.removeChild(modal); try { history.pushState({ pwa: true }, ''); } catch(_){} return; }
-  if (typeof STATE !== 'undefined' && STATE && STATE.helpMenuOpen) {
-    try { APP.closeHelpMenu(); } catch(_){}
-    try { history.pushState({ pwa: true }, ''); } catch(_){}
-    return;
-  }
-  /* Close any open overlay/modal */
-  var openOverlay = document.querySelector('.modal.open, .overlay.open, .sheet.open, .help-overlay.open');
-  if (openOverlay) {
-    openOverlay.classList.remove('open');
-    try { history.pushState({ pwa: true }, ''); } catch(_){}
-    return;
-  }
-  var now = Date.now();
-  if (now - _lastBackPress < 2000) {
-    try { history.pushState({ pwa: true }, ''); } catch(_){}
-    _showExitModal();
-    _lastBackPress = 0;
-  } else {
-    _lastBackPress = now;
-    _showBackToast();
-    try { history.pushState({ pwa: true }, ''); } catch(_){}
-  }
-}
-function _initBackButtonHandler() {
-  try { history.pushState({ pwa: true }, ''); } catch(_){}
-  window.addEventListener('popstate', _onBackPress);
-}
-/* === Draggable Help FAB === */
-function _initHelpFabDrag() {
-  var fab = document.getElementById('help-fab');
-  if (!fab) return;
-  var dragging = false, moved = false;
-  var startX = 0, startY = 0, startLeft = 0, startTop = 0;
-  var FAB_SIZE = 64;
-
-  function restorePos() {
-    try {
-      var raw = localStorage.getItem('helpFabPos');
-      if (raw) {
-        var p = JSON.parse(raw);
-        var y = Math.max(8, Math.min(window.innerHeight - FAB_SIZE - 8, p.y || 0));
-        fab.style.top = y + 'px';
-        fab.style.bottom = 'auto';
-        if (p.side === 'left') { fab.style.left = '18px'; fab.style.right = 'auto'; }
-        else { fab.style.right = '18px'; fab.style.left = 'auto'; }
-      }
-    } catch(e) {}
-  }
-  restorePos();
-
-  function onDown(e) {
-    if (e.type === 'touchstart') { try { e.preventDefault(); } catch(_){} }
-    var pt = e.touches ? e.touches[0] : e;
-    startX = pt.clientX; startY = pt.clientY;
-    var r = fab.getBoundingClientRect();
-    startLeft = r.left; startTop = r.top;
-    dragging = true; moved = false;
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchend', onUp);
-    document.addEventListener('mouseup', onUp);
-  }
-
-  function onMove(e) {
-    if (!dragging) return;
-    var pt = e.touches ? e.touches[0] : e;
-    var dx = pt.clientX - startX;
-    var dy = pt.clientY - startY;
-    if (!moved && (Math.abs(dx) > 15 || Math.abs(dy) > 15)) {
-      moved = true;
-      fab.classList.add('dragging');
-      fab.style.transition = 'transform .15s ease';
-    }
-    if (moved) {
-      if (e.cancelable) { try { e.preventDefault(); } catch(_){} }
-      var nx = startLeft + dx;
-      var ny = startTop + dy;
-      nx = Math.max(0, Math.min(window.innerWidth - FAB_SIZE, nx));
-      ny = Math.max(0, Math.min(window.innerHeight - FAB_SIZE, ny));
-      fab.style.left = nx + 'px';
-      fab.style.top = ny + 'px';
-      fab.style.right = 'auto';
-      fab.style.bottom = 'auto';
-    }
-  }
-
-  function onUp(e) {
-    if (!dragging) return;
-    dragging = false;
-    document.removeEventListener('touchmove', onMove);
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('touchend', onUp);
-    document.removeEventListener('mouseup', onUp);
-    if (!moved) {
-      fab.classList.remove('dragging');
-      try { APP.openHelpMenu(); } catch(_){}
-      return;
-    }
-    var r = fab.getBoundingClientRect();
-    var centerX = r.left + r.width / 2;
-    var snapLeft = centerX < window.innerWidth / 2;
-    var y = r.top;
-    fab.style.transition = 'left .3s cubic-bezier(.34,1.56,.64,1), right .3s cubic-bezier(.34,1.56,.64,1), top .3s ease, transform .15s ease';
-    fab.style.top = y + 'px';
-    if (snapLeft) { fab.style.left = '18px'; fab.style.right = 'auto'; }
-    else { fab.style.right = '18px'; fab.style.left = 'auto'; }
-    try { localStorage.setItem('helpFabPos', JSON.stringify({ side: snapLeft ? 'left' : 'right', y: y })); } catch(_){}
-    setTimeout(function() {
-      fab.style.transition = 'transform .15s ease';
-      fab.classList.remove('dragging');
-    }, 360);
-  }
-
-  fab.addEventListener('touchstart', onDown, { passive: false });
-  fab.addEventListener('mousedown', onDown);
-  fab.addEventListener('click', function(e) { if (moved) { e.preventDefault(); e.stopPropagation(); } });
-  window.addEventListener('resize', function() {
-    var r = fab.getBoundingClientRect();
-    if (r.top + FAB_SIZE > window.innerHeight) { fab.style.top = (window.innerHeight - FAB_SIZE - 8) + 'px'; }
-  });
-}
-
 /* ══ Start App ══ */
 function startApp() {
   hideLoader();
   document.getElementById('app').classList.remove('hidden');
-  var _hfab = document.getElementById('help-fab'); if (_hfab) _hfab.style.display = '';
-  try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function(){}); } catch(_){}
   renderAll();
   initSwipe();
-  try { _initHelpFabDrag(); } catch(e) { console.warn('fab drag init', e); }
-  try { _initBackButtonHandler(); } catch(e) { console.warn('back btn init', e); }
   setTimeout(APP._checkGarageReminders, 1500);
   setInterval(APP._checkGarageReminders, 60000); // re-check every 60s while app is open
 
@@ -2184,35 +1817,27 @@ function renderGarageApptWidget() {
     return;
   }
 
-  var diffMs = apptMs - now;
-  // Use CALENDAR days (midnight-to-midnight) so "היום" = same date only,
-  // not "within 24 hours". At 20:32, tomorrow 09:00 is <24h but calDays=1 → "מחר".
-  var todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
-  var apptMidnight  = new Date(apptDateStr + 'T00:00:00');
-  var calDays = Math.round((apptMidnight.getTime() - todayMidnight.getTime()) / 86400000);
+  var diffMs   = apptMs - now;
+  var diffDays = diffMs / 86400000;
 
   var tier, bg, accent, ringAnim, badgeLabel;
   if (diffMs < 0) {
     tier = 'missed';   bg = '#111';    accent = '#555';    ringAnim = 'none';                                badgeLabel = 'עבר המועד';
-  } else if (calDays <= 0) {
+  } else if (diffDays < 1) {
     tier = 'today';    bg = '#1f0505'; accent = '#ef4444'; ringAnim = 'gwPulse 0.8s ease-in-out infinite';  badgeLabel = 'היום!';
-  } else if (calDays === 1) {
-    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'מחר';
-  } else if (calDays <= 2) {
-    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'עוד ' + calDays + ' ימים';
-  } else if (calDays <= 7) {
-    tier = 'soon';     bg = '#1f1700'; accent = '#f59e0b'; ringAnim = 'gwPulse 2.4s ease-in-out infinite';  badgeLabel = 'עוד ' + calDays + ' ימים';
+  } else if (diffDays <= 2) {
+    tier = 'urgent';   bg = '#1f0808'; accent = '#ef4444'; ringAnim = 'gwPulse 1.4s ease-in-out infinite';  badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
+  } else if (diffDays <= 7) {
+    tier = 'soon';     bg = '#1f1700'; accent = '#f59e0b'; ringAnim = 'gwPulse 2.4s ease-in-out infinite';  badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
   } else {
-    tier = 'normal';   bg = '#0a1f0a'; accent = '#22c55e'; ringAnim = 'none';                               badgeLabel = 'עוד ' + calDays + ' ימים';
+    tier = 'normal';   bg = '#0a1f0a'; accent = '#22c55e'; ringAnim = 'none';                               badgeLabel = 'עוד ' + Math.ceil(diffDays) + ' ימים';
   }
 
   var dateFmt    = apptDateStr.split('-').reverse().join('/');
   var dayName    = _hebrewDayName(new Date(apptMs));
   var garageName = appt.garageName || 'המוסך';
-  var _wReqN = appt.requestNumber || (function(eid){ try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1],10)) : ''; } catch(_){ return ''; } })(appt.eventId);
-  var reqNumChipHtml = _wReqN
-    ? '<span style="display:inline-block;font-size:10px;font-weight:800;color:var(--gaw-accent);background:rgba(255,255,255,.08);border:1px solid var(--gaw-accent);border-radius:6px;padding:1px 7px;margin-left:6px" title="מספר בקשה">בקשה #' + _wReqN + '</span>'
-    : '';
+  var reqNumWidget = appt.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(appt.eventId);
+  var reqNumChipHtml = reqNumWidget ? '<span class="gaw-reqnum" style="display:inline-block;font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:middle">#' + reqNumWidget + '</span>' : '';
 
   mount.innerHTML =
     '<div class="gaw-widget" data-tier="' + tier + '" ' +
@@ -2516,213 +2141,57 @@ function phoneToWa(p) {
   return d;
 }
 
-/* ── Vehicle brand → Simple Icons slug map ── */
-var GAR_BRAND_SLUG_MAP = {
-  'טויוטה': 'toyota', 'הונדה': 'honda',
-  'פולקסווגן': 'volkswagen', 'פולקסוואגן': 'volkswagen',
-  'פורד': 'ford', 'יונדאי': 'hyundai', 'יונדאי מוטור': 'hyundai',
-  'קיה': 'kia', 'מזדה': 'mazda', 'מאזדה': 'mazda',
-  'מיצובישי': 'mitsubishi', 'סובארו': 'subaru', 'ניסן': 'nissan',
-  'בי.מ.וו': 'bmw', 'במוו': 'bmw', 'ב.מ.וו': 'bmw',
-  'מרצדס': 'mercedes', 'מרצדס בנץ': 'mercedes',
-  'אאודי': 'audi', 'סקודה': 'skoda', 'שברולט': 'chevrolet',
-  'אופל': 'opel', "פיג'ו": 'peugeot', 'פיגו': 'peugeot',
-  'סיטרואן': 'citroen', 'רנו': 'renault', 'פיאט': 'fiat',
-  'סוזוקי': 'suzuki', 'לקסוס': 'lexus', 'מיני': 'mini',
-  'וולוו': 'volvo', 'פורשה': 'porsche', "ג'יפ": 'jeep', 'טסלה': 'tesla',
-  'אינפיניטי': 'infiniti', "דאצ'יה": 'dacia', 'סיאט': 'seat'
-};
-
-function _garBrandLogoHtml(make) {
-  var fallback =
-    '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' +
-    '</svg>';
-
-  if (!make) return fallback;
-  var key = String(make).trim();
-  var slug = GAR_BRAND_SLUG_MAP[key];
-  if (!slug) {
-    var simplified = key.replace(/[\s.'׳]/g, '').toLowerCase();
-    var k;
-    for (k in GAR_BRAND_SLUG_MAP) {
-      if (GAR_BRAND_SLUG_MAP.hasOwnProperty(k)) {
-        if (k.replace(/[\s.'׳]/g, '').toLowerCase() === simplified) {
-          slug = GAR_BRAND_SLUG_MAP[k]; break;
-        }
-      }
-    }
-  }
-  if (!slug) return fallback;
-
-  return '<img src="https://cdn.simpleicons.org/' + slug + '/ffffff" width="32" height="32" alt="' + _escHtml(key) + '" ' +
-    'onerror="this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',' +
-      '\'<svg width=&quot;32&quot; height=&quot;32&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;#fff&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z&quot;/></svg>\')">';
-}
-
 function renderGarageTab() {
-  var v = STATE.vehicle || {};
-  var g = v.garage;
+  const v = STATE.vehicle || {};
+  const g = v.garage;
   if (!g || (!g.name && !g.address)) {
-    return '<div class="gar-empty"><div class="gar-empty-ic"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>טרם שויך מוסך לרכב.<br>פנה למנהל הצי לקבלת פרטים.</div>';
+    return '<div class="gar-empty"><div class="gar-empty-ic">🔧</div>טרם שויך מוסך לרכב.<br>פנה למנהל הצי לקבלת פרטים.</div>';
   }
 
-  var gName    = g.name || 'המוסך שלך';
-  var gAddr    = g.address || '';
-  var hasPlace = !!g.googlePlaceId;
+  // Only show name + address + Waze — no direct contact details (requires manager approval)
+  let rows = '';
+  if (g.address) {
+    const wazeUrl = 'https://waze.com/ul?q=' + encodeURIComponent(g.address) + '&navigate=yes';
+    rows +=
+      '<div class="gar-row">' +
+        '<div class="gar-row-icn"><svg width="18" height="18"><use href="#ic-pin" color="#1F8A3D"/></svg></div>' +
+        '<div class="gar-row-body">' +
+          '<div class="gar-row-lbl">כתובת</div>' +
+          '<div class="gar-row-val">' + g.address + '</div>' +
+        '</div>' +
+        '<div class="gar-row-btns">' +
+          '<a class="gar-mini-btn waze" href="' + wazeUrl + '" target="_blank" rel="noopener" title="נווט בוויז">' +
+            '<svg width="20" height="20"><use href="#ic-waze" color="#fff"/></svg>' +
+          '</a>' +
+        '</div>' +
+      '</div>';
+  }
 
-  // Phone + contact visible ONLY after manager approval
-  var _hasApproval = !!(
-    localStorage.getItem('approvedGarageRequest') ||
-    localStorage.getItem('activeGarageAppointment')
-  );
-  var gPhone   = _hasApproval ? (g.phone || '') : '';
-  var gContact = _hasApproval ? (g.contactName || g.contact || '') : '';
+  const noticeRow =
+    '<div style="margin:10px 0 4px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:10px 14px;font-size:12px;color:#f59e0b;display:flex;align-items:center;gap:8px">' +
+    '<span>⚠️</span><span>לפנייה למוסך נדרש אישור מנהל — השתמש בכפתור "מוסך" בתפריט הסיוע</span></div>';
 
-  var wazeUrl      = gAddr ? 'https://waze.com/ul?q=' + encodeURIComponent(gAddr) + '&navigate=yes' : '';
-  var mapsEmbedUrl = gAddr ? 'https://maps.google.com/maps?q=' + encodeURIComponent(gAddr) + '&output=embed&hl=he&z=15' : '';
-  var phoneClean   = gPhone ? String(gPhone).replace(/[^0-9+]/g, '') : '';
-
-  /* 1 — Warning banner (unchanged) */
-  var warningBanner =
-    '<div class="gar-warning-banner">' +
-      '<div class="gar-warning-banner-icon">' +
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
-          '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>' +
-        '</svg>' +
-      '</div>' +
-      '<div class="gar-warning-banner-body">' +
-        '<div class="gar-warning-banner-title">לפנייה למוסך נדרש אישור מנהל</div>' +
-        '<div class="gar-warning-banner-sub">כל כניסה למוסך מחייבת אישור מנהל מראש</div>' +
-      '</div>' +
-    '</div>';
-
-  /* 2 — Approval request button (unchanged) */
-  var approvalBtn =
-    '<button class="gar-approval-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpGarage();},350)">' +
-      '<div class="gar-approval-icon">' +
-        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>' +
-          '<polyline points="16 17 21 12 16 7"/>' +
-          '<line x1="21" y1="12" x2="9" y2="12"/>' +
-        '</svg>' +
-      '</div>' +
-      '<div class="gar-approval-body">' +
-        '<div class="gar-approval-title">בקשה לאישור כניסה למוסך</div>' +
-        '<div class="gar-approval-sub">לחץ לשליחת בקשה למנהל הצי</div>' +
-      '</div>' +
-      '<div class="gar-approval-arrow">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>' +
-      '</div>' +
-    '</button>';
-
-  /* 3 — Closed banner removed; status shown only in chip next to garage name */
-
-  /* 4 — Info card: brand badge + name + status chip + detail rows + hours */
-  var statusChipHtml = hasPlace
-    ? '<span id="gar-status-chip" class="gar-status-chip loading">טוען...</span>'
+  const wazeUrl2 = g.address ? 'https://waze.com/ul?q=' + encodeURIComponent(g.address) + '&navigate=yes' : '';
+  const cta = wazeUrl2
+    ? '<a class="gar-cta-btn ghost" href="' + wazeUrl2 + '" target="_blank" rel="noopener">' +
+        '<svg width="17" height="17"><use href="#ic-map" color="#fff"/></svg>נווט' +
+      '</a>'
     : '';
 
-  var detailRows = '';
-  if (gPhone) {
-    detailRows +=
-      '<div class="gar-detail-row">' +
-        '<div class="gar-detail-icon">' +
-          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>' +
-          '</svg>' +
+  return '<div class="gar-wrap">' +
+    '<div class="gar-card">' +
+      '<div class="gar-head">' +
+        '<div class="gar-logo"><svg width="28" height="28"><use href="#ic-tool" color="#1F8A3D"/></svg></div>' +
+        '<div>' +
+          '<div class="gar-name">' + (g.name || 'המוסך שלך') + '</div>' +
+          '<div class="gar-tag">המוסך המשויך לרכב</div>' +
         '</div>' +
-        '<div class="gar-detail-body">' +
-          '<div class="gar-detail-label">טלפון</div>' +
-          '<div class="gar-detail-value" id="gar-phone-val">' + _escHtml(gPhone) + '</div>' +
-        '</div>' +
-        (phoneClean
-          ? '<button class="gar-call-btn" onclick="window.open(\'tel:' + phoneClean + '\')" aria-label="חייג למוסך">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
-            '</button>'
-          : '') +
-      '</div>';
-  }
-  if (gContact) {
-    detailRows +=
-      '<div class="gar-detail-row">' +
-        '<div class="gar-detail-icon">' +
-          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>' +
-            '<circle cx="12" cy="7" r="4"/>' +
-          '</svg>' +
-        '</div>' +
-        '<div class="gar-detail-body">' +
-          '<div class="gar-detail-label">איש קשר</div>' +
-          '<div class="gar-detail-value">' + _escHtml(gContact) + '</div>' +
-        '</div>' +
-      '</div>';
-  }
-
-  var hoursToggleHtml = hasPlace
-    ? '<details id="gar-hours-toggle" class="gar-hours-toggle">' +
-        '<summary>' +
-          '<span class="gar-hours-toggle-icon">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
-          '</span>' +
-          'שעות פעילות' +
-          '<span class="gar-hours-chevron">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
-          '</span>' +
-        '</summary>' +
-        '<div id="gar-hours-body" class="gar-hours-body">' +
-          '<div class="gar-hours-empty">טוען שעות פעילות...</div>' +
-        '</div>' +
-      '</details>'
-    : '';
-
-  var infoCard =
-    '<div class="gar-info-card">' +
-      '<div class="gar-info-header">' +
-        '<div class="gar-brand-badge">' + _garBrandLogoHtml(v.make) + '</div>' +
-        '<div class="gar-header-titles">' +
-          '<div class="gar-header-name">' + _escHtml(gName) + '</div>' +
-          '<div class="gar-header-sub">המוסך המשויך לרכב שלך</div>' +
-        '</div>' +
-        statusChipHtml +
       '</div>' +
-      (detailRows ? '<div class="gar-detail-list">' + detailRows + '</div>' : '') +
-      hoursToggleHtml +
-    '</div>';
-
-  /* 5 — Address + map card (unchanged) */
-  var addrCard = '';
-  if (gAddr) {
-    addrCard =
-      '<div class="gar-addr-card">' +
-        '<div class="gar-addr-row">' +
-          '<div class="gar-addr-icon">' +
-            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-              '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>' +
-              '<circle cx="12" cy="10" r="3"/>' +
-            '</svg>' +
-          '</div>' +
-          '<div class="gar-addr-body">' +
-            '<div class="gar-addr-lbl">כתובת</div>' +
-            '<div class="gar-addr-val">' + _escHtml(gAddr) + '</div>' +
-          '</div>' +
-        '</div>' +
-        (mapsEmbedUrl ? '<iframe class="gar-map-frame" src="' + mapsEmbedUrl + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="מפה"></iframe>' : '') +
-        (wazeUrl
-          ? '<a class="gar-waze-btn" href="' + wazeUrl + '" target="_blank" rel="noopener">' +
-              '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                '<polygon points="3 11 22 2 13 21 11 13 3 11"/>' +
-              '</svg>' +
-              'נווט בוויז' +
-            '</a>'
-          : '') +
-      '</div>';
-  }
-
-  if (hasPlace) setTimeout(function(){ _loadGarageDetails(); }, 80);
-
-  return '<div class="gar-wrap">' + warningBanner + approvalBtn + infoCard + addrCard + '</div>';
+      rows +
+      noticeRow +
+      (cta ? '<div class="gar-cta">' + cta + '</div>' : '') +
+    '</div>' +
+  '</div>';
 }
 
 function _escHtml(s) {
@@ -3107,759 +2576,6 @@ function renderGovSection() {
   '</div>';
 }
 
-/* ══ Insurance Tab ══ */
-function _insGetStatus(dateStr) {
-  if (!dateStr) return 'expired';
-  var d = new Date(dateStr);
-  var now = new Date();
-  if (d < now) return 'expired';
-  var diffDays = Math.floor((d - now) / 86400000);
-  if (diffDays <= 30) return 'expiring';
-  return 'valid';
-}
-
-function _insStatusLabel(status) {
-  if (status === 'expired')  return 'פג תוקף';
-  if (status === 'expiring') return 'פג בקרוב';
-  return 'בתוקף';
-}
-
-function _insCheckRenewed(key, currentExp) {
-  var storageKey = '_prevIns_' + key;
-  var prev = localStorage.getItem(storageKey) || '';
-  var isRenewed = false;
-  if (currentExp && prev && currentExp !== prev && new Date(currentExp) > new Date(prev)) {
-    isRenewed = true;
-    var tsKey = '_insRenewedTs_' + key;
-    if (!localStorage.getItem(tsKey)) {
-      localStorage.setItem(tsKey, Date.now().toString());
-    }
-  }
-  if (currentExp) localStorage.setItem(storageKey, currentExp);
-  var renewedTs = parseInt(localStorage.getItem('_insRenewedTs_' + key) || '0', 10);
-  if (renewedTs && Date.now() - renewedTs < 86400000) return true;
-  localStorage.removeItem('_insRenewedTs_' + key);
-  return false;
-}
-
-function _insDetailRow(iconHref, iconColor, label, valueId, valueText, extraClass) {
-  var cls = extraClass ? ' ' + extraClass : '';
-  return '<div class="ins-detail-row">' +
-    '<div class="ins-detail-icon"><svg width="18" height="18"><use href="' + iconHref + '" color="' + iconColor + '"/></svg></div>' +
-    '<div class="ins-detail-body">' +
-      '<div class="ins-detail-label">' + label + '</div>' +
-      '<div class="ins-detail-value' + cls + '"' + (valueId ? ' id="' + valueId + '"' : '') + '>' + (valueText || '—') + '</div>' +
-    '</div>' +
-  '</div>';
-}
-
-function _insToggleSection(id) {
-  var body = document.getElementById(id);
-  var icon = document.getElementById(id + '-chevron');
-  if (!body) return;
-  var isOpen = body.style.maxHeight && body.style.maxHeight !== '0px';
-  body.style.maxHeight = isOpen ? '0px' : '2000px';
-  body.style.overflow = 'hidden';
-  body.style.transition = 'max-height 0.35s ease';
-  if (icon) icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
-}
-window._insToggleSection = _insToggleSection;
-
-function _sanitizeForDriver(text) {
-  if (!text) return '';
-  return String(text)
-    .replace(/₪[\d,\s]+/g, '')
-    .replace(/[\d,]+\s*₪/g, '')
-    .replace(/[\d,]+\s*שקל[ים]*/g, '')
-    .replace(/פרמי[הת][^\.،؛\n]*/g, '')
-    .replace(/עלות ביטוח[^\.،؛\n]*/g, '')
-    .replace(/תעריף[^\.،؛\n]*/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
-function _insDeductibleWarningHtml(amount) {
-  return '<div class="ins-deduct-warn">' +
-    '<div class="ins-deduct-warn-head">' +
-      '<div class="ins-deduct-warn-icon">' +
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
-          '<line x1="12" y1="9" x2="12" y2="13"/>' +
-          '<line x1="12" y1="17" x2="12.01" y2="17"/>' +
-        '</svg>' +
-      '</div>' +
-      '<div class="ins-deduct-warn-title">⚠ השתתפות עצמית: ' + amount + '</div>' +
-    '</div>' +
-    '<div class="ins-deduct-warn-body">' +
-      'כל נזק שייגרם לרכב יחייב תשלום עצמי של ' + amount + ' — ללא קשר לגובה הנזק. נהג בזהירות, שמור על רכב העמותה ועל כספי הציבור.' +
-    '</div>' +
-    '<div class="ins-deduct-warn-footer">ביטוח אינו פטור מאחריות</div>' +
-  '</div>';
-}
-
-/* ── Insurance policy cache (localStorage, 24h TTL) ── */
-var _INS_CACHE_KEY = 'ins:v2:policy';
-var _INS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
-function _insCacheSet(comp, full) {
-  try {
-    localStorage.setItem(_INS_CACHE_KEY, JSON.stringify({
-      comp: comp, full: full, ts: Date.now()
-    }));
-  } catch(e) {}
-}
-
-function _insCacheGet() {
-  try {
-    var raw = localStorage.getItem(_INS_CACHE_KEY);
-    if (!raw) return null;
-    var obj = JSON.parse(raw);
-    if (!obj || Date.now() - (obj.ts || 0) > _INS_CACHE_TTL) { localStorage.removeItem(_INS_CACHE_KEY); return null; }
-    return obj;
-  } catch(e) { return null; }
-}
-
-/* ── Tier 1 router — answer driver questions locally without calling AI ── */
-function _insTier1Answer(question, comp, full) {
-  if (!question) return null;
-  var q = question.trim().toLowerCase();
-  var s = comp || {};
-  var f = full || {};
-
-  function _yn(flag) { return flag ? 'כן, מכוסה' : 'לא מכוסה'; }
-  function _agentSection(sec, label) {
-    var lines = [];
-    if (sec.agentName)  lines.push('שם הסוכן: ' + sec.agentName);
-    if (sec.agentPhone) lines.push('טלפון: ' + sec.agentPhone);
-    if (sec.agentEmail) lines.push('אימייל: ' + sec.agentEmail);
-    return lines.length ? label + ':\n' + lines.join('\n') : '';
-  }
-
-  // ── Agent / contact ──
-  if (/סוכן|סוכנ|agent|ביטוח.*מי|מי.*ביטוח|יצור קשר|ליצור קשר/.test(q)) {
-    var parts = [];
-    var compAgent = _agentSection(s, 'ביטוח חובה');
-    var fullAgent = _agentSection(f, 'ביטוח מקיף');
-    if (compAgent) parts.push(compAgent);
-    if (fullAgent) parts.push(fullAgent);
-    return parts.length ? parts.join('\n\n') : null;
-  }
-
-  // ── Towing ──
-  if (/גרירה|גרר|תקוע|תקע/.test(q)) {
-    // Check top-level v2.0 fields first, then fall back to coverages array
-    var towProvider = f.towingProvider || s.towingProvider || '';
-    var towPhone    = f.towingPhone    || s.towingPhone    || '';
-    if (!towProvider && f.coverages) {
-      var tc = f.coverages.find(function(c){ return c.name && c.name.indexOf('גרירה') >= 0; });
-      if (tc) { towProvider = tc.provider || ''; towPhone = tc.phone || ''; }
-    }
-    if (!towProvider && s.coverages) {
-      var tc2 = s.coverages.find(function(c){ return c.name && c.name.indexOf('גרירה') >= 0; });
-      if (tc2) { towProvider = tc2.provider || ''; towPhone = tc2.phone || ''; }
-    }
-    var hasTow = f.hasTowing || s.hasTowing || !!towProvider;
-    if (!hasTow) return null;
-    var ans = 'גרירה מכוסה';
-    if (towProvider) ans += ' — ספק: ' + towProvider;
-    if (towPhone)    ans += ' | טלפון: ' + towPhone;
-    return ans;
-  }
-
-  // ── Mirrors ──
-  if (/מראה|מראות/.test(q)) {
-    return _yn(f.hasMirrors || s.hasMirrors) + ' (מראות)';
-  }
-
-  // ── Glass / windshield ──
-  if (/שמש|שמשה|זגוגי|windshield|שמשות/.test(q)) {
-    var wdCov = null;
-    if (f.coverages) wdCov = f.coverages.find(function(c){ return c.name && (c.name.indexOf('שמש') >= 0 || c.name.indexOf('זגוג') >= 0); });
-    if (!wdCov && s.coverages) wdCov = s.coverages.find(function(c){ return c.name && (c.name.indexOf('שמש') >= 0 || c.name.indexOf('זגוג') >= 0); });
-    if (!wdCov && !f.hasGlass && !s.hasGlass) return null;
-    var wdProv = wdCov && wdCov.provider ? wdCov.provider : '';
-    var wdPhone = wdCov && wdCov.phone ? wdCov.phone : '';
-    return 'שמשות מכוסות' + (wdProv ? ' — ספק: ' + wdProv + (wdPhone ? ' (' + wdPhone + ')' : '') : '');
-  }
-
-  // ── Headlights ──
-  if (/פנס|פנסים|תאורה/.test(q)) {
-    var hlCov = null;
-    if (f.coverages) hlCov = f.coverages.find(function(c){ return c.name && c.name.indexOf('פנס') >= 0; });
-    if (!hlCov && !f.hasHeadlights && !s.hasHeadlights) return null;
-    return 'פנסים מכוסים' + (hlCov && hlCov.provider ? ' — ספק: ' + hlCov.provider : '');
-  }
-
-  // ── Theft ──
-  if (/גניב|גנוב|נגנב/.test(q)) {
-    var theftCov = null;
-    if (f.coverages) theftCov = f.coverages.find(function(c){ return c.name && c.name.indexOf('גניב') >= 0; });
-    if (!theftCov && !f.hasTheft && !s.hasTheft) return null;
-    return 'גניבה מכוסה';
-  }
-
-  // ── Replacement car ──
-  if (/רכב חלופי|רכב חליפי|חלופי|תחליף/.test(q)) {
-    var hasR = f.hasReplacementCar || s.hasReplacementCar;
-    if (!hasR) return 'רכב חלופי לא מכוסה בפוליסה זו';
-    var days = f.replacementCarDays || s.replacementCarDays;
-    return 'רכב חלופי מכוסה' + (days ? ' — עד ' + days + ' ימים' : '');
-  }
-
-  // ── Territory ──
-  if (/טריטוריה|אזור כיסוי|מחוץ|חו"ל|סיני|שטחים/.test(q)) {
-    var terr = f.territory || s.territory;
-    return terr ? 'אזור כיסוי: ' + terr : null;
-  }
-
-  // ── Claims phone ──
-  if (/תאונה.*מי|מה.*תאונה|לדווח|לדיווח|תביעה.*טלפון/.test(q)) {
-    var cp = f.claimsPhone || s.claimsPhone;
-    return cp ? 'לדיווח תאונה: ' + cp : null;
-  }
-
-  // ── Driver requirements / age ──
-  if (/גיל|ותק|דרישות נהג|מינימ/.test(q)) {
-    var dr = f.driverRequirements || s.driverRequirements;
-    var age = f.minDriverAge || s.minDriverAge;
-    var exp = f.minDrivingExperience || s.minDrivingExperience;
-    if (!dr && !age && !exp) return null;
-    var rParts = [];
-    if (age) rParts.push('גיל מינימלי: ' + age);
-    if (exp) rParts.push('ותק נהיגה: ' + exp + ' חודשים');
-    return (dr || rParts.join(', ')) || null;
-  }
-
-  // ── Deductible ──
-  if (/השתתפות|השתתפ|deductible/.test(q)) {
-    var ded = typeof f.deductible === 'number' ? f.deductible : null;
-    if (ded === null) return null;
-    return ded === 0 ? 'אין השתתפות עצמית' : 'השתתפות עצמית: ₪' + ded.toLocaleString('he-IL');
-  }
-
-  // ── Dates ──
-  if (/תוקף|מתי פג|פקיעה|תאריך/.test(q)) {
-    var endDate = f.endDate || s.endDate;
-    return endDate ? 'תוקף הביטוח: עד ' + endDate : null;
-  }
-
-  return null; // no local answer — fall through to AI
-}
-
-/* ── Vehicle License helpers ── */
-function _parseFlexibleDate(raw) {
-  if (!raw) return null;
-  var s = String(raw).trim();
-  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
-  return null;
-}
-
-function _formatDateHe(d) {
-  if (!d) return '—';
-  var day = d.getDate(), month = d.getMonth()+1, year = d.getFullYear();
-  return (day < 10 ? '0'+day : day) + '/' + (month < 10 ? '0'+month : month) + '/' + year;
-}
-
-function renderLicenseSection() {
-  var v = STATE.vehicle || {};
-  var raw = v.licExp || '';
-  var licLink = v.licLink || '';
-  var plateNum = v.num || '';
-
-  var expDate = _parseFlexibleDate(raw);
-  var now = new Date();
-  var status = 'unknown';
-  var daysLeft = null;
-  if (expDate) {
-    daysLeft = Math.floor((expDate - now) / (1000 * 60 * 60 * 24));
-    if (daysLeft < 0) status = 'expired';
-    else if (daysLeft <= 60) status = 'expiring';
-    else status = 'valid';
-  }
-
-  var expFormatted = expDate ? _formatDateHe(expDate) : '—';
-  var statusLabels = { valid: 'בתוקף', expiring: 'פג בקרוב', expired: 'פג תוקף', unknown: 'לא ידוע' };
-  var chipHtml = '<div class="ins-status ' + status + '"><div class="ins-status-dot"></div>' + (statusLabels[status] || status) + '</div>';
-
-  var daysNote = '';
-  if (status === 'expiring' && daysLeft !== null) daysNote = ' (' + daysLeft + ' יום)';
-  if (status === 'expired' && daysLeft !== null) daysNote = ' (' + Math.abs(daysLeft) + ' ימים)';
-
-  var detailsHtml =
-    '<div class="ins-detail-list">' +
-    (plateNum
-      ? '<div class="ins-detail-row">' +
-          '<div class="ins-detail-icon ins-row-icon"><svg width="18" height="18"><use href="#ic-car" color="#06b6d4"/></svg></div>' +
-          '<div class="ins-detail-body"><div class="ins-detail-label">מספר רכב</div><div class="ins-detail-value">' + plateNum + '</div></div>' +
-        '</div>'
-      : '') +
-    '<div class="ins-detail-row">' +
-      '<div class="ins-detail-icon ins-row-icon"><svg width="18" height="18"><use href="#ic-cal" color="' + (status === 'valid' ? '#22c55e' : '#f87171') + '"/></svg></div>' +
-      '<div class="ins-detail-body"><div class="ins-detail-label">תוקף הרישיון</div><div class="ins-detail-value' + (status !== 'valid' && status !== 'unknown' ? ' ' + status : '') + '">' + expFormatted + daysNote + '</div></div>' +
-    '</div>' +
-    '</div>';
-
-  var ctaHtml = licLink
-    ? '<div class="ins-cta-row">' +
-        '<a href="' + licLink + '" target="_blank" class="ins-cta-btn lic-primary">' +
-          '<span class="ins-cta-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>' +
-          'הצג רישיון רכב' +
-        '</a>' +
-      '</div>'
-    : '';
-
-  return (
-    '<div class="ins-section">' +
-      '<div class="ins-section-header lic" onclick="_insToggleSection(\'ins-lic-body\')" style="cursor:pointer">' +
-        '<div class="ins-shield-icon lic">' +
-          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-            '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h6M7 16h4"/>' +
-          '</svg>' +
-        '</div>' +
-        '<div class="ins-section-titles">' +
-          '<div class="ins-section-title lic">רישיון רכב</div>' +
-          '<div class="ins-section-subtitle">Vehicle Registration</div>' +
-        '</div>' +
-        chipHtml +
-        '<span id="ins-lic-body-chevron" style="margin-right:auto;font-size:18px;transition:transform 0.3s;color:rgba(255,255,255,0.6)">▼</span>' +
-      '</div>' +
-      '<div id="ins-lic-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
-        detailsHtml +
-        ctaHtml +
-      '</div>' +
-    '</div>'
-  );
-}
-
-function renderInsuranceTab() {
-  var v = STATE.vehicle || {};
-  var stateIns = (STATE.insurance && STATE.insurance.length) ? STATE.insurance[0] : null;
-  var syncCompany = stateIns ? (stateIns.company || '') : '';
-  var syncYear    = stateIns ? (stateIns.year    || '') : '';
-  var syncSubtitle = syncCompany ? (syncCompany + (syncYear ? ' · ' + syncYear : '')) : '';
-  var fallbackCompany = syncCompany || '—';
-
-  var compExp  = v.insCompExp || '';
-  var fullExp  = v.insFullExp || '';
-
-  var compStatus  = _insGetStatus(compExp);
-  var fullStatus  = _insGetStatus(fullExp);
-  var compRenewed = _insCheckRenewed('comp', compExp);
-  var fullRenewed = _insCheckRenewed('full', fullExp);
-
-  var compExpFormatted = compExp ? formatDate(compExp) : '—';
-  var fullExpFormatted = fullExp ? formatDate(fullExp) : '—';
-
-  function statusChip(status, renewed) {
-    var badge = renewed ? '<span class="ins-renewed-badge">✓ חודש!</span>' : '';
-    return badge + '<div class="ins-status ' + status + '"><div class="ins-status-dot"></div>' + _insStatusLabel(status) + '</div>';
-  }
-
-  function detailRow(iconHref, iconColor, label, valueId, valueText, extraClass, animDelay) {
-    var cls = extraClass ? ' ' + extraClass : '';
-    var valHtml = valueId
-      ? '<div class="ins-detail-value' + cls + '" id="' + valueId + '">' + (valueText || '—') + '</div>'
-      : '<div class="ins-detail-value' + cls + '">' + (valueText || '—') + '</div>';
-    var delayStyle = (typeof animDelay === 'number') ? ' style="animation-delay:' + animDelay + 's"' : '';
-    return '<div class="ins-detail-row">' +
-      '<div class="ins-detail-icon ins-row-icon"' + delayStyle + '><svg width="18" height="18"><use href="' + iconHref + '" color="' + iconColor + '"/></svg></div>' +
-      '<div class="ins-detail-body"><div class="ins-detail-label">' + label + '</div>' + valHtml + '</div>' +
-      '</div>';
-  }
-
-  var chevronHtml = '<span style="margin-right:auto;font-size:18px;transition:transform 0.3s;color:rgba(255,255,255,0.6)">▼</span>';
-  function chevron(id) {
-    return '<span id="' + id + '-chevron" style="margin-right:auto;font-size:18px;transition:transform 0.3s;color:rgba(255,255,255,0.6)">▼</span>';
-  }
-
-  /* ── ביטוח חובה ── */
-  /* NOTE: חובה (liability) has NO deductible in Israel and NO min driver age — skip those rows entirely */
-  var compSection =
-    '<div class="ins-section">' +
-      '<div class="ins-section-header comp" onclick="_insToggleSection(\'ins-comp-body\')" style="cursor:pointer">' +
-        '<div class="ins-shield-icon comp"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
-        '<div class="ins-section-titles"><div class="ins-section-title comp">ביטוח חובה</div><div class="ins-section-subtitle">' + (syncSubtitle || 'Third-Party Liability') + '</div></div>' +
-        statusChip(compStatus, compRenewed) +
-        chevron('ins-comp-body') +
-      '</div>' +
-      '<div id="ins-comp-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
-        '<div class="ins-detail-list">' +
-          detailRow('#ic-shield', '#0ea5e9', 'חברת ביטוח',         'ins-comp-company',  fallbackCompany, '', 0) +
-          detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-comp-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
-          detailRow('#ic-cal',    compStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, compExpFormatted, compStatus !== 'valid' ? compStatus : '', 0.6) +
-          detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-comp-agent-name',  '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
-          detailRow('#ic-user',   '#64748b', 'טלפון סוכן',           'ins-comp-agent-phone', '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
-        '</div>' +
-        '<div class="ins-cta-row" id="ins-comp-cta"></div>' +
-      '</div>' +
-    '</div>';
-
-  /* ── ביטוח מקיף ── */
-  var fullSection =
-    '<div class="ins-section">' +
-      '<div class="ins-section-header full" onclick="_insToggleSection(\'ins-full-body\')" style="cursor:pointer">' +
-        '<div class="ins-shield-icon full"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>' +
-        '<div class="ins-section-titles"><div class="ins-section-title full">ביטוח מקיף</div><div class="ins-section-subtitle">' + (syncSubtitle || 'Comprehensive Coverage') + '</div></div>' +
-        statusChip(fullStatus, fullRenewed) +
-        chevron('ins-full-body') +
-      '</div>' +
-      '<div id="ins-full-body" style="max-height:2000px;overflow:hidden;transition:max-height 0.35s ease;">' +
-        '<div class="ins-detail-list">' +
-          detailRow('#ic-shield', '#f59e0b', 'חברת ביטוח',         'ins-full-company',  fallbackCompany, '', 0) +
-          detailRow('#ic-hash',   '#64748b', 'מספר פוליסה',         'ins-full-policy',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.3) +
-          detailRow('#ic-cal',    fullStatus === 'valid' ? '#22c55e' : '#f87171', 'תוקף הביטוח', null, fullExpFormatted, fullStatus !== 'valid' ? fullStatus : '', 0.6) +
-          detailRow('#ic-user',   '#64748b', 'גיל מינימום לנהיגה',  'ins-full-minage',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 0.9) +
-          detailRow('#ic-star',   '#64748b', 'השתתפות עצמית',       'ins-full-deduct',   '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.2) +
-          detailRow('#ic-user',   '#64748b', 'שם סוכן',             'ins-full-agent-name',  '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.5) +
-          detailRow('#ic-user',   '#64748b', 'טלפון סוכן',           'ins-full-agent-phone', '<span class="ins-skeleton ins-skeleton-text"></span>', '', 1.8) +
-        '</div>' +
-        '<div id="ins-deductible-warning" style="display:none"></div>' +
-      '<div class="ins-services-divider"><span class="ins-services-label">שירותים כלולים בפוליסה</span></div>' +
-      '<div class="ins-chips" id="ins-full-chips">' +
-        '<div class="ins-chip full-chip" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpTowing();},350)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>גרירה</div>' +
-        '<div class="ins-chip full-chip" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpWindshield();},350)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>שמשות</div>' +
-        '<div class="ins-chip full-chip" id="ins-rental-chip" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>רכב חלופי</div>' +
-      '</div>' +
-      /* Towing card */
-      '<div class="ins-service-card">' +
-        '<div class="ins-service-card-header">' +
-          '<div class="ins-service-card-icon towing"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>' +
-          '<div><div class="ins-service-card-title">שירות גרירה</div><div class="ins-service-card-sub" id="ins-towing-detail">שירות גרירה 24/7</div></div>' +
-        '</div>' +
-        '<div class="ins-service-card-body">' +
-          '<button class="ins-service-action-btn towing-btn" id="ins-towing-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpTowing();},350)">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
-            'צור קשר עם שגריר' +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-      /* Windshield card */
-      '<div class="ins-service-card">' +
-        '<div class="ins-service-card-header">' +
-          '<div class="ins-service-card-icon glass"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg></div>' +
-          '<div><div class="ins-service-card-title">שירות שמשות</div><div class="ins-service-card-sub" id="ins-wd-sub">שירות החלפת שמשות</div></div>' +
-        '</div>' +
-        '<div class="ins-service-card-body">' +
-          '<button class="ins-service-action-btn glass-btn" onclick="APP.openHelpMenu();setTimeout(function(){APP.helpWindshield();},350)">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="14" width="6" height="7"/></svg>' +
-            'פתח תביעת שמשה' +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-      '<div id="ins-full-cta-placeholder"></div>' +
-      '</div>' /* close #ins-full-body */ +
-    '</div>';
-
-  setTimeout(function() { _loadInsuranceDetails(); }, 80);
-
-  var skeletonCss =
-    '<style>' +
-      '.ins-skeleton{display:inline-block;background:linear-gradient(90deg,rgba(148,163,184,0.12) 0%,rgba(148,163,184,0.28) 50%,rgba(148,163,184,0.12) 100%);background-size:200% 100%;border-radius:6px;animation:insSkelShimmer 1.2s ease-in-out infinite;vertical-align:middle}' +
-      '.ins-skeleton-text{width:90px;height:14px}' +
-      '@keyframes insSkelShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}' +
-    '</style>';
-
-  var errorBanner = '<div id="ins-load-error" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;direction:rtl;text-align:center;"></div>';
-
-  var aiSection =
-    '<div class="ins-ai-card" id="ins-ai-card" style="margin:0 0 14px;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(109,40,217,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:16px;padding:14px 16px;">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
-        '<div class="ins-ai-spark-icon" style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-        '</div>' +
-        '<span style="font-size:13px;font-weight:800;color:#c4b5fd;letter-spacing:0.3px">שאל AI על הביטוח שלך</span>' +
-      '</div>' +
-      '<div id="ins-ai-text" style="font-size:13px;color:#cbd5e1;line-height:1.6;font-weight:500;margin-bottom:10px;display:none"></div>' +
-      '<div class="ins-ai-questions">' +
-        '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה כלול בביטוח שלי?\')">מה כלול בביטוח שלי?</button>' +
-        '<button class="ins-ai-q-chip" onclick="_insAskAI(\'מה ההשתתפות העצמית?\')">מה ההשתתפות העצמית?</button>' +
-        '<button class="ins-ai-q-chip" onclick="_insAskAI(\'האם יש גרירה?\')">האם יש גרירה?</button>' +
-      '</div>' +
-      '<div class="ins-ai-input-row">' +
-        '<input id="ins-ai-input" type="text" placeholder="שאל שאלה על הביטוחים..." onkeydown="if(event.key===\'Enter\'){_insAskAI();}"/>' +
-        '<button class="ins-ai-ask-btn" onclick="_insAskAI()">שאל</button>' +
-      '</div>' +
-      '<div id="ins-ai-response"></div>' +
-    '</div>';
-
-  return '<div class="ins-wrap">' + skeletonCss + errorBanner + renderLicenseSection() + compSection + fullSection + aiSection + '</div>';
-}
-
-function _insShowError(msg) {
-  var el = document.getElementById('ins-load-error');
-  if (!el) return;
-  el.textContent = msg || 'לא ניתן לטעון נתוני ביטוח';
-  el.style.display = 'block';
-}
-
-async function _loadGarageDetails() {
-  try {
-    var v = STATE.vehicle || {};
-    var g = v.garage || {};
-    if (!g.googlePlaceId) return;
-
-    var res = null;
-    try {
-      res = await gasPost('get_place_status', { placeId: g.googlePlaceId }, { silent: true });
-    } catch(e1) {
-      console.warn('[_loadGarageDetails] network error:', e1 && e1.message);
-      return;
-    }
-    if (!res || !res.ok) {
-      console.warn('[_loadGarageDetails] API not ok:', res);
-      return;
-    }
-
-    var isOpen   = (typeof res.isOpen === 'boolean') ? res.isOpen : null;
-    /* openingHours comes from the stored garage record, not from get_place_status
-       (which only returns isOpen/todayHours). Use STATE.vehicle.garage.openingHours. */
-    var v2 = STATE.vehicle || {};
-    var g2 = v2.garage || {};
-    var hoursStr = g2.openingHours || '';
-
-    /* Status chip */
-    var chip = document.getElementById('gar-status-chip');
-    if (chip) {
-      if (isOpen === true) {
-        chip.className = 'gar-status-chip open';
-        chip.innerHTML = '<span class="gar-status-dot"></span>פתוח כעת';
-      } else if (isOpen === false) {
-        chip.className = 'gar-status-chip closed';
-        chip.innerHTML = '<span class="gar-status-dot"></span>סגור כעת';
-      } else {
-        chip.style.display = 'none';
-      }
-    }
-
-    /* Hours body */
-    var hoursBody   = document.getElementById('gar-hours-body');
-    var hoursToggle = document.getElementById('gar-hours-toggle');
-    if (hoursBody) {
-      if (hoursStr && hoursStr.trim()) {
-        var dayNames  = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
-        var todayName = dayNames[new Date().getDay()];
-        var lines     = hoursStr.split('\n').filter(function(l){ return l && l.trim(); });
-        var todayHtml = '';
-        var rowsHtml  = '';
-        lines.forEach(function(line) {
-          var clean   = String(line).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          var isToday = clean.indexOf(todayName) !== -1;
-          var rowHtml = '<div class="gar-hours-row' + (isToday ? ' today' : '') + '">' + clean + '</div>';
-          if (isToday) todayHtml = rowHtml;
-          rowsHtml += rowHtml;
-        });
-        /* Hoist today to top */
-        if (todayHtml) rowsHtml = todayHtml + rowsHtml.replace(todayHtml, '');
-        hoursBody.innerHTML = rowsHtml;
-        /* Auto-open toggle so driver always sees hours */
-        if (hoursToggle) hoursToggle.setAttribute('open', '');
-      } else {
-        if (hoursToggle) hoursToggle.style.display = 'none';
-      }
-    }
-  } catch(e) {
-    console.error('[_loadGarageDetails] exception:', e && e.message);
-  }
-}
-
-async function _loadInsuranceDetails() {
-  try {
-    var res = await gasPost('get_vehicle_insurance_details', {}, { silent: true });
-    if (!res || !res.ok) {
-      var errMsg = res && res.error ? res.error : 'שגיאת שרת';
-      console.error('[_loadInsuranceDetails] API error:', errMsg, res);
-      _insShowError('שגיאה בטעינת נתוני ביטוח: ' + errMsg);
-      return;
-    }
-    try {
-      console.log('[_loadInsuranceDetails] res:', JSON.stringify(res).substring(0, 600));
-      if (res._debug) console.table(res._debug);
-    } catch(_) {}
-
-    var comp = res.comp || null;
-    var full = res.full || null;
-
-    if (!comp && !full) {
-      // Only show error banner if STATE also has no sync data — otherwise sync data is already visible
-      var hasSyncData = (STATE.vehicle && (STATE.vehicle.insCompExp || STATE.vehicle.insFullExp)) ||
-                        (STATE.insurance && STATE.insurance.length);
-      if (!hasSyncData) {
-        _insShowError('לא נמצאו נתוני ביטוח לרכב זה');
-      } else {
-        console.warn('[_loadInsuranceDetails] API returned null sections — showing sync STATE data only. Check GAS logs for _debug.');
-      }
-      return;
-    }
-
-    comp = comp || {};
-    full = full || {};
-
-    // Cache for Tier 1 router
-    _insCacheSet(comp, full);
-
-    function _setText(id, text) {
-      var el = document.getElementById(id);
-      if (el && text !== null && typeof text !== 'undefined' && String(text) !== '') el.textContent = String(text);
-    }
-    function _setHtml(id, html) {
-      var el = document.getElementById(id);
-      if (el) el.innerHTML = html;
-    }
-    /* Hide a detail row whose async value came back empty — removes lingering skeletons */
-    function _hideEmptyRow(id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      var row = el.closest ? el.closest('.ins-detail-row') : null;
-      if (row) row.style.display = 'none';
-    }
-
-    /* ── ביטוח חובה ── */
-    if (comp.company)      _setText('ins-comp-company', comp.company);
-    if (comp.policyNumber) _setText('ins-comp-policy',  comp.policyNumber);
-    else                   _hideEmptyRow('ins-comp-policy');
-    if (comp.agentName)    _setText('ins-comp-agent-name',  comp.agentName);
-    else                   _hideEmptyRow('ins-comp-agent-name');
-    if (comp.agentPhone)   _setText('ins-comp-agent-phone', comp.agentPhone);
-    else                   _hideEmptyRow('ins-comp-agent-phone');
-
-    /* CTA for חובה: view policy + call company */
-    var compCtaEl = document.getElementById('ins-comp-cta');
-    if (compCtaEl) {
-      var compFileLink = comp.fileLink || (STATE.vehicle && STATE.vehicle.insCompLink) || '';
-      var compCtaHtml = '';
-      if (compFileLink) {
-        compCtaHtml += '<a class="ins-cta-btn ghost" href="' + compFileLink + '" target="_blank" rel="noopener">' +
-            '<span class="ins-cta-icon">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
-            '</span>' +
-            'הצג פוליסה</a>';
-      }
-      if (comp.agentPhone) {
-        var compPhoneClean = String(comp.agentPhone).replace(/[^0-9+]/g,'');
-        compCtaHtml += '<button class="ins-cta-btn primary" onclick="window.open(\'tel:' + compPhoneClean + '\')">' +
-            '<span class="ins-cta-icon">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>' +
-            '</span>' +
-            'פניה לחברה</button>';
-      }
-      compCtaEl.innerHTML = compCtaHtml;
-    }
-
-    /* ── ביטוח מקיף ── */
-    if (full.company)      _setText('ins-full-company', full.company);
-    if (full.policyNumber) _setText('ins-full-policy',  full.policyNumber);
-    else                   _hideEmptyRow('ins-full-policy');
-    if (full.minDriverAge) _setText('ins-full-minage',  full.minDriverAge + ' שנים');
-    else                   _hideEmptyRow('ins-full-minage');
-    if (typeof full.deductible === 'number') _setText('ins-full-deduct', full.deductible === 0 ? 'ללא השתתפות' : '₪' + full.deductible.toLocaleString('he'));
-    else                   _hideEmptyRow('ins-full-deduct');
-    if (full.agentName)    _setText('ins-full-agent-name',  full.agentName);
-    else                   _hideEmptyRow('ins-full-agent-name');
-    if (full.agentPhone)   _setText('ins-full-agent-phone', full.agentPhone);
-    else                   _hideEmptyRow('ins-full-agent-phone');
-
-    /* Deductible warning (FIX 3): show only when deductible > 0 */
-    var deductNum = parseFloat(full.deductible);
-    if (full.deductible && !isNaN(deductNum) && deductNum > 0) {
-      var warnEl = document.getElementById('ins-deductible-warning');
-      var deductFmt = '₪' + parseInt(deductNum, 10).toLocaleString('he-IL');
-      if (warnEl) {
-        warnEl.innerHTML = _insDeductibleWarningHtml(deductFmt);
-        warnEl.style.display = 'block';
-      }
-    }
-
-    /* Coverages */
-    var coverages = full.coverages || [];
-    var towing    = coverages.find(function(c){ return c.name && c.name.indexOf('גרירה') >= 0; });
-    var windshield= coverages.find(function(c){ return c.name && (c.name.indexOf('שמש') >= 0 || c.name.indexOf('זכוכ') >= 0); });
-    var rental    = coverages.find(function(c){ return c.name && (c.name.indexOf('חלופי') >= 0 || c.name.indexOf('שכירות') >= 0); });
-
-    if (towing) {
-      var towProvider = towing.provider || 'שגריר';
-      var towDetail   = towProvider + (towing.limit ? ' | ' + towing.limit : '') + ' | 24/7';
-      _setText('ins-towing-detail', towDetail);
-      var towBtn = document.getElementById('ins-towing-btn');
-      if (towBtn) towBtn.childNodes[towBtn.childNodes.length - 1].textContent = 'צור קשר עם ' + towProvider;
-    }
-
-    if (windshield) {
-      var wdProvider = windshield.provider || 'אילן קארגלס';
-      _setText('ins-wd-sub', 'ספק: ' + wdProvider + (windshield.limit ? ' | ' + windshield.limit : ''));
-    }
-
-    if (rental) {
-      var rentalChip = document.getElementById('ins-rental-chip');
-      if (rentalChip) rentalChip.style.display = 'flex';
-    }
-
-    /* מקיף: no CTA button — policy doc contains pricing, not shown to driver */
-
-    /* AI insight (FIX 4: strip pricing from driver-facing text) */
-    var insight = _sanitizeForDriver(full.summary || comp.summary || '');
-    if (insight) {
-      var aiText = document.getElementById('ins-ai-text');
-      if (aiText) {
-        aiText.textContent = insight;
-        aiText.style.display = 'block';
-      }
-    }
-
-  } catch(e) {
-    console.error('[_loadInsuranceDetails] exception:', e.message, e);
-    _insShowError('לא ניתן לטעון נתוני ביטוח (' + (e.message || 'שגיאת רשת') + ')');
-  }
-}
-
-/* ── AI insurance Q&A — Tier 1 (local) → Tier 2 (AI) ── */
-function _insAskAI(question) {
-  var input = document.getElementById('ins-ai-input');
-  var responseEl = document.getElementById('ins-ai-response');
-  var q = question;
-  if (!q && input) q = input.value;
-  q = (q || '').trim();
-  if (!q) return;
-  if (input && !question) input.value = '';
-  if (responseEl) {
-    responseEl.className = '';
-    responseEl.textContent = '⏳ מחשב...';
-  }
-
-  // Tier 1: try local cache first (instant, free)
-  var cached = _insCacheGet();
-  if (cached) {
-    var localAnswer = _insTier1Answer(q, cached.comp, cached.full);
-    if (localAnswer) {
-      if (responseEl) {
-        responseEl.textContent = localAnswer;
-        responseEl.className = 'fade-in';
-      }
-      return;
-    }
-  }
-
-  // Tier 2: AI fallback
-  gasPost('insurance_ai_explain', { question: q }).then(function(res) {
-    if (!responseEl) return;
-    if (res && res.ok && res.answer) {
-      responseEl.textContent = _sanitizeForDriver(res.answer);
-      responseEl.className = 'fade-in';
-    } else {
-      responseEl.textContent = 'לא ניתן לקבל תובנות כרגע';
-      responseEl.className = 'fade-in';
-    }
-  }).catch(function() {
-    if (responseEl) {
-      responseEl.textContent = 'לא ניתן לקבל תובנות כרגע';
-      responseEl.className = 'fade-in';
-    }
-  });
-}
-window._insAskAI = _insAskAI;
-
 function renderVehicleScreen(tab) {
   const v = STATE.vehicle;
   if (!v) return;
@@ -3893,13 +2609,42 @@ function renderVehicleScreen(tab) {
     }).join('') + '</div>' + renderGovSection();
 
   } else if (tab === 'docs') {
-    // docs tab removed — redirect to insurance (licenses & insurance)
-    STATE.currentTab = 'insurance';
-    renderVehicleScreen('insurance');
-    return;
+    if (!STATE.documents.length) {
+      content.innerHTML = '<div class="empty">אין מסמכים</div>';
+    } else {
+      content.innerHTML = STATE.documents.map(function(d, i) {
+        const warn = daysLeftWarn(d.date, 30);
+        const safeLink  = (d.link  || '').replace(/'/g, "\\'");
+        const safeTitle = (d.type || 'מסמך').replace(/'/g, "\\'");
+        const onclick   = 'viewDoc(\'' + safeLink + '\',\'' + safeTitle + '\')';
+        return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's" onclick="' + onclick + '">' +
+          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-file" color="#1F8A3D"/></svg></div>' +
+          '<div class="dr-body">' +
+            '<div class="dr-title">' + (d.type || 'מסמך') + '</div>' +
+            '<div class="dr-sub' + (warn ? ' warn' : '') + '">' + formatDate(d.date) + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+            '<span style="font-size:11px;font-weight:600;color:' + (d.link ? '#30D158' : '#6e6e73') + '">' + (d.link ? 'פתח' : 'אין קישור') + '</span>' +
+            '<svg width="14" height="14" fill="none" stroke="' + (d.link ? '#30D158' : '#4e4e53') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
 
   } else if (tab === 'insurance') {
-    content.innerHTML = renderInsuranceTab();
+    if (!STATE.insurance.length) {
+      content.innerHTML = '<div class="empty">אין נתוני ביטוח</div>';
+    } else {
+      content.innerHTML = STATE.insurance.map(function(ins, i) {
+        return '<div class="doc-row" style="animation-delay:' + (i * 0.05) + 's">' +
+          '<div class="dr-icon-wrap"><svg width="20" height="20"><use href="#ic-shield" color="#1F8A3D"/></svg></div>' +
+          '<div class="dr-body">' +
+            '<div class="dr-title">ביטוח ' + (ins.year || '') + ' — ' + (ins.company || '') + '</div>' +
+            '<div class="dr-sub">חובה: ₪' + Number(ins.compCost || 0).toLocaleString('he') + ' | מקיף: ₪' + Number(ins.fullCost || 0).toLocaleString('he') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
 
   } else if (tab === 'history') {
     renderHistory();
@@ -3948,8 +2693,6 @@ const APP = {
       ? Number(v.currentKm).toLocaleString('he') + ' ק"מ'
       : (v.lastServiceKm ? Number(v.lastServiceKm).toLocaleString('he') + ' ק"מ' : '—');
     document.getElementById('km-modal-prev').textContent = 'ק"מ אחרון: ' + prev;
-    var _veh = document.getElementById('km-modal-vehicle');
-    if (_veh) _veh.textContent = v.id ? ('רכב: ' + v.id) : 'עדכון קילומטרז';
     const inp = document.getElementById('km-modal-input');
     inp.value = '';
     // reset to form state
@@ -4040,6 +2783,21 @@ const APP = {
   updateKm: async function() {
     // legacy — redirect to modal
     APP.openKmModal();
+  },
+
+  reportFault: async function() {
+    const desc = document.getElementById('fault-text').value.trim();
+    if (!desc) { showToast('תאר את התקלה'); return; }
+    showLoader();
+    try {
+      await gasPost('driver_report_fault', { description: desc });
+      document.getElementById('fault-text').value = '';
+      showToast('דיווח נשלח בהצלחה ✓');
+    } catch(e) {
+      showToast('שגיאה: ' + e.message);
+    } finally {
+      hideLoader();
+    }
   }
 };
 
@@ -4594,24 +3352,15 @@ APP.helpWindshield = async function() {
   var insCompany = '', insPolicy = '', wdPhone = '', wdProvider = '';
   try {
     var res = await gasPost('get_vehicle_insurance_details', {});
-    var full = (res && res.full) ? res.full : null;
-    if (full) {
-      insCompany = full.company || '';
-      insPolicy  = full.policyNumber || '';
+    if (res.ok && res.insurance && res.insurance.hasComprehensive) {
+      var ins = res.insurance;
+      insCompany = ins.company || '';
+      insPolicy  = ins.policyNumber || '';
     }
-    /* חפש כיסוי שמשות ב-coverages של המקיף */
-    var wdCov = null;
-    if (full && full.coverages && full.coverages.length) {
-      for (var wi = 0; wi < full.coverages.length; wi++) {
-        var wc = full.coverages[wi];
-        if (wc && wc.name && (wc.name.indexOf('שמש') >= 0 || wc.name.indexOf('זכוכ') >= 0)) {
-          wdCov = wc; break;
-        }
-      }
-    }
-    if (wdCov) {
-      wdProvider = wdCov.provider || 'אילן קארגלס';
-      wdPhone    = wdCov.phone    || '03-6534444';
+    /* חפש כיסוי שמשות ב-parsedData — מגיע מ-GAS דרך כיסויים */
+    if (res.windshieldCoverage) {
+      wdProvider = res.windshieldCoverage.provider || 'אילן קארגלס';
+      wdPhone    = res.windshieldCoverage.phone    || '03-6534444';
     } else {
       wdProvider = 'אילן קארגלס';
       wdPhone    = '03-6534444';
@@ -4725,41 +3474,8 @@ APP.helpTowing = async function() {
   _showHelpCard('<div class="help-card"><button class="help-back-btn" onclick="APP._helpBackToMenu()">&#x25C4; חזרה</button><div class="help-card-spinner">&#x27F3; טוען פרטי ביטוח...</div></div>');
   try {
     var res = await gasPost('get_vehicle_insurance_details', {});
-    var full = (res && res.full) ? res.full : null;
-    var garage = (res && res.garage) ? res.garage : ((STATE.vehicle && STATE.vehicle.garage) ? STATE.vehicle.garage : null);
-
-    /* Build a shim "ins" object so the rest of the rendering code keeps working */
-    var ins = null;
-    if (full) {
-      var towingCov = null;
-      if (full.coverages && full.coverages.length) {
-        for (var ci = 0; ci < full.coverages.length; ci++) {
-          var cv = full.coverages[ci];
-          if (cv && cv.name && (cv.name.indexOf('גרירה') >= 0 || cv.name.indexOf('שירותי דרך') >= 0)) {
-            towingCov = cv; break;
-          }
-        }
-      }
-      var rentalCov = null;
-      if (full.coverages && full.coverages.length) {
-        for (var ri = 0; ri < full.coverages.length; ri++) {
-          var rv = full.coverages[ri];
-          if (rv && rv.name && (rv.name.indexOf('חלופי') >= 0 || rv.name.indexOf('שכירות') >= 0)) {
-            rentalCov = rv; break;
-          }
-        }
-      }
-      ins = {
-        hasComprehensive: true,
-        company: full.company || '',
-        policyNumber: full.policyNumber || '',
-        emergencyPhone: (towingCov && towingCov.phone) ? towingCov.phone : '',
-        towingProvider: (towingCov && towingCov.provider) ? towingCov.provider : '',
-        towingLimit:    (towingCov && towingCov.limit)    ? towingCov.limit    : '',
-        includesRentalCar: !!rentalCov,
-        expiryDate: full.endDate || ''
-      };
-    }
+    var ins = res.insurance;
+    var garage = res.garage;
 
     if (!ins || !ins.hasComprehensive) {
       var mgrPhone = (STATE.vehicle && STATE.vehicle.fleetManagerPhone) ? STATE.vehicle.fleetManagerPhone : '';
@@ -4836,7 +3552,6 @@ APP.helpTowing = async function() {
             '<div class="tw-provider-label">🔗 ספק גרירה ושירותי דרך</div>' +
             (ins.towingProvider ? '<div class="tw-provider-name">' + ins.towingProvider + '</div>' : '') +
             (ins.emergencyPhone ? '<div class="tw-provider-phone">📞 ' + ins.emergencyPhone + '</div>' : '') +
-            (ins.towingLimit ? '<div class="tw-provider-phone">🛣️ עד ' + ins.towingLimit + '</div>' : '') +
           '</div>' : '') +
         '<div class="tw-info-grid">' +
           '<div class="tw-info-cell"><div class="tw-info-label">רכב חלופי</div><div class="tw-info-val">' + (ins.includesRentalCar ? '✅ כלול' : '❌ לא כלול') + '</div></div>' +
@@ -5049,7 +3764,7 @@ APP._garageSubmitRequest = async function() {
     if (result.ok) {
       var eventId = result.eventId || '';
       try {
-        var _pendingData = { eventId: eventId, requestNumber: result.requestNumber || '', reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() };
+        var _pendingData = { eventId: eventId, reason: ctx.reasonId, reasonLabel: ctx.reasonLabel, description: ctx.description || '', submittedAt: Date.now() };
         localStorage.setItem('pendingGarageRequest', JSON.stringify(_pendingData));
         _fbSetPendingGarage(_pendingData);
       } catch(e) {}
@@ -5281,9 +3996,7 @@ APP._garageShowPending = function(pending) {
     } catch(e) {}
   }
   var reqNum = '';
-  if (pending.requestNumber !== undefined && pending.requestNumber !== null && pending.requestNumber !== '') {
-    reqNum = String(pending.requestNumber);
-  } else if (pending.eventId) {
+  if (pending.eventId) {
     var m = String(pending.eventId).match(/-(\d+)$/);
     if (m) reqNum = String(parseInt(m[1], 10));
   }
@@ -5393,6 +4106,7 @@ APP._garageEditAppointment = function(eventId) {
   var curDate = appt.appointmentDate || '';
   var curTime = appt.appointmentTime || '';
   var today = new Date().toISOString().slice(0,10);
+  var reqNum = appt.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId);
   var garageName = appt.garageName || '';
   var curDateFmt = curDate ? curDate.split('-').reverse().join('/') : '--';
   var curTimeFmt = curTime || '--:--';
@@ -5407,8 +4121,7 @@ APP._garageEditAppointment = function(eventId) {
   var ol = document.createElement('div');
   ol.id = '_gedit_overlay';
   ol.setAttribute('style', 'position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;direction:rtl;animation:_geditFade .2s ease');
-  var _eReqN = (appt && appt.requestNumber) ? String(appt.requestNumber) : (function(){ var _m = String(eventId||'').match(/-(\d+)$/); return _m ? String(parseInt(_m[1],10)) : ''; })();
-  var reqChip = _eReqN ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:3px 10px;letter-spacing:.3px">&#x1F527; #' + _eReqN + '</span>' : '';
+  var reqChip = reqNum ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:3px 10px;letter-spacing:.3px">&#x1F527; #' + reqNum + '</span>' : '';
   var garageRow = garageName ? '<div style="display:flex;align-items:center;gap:8px;background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.15);border-radius:12px;padding:10px 12px;margin-bottom:14px"><span style="font-size:16px">&#x1F527;</span><div style="flex:1;min-width:0"><div style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:.4px">מוסך</div><div style="font-size:13px;color:#e2e8f0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + garageName.replace(/</g,"&lt;") + '</div></div></div>' : '';
   ol.innerHTML =
     '<div style="background:linear-gradient(180deg,#1e293b 0%,#172033 100%);width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:0;box-shadow:0 -20px 60px rgba(0,0,0,.6);animation:_geditSlideUp .28s cubic-bezier(.2,.9,.3,1.2);max-height:92vh;overflow-y:auto;border-top:1px solid rgba(148,163,184,.15)">' +
@@ -5664,7 +4377,7 @@ APP._garageConfirmAppointment = async function(eventId) {
       var _garageCtx = APP._garageCtx || {};
       var _apptData = {
         eventId:         eventId,
-        requestNumber:   (result.requestNumber ? String(result.requestNumber) : (function(){ try { var _apg = JSON.parse(localStorage.getItem('approvedGarageRequest')||'null'); if (_apg && _apg.requestNumber) return String(_apg.requestNumber); } catch(_){} var _m = String(eventId||'').match(/-(\d+)$/); return _m ? String(parseInt(_m[1],10)) : ''; })()),
+        requestNumber:   _reqNumConfirm || '',
         appointmentDate: dateVal,
         appointmentTime: timeVal,
         garageName:    _garageCtx.garageName    || (STATE.vehicle && STATE.vehicle.garage && STATE.vehicle.garage.name)    || '',
@@ -5683,6 +4396,8 @@ APP._garageConfirmAppointment = async function(eventId) {
       var _dateFmt  = dateVal.split('-').reverse().join('/');
       var _timeDisp = timeVal || '09:00';
       var _calUrl   = _buildGoogleCalendarUrl(dateVal, timeVal, STATE.vehicle);
+      var _reqNumConfirm = (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId);
+
       _showHelpCard(
         '<div class="help-card" style="padding:0;overflow:hidden">' +
 
@@ -5691,6 +4406,7 @@ APP._garageConfirmAppointment = async function(eventId) {
             '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' +
           '</div>' +
           '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px">תור נקבע!</div>' +
+          (_reqNumConfirm ? '<div style="display:inline-block;font-size:11px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:2px 10px;margin-bottom:6px">מספר תקלה #' + _reqNumConfirm + '</div>' : '') +
           '<div style="font-size:14px;color:rgba(255,255,255,.85)">תאריך: <b>' + _dateFmt + '</b> · <b>' + _timeDisp + '</b></div>' +
           '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px">מנהל הצי קיבל עדכון</div>' +
         '</div>' +
@@ -6503,83 +5219,21 @@ function hideGreeting() {
 }
 
 /* ══ Boot ══ */
-/* ── Version display — fetches latest commit from GitHub ── */
-var __latestVerLabel = '';
-(function() {
-  var el = document.getElementById('splash-ver-text');
-  if (!el) return;
-  fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
-    headers: { 'Accept': 'application/vnd.github.v3+json' }
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data || !data.sha) { el.textContent = ''; return; }
-    var sha = data.sha.slice(0, 7);
-    var raw = (data.commit && data.commit.author && data.commit.author.date) || '';
-    var dt = raw ? new Date(raw) : null;
-    var fmt = dt ? (
-      ('0'+(dt.getDate())).slice(-2) + '/' +
-      ('0'+(dt.getMonth()+1)).slice(-2) + ' ' +
-      ('0'+dt.getHours()).slice(-2) + ':' +
-      ('0'+dt.getMinutes()).slice(-2)
-    ) : '';
-    __latestVerLabel = 'commit ' + sha + (fmt ? ' · ' + fmt : '');
-    el.textContent = sha + (fmt ? ' · ' + fmt : '');
-  }).catch(function() { el.textContent = ''; });
-})();
-
-/* ── Update banner: stunning slide-up + animated progress, auto-reload ── */
-function showUpdateBanner() {
-  var banner = document.getElementById('splash-update-banner');
-  if (!banner || banner.dataset.shown === '1') return;
-  banner.dataset.shown = '1';
-  var bar   = document.getElementById('sub-progress-bar');
-  var label = document.getElementById('sub-ver-label');
-  if (label) label.innerHTML = (__latestVerLabel || 'מתקין עדכון') + '<span class="blink">▋</span>';
-  banner.classList.remove('hidden');
-  /* kick the progress bar after the slide-up settles */
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() { if (bar) bar.style.width = '100%'; });
-  });
-  setTimeout(function() {
-    try { window.location.reload(); } catch (e) {}
-  }, 2700);
-}
-function showUpToDate() {
-  var banner = document.getElementById('splash-update-banner');
-  var title  = document.getElementById('sub-title');
-  if (!banner) return;
-  banner.dataset.shown = '1';
-  banner.classList.add('ver-ok');
-  if (title) title.textContent = '✓ גירסה עדכנית';
-  var wrap = document.getElementById('sub-progress-wrap');
-  var label = document.getElementById('sub-ver-label');
-  if (wrap) wrap.style.display = 'none';
-  if (label) label.textContent = '';
-  banner.classList.remove('hidden');
-  setTimeout(function() {
-    banner.classList.add('fade-out');
-    setTimeout(function() { banner.classList.add('hidden'); }, 500);
-  }, 1400);
-}
-
 document.addEventListener('DOMContentLoaded', async function() {
+  /* פתח נעילת orientation — עוקף manifest ישן ומאפשר סיבוב */
+  try {
+    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+  } catch(e) {}
 
   if ('serviceWorker' in navigator) {
-    /* updateViaCache:'none' — never serve sw.js from the HTTP cache; always hit network.
-       This is the fix for Desktop Chrome not picking up new SW versions. */
-    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function(reg) {
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
       /* בדוק עדכון בכל טעינה */
       reg.update();
       reg.addEventListener('updatefound', function() {
         const sw = reg.installing;
         if (!navigator.serviceWorker.controller) return; /* התקנה ראשונה — לא reload */
-        showUpdateBanner(); /* באנר עדכון מהמם — מבצע reload בעצמו */
         sw.addEventListener('statechange', function() {
-          /* New SW finished installing — tell it to activate immediately
-             (no waiting for all tabs to close). Desktop Chrome otherwise parks it in "waiting". */
-          if (sw.state === 'installed') {
-            try { sw.postMessage({ type: 'skip-waiting' }); } catch (_) {}
-          }
-          if (sw.state === 'redundant') showUpToDate();
+          if (sw.state === 'activated') window.location.reload();
         });
       });
     }).catch(function(e) {
@@ -6631,7 +5285,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.src = 'https://accounts.google.com/gsi/client';
   script.onload = function() {
     initGoogleAuth();
-    wireGoogleLoginButton();
+    document.getElementById('login-btn').addEventListener('click', function() {
+      google.accounts.id.prompt();
+    });
   };
   document.head.appendChild(script);
 });

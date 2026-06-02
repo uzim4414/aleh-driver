@@ -1,4 +1,4 @@
-// SW build: 2026-06-02T18:41:40Z // v94
+// SW build: 2026-05-21T14:00:00Z // v86
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v94';
+const CACHE_NAME = 'aleh-driver-v87';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
@@ -76,11 +76,6 @@ self.GAS_URL = self.GAS_URL || '';
 
 self.addEventListener('message', e => {
   if (!e.data) return;
-  // Activate a freshly-installed SW right away (sent by the page on statechange)
-  if (e.data.type === 'skip-waiting') {
-    self.skipWaiting();
-    return;
-  }
   if (e.data.type === 'set-gas-url' && typeof e.data.url === 'string') {
     self.GAS_URL = e.data.url;
   }
@@ -95,127 +90,20 @@ self.addEventListener('message', e => {
   }
 });
 
-const BADGE_ICON = './icons/notif-badge.png';
-
 const TYPE_CONFIG = {
-  overdue:                      { vibrate: [400,100,400,100,400], requireInteraction: true  },
-  urgent:                       { vibrate: [300,100,300],         requireInteraction: false },
-  plan:                         { vibrate: [200],                 requireInteraction: false },
-  km_update:                    { vibrate: [150],                 requireInteraction: false },
-  test_due:                     { vibrate: [300,100,300],         requireInteraction: false },
-  test_urgent:                  { vibrate: [400,100,400,100,400], requireInteraction: true  },
-  garage_approved:              { vibrate: [200,100,200],         requireInteraction: true  },
-  garage_rejected:              { vibrate: [400,100,400],         requireInteraction: true  },
-  garage_appointment_set:       { vibrate: [200,100,200,100,200], requireInteraction: true  },
-  garage_appointment_cancelled: { vibrate: [300,100,300],         requireInteraction: false },
-  fuel_high:                    { vibrate: [300,100,300],         requireInteraction: false },
-  fuel_km_high:                 { vibrate: [150],                 requireInteraction: false }
+  overdue:     { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
+  urgent:      { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+  plan:        { vibrate: [200],                 requireInteraction: false, badge: './icons/badge-blue.png' },
+  km_update:   { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' },
+  test_due:        { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+  test_urgent:     { vibrate: [400,100,400,100,400], requireInteraction: true,  badge: './icons/badge-red.png' },
+  garage_approved:         { vibrate: [200,100,200],             requireInteraction: true,  badge: './icons/badge-blue.png' },
+  garage_rejected:         { vibrate: [400,100,400],             requireInteraction: true,  badge: './icons/badge-red.png' },
+  garage_appointment_set:  { vibrate: [200,100,200,100,200],     requireInteraction: true,  badge: './icons/badge-blue.png' },
+  garage_appointment_cancelled: { vibrate: [300,100,300],            requireInteraction: false, badge: './icons/badge-blue.png' },
+  fuel_high:       { vibrate: [300,100,300],         requireInteraction: false, badge: './icons/badge-amber.png' },
+  fuel_km_high:    { vibrate: [150],                 requireInteraction: false, badge: './icons/badge-violet.png' }
 };
-
-/* ════════════════════════════════════════════════════════════════════
-   OS notification content builder — per-type title + body with real data
-   ════════════════════════════════════════════════════════════════════ */
-
-function _buildOsNotifContent(type, m, fallback) {
-  var id  = m.vehicleId ? 'רכב ' + m.vehicleId : '';
-  var dash = id ? ' — ' + id : '';
-
-  var builders = {
-    overdue: function() {
-      return {
-        title: 'טיפול דחוף' + dash,
-        body:  'חריגה של ' + (m.kmLeft || '?') + ' ק"מ מהמועד. יש לתאם מוסך מיידית.'
-      };
-    },
-    urgent: function() {
-      return {
-        title: 'טיפול בקרוב' + dash,
-        body:  'נותרו ' + (m.kmLeft || '?') + ' ק"מ עד הטיפול הבא.'
-      };
-    },
-    plan: function() {
-      return {
-        title: 'תכנן טיפול' + dash,
-        body:  'נותרו ' + (m.kmLeft || '?') + ' ק"מ. כדאי להתחיל לתכנן.'
-      };
-    },
-    km_update: function() {
-      return {
-        title: 'עדכון קילומטרז׳ נדרש' + dash,
-        body:  'לא עודכן ' + (m.daysSinceUpdate || '?') + ' ימים. ק"מ אחרון: ' + (m.lastKm || '?') + '.'
-      };
-    },
-    test_due: function() {
-      return {
-        title: 'טסט רכב בקרוב' + dash,
-        body:  'הטסט לפני ' + (m.testDate || '?') + '. נותרו ' + (m.daysLeft || '?') + ' ימים.'
-      };
-    },
-    test_urgent: function() {
-      return {
-        title: 'טסט רכב — דחוף!' + dash,
-        body:  'הטסט חייב להתבצע לפני ' + (m.testDate || '?') + '. נותרו ' + (m.daysLeft || '?') + ' ימים בלבד.'
-      };
-    },
-    garage_approved: function() {
-      var garage = m.garageInfo ? ' ב' + m.garageInfo : '';
-      return {
-        title: 'בקשת מוסך אושרה',
-        body:  (id || 'הבקשה') + ' אושרה. ניתן לקבוע תור' + garage + '.'
-      };
-    },
-    garage_rejected: function() {
-      return {
-        title: 'בקשת מוסך נדחתה',
-        body:  (id ? id + ' — ' : '') + 'ניתן לשלוח בקשה חדשה.'
-      };
-    },
-    garage_appointment_set: function() {
-      var when = m.appointmentDate || '';
-      var time = m.appointmentTime ? ' · ' + m.appointmentTime : '';
-      var garage = m.garageInfo ? ' · ' + m.garageInfo : '';
-      return {
-        title: 'תור מוסך נקבע' + (when ? ' — ' + when : ''),
-        body:  (id || '') + time + garage + '.'
-      };
-    },
-    garage_appointment_cancelled: function() {
-      var when = m.appointmentDate || '';
-      return {
-        title: 'תור מוסך בוטל' + (when ? ' — ' + when : ''),
-        body:  (id ? id + ' — ' : '') + 'ניתן לקבוע מועד חדש.'
-      };
-    },
-    fuel_high: function() {
-      var pct = (m.fuelConsumption && m.fleetAverage)
-        ? ' (' + Math.round((m.fuelConsumption / m.fleetAverage - 1) * 100) + '% מעל הממוצע)'
-        : '';
-      return {
-        title: 'צריכת דלק חריגה' + dash,
-        body:  (m.fuelConsumption || '?') + ' ל׳/100ק"מ' + pct + '.'
-      };
-    },
-    fuel_km_high: function() {
-      return {
-        title: 'עלות דלק חריגה' + dash,
-        body:  (m.costPerKm || '?') + ' ₪/ק"מ — ממוצע ציי: ' + (m.fleetAverage || '?') + ' ₪/ק"מ.'
-      };
-    }
-  };
-
-  var builder = builders[type];
-  if (builder) {
-    var built = builder();
-    return {
-      title: built.title || fallback.title || 'עלה — התראה',
-      body:  built.body  || fallback.body  || 'פתח את האפליקציה לפרטים'
-    };
-  }
-  return {
-    title: fallback.title || 'עלה — התראה',
-    body:  fallback.body  || 'פתח את האפליקציה לפרטים'
-  };
-}
 
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
@@ -228,8 +116,22 @@ self.addEventListener('push', e => {
       meta  = payload.data || {};
     }
 
-    // No payload — silent no-op (empty pushes are FCM keep-alives, not real notifications)
-    if (!notif) return;
+    // Empty push — fetch latest pending notification from GAS
+    if (!notif && self.GAS_URL) {
+      try {
+        const r = await fetch(self.GAS_URL + '?action=driver_pending_notifications', { mode: 'cors' });
+        const list = await r.json();
+        if (list && list.ok && list.notifications && list.notifications.length) {
+          const first = list.notifications[0];
+          notif = first.notification || first;
+          meta  = first.data || meta;
+        }
+      } catch(_) {}
+    }
+
+    if (!notif) {
+      notif = { title: 'עלה — התראה', body: 'יש התראה חדשה. פתח את האפליקציה.' };
+    }
 
     const alertType = meta.alertType || '';
     const cfg = TYPE_CONFIG[alertType] || { vibrate: [200], requireInteraction: false };
@@ -257,13 +159,28 @@ self.addEventListener('push', e => {
     const focusedClients = openClients.filter(c => c.focused);
     if (focusedClients.length > 0) return;
 
-    // Build OS-optimised title + body with relevant data per alert type
-    const osContent = _buildOsNotifContent(alertType, meta, notif);
+    const LABEL = {
+      overdue:         '🔴 טיפול באיחור',
+      urgent:          '🟠 טיפול דחוף',
+      plan:            '🔵 תכנית טיפולים',
+      km_update:       '🟣 עדכון קילומטרז\'',
+      test_due:        '🟠 טסט בקרוב',
+      test_urgent:     '🔴 טסט דחוף',
+      garage_approved:        '✅ תור מוסך אושר',
+      garage_rejected:        '❌ תור מוסך נדחה',
+      garage_appointment_set: '📅 תור מוסך נקבע',
+      garage_appointment_cancelled: '📅 תור בוטל',
+      fuel_high:       '⛽ צריכת דלק חריגה',
+      fuel_km_high:    '📊 עלות לקמ חריגה'
+    };
+    const notifTitle = notif.title || LABEL[alertType] || 'עלה — התראה';
+    const notifBody  = notif.body  || 'פתח את האפליקציה לפרטים';
 
-    return self.registration.showNotification(osContent.title, {
-      body:  osContent.body,
-      icon:  './icons/notif-bell.png',
-      badge: BADGE_ICON,
+    return self.registration.showNotification(notifTitle, {
+      body:  notifBody,
+      icon:  './icons/icon-512.png',
+      image: './icons/icon-512.png',
+      badge: './icons/icon-192.png',
       dir:   'rtl',
       lang:  'he',
       tag:   'aleh-' + (alertType || 'notif') + '-' + (meta.vehicleId || ''),
@@ -274,8 +191,8 @@ self.addEventListener('push', e => {
       timestamp:           Date.now(),
       data: Object.assign({}, meta, { _pushTs: relayPayload.ts }),
       actions: [
-        { action: 'open',    title: 'פתח עכשיו' },
-        { action: 'dismiss', title: 'סגור' }
+        { action: 'open',    title: '▶ פתח עכשיו' },
+        { action: 'dismiss', title: 'הבנתי' }
       ]
     });
   })());
@@ -309,15 +226,4 @@ self.addEventListener('notificationclick', e => {
       return clients.openWindow(url);
     })
   );
-});
-
-self.addEventListener('notificationclose', e => {
-  const tag = e.notification.tag;
-  if (tag) {
-    _pendingNotifs = _pendingNotifs.filter(n => {
-      if (!n.data) return true;
-      const nTag = 'aleh-' + (n.data.alertType || 'notif') + '-' + (n.data.vehicleId || '');
-      return nTag !== tag;
-    });
-  }
 });

@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>עיצוב מערכת התראות — נהג PWA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: 'Noto Sans Hebrew', 'Segoe UI', sans-serif;
+    direction: rtl;
+    padding: 24px;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  h1 { font-size: 22px; font-weight: 800; margin-bottom: 4px; color: #fff; }
+  h2 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #8b949e; letter-spacing: 0.5px; text-transform: uppercase; }
+  .subtitle { color: #8b949e; margin-bottom: 32px; font-size: 13px; }
+
+  /* ===================== SECTION ===================== */
+  .section { margin-bottom: 48px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #8b949e; margin-bottom: 20px;
+    padding-bottom: 8px; border-bottom: 1px solid #21262d;
+  }
+
+  /* ===================== PHONE FRAME ===================== */
+  .phone-row {
+    display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start;
+  }
+  .phone-wrap { position: relative; }
+  .phone-label {
+    text-align: center; font-size: 11px; color: #8b949e; margin-top: 12px;
+    font-weight: 600; letter-spacing: 0.5px;
+  }
+  .phone {
+    width: 320px;
+    background: #161b22;
+    border-radius: 36px;
+    border: 2px solid #30363d;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .phone-notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 28px; background: #0d1117;
+    border-radius: 0 0 20px 20px; z-index: 10;
+  }
+  .phone-status {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 36px 20px 8px;
+    font-size: 11px; font-weight: 600; color: #8b949e;
+    direction: ltr;
+  }
+  .status-icons { display: flex; gap: 4px; align-items: center; }
+  .bar { width: 3px; background: #e6edf3; border-radius: 1px; }
+  .phone-content { padding: 12px 16px 24px; }
+
+  /* ===================== TOAST NOTIFICATION ===================== */
+  .toast {
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .toast::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    opacity: 0.08;
+  }
+  .toast:hover { transform: scale(1.01); }
+
+  .toast-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .toast-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .toast-icon svg { width: 18px; height: 18px; }
+  .toast-meta {
+    flex: 1; min-width: 0;
+  }
+  .toast-title {
+    font-size: 13px; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 1px;
+  }
+  .toast-time { font-size: 10px; color: #8b949e; }
+  .toast-badge {
+    font-size: 9px; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px;
+    flex-shrink: 0; align-self: flex-start;
+  }
+  .toast-body {
+    font-size: 12px; line-height: 1.6; color: #c9d1d9;
+    margin-bottom: 10px;
+  }
+  .toast-chips {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .chip {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 3px 10px;
+    font-size: 10px; color: #8b949e; white-space: nowrap;
+    font-weight: 600;
+  }
+  .chip span { color: #e6edf3; font-weight: 700; }
+  .toast-actions {
+    display: flex; gap: 8px;
+  }
+  .btn-action {
+    flex: 1; padding: 8px 12px;
+    border-radius: 10px; border: none;
+    font-size: 11px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    transition: opacity 150ms;
+  }
+  .btn-action:hover { opacity: 0.85; }
+  .btn-dismiss {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #8b949e;
+    flex: 0 0 auto; padding: 8px 12px;
+  }
+  .progress-bar {
+    position: absolute; bottom: 0; right: 0; left: 0; height: 2px;
+    border-radius: 0 0 16px 16px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 2px;
+    animation: progress 6s linear forwards;
+  }
+  @keyframes progress {
+    from { width: 100%; }
+    to { width: 0%; }
+  }
+
+  /* ===================== SEVERITY COLORS ===================== */
+  /* CRITICAL — overdue, test_urgent */
+  .sev-critical { background: linear-gradient(135deg, rgba(248,81,73,0.12), rgba(248,81,73,0.04)); border-color: rgba(248,81,73,0.25); }
+  .sev-critical .toast-icon { background: rgba(248,81,73,0.15); }
+  .sev-critical .toast-icon svg { color: #f85149; }
+  .sev-critical .toast-badge { background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+  .sev-critical .btn-action { background: #f85149; color: #fff; }
+  .sev-critical .progress-fill { background: #f85149; }
+
+  /* URGENT — urgent, test_due, fuel_high */
+  .sev-urgent { background: linear-gradient(135deg, rgba(227,179,65,0.12), rgba(227,179,65,0.04)); border-color: rgba(227,179,65,0.25); }
+  .sev-urgent .toast-icon { background: rgba(227,179,65,0.15); }
+  .sev-urgent .toast-icon svg { color: #e3b341; }
+  .sev-urgent .toast-badge { background: rgba(227,179,65,0.15); color: #e3b341; border: 1px solid rgba(227,179,65,0.3); }
+  .sev-urgent .btn-action { background: #e3b341; color: #0d1117; }
+  .sev-urgent .progress-fill { background: #e3b341; }
+
+  /* PLAN — plan, garage_appointment_set */
+  .sev-plan { background: linear-gradient(135deg, rgba(88,166,255,0.12), rgba(88,166,255,0.04)); border-color: rgba(88,166,255,0.25); }
+  .sev-plan .toast-icon { background: rgba(88,166,255,0.15); }
+  .sev-plan .toast-icon svg { color: #58a6ff; }
+  .sev-plan .toast-badge { background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
+  .sev-plan .btn-action { background: #58a6ff; color: #0d1117; }
+  .sev-plan .progress-fill { background: #58a6ff; }
+
+  /* APPROVED — garage_approved */
+  .sev-approved { background: linear-gradient(135deg, rgba(63,185,80,0.12), rgba(63,185,80,0.04)); border-color: rgba(63,185,80,0.25); }
+  .sev-approved .toast-icon { background: rgba(63,185,80,0.15); }
+  .sev-approved .toast-icon svg { color: #3fb950; }
+  .sev-approved .toast-badge { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+  .sev-approved .btn-action { background: #3fb950; color: #0d1117; }
+  .sev-approved .progress-fill { background: #3fb950; }
+
+  /* INFO — km_update, garage_rejected, fuel_km_high, garage_appointment_cancelled */
+  .sev-info { background: linear-gradient(135deg, rgba(139,148,158,0.12), rgba(139,148,158,0.04)); border-color: rgba(139,148,158,0.2); }
+  .sev-info .toast-icon { background: rgba(139,148,158,0.15); }
+  .sev-info .toast-icon svg { color: #8b949e; }
+  .sev-info .toast-badge { background: rgba(139,148,158,0.12); color: #8b949e; border: 1px solid rgba(139,148,158,0.25); }
+  .sev-info .btn-action { background: rgba(139,148,158,0.2); color: #e6edf3; }
+  .sev-info .progress-fill { background: #8b949e; }
+
+  /* ===================== HISTORY CARD ===================== */
+  .hist-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+  }
+  .hist-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 200ms, transform 200ms;
+    position: relative;
+  }
+  .hist-card:hover { border-color: #30363d; transform: translateY(-1px); }
+  .hist-card-accent {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 4px; border-radius: 0 14px 14px 0;
+  }
+  .hist-card-inner { padding: 14px 14px 14px 18px; }
+  .hist-card-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .hist-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .hist-icon svg { width: 16px; height: 16px; }
+  .hist-title { font-size: 12px; font-weight: 700; color: #e6edf3; flex: 1; }
+  .hist-time { font-size: 10px; color: #8b949e; white-space: nowrap; }
+  .hist-desc {
+    font-size: 11.5px; color: #8b949e; line-height: 1.5;
+    margin-bottom: 10px;
+  }
+  .hist-meta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;
+  }
+  .hist-meta-item {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 6px 10px;
+  }
+  .hist-meta-label { font-size: 9px; color: #8b949e; font-weight: 600; margin-bottom: 2px; }
+  .hist-meta-value { font-size: 12px; font-weight: 700; color: #e6edf3; }
+  .hist-badge {
+    display: inline-block; font-size: 9px; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px; margin-left: 6px;
+  }
+  .hist-cta {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .hist-cta-btn {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700;
+    padding: 6px 12px; border-radius: 8px;
+    cursor: pointer; border: none; font-family: inherit;
+    transition: opacity 150ms;
+  }
+  .hist-cta-btn:hover { opacity: 0.85; }
+  .hist-cta-btn svg { width: 12px; height: 12px; }
+
+  /* ===================== ANIMATION SHOWCASE ===================== */
+  .anim-box {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .anim-label { font-size: 11px; color: #8b949e; margin-bottom: 12px; font-weight: 600; }
+
+  .slide-toast {
+    animation: slideDown 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    transform-origin: top center;
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-24px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .pulse-ring {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(248,81,73,0.2);
+    animation: pulseRing 1.5s ease-out infinite;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 8px;
+  }
+  .pulse-ring::after {
+    content: ''; position: absolute; width: 40px; height: 40px;
+    border-radius: 50%; background: rgba(248,81,73,0.15);
+    animation: pulseRing 1.5s ease-out 0.5s infinite;
+  }
+  @keyframes pulseRing {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+
+  /* ===================== OS NOTIFICATION ===================== */
+  .os-notif {
+    background: rgba(30,30,30,0.95);
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: flex; gap: 10px; align-items: flex-start;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 8px;
+  }
+  .os-notif-app-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .os-notif-app-icon svg { width: 20px; height: 20px; color: #fff; }
+  .os-notif-body { flex: 1; min-width: 0; }
+  .os-notif-app-name { font-size: 10px; color: rgba(255,255,255,0.5); margin-bottom: 2px; }
+  .os-notif-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .os-notif-text { font-size: 12px; color: rgba(255,255,255,0.7); line-height: 1.4; }
+  .os-notif-time { font-size: 10px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+  .os-notif-actions {
+    display: flex; border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 10px; padding-top: 10px; gap: 0;
+  }
+  .os-action {
+    flex: 1; text-align: center; font-size: 12px; font-weight: 600;
+    color: #58a6ff; padding: 4px 0; cursor: pointer;
+  }
+  .os-action + .os-action { border-right: 1px solid rgba(255,255,255,0.08); }
+
+  /* ===================== LAYOUT ===================== */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<h1>🔔 עיצוב מערכת ההתראות</h1>
+<p class="subtitle">מוקאפ עיצוב — In-App Toasts · היסטוריה · OS Notifications · 12 סוגים</p>
+
+<!-- ======================== SECTION 1: IN-APP TOASTS ======================== -->
+<div class="section">
+  <div class="section-label">חלק א׳ — In-App Toast Notifications (כשהאפליקציה פתוחה)</div>
+
+  <div class="phone-row">
+
+    <!-- PHONE 1: CRITICAL/URGENT -->
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-status">
+          <span>09:41</span>
+          <div class="status-icons">
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="#e6edf3"><rect x="0" y="2" width="3" height="10" rx="1"/><rect x="4" y="1" width="3" height="11" rx="1"/><rect x="8" y="0" width="3" height="12" rx="1"/><rect x="12" y="0" width="4" height="12" rx="1" opacity=".3"/></svg>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="#e6edf3"><path d="M8 2C5.5 2 3.3 3.1 1.8 4.8L0 3C2.1 1.1 4.9 0 8 0s5.9 1.1 8 3l-1.8 1.8C12.7 3.1 10.5 2 8 2z" opacity=".4"/><path d="M8 5.5C6.3 5.5 4.8 6.2 3.7 7.3L2 5.5C3.5 4 5.6 3 8 3s4.5 1 6 2.5l-1.7 1.8C11.2 6.2 9.7 5.5 8 5.5z" opacity=".7"/><circle cx="8" cy="10" r="2"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" stroke="#e6edf3" stroke-opacity=".35"/><rect x="2" y="2" width="17" height="8" rx="2" fill="#3fb950"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="#e6edf3" opacity=".4"/></svg>
+          </div>
+        </div>
+        <div class="phone-content">
+
+          <!-- overdue -->
+          <div class="toast sev-critical slide-toast">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">⚠️ טיפול באיחור!</div>
+                <div class="toast-time">כרגע · רכב 143</div>
+              </div>
+              <div class="toast-badge">קריטי</div>
+            </div>
+            <div class="toast-body">הרכב עבר את מועד הטיפול לפני <strong style="color:#f85149">1,200 ק"מ</strong>. יש לתאם טיפול <strong>מיידית</strong>.</div>
+            <div class="toast-chips">
+              <div class="chip">עבר: <span>1,200 ק"מ</span></div>
+              <div class="chip">מד: <span>87,340</span></div>
+              <div class="chip">הבא ב: <span>86,140</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action sev-critical" style="background:#f85149;color:#fff">בקש תור מוסך</button>
+              <button class="btn-dismiss btn-action">עכשיו לא</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="background:#f85149"></div></div>
+          </div>
+
+          <!-- urgent -->
+          <div class="toast sev-urgent">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">טיפול מתקרב</div>
+                <div class="toast-time">לפני 2 דקות · רכב 143</div>
+              </div>
+              <div class="toast-badge">דחוף</div>
+            </div>
+            <div class="toast-body">נותרו <strong style="color:#e3b341">430 ק"מ</strong> עד לטיפול הבא. מומלץ לתאם בשבוע הקרוב.</div>
+            <div class="toast-chips">
+              <div class="chip">נותר: <span>430 ק"מ</span></div>
+              <div class="chip">עד טיפול: <span>87,770</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#e3b341;color:#0d1117">תזמן טיפול</button>
+              <button class="btn-dismiss btn-action">ידוע לי</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="background:#e3b341;animation-delay:2s"></div></div>
+          </div>
+
+          <!-- plan -->
+          <div class="toast sev-plan">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">תכנן טיפול עתידי</div>
+                <div class="toast-time">לפני שעה</div>
+              </div>
+              <div class="toast-badge">תכנון</div>
+            </div>
+            <div class="toast-body">נותרו <strong style="color:#58a6ff">2,800 ק"מ</strong> עד לטיפול הבא. כדאי להתכונן מראש.</div>
+            <div class="toast-chips">
+              <div class="chip">נותר: <span>2,800 ק"מ</span></div>
+              <div class="chip">הבא ב: <span>90,000</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#58a6ff;color:#0d1117">צפה בפרטים</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="background:#58a6ff;animation-delay:4s"></div></div>
+          </div>
+
+        </div>
+      </div>
+      <div class="phone-label">Critical / Urgent / Plan</div>
+    </div>
+
+    <!-- PHONE 2: GARAGE -->
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-status">
+          <span>09:41</span>
+          <div class="status-icons">
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="#e6edf3"><rect x="0" y="2" width="3" height="10" rx="1"/><rect x="4" y="1" width="3" height="11" rx="1"/><rect x="8" y="0" width="3" height="12" rx="1"/><rect x="12" y="0" width="4" height="12" rx="1" opacity=".3"/></svg>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="#e6edf3"><circle cx="8" cy="10" r="2"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" stroke="#e6edf3" stroke-opacity=".35"/><rect x="2" y="2" width="17" height="8" rx="2" fill="#3fb950"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="#e6edf3" opacity=".4"/></svg>
+          </div>
+        </div>
+        <div class="phone-content">
+
+          <!-- garage_approved -->
+          <div class="toast sev-approved">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">בקשת מוסך אושרה!</div>
+                <div class="toast-time">כרגע</div>
+              </div>
+              <div class="toast-badge">אושר</div>
+            </div>
+            <div class="toast-body">הבקשה שלך <strong>אושרה על ידי המנהל</strong>. ניתן כעת לקבוע מועד מוסך.</div>
+            <div class="toast-chips">
+              <div class="chip">מוסך: <span>גלית אחזקה</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#3fb950;color:#0d1117">קבע מועד</button>
+              <button class="btn-dismiss btn-action">מאוחר יותר</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="background:#3fb950"></div></div>
+          </div>
+
+          <!-- garage_appointment_set -->
+          <div class="toast sev-plan">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 15 11 17 15 13"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">תור מוסך נקבע</div>
+                <div class="toast-time">לפני 3 דקות</div>
+              </div>
+              <div class="toast-badge">תאריך</div>
+            </div>
+            <div class="toast-body">מנהל קבע עבורך תור מוסך. <strong style="color:#58a6ff">ראשון, 26/05/2026 · 09:00</strong>.</div>
+            <div class="toast-chips">
+              <div class="chip">מוסך: <span>גלית אחזקה</span></div>
+              <div class="chip">שעה: <span>09:00</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#58a6ff;color:#0d1117">הוסף ליומן</button>
+              <button class="btn-dismiss btn-action">בסדר</button>
+            </div>
+          </div>
+
+          <!-- garage_rejected -->
+          <div class="toast sev-info">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">בקשת מוסך נדחתה</div>
+                <div class="toast-time">אתמול · 14:22</div>
+              </div>
+              <div class="toast-badge">נדחה</div>
+            </div>
+            <div class="toast-body">הבקשה <strong>נדחתה</strong>. ניתן לשלוח בקשה חדשה.</div>
+            <div class="toast-chips">
+              <div class="chip">סיבה: <span>הרכב לא דורש טיפול כעת</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action">שלח בקשה חדשה</button>
+            </div>
+          </div>
+
+          <!-- garage_appointment_cancelled -->
+          <div class="toast sev-info">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">תור מוסך בוטל</div>
+                <div class="toast-time">כרגע</div>
+              </div>
+              <div class="toast-badge">בוטל</div>
+            </div>
+            <div class="toast-body">התור ב<strong>ראשון 26/05/2026 · 09:00</strong> בוטל. ניתן לקבוע מועד חדש.</div>
+            <div class="toast-actions">
+              <button class="btn-action">קבע מועד חדש</button>
+              <button class="btn-dismiss btn-action">לא כרגע</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="phone-label">Garage Notifications</div>
+    </div>
+
+    <!-- PHONE 3: TEST + FUEL + KM -->
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-status">
+          <span>09:41</span>
+          <div class="status-icons">
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" stroke="#e6edf3" stroke-opacity=".35"/><rect x="2" y="2" width="17" height="8" rx="2" fill="#3fb950"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="#e6edf3" opacity=".4"/></svg>
+          </div>
+        </div>
+        <div class="phone-content">
+
+          <!-- test_urgent -->
+          <div class="toast sev-critical">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4l-5 8-4-4-5 7"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">טסט רכב — דחוף!</div>
+                <div class="toast-time">כרגע · רכב 143</div>
+              </div>
+              <div class="toast-badge">קריטי</div>
+            </div>
+            <div class="toast-body">הטסט הבא פג תוקף בעוד <strong style="color:#f85149">3 ימים</strong>! יש לבצע <strong>מיידית</strong>.</div>
+            <div class="toast-chips">
+              <div class="chip">תאריך טסט: <span>27/05/2026</span></div>
+              <div class="chip">נותרו: <span>3 ימים</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#f85149;color:#fff">בצע טסט</button>
+              <button class="btn-dismiss btn-action">הבנתי</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="background:#f85149"></div></div>
+          </div>
+
+          <!-- test_due -->
+          <div class="toast sev-urgent">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4l-5 8-4-4-5 7"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">טסט רכב מתקרב</div>
+                <div class="toast-time">לפני שעה</div>
+              </div>
+              <div class="toast-badge">דחוף</div>
+            </div>
+            <div class="toast-body">הטסט הבא חייב להתבצע לפני <strong style="color:#e3b341">15/06/2026</strong>. נותרו <strong>22 ימים</strong>.</div>
+            <div class="toast-chips">
+              <div class="chip">תאריך: <span>15/06/2026</span></div>
+              <div class="chip">ימים: <span>22</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#e3b341;color:#0d1117">תזכורת</button>
+            </div>
+          </div>
+
+          <!-- fuel_high -->
+          <div class="toast sev-urgent">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 22V7l8-4 8 4v15H3z"/><path d="M13 22V12h-4v10"/><path d="M18 7l3 2-3 2"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">צריכת דלק חריגה</div>
+                <div class="toast-time">היום · 08:15</div>
+              </div>
+              <div class="toast-badge">חריג</div>
+            </div>
+            <div class="toast-body">צריכת הדלק גבוהה ב<strong style="color:#e3b341">23%</strong> מהממוצע הצפוי. בדוק לחץ צמיגים ומצב מנוע.</div>
+            <div class="toast-chips">
+              <div class="chip">צריכה: <span>11.3 ל׳/100ק"מ</span></div>
+              <div class="chip">ממוצע: <span>9.2</span></div>
+              <div class="chip">סף: <span>10.5</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action" style="background:#e3b341;color:#0d1117">דוח צריכה</button>
+            </div>
+          </div>
+
+          <!-- km_update -->
+          <div class="toast sev-info">
+            <div class="toast-header">
+              <div class="toast-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="toast-meta">
+                <div class="toast-title">עדכן קילומטראז׳</div>
+                <div class="toast-time">3 ימים ללא עדכון</div>
+              </div>
+              <div class="toast-badge">תזכורת</div>
+            </div>
+            <div class="toast-body">לא עדכנת קילומטראז׳ כבר <strong>3 ימים</strong>. מד הנסיעה לא מעודכן.</div>
+            <div class="toast-chips">
+              <div class="chip">מד אחרון: <span>87,340 ק"מ</span></div>
+              <div class="chip">לפני: <span>3 ימים</span></div>
+            </div>
+            <div class="toast-actions">
+              <button class="btn-action">עדכן עכשיו</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="phone-label">Test / Fuel / KM</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================== SECTION 2: HISTORY SCREEN ======================== -->
+<div class="section">
+  <div class="section-label">חלק ב׳ — מסך היסטוריית התראות (עיצוב כרטיסיות)</div>
+  <div class="hist-grid">
+
+    <!-- overdue -->
+    <div class="hist-card">
+      <div class="hist-card-accent" style="background:#f85149"></div>
+      <div class="hist-card-inner">
+        <div class="hist-card-header">
+          <div class="hist-icon" style="background:rgba(248,81,73,0.12)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="hist-title">⚠️ טיפול באיחור</div>
+          <div class="hist-badge" style="background:rgba(248,81,73,0.12);color:#f85149;border:1px solid rgba(248,81,73,0.3)">קריטי</div>
+          <div class="hist-time">09:41</div>
+        </div>
+        <div class="hist-desc">הרכב עבר את מועד הטיפול. נדרשת תגובה מידית.</div>
+        <div class="hist-meta">
+          <div class="hist-meta-item"><div class="hist-meta-label">חריגה בק"מ</div><div class="hist-meta-value" style="color:#f85149">+1,200</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">מד נוכחי</div><div class="hist-meta-value">87,340</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">הבא לטיפול</div><div class="hist-meta-value">86,140</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">צפי (AI)</div><div class="hist-meta-value">90,890</div></div>
+        </div>
+        <div class="hist-cta">
+          <button class="hist-cta-btn" style="background:rgba(248,81,73,0.15);color:#f85149">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            בקש מוסך
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- garage_approved -->
+    <div class="hist-card">
+      <div class="hist-card-accent" style="background:#3fb950"></div>
+      <div class="hist-card-inner">
+        <div class="hist-card-header">
+          <div class="hist-icon" style="background:rgba(63,185,80,0.12)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="hist-title">בקשת מוסך אושרה</div>
+          <div class="hist-badge" style="background:rgba(63,185,80,0.12);color:#3fb950;border:1px solid rgba(63,185,80,0.3)">אושר</div>
+          <div class="hist-time">אתמול</div>
+        </div>
+        <div class="hist-desc">המנהל אישר את בקשת המוסך שלך. קבע מועד בהקדם.</div>
+        <div class="hist-meta">
+          <div class="hist-meta-item" style="grid-column:1/-1"><div class="hist-meta-label">מוסך מאושר</div><div class="hist-meta-value">גלית אחזקה בע"מ</div></div>
+        </div>
+        <div class="hist-cta">
+          <button class="hist-cta-btn" style="background:rgba(63,185,80,0.15);color:#3fb950">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            קבע מועד
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- garage_appointment_set -->
+    <div class="hist-card">
+      <div class="hist-card-accent" style="background:#58a6ff"></div>
+      <div class="hist-card-inner">
+        <div class="hist-card-header">
+          <div class="hist-icon" style="background:rgba(88,166,255,0.12)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 15 11 17 15 13"/></svg>
+          </div>
+          <div class="hist-title">תור מוסך נקבע</div>
+          <div class="hist-badge" style="background:rgba(88,166,255,0.12);color:#58a6ff;border:1px solid rgba(88,166,255,0.3)">תאריך</div>
+          <div class="hist-time">לפני שעה</div>
+        </div>
+        <div class="hist-desc">המנהל קבע עבורך תור מוסך.</div>
+        <div class="hist-meta">
+          <div class="hist-meta-item"><div class="hist-meta-label">תאריך</div><div class="hist-meta-value">ראשון, 26/05</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">שעה</div><div class="hist-meta-value">09:00</div></div>
+          <div class="hist-meta-item" style="grid-column:1/-1"><div class="hist-meta-label">מוסך</div><div class="hist-meta-value">גלית אחזקה</div></div>
+        </div>
+        <div class="hist-cta">
+          <button class="hist-cta-btn" style="background:rgba(88,166,255,0.15);color:#58a6ff">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1"/></svg>
+            הוסף ליומן
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- fuel_high -->
+    <div class="hist-card">
+      <div class="hist-card-accent" style="background:#e3b341"></div>
+      <div class="hist-card-inner">
+        <div class="hist-card-header">
+          <div class="hist-icon" style="background:rgba(227,179,65,0.12)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#e3b341" stroke-width="2.5"><path d="M3 22V7l8-4 8 4v15H3z"/><path d="M18 7l3 2-3 2"/></svg>
+          </div>
+          <div class="hist-title">צריכת דלק חריגה</div>
+          <div class="hist-badge" style="background:rgba(227,179,65,0.12);color:#e3b341;border:1px solid rgba(227,179,65,0.3)">חריג</div>
+          <div class="hist-time">היום</div>
+        </div>
+        <div class="hist-desc">הצריכה גבוהה באופן משמעותי מהסף המוגדר.</div>
+        <div class="hist-meta">
+          <div class="hist-meta-item"><div class="hist-meta-label">צריכה בפועל</div><div class="hist-meta-value" style="color:#e3b341">11.3 ל׳</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">סף מוגדר</div><div class="hist-meta-value">10.5 ל׳</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">חריגה</div><div class="hist-meta-value" style="color:#e3b341">+7.6%</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">ממוצע ציי</div><div class="hist-meta-value">9.2 ל׳</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- fuel_km_high -->
+    <div class="hist-card">
+      <div class="hist-card-accent" style="background:#8b949e"></div>
+      <div class="hist-card-inner">
+        <div class="hist-card-header">
+          <div class="hist-icon" style="background:rgba(139,148,158,0.12)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <div class="hist-title">עלות לק"מ חריגה</div>
+          <div class="hist-badge" style="background:rgba(139,148,158,0.12);color:#8b949e;border:1px solid rgba(139,148,158,0.25)">מידע</div>
+          <div class="hist-time">3 ימים</div>
+        </div>
+        <div class="hist-desc">עלות הדלק לק"מ גבוהה מממוצע הצי.</div>
+        <div class="hist-meta">
+          <div class="hist-meta-item"><div class="hist-meta-label">עלות לק"מ</div><div class="hist-meta-value" style="color:#e3b341">₪0.87</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">ממוצע ציי</div><div class="hist-meta-value">₪0.71</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- test_urgent -->
+    <div class="hist-card">
+      <div class="hist-card-accent" style="background:#f85149"></div>
+      <div class="hist-card-inner">
+        <div class="hist-card-header">
+          <div class="hist-icon" style="background:rgba(248,81,73,0.12)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="2.5"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4l-5 8-4-4-5 7"/></svg>
+          </div>
+          <div class="hist-title">טסט רכב — דחוף</div>
+          <div class="hist-badge" style="background:rgba(248,81,73,0.12);color:#f85149;border:1px solid rgba(248,81,73,0.3)">קריטי</div>
+          <div class="hist-time">כרגע</div>
+        </div>
+        <div class="hist-desc">הטסט פג בעוד ימים ספורים. פעולה מיידית נדרשת.</div>
+        <div class="hist-meta">
+          <div class="hist-meta-item"><div class="hist-meta-label">תאריך טסט</div><div class="hist-meta-value" style="color:#f85149">27/05/2026</div></div>
+          <div class="hist-meta-item"><div class="hist-meta-label">ימים שנותרו</div><div class="hist-meta-value" style="color:#f85149">3 ימים</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================== SECTION 3: OS NOTIFICATION ======================== -->
+<div class="section">
+  <div class="section-label">חלק ג׳ — OS Notification (כשהאפליקציה סגורה)</div>
+  <div style="max-width:360px">
+
+    <!-- OS screen -->
+    <div style="background:#1c1c1e;border-radius:24px;padding:20px;border:1px solid #333">
+      <div style="text-align:center;font-size:32px;font-weight:300;color:#fff;margin-bottom:4px;direction:ltr">09:41</div>
+      <div style="text-align:center;font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:20px">ראשון, 26 במאי 2026</div>
+
+      <div class="os-notif">
+        <div class="os-notif-app-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        </div>
+        <div class="os-notif-body">
+          <div class="os-notif-app-name">עלה — ניהול ציי · כרגע</div>
+          <div class="os-notif-title">⚠️ טיפול באיחור — רכב 143</div>
+          <div class="os-notif-text">הרכב עבר את מועד הטיפול לפני 1,200 ק"מ. נדרשת תגובה מידית.</div>
+        </div>
+      </div>
+      <div style="padding: 0 0 0 0; background:rgba(30,30,30,0.95);border-radius:0 0 16px 16px;margin-top:-8px;border:1px solid rgba(255,255,255,0.08);border-top:none">
+        <div class="os-notif-actions">
+          <div class="os-action" style="color:#f85149">בקש מוסך</div>
+          <div class="os-action">סגור</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px"></div>
+
+      <div class="os-notif">
+        <div class="os-notif-app-icon" style="background:linear-gradient(135deg,#2d6a4f,#1b4332)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="os-notif-body">
+          <div class="os-notif-app-name">עלה — ניהול ציי · אתמול</div>
+          <div class="os-notif-title">✅ בקשת מוסך אושרה</div>
+          <div class="os-notif-text">המנהל אישר את בקשת המוסך. קבע מועד בהקדם.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== SECTION 4: ANIMATION SPEC ======================== -->
+<div class="section">
+  <div class="section-label">חלק ד׳ — מפרט אנימציות</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
+
+    <div class="anim-box">
+      <div class="anim-label">① Entrance — Slide + Spring (450ms)</div>
+      <div style="font-family:monospace;font-size:11px;color:#58a6ff;line-height:1.8">
+        from: translateY(-28px) scale(0.93) opacity(0)<br>
+        to: translateY(0) scale(1) opacity(1)<br>
+        easing: cubic-bezier(0.34, 1.56, 0.64, 1)<br>
+        duration: 450ms
+      </div>
+    </div>
+
+    <div class="anim-box">
+      <div class="anim-label">② Exit — Slide + Fade (280ms)</div>
+      <div style="font-family:monospace;font-size:11px;color:#8b949e;line-height:1.8">
+        from: translateY(0) scale(1) opacity(1)<br>
+        to: translateY(-16px) scale(0.96) opacity(0)<br>
+        easing: ease-in<br>
+        duration: 280ms
+      </div>
+    </div>
+
+    <div class="anim-box">
+      <div class="anim-label">③ Dismiss swipe — RTL drag</div>
+      <div style="font-family:monospace;font-size:11px;color:#8b949e;line-height:1.8">
+        swipe-right → translateX(110%) opacity(0)<br>
+        easing: ease-out | duration: 300ms<br>
+        threshold: 40% of width
+      </div>
+    </div>
+
+    <div class="anim-box">
+      <div class="anim-label">④ Critical pulse ring (continuous)</div>
+      <div style="font-family:monospace;font-size:11px;color:#f85149;line-height:1.8">
+        scale: 1 → 2.2 opacity: 0.8 → 0<br>
+        easing: ease-out<br>
+        duration: 1.5s, infinite<br>
+        delay: 0.5s stagger on 2nd ring
+      </div>
+    </div>
+
+    <div class="anim-box">
+      <div class="anim-label">⑤ Auto-dismiss progress bar</div>
+      <div style="font-family:monospace;font-size:11px;color:#8b949e;line-height:1.8">
+        width: 100% → 0%<br>
+        easing: linear<br>
+        duration: 6s (critical: 10s)
+      </div>
+    </div>
+
+    <div class="anim-box">
+      <div class="anim-label">⑥ Stacking — multiple toasts</div>
+      <div style="font-family:monospace;font-size:11px;color:#8b949e;line-height:1.8">
+        Max visible: 3<br>
+        4th+ stacks behind (scale 0.96, y+8px)<br>
+        Oldest auto-dismissed after 8s
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

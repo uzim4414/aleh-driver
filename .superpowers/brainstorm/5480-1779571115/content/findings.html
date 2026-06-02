@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ממצאי ה-Audit — מערכת התראות</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; padding: 24px; font-size: 14px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+  .subtitle { color: #8b949e; margin-bottom: 24px; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
+  .section h2 { font-size: 13px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .bug-list { list-style: none; }
+  .bug-list li { display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid #21262d; font-size: 12px; line-height: 1.5; }
+  .bug-list li:last-child { border-bottom: none; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .badge.critical { background: #3d1212; color: #f85149; border: 1px solid #f85149; }
+  .badge.warn { background: #2d1f00; color: #e3b341; border: 1px solid #e3b341; }
+  .badge.info { background: #0d2344; color: #58a6ff; border: 1px solid #58a6ff; }
+  .badge.ok { background: #0d2b1d; color: #3fb950; border: 1px solid #3fb950; }
+  .type-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .type-table th { text-align: right; padding: 6px 8px; background: #21262d; color: #8b949e; font-weight: 600; border-bottom: 1px solid #30363d; }
+  .type-table td { padding: 6px 8px; border-bottom: 1px solid #21262d; vertical-align: top; }
+  .type-table tr:last-child td { border-bottom: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; margin-top: 4px; }
+  .dot.red { background: #f85149; }
+  .dot.orange { background: #e3b341; }
+  .dot.blue { background: #58a6ff; }
+  .col-full { grid-column: 1 / -1; }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 20px; }
+  .stat { flex: 1; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; text-align: center; }
+  .stat .num { font-size: 28px; font-weight: 800; }
+  .stat .lbl { font-size: 11px; color: #8b949e; margin-top: 2px; }
+  .stat.red .num { color: #f85149; }
+  .stat.orange .num { color: #e3b341; }
+  .stat.blue .num { color: #58a6ff; }
+  .stat.green .num { color: #3fb950; }
+</style>
+</head>
+<body>
+<h1>📊 Audit — מערכת ההתראות</h1>
+<p class="subtitle">ממצאים מחקירה מלאה של driver/app.js · sw.js · code.js</p>
+
+<div class="stat-row">
+  <div class="stat red"><div class="num">20</div><div class="lbl">באגים שנמצאו</div></div>
+  <div class="stat orange"><div class="num">12</div><div class="lbl">סוגי התראות</div></div>
+  <div class="stat red"><div class="num">2</div><div class="lbl">מנגנוני toast כפולים</div></div>
+  <div class="stat blue"><div class="num">3</div><div class="lbl">ערוצי שמירה לא מסונכרנים</div></div>
+</div>
+
+<div class="grid">
+  <!-- BUGS -->
+  <div class="section col-full">
+    <h2>🐛 באגים קריטיים</h2>
+    <ul class="bug-list">
+      <li><span class="dot red"></span><span class="badge critical">קריטי</span> שני listeners לאותו push-event (index.html + app.js) → toast כפול, צליל כפול, שמירה כפולה להיסטוריה בכל פוש</li>
+      <li><span class="dot red"></span><span class="badge critical">קריטי</span> handler כפול ל-notification-click → ניווט כפול בלחיצה על OS notification</li>
+      <li><span class="dot red"></span><span class="badge critical">קריטי</span> Endpoint שאינו קיים: sw.js קורא ל-<code>driver_pending_notifications</code> (GAS) שלא מוגדר → fallback גנרי "יש התראה חדשה" בכל push ריק</li>
+      <li><span class="dot red"></span><span class="badge critical">קריטי</span> appointmentDate / appointmentTime לא נשמרים בהיסטוריה → מסך ההיסטוריה לא מציג מתי נקבע התור</li>
+      <li><span class="dot red"></span><span class="badge critical">קריטי</span> fuelConsumption / costPerKm / threshold לא נשמרים → renderNotifHistory לעולם לא יציג את הנתונים האלו</li>
+      <li><span class="dot orange"></span><span class="badge warn">גבוה</span> garage_appointment_set ו-garage_appointment_cancelled חסרים ב-SEVERITY_MAP → מוצגים עם סיווג שגוי 'plan' + איקון תכלת</li>
+      <li><span class="dot orange"></span><span class="badge warn">גבוה</span> dismiss ב-OS notification לא מנקה את ה-pending buffer ב-SW → ההתראה מוצגת שוב כ-toast בפתיחה הבאה</li>
+      <li><span class="dot orange"></span><span class="badge warn">גבוה</span> garageInfo לא נשמר בהיסטוריה → לא ניתן לראות איזה מוסך אושר</li>
+      <li><span class="dot orange"></span><span class="badge warn">גבוה</span> fuel_high / fuel_km_high / garage_* חסרים ב-ICON_BY_TYPE של Mechanism A → fallback ic-bell</li>
+      <li><span class="dot orange"></span><span class="badge warn">בינוני</span> שלוש שיטות שמירה ללא reconciliation: localStorage + Firebase + GAS notif_log (GAS מאבד meta-fields בסנכרון)</li>
+      <li><span class="dot blue"></span><span class="badge info">נמוך</span> test_due / test_urgent לא מציגים testDate / daysLeft במסך ההיסטוריה</li>
+      <li><span class="dot blue"></span><span class="badge info">נמוך</span> אין CTA פעיל בכרטיס היסטוריה → לחיצה רק מפתחת, לא מנווטת</li>
+    </ul>
+  </div>
+
+  <!-- NOTIFICATION TYPES -->
+  <div class="section col-full">
+    <h2>📋 12 סוגי התראות — מה חסר לכל אחת</h2>
+    <table class="type-table">
+      <tr>
+        <th>סוג</th>
+        <th>Severity</th>
+        <th>פרטים שחסרים בהיסטוריה</th>
+        <th>בעיות נוספות</th>
+      </tr>
+      <tr><td>🚨 overdue</td><td><span class="badge critical">critical</span></td><td>kmLeft, estKm, nextKm</td><td>–</td></tr>
+      <tr><td>⚠️ urgent</td><td><span class="badge warn">urgent</span></td><td>kmLeft, estKm, nextKm</td><td>–</td></tr>
+      <tr><td>📅 plan</td><td><span class="badge info">plan</span></td><td>kmLeft, nextKm</td><td>–</td></tr>
+      <tr><td>📊 km_update</td><td><span class="badge info">plan</span></td><td>daysSinceUpdate</td><td>–</td></tr>
+      <tr><td>🔧 test_due</td><td><span class="badge warn">urgent</span></td><td>testDate, daysLeft ❌ לא נשמרים</td><td>אין metaRows ייעודיים</td></tr>
+      <tr><td>⚠️ test_urgent</td><td><span class="badge critical">critical</span></td><td>testDate, daysLeft ❌ לא נשמרים</td><td>–</td></tr>
+      <tr><td>✅ garage_approved</td><td><span class="badge ok">approved</span></td><td>garageInfo ❌ לא נשמר</td><td>–</td></tr>
+      <tr><td>❌ garage_rejected</td><td><span class="badge info">info</span></td><td>reasonLabel</td><td>–</td></tr>
+      <tr><td>📅 garage_appointment_set</td><td style="color:#f85149">חסר ב-SEVERITY_MAP</td><td>appointmentDate ❌ / appointmentTime ❌</td><td>severity='plan' בטעות</td></tr>
+      <tr><td>🚫 garage_appointment_cancelled</td><td style="color:#f85149">חסר ב-SEVERITY_MAP</td><td>appointmentDate ❌ / appointmentTime ❌</td><td>severity='plan' בטעות</td></tr>
+      <tr><td>⛽ fuel_high</td><td><span class="badge warn">urgent</span></td><td>fuelConsumption ❌ / threshold ❌</td><td>חסר ב-ICON_BY_TYPE</td></tr>
+      <tr><td>💰 fuel_km_high</td><td><span class="badge info">info</span></td><td>costPerKm ❌ / fleetAverage ❌</td><td>חסר ב-ICON_BY_TYPE</td></tr>
+    </table>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div class="section">
+    <h2>🔧 ארכיטקטורה — מצב קיים (בעייתי)</h2>
+    <ul class="bug-list">
+      <li><span class="dot red"></span>Mechanism A: toast ב-index.html (תמיכה חלקית ב-6 סוגים)</li>
+      <li><span class="dot red"></span>Mechanism B: toast ב-app.js (תמיכה ב-12 סוגים)</li>
+      <li><span class="dot orange"></span>שני המנגנונים רצים במקביל → כפל</li>
+      <li><span class="dot blue"></span>push-foreground listener רשום פעמיים</li>
+      <li><span class="dot blue"></span>notification-click handler רשום פעמיים</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>✅ מה עובד טוב</h2>
+    <ul class="bug-list">
+      <li><span class="dot" style="background:#3fb950"></span>SW push handler — מקבל ומפנה נכון</li>
+      <li><span class="dot" style="background:#3fb950"></span>OS notification — מוצג כשאפליקציה ברקע/סגורה</li>
+      <li><span class="dot" style="background:#3fb950"></span>vibrate / requireInteraction לפי סוג</li>
+      <li><span class="dot" style="background:#3fb950"></span>notificationclick → openWindow עם _notif בURL</li>
+      <li><span class="dot" style="background:#3fb950"></span>dedup לפי ts מונע כפל בשמירה</li>
+      <li><span class="dot" style="background:#3fb950"></span>_playNotifSound עם tones לפי alertType</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
