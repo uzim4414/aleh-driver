@@ -1116,12 +1116,6 @@ function loadSession() {
 }
 
 /* ══ Auth ══ */
-// Desktop Chrome = not mobile AND Chrome (excluding Edge/Opera).
-// FedCM / One Tap is unreliable here, so we render the official OAuth-popup button instead.
-var isDesktopChrome = !(/Android|iPhone|iPad/i.test(navigator.userAgent))
-  && /Chrome/.test(navigator.userAgent)
-  && !/Edg|OPR/.test(navigator.userAgent);
-
 function initGoogleAuth() {
   if (!GOOGLE_CLIENT_ID) {
     // Demo mode — skip Google auth
@@ -1132,62 +1126,8 @@ function initGoogleAuth() {
     callback: handleGoogleCredential,
     auto_select: false,
     cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: false
+    use_fedcm_for_prompt: true
   });
-
-  if (isDesktopChrome) {
-    // Desktop: render the official Google button INSIDE the existing #login-btn container.
-    // Uses the standard OAuth popup (no FedCM), so it works without third-party cookies.
-    var loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-      loginBtn.innerHTML = ''; // clear Hebrew text
-      loginBtn.style.cssText = 'background:white;border:1.5px solid #dadce0;border-radius:100px;padding:4px 12px;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:center';
-      try {
-        google.accounts.id.renderButton(loginBtn, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'signin_with',
-          shape: 'pill',
-          locale: 'iw',
-          width: 240
-        });
-      } catch (e) {
-        console.warn('[auth] renderButton failed:', e && e.message);
-      }
-    }
-  }
-}
-
-// Render the official Google button into a hidden host, then wire #login-btn to click it.
-// renderButton() uses the standard OAuth popup (no One Tap / no FedCM) → works on Chrome Desktop,
-// while still showing the native One Tap card on Android via the same OAuth identity flow.
-function wireGoogleLoginButton() {
-  if (isDesktopChrome) {
-    // Desktop already has the official Google button rendered directly into #login-btn.
-    return;
-  }
-  var host = document.getElementById('gsi-button-host');
-  if (!host) {
-    host = document.createElement('div');
-    host.id = 'gsi-button-host';
-    // Off-screen but renderable (display:none prevents GIS from rendering)
-    host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;left:-9999px;top:-9999px';
-    document.body.appendChild(host);
-  }
-  try {
-    google.accounts.id.renderButton(host, { type: 'standard', theme: 'outline', size: 'large' });
-  } catch (e) {
-    console.warn('[auth] renderButton failed:', e && e.message);
-  }
-  var loginBtn = document.getElementById('login-btn');
-  if (loginBtn) {
-    loginBtn.addEventListener('click', function() {
-      var gBtn = host.querySelector('div[role="button"], div[tabindex]');
-      if (gBtn) { gBtn.click(); }
-      else { try { google.accounts.id.prompt(); } catch(_) {} } // fallback
-    });
-  }
 }
 
 async function handleGoogleCredential(response) {
@@ -6631,7 +6571,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.src = 'https://accounts.google.com/gsi/client';
   script.onload = function() {
     initGoogleAuth();
-    wireGoogleLoginButton();
+    document.getElementById('login-btn').addEventListener('click', function() {
+      google.accounts.id.prompt();
+    });
   };
   document.head.appendChild(script);
 });
