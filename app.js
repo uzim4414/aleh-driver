@@ -1606,9 +1606,9 @@ async function loadNotifHistoryFromGAS() {
     if (merged.length > 30) merged = merged.slice(0, 30);
     localStorage.setItem('driver_notif_history', JSON.stringify(merged));
 
-    // Always update badge — GAS is source of truth for unread count
-    var lastSeen = parseInt(localStorage.getItem('driver_notif_last_seen') || '0', 10);
-    var unread = gasNotifs.filter(function(n) { return n.ts > lastSeen; }).length;
+    /* Badge count from the deduplicated merged list, using clearedAt (same
+       reference point as the Firebase listener) so the two sources agree. */
+    var unread = merged.filter(function(n) { return n.ts > clearedAt; }).length;
     localStorage.setItem('driver_notif_unread', String(unread));
     _applyBadgeCount(unread);
 
