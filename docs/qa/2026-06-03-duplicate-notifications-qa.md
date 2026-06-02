@@ -118,6 +118,69 @@ _fbSaveNotif(newItem); // ← Firebase sync
 
 ---
 
+## הפקת לקחים — מניעת חזרה על הטעות
+
+### העיקרון שנשבר
+
+**"Single Writer Principle"** — לכל מידע ב-Firebase צריך להיות **מקור כתיבה אחד בלבד**.
+
+בפרויקט זה: GAS הוא המקור. הלקוח הוא קורא בלבד (דרך Firebase listener). כשהלקוח התחיל לכתוב גם הוא — נוצרה כפילות בלתי ניתנת לדחייה מלאה.
+
+---
+
+### כללים לפיתוח עתידי — בכל ממשק (driver, manager, admin)
+
+#### 1. לפני כל כתיבה ל-Firebase — שאל: מי הסמכות?
+
+| שאלה | תשובה נכונה |
+|------|------------|
+| מי יוצר את הנתון? | **GAS בלבד** = GAS כותב ל-Firebase |
+| הלקוח מחשב מחדש? | **רק אם GAS לא כותב** = הלקוח כותב ל-Firebase |
+| שניהם כותבים? | **פגיעה בכלל** — בחר אחד |
+
+#### 2. כשיש Firebase listener — אל תכתוב לאותו node מהלקוח
+
+Firebase listener שם `on('value')` על node X → הוא **קורא** מ-X.  
+אם הלקוח גם **כותב** ל-X → הlistener יורה → כפילות אפשרית.
+
+**כלל:** אם יש `listener.on('value')` על node → **אל תכתוב לאותו node מהלקוח**.
+
+#### 3. כשיש שני מקורות לאותו נתון — אל תסמוך על content-matching לdedup
+
+`sig:alertType|title|body` נכשל כשפורמטים שונים. במקום:
+- השתמש ב-`eventId` כמפתח Firebase עבור כל ישות שצריכה sync
+- אם אין eventId — **אל תכתוב ל-Firebase מהלקוח**
+
+#### 4. badge / counter — מקור אמת אחד
+
+כל counter (badge, unread, סה"כ) חייב להיספר **מרשימה אחת** ועם **אותו timestamp reference**:
+- ✅ `merged.filter(n => n.ts > clearedAt)` — אחרי dedup, clearedAt עקבי
+- ❌ `gasNotifs.filter(n => n.ts > lastSeen)` — לפני dedup, lastSeen שונה
+
+#### 5. לפני הוספת כתיבה ל-Firebase — בדוק את הdiagram
+
+```
+Firebase node X
+    ↑ כותב?      ↓ קורא?
+  GAS ✓        listener ✓
+  Client ✗     Client ✓ (דרך listener)
+```
+
+אם Client כותב ל-X **וגם** GAS כותב ל-X → דגל אדום. חייבים מפתח Firebase יציב (eventId) כדי למנוע ערכים כפולים.
+
+---
+
+### יישום בממשקים אחרים (manager, admin)
+
+אם בעתיד ממשק ה-manager או admin מקבל התראות או סנכרון דו-כיווני:
+
+1. **הגדר מי הסמכות לכל Firebase node לפני כתיבת שורת קוד**
+2. **כל push notification שמגיע מ-FCM + Firebase listener — אחד מהם מיותר** (בדרך כלל הlocalcopy via FCM, הlistener הוא הsync)
+3. **אם GAS כותב ל-Firebase לפני שליחת FCM** — הלקוח לא צריך לכתוב חזרה
+4. **badge/unread counts** — תמיד חשב לאחר dedup, תמיד עם אותו reference timestamp בכל code path
+
+---
+
 ## אימות
 
 ```bash
