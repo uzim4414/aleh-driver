@@ -6470,6 +6470,27 @@ function hideGreeting() {
 }
 
 /* ══ Boot ══ */
+/* ── Version display — fetches latest commit from GitHub ── */
+(function() {
+  var el = document.getElementById('splash-version');
+  if (!el) return;
+  fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
+    headers: { 'Accept': 'application/vnd.github.v3+json' }
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data || !data.sha) return;
+    var sha = data.sha.slice(0, 7);
+    var raw = (data.commit && data.commit.author && data.commit.author.date) || '';
+    var dt = raw ? new Date(raw) : null;
+    var fmt = dt ? (
+      ('0'+(dt.getDate())).slice(-2) + '/' +
+      ('0'+(dt.getMonth()+1)).slice(-2) + ' ' +
+      ('0'+dt.getHours()).slice(-2) + ':' +
+      ('0'+dt.getMinutes()).slice(-2)
+    ) : '';
+    el.textContent = sha + (fmt ? ' · ' + fmt : '');
+  }).catch(function() { el.textContent = ''; });
+})();
+
 document.addEventListener('DOMContentLoaded', async function() {
 
   if ('serviceWorker' in navigator) {
