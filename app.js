@@ -1124,13 +1124,15 @@ function initGoogleAuth() {
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
-    auto_select: false,
+    auto_select: true,
     cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: true
+    use_fedcm_for_prompt: false
   });
 }
 
 async function handleGoogleCredential(response) {
+  /* Dismiss One Tap overlay immediately so it doesn't block the app */
+  try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.cancel(); } catch(_) {}
   showLoader();
   try {
     STATE.idToken = response.credential;
