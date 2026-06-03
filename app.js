@@ -104,6 +104,25 @@ function navigateForAlertType(alertType, meta) {
       break;
 
     case 'garage_appointment_set':
+      /* Guard: if the appointment was cancelled, activeGarageAppointment is gone.
+         Show a cancelled popup instead of opening a stale calendar URL. */
+      try {
+        var _apptData = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null');
+        if (!_apptData) {
+          _nrdShowCancelledPopup(meta, {
+            title:    'התור בוטל',
+            body:     'התור שנקבע עבור בקשה זו בוטל.\nניתן לקבוע תור חדש דרך ממשק עזרה.',
+            btnLabel: 'קבע תור חדש',
+            onNewRequest: function() {
+              if (typeof APP !== 'undefined' && typeof APP.openHelpMenu === 'function') {
+                APP.openHelpMenu();
+                setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
+              }
+            }
+          });
+          return;
+        }
+      } catch(_e) {}
       try {
         var url = _buildGoogleCalendarUrl(meta.appointmentDate, meta.appointmentTime || '09:00', (typeof STATE !== 'undefined' ? STATE.vehicle : null));
         if (url) window.open(url, '_blank');
@@ -5372,13 +5391,110 @@ APP._garageBuildInfoFromState = function() {
 
 // מציג מסך מוסך מאושר מתוך נתוני localStorage + STATE — בלי קריאה לשרת.
 // אם יש eventId — ננסה לרענן מהשרת ברקע, אבל מציגים מיידית את מה שיש.
+/* Popup shown when user taps an old notification whose garage request or
+   appointment was already cancelled (localStorage state is cleared).
+   opts: { title, body, btnLabel, onNewRequest } */
+function _nrdShowCancelledPopup(meta, opts) {
+  var prev = document.getElementById('nrd-cancelled-popup');
+  if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+
+  opts = opts || {};
+  var title     = opts.title     || 'הבקשה בוטלה';
+  var body      = opts.body      || 'הבקשה שאליה מתייחסת התראה זו בוטלה.\nלא ניתן לפעול עליה יותר.';
+  var btnLabel  = opts.btnLabel  || 'פתח בקשה חדשה';
+  var reqNum    = (meta && meta.requestNumber) ? String(meta.requestNumber) : '';
+
+  var ov = document.createElement('div');
+  ov.id = 'nrd-cancelled-popup';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10500;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;padding:20px;animation:nrd-toast-in .28s cubic-bezier(0.22,1,0.36,1);';
+
+  var card = document.createElement('div');
+  card.style.cssText = 'background:#111111;border:1px solid rgba(255,255,255,0.09);border-radius:22px;padding:28px 20px 20px;max-width:340px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.75);position:relative;direction:rtl;';
+
+  /* X close button — top-left (physically left, per user spec) */
+  var xBtn = document.createElement('button');
+  xBtn.setAttribute('aria-label', 'סגור');
+  xBtn.style.cssText = 'position:absolute;top:14px;left:14px;background:rgba(255,255,255,0.06);border:none;color:#666;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+  xBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  card.appendChild(xBtn);
+
+  /* Danger badge */
+  var badge = document.createElement('div');
+  badge.style.cssText = 'width:60px;height:60px;border-radius:16px;background:linear-gradient(145deg,#ff6b60,#ef4444);display:flex;align-items:center;justify-content:center;margin:8px auto 18px;box-shadow:0 8px 24px rgba(239,68,68,0.35);';
+  badge.innerHTML = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  card.appendChild(badge);
+
+  /* Title */
+  var titleEl = document.createElement('div');
+  titleEl.style.cssText = 'text-align:center;font-size:19px;font-weight:800;color:#fff;margin-bottom:8px;letter-spacing:-0.3px;';
+  titleEl.textContent = title;
+  card.appendChild(titleEl);
+
+  /* Request number pill */
+  if (reqNum) {
+    var pill = document.createElement('div');
+    pill.style.cssText = 'text-align:center;margin-bottom:10px;';
+    var pillInner = document.createElement('span');
+    pillInner.style.cssText = 'background:rgba(239,68,68,0.12);color:#f87171;font-size:12px;font-weight:700;padding:4px 14px;border-radius:999px;display:inline-block;';
+    pillInner.textContent = 'בקשה #' + _escHtml(reqNum);
+    pill.appendChild(pillInner);
+    card.appendChild(pill);
+  }
+
+  /* Body text */
+  var bodyEl = document.createElement('div');
+  bodyEl.style.cssText = 'text-align:center;font-size:13.5px;color:#888;line-height:1.6;margin-bottom:22px;white-space:pre-line;';
+  bodyEl.textContent = body;
+  card.appendChild(bodyEl);
+
+  /* Divider */
+  var divider = document.createElement('div');
+  divider.style.cssText = 'height:1px;background:rgba(255,255,255,0.07);margin-bottom:16px;';
+  card.appendChild(divider);
+
+  /* Primary button */
+  var primaryBtn = document.createElement('button');
+  primaryBtn.style.cssText = 'width:100%;height:50px;background:#34d96f;color:#04210f;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;';
+  primaryBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>' + _escHtml(btnLabel);
+  card.appendChild(primaryBtn);
+
+  /* Ghost close button */
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'width:100%;height:44px;background:none;color:#666;border:none;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;';
+  closeBtn.textContent = 'סגור';
+  card.appendChild(closeBtn);
+
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+
+  function _dismiss() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+
+  xBtn.addEventListener('click', _dismiss);
+  closeBtn.addEventListener('click', _dismiss);
+  ov.addEventListener('click', function(e) { if (e.target === ov) _dismiss(); });
+
+  primaryBtn.addEventListener('click', function() {
+    _dismiss();
+    if (typeof opts.onNewRequest === 'function') opts.onNewRequest();
+  });
+}
+
 APP._garageShowApprovedFromStorage = function(meta) {
   var approved = APP._garageGetApproved();
   /* Fallback removed: writing stale meta back to storage resurrected cancelled
      requests. If localStorage is empty the approved state is gone — show helpGarage. */
   if (!approved) {
-    // אין נתוני אישור — נפילה חזרה לזרימת הבקשה
-    APP.helpGarage();
+    _nrdShowCancelledPopup(meta, {
+      title:    'הבקשה בוטלה',
+      body:     'הבקשה שאליה מתייחסת התראה זו בוטלה.\nניתן לפתוח בקשה חדשה דרך ממשק עזרה.',
+      btnLabel: 'פתח בקשה חדשה',
+      onNewRequest: function() {
+        if (typeof APP !== 'undefined') {
+          APP.nav('vehicle');
+          setTimeout(function() { APP.switchTab('garage'); }, 350);
+        }
+      }
+    });
     return;
   }
   var info          = APP._garageBuildInfoFromState();
