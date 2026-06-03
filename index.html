@@ -2713,6 +2713,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .nrd-toast-btn-primary.blue { background:#0a84ff; color:#fff; }
 .nrd-toast-btn-ghost { background:rgba(255,255,255,0.06); color:#bbb; }
 
+/* Appointment recommendation banner — orange pulsing */
+.nrd-rec { background:rgba(255,159,10,0.08); border:1px solid rgba(255,159,10,0.25); border-radius:13px; padding:12px 14px; display:flex; gap:10px; align-items:flex-start; margin-bottom:14px; animation:nrd-rec-pulse 2.4s ease-in-out infinite; }
+@keyframes nrd-rec-pulse { 0%,100% { border-color:rgba(255,159,10,0.18); background:rgba(255,159,10,0.06); } 50% { border-color:rgba(255,159,10,0.45); background:rgba(255,159,10,0.13); } }
+.nrd-rec-icon { width:28px; height:28px; border-radius:8px; background:rgba(255,159,10,0.15); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nrd-rec-icon svg { color:#FF9F0A; }
+.nrd-rec-text { font-size:13px; color:#FF9F0A; line-height:1.55; font-weight:500; }
+
 /* Reduced-motion overrides for new animation classes */
 @media (prefers-reduced-motion: reduce) {
   .nrd-b-reminder, .nrd-b-info, .nrd-b-danger, .nrd-b-warning, .nrd-swipe-hint svg, .nrd-wrap { animation:none !important; }

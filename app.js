@@ -70,13 +70,19 @@ function navigateForAlertType(alertType, meta) {
       break;
 
     case 'plan':
-    case 'maintenance_plan':
     case 'overdue':
     case 'urgent':
     case 'maintenance_overdue':
     case 'maintenance_urgent':
-      APP.nav('vehicle');
-      setTimeout(function() { APP.switchTab('garage'); }, 350);
+      /* Opens garage request interface so driver can submit a new service request. */
+      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
+      setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
+      break;
+
+    case 'maintenance_plan':
+      /* Set aside — routing TBD after product discussion. */
+      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
+      setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
       break;
 
     case 'test_due':
@@ -86,11 +92,10 @@ function navigateForAlertType(alertType, meta) {
       break;
 
     case 'garage_approved':
+      /* helpGarage() auto-detects approved state in localStorage and shows
+         the approved garage details / appointment screen internally. */
       if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
-      setTimeout(function() {
-        if (typeof APP._garageShowApprovedFromStorage === 'function') APP._garageShowApprovedFromStorage(meta);
-        else if (typeof APP.helpGarage === 'function') APP.helpGarage();
-      }, 350);
+      setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
       break;
 
     case 'garage_rejected':
@@ -2835,7 +2840,9 @@ function _nrdDetailRows(n) {
       if (n.garageInfo) V('מוסך מאושר', n.garageInfo); break;
     case 'garage_rejected':
       V('סיבה', n.reasonLabel); break;
-    case 'garage_appointment_set': case 'garage_appointment_cancelled':
+    case 'garage_appointment_set':
+      V('תאריך', n.appointmentDate); V('שעה', n.appointmentTime); if (n.garageInfo) V('מוסך', n.garageInfo); break;
+    case 'garage_appointment_cancelled':
       V('תאריך', n.appointmentDate); V('שעה', n.appointmentTime); if (n.garageInfo) V('מוסך', n.garageInfo); break;
     case 'fuel_high':
       V('צריכה', n.fuelConsumption, 'ל׳/100ק"מ'); V('סף', n.threshold, 'ל׳'); V('ממוצע צי', n.fleetAverage, 'ל׳'); break;
@@ -2844,12 +2851,20 @@ function _nrdDetailRows(n) {
       if (n.fleetAverage != null && n.fleetAverage !== '') rows.push(['ממוצע צי', '<span class="nrd-row-value">₪' + _escHtml(String(n.fleetAverage)) + '</span>']);
       break;
   }
-  if (n.originalDescription) V('תיאור', n.originalDescription);
-  if (n.managerNote) V('הערת מנהל', n.managerNote);
-  if (!rows.length) return '';
-  return '<div class="nrd-rows">' + rows.map(function(r) {
+  /* For garage_appointment_set the fixed recommendation replaces managerNote */
+  if (type !== 'garage_appointment_set' && n.originalDescription) V('תיאור', n.originalDescription);
+  if (type !== 'garage_appointment_set' && n.managerNote) V('הערת מנהל', n.managerNote);
+  if (!rows.length && type !== 'garage_appointment_set') return '';
+  var _rowsHtml = rows.length ? '<div class="nrd-rows">' + rows.map(function(r) {
     return '<div class="nrd-detail-row"><span class="nrd-row-label">' + r[0] + '</span>' + r[1] + '</div>';
-  }).join('') + '</div>';
+  }).join('') + '</div>' : '';
+  if (type === 'garage_appointment_set') {
+    _rowsHtml += '<div class="nrd-rec">' +
+      '<div class="nrd-rec-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>' +
+      '<div class="nrd-rec-text">ככל שתגיע למוסך מוקדם יותר — תצא מוקדם יותר<br>שעת הגעה מומלצת: <strong>07:30 בבוקר</strong></div>' +
+    '</div>';
+  }
+  return _rowsHtml;
 }
 
 /* Action buttons HTML for one card. */
@@ -2877,9 +2892,9 @@ function _nrdCardActions(n) {
     case 'garage_appointment_cancelled':
       primary = btn('קבע תור חדש'); break;
     case 'overdue': case 'urgent': case 'maintenance_overdue': case 'maintenance_urgent':
-      primary = btn('תאם טיפול'); break;
+      primary = btn('קבע תור לטיפול במוסך'); break;
     case 'plan': case 'maintenance_plan':
-      primary = btn('תכנן טיפול', true); break;
+      primary = btn('קבע תור לטיפול במוסך', true); break;
     case 'km_update':
       primary = btn('עדכן ק"מ', true); break;
     case 'test_due': case 'test_urgent':
@@ -6670,8 +6685,8 @@ function _nrdToastActions(n) {
     case 'garage_approved': label = 'קבע תור'; blue = true; ghost = 'פרטי מוסך'; break;
     case 'garage_rejected': label = 'פתח בקשה חדשה'; break;
     case 'garage_appointment_cancelled': label = 'קבע תור חדש'; break;
-    case 'overdue': case 'urgent': case 'maintenance_overdue': case 'maintenance_urgent': label = 'תאם טיפול'; break;
-    case 'plan': case 'maintenance_plan': label = 'תכנן טיפול'; blue = true; break;
+    case 'overdue': case 'urgent': case 'maintenance_overdue': case 'maintenance_urgent': label = 'קבע תור לטיפול במוסך'; break;
+    case 'plan': case 'maintenance_plan': label = 'קבע תור לטיפול במוסך'; blue = true; break;
     case 'km_update': label = 'עדכן ק"מ'; blue = true; break;
     case 'test_due': case 'test_urgent': label = 'בקרוב — מכוני טסט'; blue = true; break;
     case 'fuel_high': label = 'דוח צריכה'; break;
