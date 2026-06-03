@@ -1513,7 +1513,32 @@ function _initFbGarageStatusSync() {
           var _isAdminChange = data.setBy !== 'driver';
           var _apptTitle = (_dateChanged && _isAdminChange) ? 'המנהל שינה את התור שלך' : 'תור נקבע במוסך';
           var _apptBody  = 'מנהל הצי קבע לך תור במוסך ל-' + _aSet.appointmentDate + ' בשעה ' + (_aSet.appointmentTime || '');
-          if (typeof showInAppNotification === 'function') {
+          // Single Writer Principle: FCM is the canonical owner of notification
+          // history for this event. The Firebase listener syncs STATE only — it must
+          // NOT create a second history card. The in-memory dedup maps
+          // (_garageDedupMap / _notifDedupTtlMap) reset on app reload and are not
+          // shared with the background SW that handled FCM, so they cannot be trusted
+          // for cross-channel dedup. Check PERSISTENT history instead.
+          var _alreadySaved = (function() {
+            try {
+              var hist = (typeof getNotifHistory === 'function')
+                ? getNotifHistory()
+                : JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]');
+              return hist.some(function(n) {
+                if (n.alertType !== 'garage_appointment_set') return false;
+                // Match on eventId when both sides have it…
+                if (_aSet.eventId && n.eventId) {
+                  return String(n.eventId) === String(_aSet.eventId);
+                }
+                // …otherwise fall back to a content fingerprint so a partial-format
+                // FCM card (missing eventId) still blocks the listener duplicate.
+                return (n.title || '') === _apptTitle && (n.body || '') === _apptBody;
+              });
+            } catch (_e) { return false; }
+          })();
+          // Only save+show when FCM did NOT already record this event.
+          // If FCM handled it, do nothing — STATE sync was already done above.
+          if (!_alreadySaved && typeof showInAppNotification === 'function') {
             showInAppNotification({
               notification: { title: _apptTitle, body: _apptBody },
               data: {
