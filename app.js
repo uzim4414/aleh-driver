@@ -2983,42 +2983,48 @@ function _nrdDetailRows(n) {
   var R = function(icon, label, valueHtml) {
     rows.push([icon, label, valueHtml]);
   };
-  /* Helper: push a plain text value row */
+  /* Helper: push a plain text value row.
+     For KM/ל׳/ימים units, uses nrd-val-km so unit appears LEFT of number. */
+  var _KM_UNITS = ['ק"מ', 'ל׳', 'ל׳/100ק"מ', 'ימים'];
   var V = function(icon, label, val, unit) {
     if (val == null || val === '') return;
-    R(icon, label, '<span class="nrd-row-value">' + _escHtml(String(val)) + (unit ? ' ' + unit : '') + '</span>');
+    var valStr = String(val);
+    var valHtml;
+    if (unit && _KM_UNITS.indexOf(unit) >= 0) {
+      /* Determine color for negative KM (overdue) */
+      var numColor = (parseFloat(valStr) < 0) ? 'color:#f87171;' : '';
+      valHtml = '<span class="nrd-row-value"><span class="nrd-val-km"><span class="nrdv" style="' + numColor + '">' + _escHtml(valStr) + '</span><span class="nrdu">' + _escHtml(unit) + '</span></span></span>';
+    } else {
+      valHtml = '<span class="nrd-row-value">' + _escHtml(valStr) + (unit ? ' ' + _escHtml(unit) : '') + '</span>';
+    }
+    R(icon, label, valHtml);
   };
   /* Vehicle always shown when available (not as chip — chips are in meta row) */
   if (n.vehicleId) R('car', 'רכב', _nrdAlehPlateHtml(n.vehicleId));
 
   switch (type) {
     case 'garage_approved':
-      if (n.garageInfo) V('garage', 'מוסך', n.garageInfo);
-      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      /* garageInfo and managerNote now rendered by _nrdBodySections */
       break;
     case 'garage_rejected':
-      V('tag',  'סוג',          n.originalDescription ? 'תקלה / בעיה' : '');
-      V('text', 'תיאור',        n.originalDescription);
-      V('info', 'סיבת דחייה',  n.reasonLabel);
-      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      /* originalDescription, reasonLabel, managerNote now in _nrdBodySections */
       break;
     case 'garage_appointment_set':
       V('calendar', 'תאריך', n.appointmentDate);
       V('clock',    'שעה',   n.appointmentTime);
-      if (n.garageInfo) V('garage', 'מוסך', n.garageInfo);
+      /* garageInfo now in _nrdBodySections */
       break;
     case 'garage_appointment_cancelled':
       V('calendar', 'תאריך', n.appointmentDate);
       V('clock',    'שעה',   n.appointmentTime);
-      if (n.garageInfo) V('garage', 'מוסך', n.garageInfo);
-      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      /* garageInfo, managerNote now in _nrdBodySections */
       break;
     case 'overdue': case 'urgent': case 'plan':
     case 'maintenance_overdue': case 'maintenance_urgent': case 'maintenance_plan':
       V('gauge',    'נותר',        n.kmLeft,  'ק"מ');
       V('gauge',    'הבא לטיפול', n.nextKm,  'ק"מ');
       V('gauge',    'צפי',         n.estKm,   'ק"מ');
-      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      /* managerNote now in _nrdBodySections */
       break;
     case 'km_update':
       V('hourglass', 'ימים מאז עדכון', n.daysSinceUpdate, 'ימים');
@@ -3097,6 +3103,141 @@ function _nrdCardActions(n) {
       primary = btn('פרטים', true); break;
   }
   return primary + secondary;
+}
+
+/* SVG icons for structured body sections */
+var _NRD_BODY_ICONS = {
+  note:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>',
+  reject:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+  garage:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  nodrive: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+  info:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+};
+
+function _nrdBodySections(n) {
+  var type = n.alertType || 'plan';
+  var parts = [];
+
+  /* ── fault description (garage types with original description) ── */
+  if (n.originalDescription && (type === 'garage_rejected' || type === 'garage_approved')) {
+    parts.push(
+      '<div class="nrd-fault">' +
+        '<div class="nrd-fault-label">תיאור התקלה</div>' +
+        '<div class="nrd-fault-text">' + _escHtml(n.originalDescription) + '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ── garage block (approved / appointment types) ── */
+  if (n.garageInfo && (type === 'garage_approved' || type === 'garage_appointment_set' || type === 'garage_appointment_cancelled')) {
+    var gName = typeof n.garageInfo === 'string' ? n.garageInfo : (n.garageInfo.name || n.garageInfo.garageName || '');
+    if (gName) {
+      parts.push(
+        '<div class="nrd-garage-block">' +
+          '<div class="nrd-garage-icon-wrap">' + _NRD_BODY_ICONS.garage + '</div>' +
+          '<div>' +
+            '<div class="nrd-garage-name">' + _escHtml(gName) + '</div>' +
+            '<div class="nrd-garage-sub">מוסך מאושר</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+  }
+
+  /* ── rejection reason ── */
+  if (n.reasonLabel && type === 'garage_rejected') {
+    parts.push(
+      '<div class="nrd-rejection">' +
+        '<div class="nrd-rejection-icon">' + _NRD_BODY_ICONS.reject + '</div>' +
+        '<div>' +
+          '<div class="nrd-rejection-label">סיבת דחייה</div>' +
+          '<div class="nrd-rejection-text">' + _escHtml(n.reasonLabel) + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ── manager note ── */
+  if (n.managerNote) {
+    parts.push(
+      '<div class="nrd-note">' +
+        '<div class="nrd-note-icon">' + _NRD_BODY_ICONS.note + '</div>' +
+        '<div>' +
+          '<div class="nrd-note-label">הערת מנהל</div>' +
+          '<div class="nrd-note-text">' + _escHtml(n.managerNote) + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ── test_due countdown ring ── */
+  if ((type === 'test_due' || type === 'test_urgent') && n.daysLeft != null) {
+    var days = parseInt(n.daysLeft, 10) || 0;
+    var isUrgent = (type === 'test_urgent');
+    var maxDays = 30;
+    var pct = Math.max(0, Math.min(1, days / maxDays));
+    var r = isUrgent ? 34 : 26;
+    var circ = 2 * Math.PI * r;
+    var offset = circ * (1 - pct);
+    var ringColor = isUrgent ? '#ef4444' : '#4aa8ff';
+
+    if (isUrgent) {
+      /* ── alarm ring for test_urgent ── */
+      parts.push(
+        '<div class="nrd-urgent-alarm">' +
+          '<div class="nrd-alarm-right">' +
+            '<div class="nrd-alarm-warning">⚠ הרכב לא יוכל לנסוע</div>' +
+            '<div class="nrd-alarm-msg">ב-' + _escHtml(String(n.testDate || '')) + ' פג תוקף הטסט — יש לחדש מיידית</div>' +
+          '</div>' +
+          '<div class="nrd-alarm-ring">' +
+            '<svg width="68" height="68" viewBox="0 0 68 68">' +
+              '<circle cx="34" cy="34" r="' + r + '" fill="none" stroke="rgba(239,68,68,0.15)" stroke-width="5"/>' +
+              '<circle cx="34" cy="34" r="' + r + '" fill="none" stroke="' + ringColor + '" stroke-width="5"' +
+              ' stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"' +
+              ' stroke-linecap="round"><animate attributeName="stroke-dashoffset" from="' + circ.toFixed(1) + '" to="' + offset.toFixed(1) + '" dur="0.8s" fill="freeze"/><animate attributeName="opacity" values="0.7;1;0.7" dur="1s" repeatCount="indefinite"/></circle>' +
+            '</svg>' +
+            '<div class="nrd-alarm-ring-num"><div class="d">' + days + '</div><div class="u">ימים</div></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="nrd-no-drive-warn">' +
+          '<div class="nrd-no-drive-icon">' + _NRD_BODY_ICONS.nodrive + '</div>' +
+          '<div class="nrd-no-drive-text">לאחר <strong>' + _escHtml(String(n.testDate || '')) + '</strong> הרכב אינו רשאי לנסוע על פי חוק ללא טסט תקף</div>' +
+        '</div>'
+      );
+    } else {
+      /* ── countdown ring for test_due ── */
+      parts.push(
+        '<div class="nrd-countdown">' +
+          '<div class="nrd-cd-right">' +
+            '<div class="nrd-cd-label">נותר לטסט</div>' +
+            '<div class="nrd-cd-date" dir="ltr">' + _escHtml(String(n.testDate || '')) + '</div>' +
+          '</div>' +
+          '<div class="nrd-cd-ring">' +
+            '<svg width="64" height="64" viewBox="0 0 64 64">' +
+              '<circle cx="32" cy="32" r="' + r + '" fill="none" stroke="rgba(74,168,255,0.12)" stroke-width="4"/>' +
+              '<circle cx="32" cy="32" r="' + r + '" fill="none" stroke="#4aa8ff" stroke-width="4"' +
+              ' stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"' +
+              ' stroke-linecap="round" opacity="0.85"><animate attributeName="stroke-dashoffset" from="' + circ.toFixed(1) + '" to="' + offset.toFixed(1) + '" dur="1.2s" fill="freeze"/></circle>' +
+            '</svg>' +
+            '<div class="nrd-cd-ring-num"><span>' + days + '</span><span class="nrd-cd-ring-sub">ימים</span></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+  }
+
+  /* ── km_update — why it matters ── */
+  if (type === 'km_update') {
+    parts.push(
+      '<div class="nrd-km-why">' +
+        '<div class="nrd-km-why-icon">' + _NRD_BODY_ICONS.info + '</div>' +
+        '<div class="nrd-km-why-text">עדכון ק״מ מאפשר לנו לחשב עם דיוק מלא את מועד הטיפול הבא, להתריע בזמן על חריגות, ולשמור על הרכב שלך במצב אופטימלי</div>' +
+      '</div>'
+    );
+  }
+
+  if (!parts.length) return '';
+  return '<div class="nrd-body-sections">' + parts.join('') + '</div>';
 }
 
 function renderNotifHistory() {
@@ -3183,6 +3324,7 @@ function _nrdCardHtml(n, idx) {
   var statusPill = _NRD_STATUS_PILL[type] || (_NRD_PILL[cat] || _NRD_PILL.info);
   var body = n.body || '';
   var detailRows = _nrdDetailRows(n);
+  /* bodySections is called inline in the template */
   var actions = _nrdCardActions(n);
 
   /* Meta row: request number chip + date chip (appointment) + status pill */
@@ -3198,7 +3340,7 @@ function _nrdCardHtml(n, idx) {
   return '<div class="nrd-wrap" data-cat="' + cat + '" style="animation-delay:' + (idx * 0.05) + 's">' +
     '<div class="nrd-swipe-bg-left"><span class="nrd-swipe-label">מחק ✕</span></div>' +
     '<div class="nrd-swipe-bg-right"><span class="nrd-swipe-label">✓ נקרא</span></div>' +
-    '<div class="nrd-card" data-id="' + safeId + '" data-type="' + type + '" onclick="_nrdToggleCard(this,event)">' +
+    '<div class="nrd-card' + (type === 'test_urgent' ? ' nrd-test-urgent-card' : '') + '" data-id="' + safeId + '" data-type="' + type + '" onclick="_nrdToggleCard(this,event)">' +
       (n.read ? '' : '<span class="nrd-unread-dot" style="background:' + dot + '"></span>') +
       '<div class="nrd-swipe-hint">' + _NRD_ICONS.swipe + '</div>' +
       '<div class="nrd-card-top">' +
@@ -3215,7 +3357,7 @@ function _nrdCardHtml(n, idx) {
       '</div>' +
       '<div class="nrd-body"><div class="nrd-body-inner">' +
         '<div class="nrd-divider"></div>' +
-        (body ? '<div class="nrd-full-body">' + _escHtml(body) + '</div>' : '') +
+        _nrdBodySections(n) +
         detailRows +
         actions +
       '</div></div>' +

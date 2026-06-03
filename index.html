@@ -2677,7 +2677,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
 /* Meta row — chips below title */
 .nrd-meta-row { display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap; }
-.nrd-req-chip { background:rgba(255,255,255,0.07); color:#aaa; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; }
+.nrd-req-chip { background:rgba(255,255,255,0.07); color:#aaa; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; /* beacon animation added below in redesign block */ }
 .nrd-date-chip { background:rgba(74,168,255,0.12); color:#7cc0ff; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; }
 
 /* AlehPlate */
@@ -2734,6 +2734,161 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   .nrd-wrap { opacity:1 !important; transform:none !important; }
   .nrd-toast { animation:none !important; transform:translateX(-50%) translateY(0) !important; }
 }
+
+/* ════════ NOTIFICATION BODY REDESIGN — structured sections ════════ */
+
+/* ── KM unit left of number ── */
+.nrd-val-km { display:inline-flex; direction:ltr; flex-direction:row-reverse; gap:5px; align-items:baseline; }
+.nrd-val-km .nrdv { font-size:14px; font-weight:600; color:#e5e5ea; }
+.nrd-val-km .nrdu { font-size:12px; color:#888; font-weight:500; }
+
+/* ── Request number chip — beacon glow ── */
+.nrd-req-chip {
+  background:rgba(255,255,255,0.07); color:#fff; font-size:11px; font-weight:800;
+  padding:3px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:4px;
+  direction:ltr; border:1px solid rgba(255,255,255,0.25);
+  text-shadow:0 0 8px rgba(255,255,255,0.5);
+  animation:nrd-req-pulse 1.8s ease-in-out infinite;
+}
+@keyframes nrd-req-pulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(255,255,255,0.3); border-color:rgba(255,255,255,0.25); }
+  40%  { box-shadow:0 0 0 5px rgba(255,255,255,0.07), 0 0 14px rgba(255,255,255,0.25); border-color:rgba(255,255,255,0.65); }
+  70%  { box-shadow:0 0 0 9px rgba(255,255,255,0); }
+  100% { box-shadow:0 0 0 0 rgba(255,255,255,0); }
+}
+
+/* ── Fault description ── */
+.nrd-fault {
+  background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.05);
+  border-right:3px solid rgba(255,255,255,0.15); border-radius:10px; padding:10px 13px;
+  margin-bottom:0;
+}
+.nrd-fault-label { font-size:10px; font-weight:700; letter-spacing:1px; color:#555; margin-bottom:5px; text-transform:uppercase; }
+.nrd-fault-text  { font-size:13.5px; line-height:1.55; color:#d8d8da; font-weight:500; font-style:italic; }
+
+/* ── Manager note — amber glow ── */
+.nrd-note {
+  display:flex; gap:10px; align-items:flex-start;
+  background:rgba(245,158,11,0.07); border:1px solid rgba(245,158,11,0.18);
+  border-radius:10px; padding:10px 12px;
+  animation:nrd-note-glow 2.5s ease-in-out infinite;
+}
+@keyframes nrd-note-glow {
+  0%,100% { border-color:rgba(245,158,11,0.18); box-shadow:none; }
+  50%     { border-color:rgba(245,158,11,0.5); box-shadow:0 0 12px rgba(245,158,11,0.12); }
+}
+.nrd-note-icon  { width:26px; height:26px; flex-shrink:0; border-radius:8px; background:rgba(245,158,11,0.16); display:flex; align-items:center; justify-content:center; color:#f0a13a; }
+.nrd-note-label { font-size:10px; font-weight:700; letter-spacing:1px; color:#f0a13a; margin-bottom:2px; text-transform:uppercase; }
+.nrd-note-text  { font-size:13.5px; line-height:1.5; color:#f3d3a0; font-weight:600; }
+
+/* ── Rejection reason — red glow ── */
+.nrd-rejection {
+  display:flex; gap:10px; align-items:flex-start;
+  background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.2);
+  border-radius:10px; padding:10px 12px;
+  animation:nrd-rejection-glow 2.5s ease-in-out infinite;
+}
+@keyframes nrd-rejection-glow {
+  0%,100% { border-color:rgba(239,68,68,0.15); }
+  50%     { border-color:rgba(239,68,68,0.45); box-shadow:0 0 12px rgba(239,68,68,0.1); }
+}
+.nrd-rejection-icon  { width:26px; height:26px; flex-shrink:0; border-radius:8px; background:rgba(239,68,68,0.14); display:flex; align-items:center; justify-content:center; color:#f87171; }
+.nrd-rejection-label { font-size:10px; font-weight:700; letter-spacing:1px; color:#f87171; margin-bottom:2px; text-transform:uppercase; }
+.nrd-rejection-text  { font-size:13.5px; line-height:1.5; color:#fca5a5; font-weight:600; }
+
+/* ── Garage styled block ── */
+.nrd-garage-block {
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+  border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px;
+}
+.nrd-garage-icon-wrap { width:36px; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; color:#888; flex-shrink:0; }
+.nrd-garage-name { font-size:15px; font-weight:700; color:#fff; line-height:1.3; }
+.nrd-garage-sub  { font-size:11px; color:#888; margin-top:2px; }
+
+/* ── Countdown ring (test_due) ── */
+.nrd-countdown {
+  background:rgba(74,168,255,0.06); border:1px solid rgba(74,168,255,0.2);
+  border-radius:14px; padding:14px 16px; display:flex; align-items:center;
+  justify-content:space-between; position:relative; overflow:hidden;
+}
+.nrd-countdown::before {
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(74,168,255,0.04) 50%,transparent 100%);
+  animation:nrd-scan 3s ease-in-out infinite;
+}
+@keyframes nrd-scan { 0% { transform:translateX(-100%); } 100% { transform:translateX(100%); } }
+.nrd-cd-right { text-align:right; }
+.nrd-cd-label { font-size:11px; color:#888; font-weight:600; letter-spacing:.3px; margin-bottom:4px; }
+.nrd-cd-date  { font-size:13px; color:#ddd; font-weight:700; direction:ltr; }
+.nrd-cd-ring  { position:relative; width:64px; height:64px; flex-shrink:0; }
+.nrd-cd-ring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.nrd-cd-ring-num {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:1px;
+}
+.nrd-cd-ring-num span:first-child { font-size:22px; font-weight:900; color:#7cc0ff; line-height:1; direction:ltr; animation:nrd-cd-breathe 2.5s ease-in-out infinite; }
+.nrd-cd-ring-sub { font-size:9px; color:#888; font-weight:600; line-height:1; }
+@keyframes nrd-cd-breathe { 0%,100% { opacity:.85; transform:scale(1); } 50% { opacity:1; transform:scale(1.04); } }
+
+/* ── Urgent test alarm ── */
+.nrd-card.nrd-test-urgent-card { animation:nrd-danger-border 1.2s ease-in-out infinite; }
+@keyframes nrd-danger-border {
+  0%,100% { border-color:rgba(239,68,68,0.25); box-shadow:none; }
+  50%     { border-color:rgba(239,68,68,0.7); box-shadow:0 0 20px rgba(239,68,68,0.12),inset 0 0 20px rgba(239,68,68,0.03); }
+}
+.nrd-urgent-alarm {
+  background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(220,38,38,0.05));
+  border:1px solid rgba(239,68,68,0.25); border-radius:14px; padding:14px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:relative; overflow:hidden;
+  animation:nrd-alarm-pulse 1s ease-in-out infinite;
+}
+@keyframes nrd-alarm-pulse {
+  0%,100% { background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(220,38,38,0.04)); border-color:rgba(239,68,68,0.22); }
+  50%     { background:linear-gradient(135deg,rgba(239,68,68,0.18),rgba(220,38,38,0.1)); border-color:rgba(239,68,68,0.6); box-shadow:0 0 16px rgba(239,68,68,0.18); }
+}
+.nrd-urgent-alarm::before {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(45deg,rgba(239,68,68,0.025) 0,rgba(239,68,68,0.025) 2px,transparent 2px,transparent 12px);
+  animation:nrd-stripe-move 2s linear infinite;
+}
+@keyframes nrd-stripe-move { 0% { background-position:0 0; } 100% { background-position:24px 0; } }
+.nrd-alarm-ring { position:relative; width:68px; height:68px; flex-shrink:0; }
+.nrd-alarm-ring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.nrd-alarm-ring-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
+.nrd-alarm-ring-num .d { font-size:22px; font-weight:900; color:#f87171; line-height:1; direction:ltr; animation:nrd-num-flash 1s ease-in-out infinite; }
+@keyframes nrd-num-flash { 0%,100% { color:#f87171; } 50% { color:#ff3333; text-shadow:0 0 10px rgba(255,51,51,0.7); } }
+.nrd-alarm-ring-num .u { font-size:9px; color:#f87171; font-weight:700; opacity:.8; }
+.nrd-alarm-right { text-align:right; }
+.nrd-alarm-warning { font-size:10px; font-weight:800; letter-spacing:1px; color:#f87171; margin-bottom:6px; text-transform:uppercase; animation:nrd-label-flash 1s ease-in-out infinite; }
+@keyframes nrd-label-flash { 0%,100% { opacity:.8; } 50% { opacity:1; } }
+.nrd-alarm-msg { font-size:13px; color:#fca5a5; font-weight:600; line-height:1.4; max-width:175px; }
+.nrd-no-drive-warn {
+  background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.18);
+  border-right:3px solid #ef4444; border-radius:10px; padding:10px 13px;
+  display:flex; gap:9px; align-items:flex-start;
+  animation:nrd-warn-glow 1.4s ease-in-out infinite;
+}
+@keyframes nrd-warn-glow { 0%,100% { border-right-color:#ef4444; } 50% { border-right-color:#ff4444; box-shadow:0 0 10px rgba(239,68,68,0.12); } }
+.nrd-no-drive-icon { color:#f87171; flex-shrink:0; margin-top:1px; }
+.nrd-no-drive-text { font-size:13px; color:#fca5a5; font-weight:600; line-height:1.5; }
+
+/* ── KM why-it-matters box ── */
+.nrd-km-why {
+  display:flex; gap:10px; align-items:flex-start;
+  background:rgba(255,159,10,0.07); border:1px solid rgba(255,159,10,0.22);
+  border-right:3px solid rgba(255,159,10,0.7); border-radius:11px; padding:11px 13px;
+  animation:nrd-km-why-glow 3s ease-in-out infinite;
+}
+@keyframes nrd-km-why-glow {
+  0%,100% { border-right-color:rgba(255,159,10,0.5); }
+  50%     { border-right-color:rgba(255,159,10,0.9); box-shadow:0 0 14px rgba(255,159,10,0.08); }
+}
+.nrd-km-why-icon { width:24px; height:24px; flex-shrink:0; margin-top:1px; color:#FF9F0A; }
+.nrd-km-why-text { font-size:12.5px; color:#ffd580; font-weight:500; line-height:1.6; }
+
+/* ── Body structured wrapper ── */
+.nrd-body-sections { display:flex; flex-direction:column; gap:9px; margin-bottom:14px; }
 
 /* --- Reduced Motion Override --- */
 @media (prefers-reduced-motion: reduce) {
