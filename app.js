@@ -1503,18 +1503,30 @@ function _initFbGarageStatusSync() {
         if (typeof _fbClearApprovedGarage === 'function') _fbClearApprovedGarage();
         if (typeof _fbClearPendingGarage === 'function') _fbClearPendingGarage();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
-        // Cross-channel dedup: skip toast if FCM already showed this event
+        // Cross-channel dedup: skip notification if FCM already showed this event
         var _setDupKey = _normGarageEventKey('appointment_set', data.eventId);
-        if (typeof showToast === 'function' && !_garageDedupSeen(_setDupKey)) {
+        if (!_garageDedupSeen(_setDupKey)) {
           var _prevHadAppt = _localApptCheck && _localApptCheck.appointmentDate;
           var _dateChanged = _prevHadAppt &&
             (_localApptCheck.appointmentDate !== _aSet.appointmentDate ||
              (_localApptCheck.appointmentTime || '') !== _aSet.appointmentTime);
           var _isAdminChange = data.setBy !== 'driver';
-          var _toastMsg = (_dateChanged && _isAdminChange)
-            ? '🔄 המנהל שינה את התור שלך ל-' + _aSet.appointmentDate + ' בשעה ' + (_aSet.appointmentTime || '')
-            : '✅ תור נקבע ל-' + _aSet.appointmentDate + ' בשעה ' + (_aSet.appointmentTime || '');
-          showToast(_toastMsg);
+          var _apptTitle = (_dateChanged && _isAdminChange) ? 'המנהל שינה את התור שלך' : 'תור נקבע במוסך';
+          var _apptBody  = 'מנהל הצי קבע לך תור במוסך ל-' + _aSet.appointmentDate + ' בשעה ' + (_aSet.appointmentTime || '');
+          if (typeof showInAppNotification === 'function') {
+            showInAppNotification({
+              notification: { title: _apptTitle, body: _apptBody },
+              data: {
+                alertType: 'garage_appointment_set',
+                vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
+                eventId: _aSet.eventId,
+                requestNumber: _aSet.requestNumber,
+                appointmentDate: _aSet.appointmentDate,
+                appointmentTime: _aSet.appointmentTime,
+                managerNote: _aSet.managerNote
+              }
+            });
+          }
         }
         snap.ref.update({ consumed: true, consumedAt: Date.now() });
         return;
