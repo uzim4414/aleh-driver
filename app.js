@@ -3082,7 +3082,7 @@ function _nrdCardActions(n) {
       secondary = ghost('ניווט למוסך', wazeClick); break;
     case 'garage_approved':
       primary = btn('קבע תור', true);
-      secondary = ghost('פרטי מוסך', call); break;
+      secondary = ghost('פרטי מוסך', 'APP.nav(\'vehicle\');setTimeout(function(){APP.switchTab(\'garage\');},350);event.stopPropagation()'); break;
     case 'garage_rejected':
       primary = btn('פתח בקשה חדשה'); break;
     case 'garage_appointment_cancelled':
