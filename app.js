@@ -94,8 +94,8 @@ function navigateForAlertType(alertType, meta) {
       break;
 
     case 'garage_rejected':
-      APP.nav('vehicle');
-      setTimeout(function() { APP.switchTab('garage'); }, 350);
+      if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
+      setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
       break;
 
     case 'garage_appointment_cancelled':
