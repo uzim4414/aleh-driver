@@ -111,8 +111,8 @@ function navigateForAlertType(alertType, meta) {
         if (!_apptData) {
           _nrdShowCancelledPopup(meta, {
             title:    'התור בוטל',
-            body:     'התור שנקבע עבור בקשה זו בוטל.\nניתן לקבוע תור חדש דרך ממשק עזרה.',
-            btnLabel: 'קבע תור חדש',
+            body:     'התור שנקבע עבור בקשה זו בוטל.\nכדי לתאם תור חדש יש לפתוח בקשת מוסך חדשה.',
+            btnLabel: 'פתח בקשה חדשה',
             onNewRequest: function() {
               if (typeof APP !== 'undefined' && typeof APP.openHelpMenu === 'function') {
                 APP.openHelpMenu();
