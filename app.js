@@ -5489,9 +5489,9 @@ APP._garageShowApprovedFromStorage = function(meta) {
       body:     'הבקשה שאליה מתייחסת התראה זו בוטלה.\nניתן לפתוח בקשה חדשה דרך ממשק עזרה.',
       btnLabel: 'פתח בקשה חדשה',
       onNewRequest: function() {
-        if (typeof APP !== 'undefined') {
-          APP.nav('vehicle');
-          setTimeout(function() { APP.switchTab('garage'); }, 350);
+        if (typeof APP !== 'undefined' && typeof APP.openHelpMenu === 'function') {
+          APP.openHelpMenu();
+          setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
         }
       }
     });
