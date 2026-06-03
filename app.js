@@ -5489,10 +5489,14 @@ APP._garageShowApprovedFromStorage = function(meta) {
       body:     'הבקשה שאליה מתייחסת התראה זו בוטלה.\nניתן לפתוח בקשה חדשה דרך ממשק עזרה.',
       btnLabel: 'פתח בקשה חדשה',
       onNewRequest: function() {
-        if (typeof APP !== 'undefined' && typeof APP.openHelpMenu === 'function') {
-          APP.openHelpMenu();
-          setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
-        }
+        if (typeof APP === 'undefined') return;
+        /* Help overlay may already be open (navigateForAlertType opened it before
+           showing the popup). Calling openHelpMenu() again would re-initialize the
+           menu and retrigger the popup cycle. Only open if not already open. */
+        var _alreadyOpen = (typeof STATE !== 'undefined' && STATE.helpMenuOpen);
+        if (!_alreadyOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
+        var _delay = _alreadyOpen ? 0 : 350;
+        setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, _delay);
       }
     });
     return;
