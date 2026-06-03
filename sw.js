@@ -1,4 +1,4 @@
-// SW build: 2026-06-03T23:07:49Z // v133
+// SW build: 2026-06-03T23:16:42Z // v134
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v133';
+const CACHE_NAME = 'aleh-driver-v134';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
@@ -111,6 +111,34 @@ const TYPE_CONFIG = {
   fuel_high:                    { vibrate: [300,100,300],         requireInteraction: false },
   fuel_km_high:                 { vibrate: [150],                 requireInteraction: false }
 };
+
+// Per-type OS notification visuals. Each alert category maps to a coloured icon
+// (96x96, shown left of the title) + a wide banner image (shown below the body on
+// Chrome for Android, the biggest visual upgrade available to PWAs) + a
+// type-specific primary action label.
+// approved=green, danger=red, reminder=blue, warning=orange, info=purple.
+const NOTIF_VISUAL = {
+  garage_approved:              { cat: 'approved', action: 'קבע תור'       },
+  garage_rejected:              { cat: 'danger',   action: 'שלח בקשה חדשה' },
+  garage_appointment_set:       { cat: 'reminder', action: 'הוסף ליומן'    },
+  garage_appointment_cancelled: { cat: 'danger',   action: 'קבע תור חדש'   },
+  plan:                         { cat: 'approved', action: 'תכנן טיפול'     },
+  overdue:                      { cat: 'danger',   action: 'תאם מוסך עכשיו' },
+  urgent:                       { cat: 'warning',  action: 'תאם מוסך'       },
+  km_update:                    { cat: 'reminder', action: 'עדכן ק"מ'       },
+  test_due:                     { cat: 'reminder', action: 'פרטי טסט'       },
+  test_urgent:                  { cat: 'danger',   action: 'תאם טסט דחוף'   },
+  fuel_high:                    { cat: 'warning',  action: 'צפה בדוח'       },
+  fuel_km_high:                 { cat: 'warning',  action: 'צפה בדוח'       }
+};
+function notifVisual(alertType) {
+  const v = NOTIF_VISUAL[alertType] || { cat: 'info', action: 'פתח עכשיו' };
+  return {
+    icon:   './icons/notif-' + v.cat + '.png',
+    image:  './icons/notif-banner-' + v.cat + '.png',
+    action: v.action
+  };
+}
 
 /* ════════════════════════════════════════════════════════════════════
    OS notification content builder — per-type title + body with real data
@@ -259,10 +287,12 @@ self.addEventListener('push', e => {
 
     // Build OS-optimised title + body with relevant data per alert type
     const osContent = _buildOsNotifContent(alertType, meta, notif);
+    const visual = notifVisual(alertType);
 
     return self.registration.showNotification(osContent.title, {
       body:  osContent.body,
-      icon:  './icons/notif-bell.png',
+      icon:  visual.icon,
+      image: visual.image,
       badge: BADGE_ICON,
       dir:   'rtl',
       lang:  'he',
@@ -274,7 +304,7 @@ self.addEventListener('push', e => {
       timestamp:           Date.now(),
       data: Object.assign({}, meta, { _pushTs: relayPayload.ts }),
       actions: [
-        { action: 'open',    title: 'פתח עכשיו' },
+        { action: 'open',    title: visual.action },
         { action: 'dismiss', title: 'סגור' }
       ]
     });
