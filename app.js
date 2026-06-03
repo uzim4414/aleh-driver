@@ -507,16 +507,48 @@ var _NOTIF_HISTORY_KEY = 'driver_notif_history';
    (ts=server canonical) with DIFFERENT ts values. When eventId/requestNumber
    are absent (plan alerts), fall back to a content fingerprint so the two
    copies collapse despite differing ts. */
+/* Map every garage status/alertType to ONE canonical event family so FCM and
+   GAS copies of the same logical event collapse even if their alertType strings
+   differ slightly. Mirrors _normGarageEventKey's table. */
+function _canonGarageType(alertType) {
+  var t = String(alertType || '').toLowerCase();
+  var map = {
+    'cancelled':                    'garage_appointment_cancelled',
+    'garage_appointment_cancelled': 'garage_appointment_cancelled',
+    'appointment_set':              'garage_appointment_set',
+    'garage_appointment_set':       'garage_appointment_set',
+    'approved':                     'garage_approved',
+    'garage_approved':              'garage_approved',
+    'rejected':                     'garage_rejected',
+    'garage_rejected':              'garage_rejected'
+  };
+  return map[t] || t;
+}
+
 function _notifDedupKey(n) {
+  var _aType = n.alertType || '';
+  var _canon = _canonGarageType(_aType);
+  var _isGarageStatus = (_canon === 'garage_approved' || _canon === 'garage_rejected' ||
+                         _canon === 'garage_appointment_set' || _canon === 'garage_appointment_cancelled');
+  /* For garage STATUS notifications, FCM and GAS share the same logical request
+     but may carry different/empty eventIds. Prefer requestNumber (the stable
+     garage request #) collapsed onto the CANONICAL type so the two copies merge.
+     This is what prevents the recurring duplicate garage_rejected/approved cards. */
+  if (_isGarageStatus) {
+    if (n.requestNumber) return 'greq:' + _canon + '|' + String(n.requestNumber);
+    if (n.eventId)       return 'geid:' + _canon + '|' + String(n.eventId);
+    /* appointment types without a request#: vehicleId + appointmentDate is stable */
+    if ((_canon === 'garage_appointment_set' || _canon === 'garage_appointment_cancelled') &&
+        n.vehicleId && n.appointmentDate) {
+      return 'appt:' + _canon + '|' + String(n.vehicleId) + '|' + String(n.appointmentDate);
+    }
+    /* last resort for garage status: collapse on canonical type + vehicleId
+       (a vehicle won't legitimately receive two distinct same-status garage
+       cards in the same history window without a request#/eventId). */
+    return 'gveh:' + _canon + '|' + String(n.vehicleId || '');
+  }
   if (n.eventId) return 'eid:' + n.eventId + '|' + (n.alertType || '');
   if (n.requestNumber) return 'req:' + n.requestNumber + '|' + (n.alertType || '');
-  /* Stable key for appointment types: use vehicleId + appointmentDate instead
-     of title/body which GAS and FCM may format differently. */
-  var _aType = n.alertType || '';
-  if ((_aType === 'garage_appointment_set' || _aType === 'garage_appointment_cancelled') &&
-      n.vehicleId && n.appointmentDate) {
-    return 'appt:' + _aType + '|' + String(n.vehicleId) + '|' + String(n.appointmentDate);
-  }
   return 'sig:' + _aType + '|' + (n.title || '') + '|' + (n.body || '') + '|' + (n.vehicleId || '');
 }
 
@@ -547,6 +579,45 @@ function getNotifHistory() {
     }
     return cleaned;
   } catch(e) { return []; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Universal persistent dedup gate. Returns true if a notification
+   matching (alertType, eventId, title, body) is ALREADY in history.
+   Used as the first line of defense before any showInAppNotification /
+   saveNotifToHistory write, regardless of channel (FCM foreground, FCM
+   pending buffer, GAS pull, Firebase garageSync listener, cold-start).
+   Matches via the SAME canonical key as dedupNotifList so the gate and
+   the list-cleaner can never disagree, plus a content-fingerprint fallback.
+   ────────────────────────────────────────────────────────────── */
+function _notifAlreadyInHistory(alertType, eventId, title, body, extra) {
+  try {
+    var hist = getNotifHistory();
+    if (!hist || !hist.length) return false;
+    var probe = {
+      alertType:     alertType || '',
+      eventId:       eventId   || '',
+      requestNumber: (extra && extra.requestNumber) || '',
+      vehicleId:     (extra && extra.vehicleId) || '',
+      appointmentDate: (extra && extra.appointmentDate) || '',
+      title:         title || '',
+      body:          body  || ''
+    };
+    var probeKey = _notifDedupKey(probe);
+    return hist.some(function(n) {
+      if (!n) return false;
+      // Canonical-key match (collapses cross-channel eventId/requestNumber/format diffs)
+      if (_notifDedupKey(n) === probeKey) return true;
+      // Content fingerprint fallback: same type + identical title + body
+      if ((n.alertType || '') === probe.alertType &&
+          (n.title || '') === probe.title &&
+          (n.body  || '') === probe.body) return true;
+      // Explicit eventId match when both present
+      if (probe.eventId && n.eventId && String(n.eventId) === String(probe.eventId) &&
+          (n.alertType || '') === probe.alertType) return true;
+      return false;
+    });
+  } catch (_e) { return false; }
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -693,6 +764,14 @@ function saveNotifToHistory(payload) {
       vehicleId: meta.vehicleId || ''
     });
     if (list.some(function(n) { return _notifDedupKey(n) === _incomingKey; })) return;
+    // Universal persistent gate — final cross-channel guard. Catches the recurring
+    // garage_* duplicate where FCM and GAS copies differ by eventId/format. Runs
+    // AFTER the STATE side-effects above so STATE stays synced even when the card
+    // itself is a duplicate that must not be written again.
+    if (_notifAlreadyInHistory(alertType, meta.eventId || '', notif.title || '', notif.body || '', {
+      requestNumber: meta.requestNumber || '', vehicleId: meta.vehicleId || '',
+      appointmentDate: meta.appointmentDate || ''
+    })) return;
     var newItem = {
       id:                  ts,
       title:               notif.title || 'עלה — התראה',
@@ -1518,24 +1597,11 @@ function _initFbGarageStatusSync() {
           // NOT create a second history card. The in-memory dedup maps
           // (_garageDedupMap / _notifDedupTtlMap) reset on app reload and are not
           // shared with the background SW that handled FCM, so they cannot be trusted
-          // for cross-channel dedup. Check PERSISTENT history instead.
-          var _alreadySaved = (function() {
-            try {
-              var hist = (typeof getNotifHistory === 'function')
-                ? getNotifHistory()
-                : JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]');
-              return hist.some(function(n) {
-                if (n.alertType !== 'garage_appointment_set') return false;
-                // Match on eventId when both sides have it…
-                if (_aSet.eventId && n.eventId) {
-                  return String(n.eventId) === String(_aSet.eventId);
-                }
-                // …otherwise fall back to a content fingerprint so a partial-format
-                // FCM card (missing eventId) still blocks the listener duplicate.
-                return (n.title || '') === _apptTitle && (n.body || '') === _apptBody;
-              });
-            } catch (_e) { return false; }
-          })();
+          // for cross-channel dedup. Check PERSISTENT history via the universal gate.
+          var _alreadySaved = _notifAlreadyInHistory(
+            'garage_appointment_set', _aSet.eventId, _apptTitle, _apptBody,
+            { requestNumber: _aSet.requestNumber, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '', appointmentDate: _aSet.appointmentDate }
+          );
           // Only save+show when FCM did NOT already record this event.
           // If FCM handled it, do nothing — STATE sync was already done above.
           if (!_alreadySaved && typeof showInAppNotification === 'function') {
