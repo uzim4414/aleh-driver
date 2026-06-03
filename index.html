@@ -2667,11 +2667,18 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .nrd-divider { height:1px; background:rgba(255,255,255,0.07); margin:0 0 13px; }
 .nrd-full-body { font-size:13.5px; color:#aaa; line-height:1.55; margin-bottom:14px; }
 
-/* Detail rows */
-.nrd-rows { display:flex; flex-direction:column; gap:11px; margin-bottom:16px; }
-.nrd-detail-row { display:flex; align-items:center; gap:14px; }
-.nrd-row-label { font-size:13px; color:#888; font-weight:500; min-width:62px; }
-.nrd-row-value { font-size:14px; color:#ddd; font-weight:600; }
+/* Detail rows — icon tile layout */
+.nrd-rows { display:flex; flex-direction:column; gap:0; margin-bottom:16px; border-radius:13px; overflow:hidden; background:#0d0d0d; border:1px solid rgba(255,255,255,0.06); }
+.nrd-detail-row { display:flex; align-items:center; gap:11px; padding:11px 14px; border-bottom:1px solid rgba(255,255,255,0.04); }
+.nrd-detail-row:last-child { border-bottom:none; }
+.nrd-row-icon { width:28px; height:28px; border-radius:8px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#666; }
+.nrd-row-label { font-size:12px; color:#666; font-weight:500; min-width:64px; flex-shrink:0; }
+.nrd-row-value { font-size:14px; color:#ddd; font-weight:600; flex:1; }
+
+/* Meta row — chips below title */
+.nrd-meta-row { display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap; }
+.nrd-req-chip { background:rgba(255,255,255,0.07); color:#aaa; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; }
+.nrd-date-chip { background:rgba(74,168,255,0.12); color:#7cc0ff; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; }
 
 /* AlehPlate */
 .aleh-plate { display:inline-flex; align-items:stretch; direction:ltr; border-radius:6px; overflow:hidden; height:30px; box-shadow:0 1px 3px rgba(0,0,0,0.5); }

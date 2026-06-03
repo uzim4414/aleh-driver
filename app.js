@@ -2800,6 +2800,60 @@ var _NRD_PILL = {
   info:    { c:'nrd-pill-info',     t:'עדכון' }
 };
 
+/* Clean computed title per alertType — overrides raw GAS/FCM title */
+var _NRD_TITLES = {
+  garage_approved:              'בקשת מוסך אושרה',
+  garage_rejected:              'בקשת מוסך נדחתה',
+  garage_appointment_set:       'תור נקבע במוסך',
+  garage_appointment_cancelled: 'תור במוסך בוטל',
+  plan:                         'תזכורת טיפול',
+  maintenance_plan:             'תזכורת תחזוקה',
+  overdue:                      'טיפול באיחור',
+  urgent:                       'טיפול דחוף',
+  maintenance_overdue:          'תחזוקה באיחור',
+  maintenance_urgent:           'תחזוקה דחופה',
+  km_update:                    'עדכון ק"מ נדרש',
+  test_due:                     'תזכורת טסט רכב',
+  test_urgent:                  'טסט רכב דחוף',
+  fuel_high:                    'צריכת דלק גבוהה',
+  fuel_km_high:                 'עלות גבוהה לק"מ'
+};
+
+/* Status pill per alertType — replaces category-based pill */
+var _NRD_STATUS_PILL = {
+  garage_approved:              { c:'nrd-pill-approved', t:'אושר' },
+  garage_rejected:              { c:'nrd-pill-danger',   t:'נדחה' },
+  garage_appointment_set:       { c:'nrd-pill-reminder', t:'תזכורת' },
+  garage_appointment_cancelled: { c:'nrd-pill-danger',   t:'בוטל' },
+  plan:                         { c:'nrd-pill-reminder', t:'תזכורת' },
+  maintenance_plan:             { c:'nrd-pill-reminder', t:'תזכורת' },
+  overdue:                      { c:'nrd-pill-danger',   t:'דחוף' },
+  urgent:                       { c:'nrd-pill-danger',   t:'דחוף' },
+  maintenance_overdue:          { c:'nrd-pill-danger',   t:'דחוף' },
+  maintenance_urgent:           { c:'nrd-pill-danger',   t:'דחוף' },
+  km_update:                    { c:'nrd-pill-reminder', t:'תזכורת' },
+  test_due:                     { c:'nrd-pill-reminder', t:'תזכורת' },
+  test_urgent:                  { c:'nrd-pill-danger',   t:'דחוף' },
+  fuel_high:                    { c:'nrd-pill-warning',  t:'אזהרה' },
+  fuel_km_high:                 { c:'nrd-pill-warning',  t:'אזהרה' }
+};
+
+/* SVG icons for detail rows (16px) */
+var _NRD_ROW_ICONS = {
+  car:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
+  calendar: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
+  clock:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  garage:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>',
+  note:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  gauge:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12l4.5-4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+  info:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+  tag:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+  text:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>',
+  hourglass:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2h14M5 22h14M17 2v4l-5 6 5 6v4M7 2v4l5 6-5 6v4"/></svg>',
+  fuel:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M3 11h12"/><path d="M15 6h2a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h0v7a2 2 0 0 1-2 2h0a2 2 0 0 1-2-2V14"/></svg>',
+  money:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>'
+};
+
 function _nrdAlehPlateHtml(num) {
   return '<span class="aleh-plate" dir="ltr">' +
     '<span class="aleh-plate-il">IL</span>' +
@@ -2822,41 +2876,74 @@ function _nrdGroupOf(ts) {
 function _nrdDetailRows(n) {
   var type = n.alertType || 'plan';
   var rows = [];
-  if (n.requestNumber) rows.push(['מספר בקשה', '<span class="nrd-row-value">#' + _escHtml(String(n.requestNumber)) + '</span>']);
-  if (n.vehicleId)     rows.push(['רכב', _nrdAlehPlateHtml(n.vehicleId)]);
-  var V = function(label, val, unit) {
-    if (val == null || val === '') return;
-    rows.push([label, '<span class="nrd-row-value">' + _escHtml(String(val)) + (unit ? ' ' + unit : '') + '</span>']);
+  /* Helper: push a row with [iconKey, label, valueHtml] */
+  var R = function(icon, label, valueHtml) {
+    rows.push([icon, label, valueHtml]);
   };
+  /* Helper: push a plain text value row */
+  var V = function(icon, label, val, unit) {
+    if (val == null || val === '') return;
+    R(icon, label, '<span class="nrd-row-value">' + _escHtml(String(val)) + (unit ? ' ' + unit : '') + '</span>');
+  };
+  /* Vehicle always shown when available (not as chip — chips are in meta row) */
+  if (n.vehicleId) R('car', 'רכב', _nrdAlehPlateHtml(n.vehicleId));
+
   switch (type) {
+    case 'garage_approved':
+      if (n.garageInfo) V('garage', 'מוסך', n.garageInfo);
+      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      break;
+    case 'garage_rejected':
+      V('tag',  'סוג',          n.originalDescription ? 'תקלה / בעיה' : '');
+      V('text', 'תיאור',        n.originalDescription);
+      V('info', 'סיבת דחייה',  n.reasonLabel);
+      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      break;
+    case 'garage_appointment_set':
+      V('calendar', 'תאריך', n.appointmentDate);
+      V('clock',    'שעה',   n.appointmentTime);
+      if (n.garageInfo) V('garage', 'מוסך', n.garageInfo);
+      break;
+    case 'garage_appointment_cancelled':
+      V('calendar', 'תאריך', n.appointmentDate);
+      V('clock',    'שעה',   n.appointmentTime);
+      if (n.garageInfo) V('garage', 'מוסך', n.garageInfo);
+      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      break;
     case 'overdue': case 'urgent': case 'plan':
     case 'maintenance_overdue': case 'maintenance_urgent': case 'maintenance_plan':
-      V('נותר', n.kmLeft, 'ק"מ'); V('הבא לטיפול', n.nextKm, 'ק"מ'); V('צפי', n.estKm, 'ק"מ'); break;
+      V('gauge',    'נותר',        n.kmLeft,  'ק"מ');
+      V('gauge',    'הבא לטיפול', n.nextKm,  'ק"מ');
+      V('gauge',    'צפי',         n.estKm,   'ק"מ');
+      if (n.managerNote) V('note', 'הערת מנהל', n.managerNote);
+      break;
     case 'km_update':
-      V('לפני', n.daysSinceUpdate, 'ימים'); break;
+      V('hourglass', 'ימים מאז עדכון', n.daysSinceUpdate, 'ימים');
+      break;
     case 'test_due': case 'test_urgent':
-      V('תאריך טסט', n.testDate); V('נותרו', n.daysLeft, 'ימים'); break;
-    case 'garage_approved':
-      if (n.garageInfo) V('מוסך מאושר', n.garageInfo); break;
-    case 'garage_rejected':
-      V('סיבה', n.reasonLabel); break;
-    case 'garage_appointment_set':
-      V('תאריך', n.appointmentDate); V('שעה', n.appointmentTime); if (n.garageInfo) V('מוסך', n.garageInfo); break;
-    case 'garage_appointment_cancelled':
-      V('תאריך', n.appointmentDate); V('שעה', n.appointmentTime); if (n.garageInfo) V('מוסך', n.garageInfo); break;
+      V('calendar',  'תאריך טסט', n.testDate);
+      V('hourglass', 'ימים שנותרו', n.daysLeft, 'ימים');
+      break;
     case 'fuel_high':
-      V('צריכה', n.fuelConsumption, 'ל׳/100ק"מ'); V('סף', n.threshold, 'ל׳'); V('ממוצע צי', n.fleetAverage, 'ל׳'); break;
+      V('fuel',  'צריכה',     n.fuelConsumption, 'ל׳/100ק"מ');
+      V('gauge', 'סף',        n.threshold,       'ל׳');
+      V('gauge', 'ממוצע צי',  n.fleetAverage,    'ל׳');
+      break;
     case 'fuel_km_high':
-      if (n.costPerKm != null && n.costPerKm !== '') rows.push(['עלות לק"מ', '<span class="nrd-row-value">₪' + _escHtml(String(n.costPerKm)) + '</span>']);
-      if (n.fleetAverage != null && n.fleetAverage !== '') rows.push(['ממוצע צי', '<span class="nrd-row-value">₪' + _escHtml(String(n.fleetAverage)) + '</span>']);
+      if (n.costPerKm != null && n.costPerKm !== '') R('money', 'עלות לק"מ', '<span class="nrd-row-value">₪' + _escHtml(String(n.costPerKm)) + '</span>');
+      if (n.fleetAverage != null && n.fleetAverage !== '') R('money', 'ממוצע צי', '<span class="nrd-row-value">₪' + _escHtml(String(n.fleetAverage)) + '</span>');
       break;
   }
-  /* For garage_appointment_set the fixed recommendation replaces managerNote */
-  if (type !== 'garage_appointment_set' && n.originalDescription) V('תיאור', n.originalDescription);
-  if (type !== 'garage_appointment_set' && n.managerNote) V('הערת מנהל', n.managerNote);
+
   if (!rows.length && type !== 'garage_appointment_set') return '';
+
+  /* Build icon-tile rows */
   var _rowsHtml = rows.length ? '<div class="nrd-rows">' + rows.map(function(r) {
-    return '<div class="nrd-detail-row"><span class="nrd-row-label">' + r[0] + '</span>' + r[1] + '</div>';
+    var iconHtml = (_NRD_ROW_ICONS[r[0]] || '') ?
+      '<div class="nrd-row-icon">' + _NRD_ROW_ICONS[r[0]] + '</div>' :
+      '<div class="nrd-row-icon"></div>';
+    return '<div class="nrd-detail-row">' + iconHtml +
+      '<span class="nrd-row-label">' + r[1] + '</span>' + r[2] + '</div>';
   }).join('') + '</div>' : '';
   if (type === 'garage_appointment_set') {
     _rowsHtml += '<div class="nrd-rec">' +
@@ -2986,11 +3073,24 @@ function _nrdCardHtml(n, idx) {
   var safeId = String(n.id || n.ts || idx);
   var badgeCls = _NRD_BADGE_CLASS[cat];
   var iconKey  = _NRD_BADGE_ICON[cat];
-  var pill = _NRD_PILL[cat] || _NRD_PILL.info;
-  var dot  = _NRD_DOT_COLOR[cat] || '#bf5af2';
+  var dot      = _NRD_DOT_COLOR[cat] || '#bf5af2';
+  /* Use computed clean title; fall back to raw n.title only if type unknown */
+  var displayTitle = _NRD_TITLES[type] || _escHtml(n.title || 'עלה — התראה');
+  /* Per-type status pill (not category-level) */
+  var statusPill = _NRD_STATUS_PILL[type] || (_NRD_PILL[cat] || _NRD_PILL.info);
   var body = n.body || '';
   var detailRows = _nrdDetailRows(n);
   var actions = _nrdCardActions(n);
+
+  /* Meta row: request number chip + date chip (appointment) + status pill */
+  var metaChips = '';
+  if (n.requestNumber) {
+    metaChips += '<span class="nrd-req-chip">#' + _escHtml(String(n.requestNumber)) + '</span>';
+  }
+  if ((type === 'garage_appointment_set' || type === 'garage_appointment_cancelled') && n.appointmentDate) {
+    metaChips += '<span class="nrd-date-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>' + _escHtml(String(n.appointmentDate)) + '</span>';
+  }
+  metaChips += '<span class="nrd-pill ' + statusPill.c + '"><span class="nrd-pdot"></span>' + statusPill.t + '</span>';
 
   return '<div class="nrd-wrap" data-cat="' + cat + '" style="animation-delay:' + (idx * 0.05) + 's">' +
     '<div class="nrd-swipe-bg-left"><span class="nrd-swipe-label">מחק ✕</span></div>' +
@@ -3002,11 +3102,11 @@ function _nrdCardHtml(n, idx) {
         '<div class="nrd-badge ' + badgeCls + '">' + _NRD_ICONS[iconKey] + '</div>' +
         '<div class="nrd-badge-meta">' +
           '<div class="nrd-row1">' +
-            '<div class="nrd-c-title">' + _escHtml(n.title || 'עלה — התראה') + '</div>' +
+            '<div class="nrd-c-title">' + displayTitle + '</div>' +
             '<div class="nrd-c-time">' + _notifTimeLabel(n.ts || n.id || Date.now()) + '</div>' +
           '</div>' +
+          '<div class="nrd-meta-row">' + metaChips + '</div>' +
           (body ? '<div class="nrd-row2"><div class="nrd-c-snip">' + _escHtml(body) + '</div></div>' : '') +
-          '<div class="nrd-row2"><span class="nrd-pill ' + pill.c + '"><span class="nrd-pdot"></span>' + pill.t + '</span></div>' +
         '</div>' +
         '<span class="nrd-chev">' + _NRD_ICONS.chev + '</span>' +
       '</div>' +
