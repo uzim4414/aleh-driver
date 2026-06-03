@@ -6998,7 +6998,26 @@ function showInAppNotification(payload) {
     e.stopPropagation(); dismissToast(el); navigateForAlertType(alertType, meta);
   });
   var ghostBtn = el.querySelector('.nrd-toast-btn-ghost');
-  if (ghostBtn) ghostBtn.addEventListener('click', function(e) { e.stopPropagation(); dismissToast(el); });
+  if (ghostBtn) ghostBtn.addEventListener('click', function(e) {
+    e.stopPropagation(); dismissToast(el);
+    /* Ghost button is type-specific, not a plain dismiss. */
+    switch (alertType) {
+      case 'garage_appointment_set':
+        /* "ניווט למוסך" — open Waze navigation to the garage. */
+        if (typeof _openGarageWaze === 'function') _openGarageWaze();
+        break;
+      case 'garage_approved':
+        /* "פרטי מוסך" — open the approved-garage details screen. */
+        if (typeof APP !== 'undefined') {
+          if (!STATE.helpMenuOpen && typeof APP.openHelpMenu === 'function') APP.openHelpMenu();
+          setTimeout(function() { if (typeof APP.helpGarage === 'function') APP.helpGarage(); }, 350);
+        }
+        break;
+      default:
+        /* No ghost action defined — dismiss only. */
+        break;
+    }
+  });
 
   var closeBtn = el.querySelector('.nrd-toast-close');
   if (closeBtn) closeBtn.addEventListener('click', function(e) { e.stopPropagation(); dismissToast(el); });
