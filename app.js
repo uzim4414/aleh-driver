@@ -1726,7 +1726,7 @@ function initSwipe() {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     // Flag if touch started on a swipeable notification item — let item handler own it
-    _swipeOnItem = !!(e.target && e.target.closest && e.target.closest('.nh-item'));
+    _swipeOnItem = !!(e.target && e.target.closest && e.target.closest('.nh-item, .nrd-wrap, .nrd-card'));
   }, { passive: true });
 
   document.getElementById('app').addEventListener('touchend', function(e) {
