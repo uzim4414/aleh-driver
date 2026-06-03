@@ -330,7 +330,13 @@ function _initFbNotifSync() {
         .filter(function(n) { return n && n.ts; })
         .sort(function(a, b) { return b.ts - a.ts; });
       // Collapse cross-path duplicates (push ts vs GAS ts) before persisting
-      items = dedupNotifList(items).slice(0, 30);
+      /* MERGE Firebase items with any locally-saved items (from FCM delivery)
+         before writing. Firebase items come first → win on dedup conflict.
+         Prevents FCM-saved item from creating a second card when Firebase
+         listener fires later with a differently-formatted GAS version. */
+      var _localRaw = [];
+      try { _localRaw = JSON.parse(localStorage.getItem(_NOTIF_HISTORY_KEY) || '[]'); } catch(_e) {}
+      items = dedupNotifList(items.concat(_localRaw)).slice(0, 30);
 
       localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(items));
 
@@ -499,7 +505,14 @@ var _NOTIF_HISTORY_KEY = 'driver_notif_history';
 function _notifDedupKey(n) {
   if (n.eventId) return 'eid:' + n.eventId + '|' + (n.alertType || '');
   if (n.requestNumber) return 'req:' + n.requestNumber + '|' + (n.alertType || '');
-  return 'sig:' + (n.alertType || '') + '|' + (n.title || '') + '|' + (n.body || '') + '|' + (n.vehicleId || '');
+  /* Stable key for appointment types: use vehicleId + appointmentDate instead
+     of title/body which GAS and FCM may format differently. */
+  var _aType = n.alertType || '';
+  if ((_aType === 'garage_appointment_set' || _aType === 'garage_appointment_cancelled') &&
+      n.vehicleId && n.appointmentDate) {
+    return 'appt:' + _aType + '|' + String(n.vehicleId) + '|' + String(n.appointmentDate);
+  }
+  return 'sig:' + _aType + '|' + (n.title || '') + '|' + (n.body || '') + '|' + (n.vehicleId || '');
 }
 
 /* Deduplicate a notification list using the canonical key plus a ts guard.
