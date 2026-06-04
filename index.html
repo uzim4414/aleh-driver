@@ -2589,12 +2589,62 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
    NOTIFICATION REDESIGN (nrd-*) — history screen + toast
    ════════════════════════════════════════════════════════════ */
 /* Screen header */
-.nrd-head { padding:18px 16px 6px; }
-.nrd-head-row { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
-.nrd-title-h { font-size:30px; font-weight:800; line-height:1.05; letter-spacing:-0.5px; color:#fff; }
-.nrd-sub-h { font-size:13px; color:#888; margin-top:4px; font-weight:500; }
-.nrd-markall { background:none; border:none; color:#34d96f; font-family:inherit; font-size:14px; font-weight:600; display:flex; align-items:center; gap:5px; cursor:pointer; padding:6px 2px; margin-top:4px; }
-.nrd-markall:active { opacity:.6; }
+/* ── Unified notification screen header ── */
+.nrd-head { padding:20px 16px 0; }
+.nrd-head-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:14px; }
+.nrd-head-left { display:flex; flex-direction:column; }
+.nrd-head-title { font-size:28px; font-weight:800; line-height:1.05; letter-spacing:-0.5px; color:#fff; }
+.nrd-head-sub { display:flex; align-items:center; gap:6px; margin-top:4px; }
+.nrd-unread-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:13px; font-weight:700; color:#fff;
+  position:relative;
+}
+.nrd-unread-badge .nrd-ub-dot {
+  width:8px; height:8px; border-radius:50%; background:#ef4444; flex-shrink:0;
+  animation:nrd-badge-ping 1.8s ease-in-out infinite;
+}
+@keyframes nrd-badge-ping {
+  0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.5); }
+  50% { box-shadow:0 0 0 6px rgba(239,68,68,0); }
+}
+.nrd-unread-badge .nrd-ub-text { font-size:13px; color:#aaa; font-weight:500; }
+.nrd-unread-badge.nrd-ub-zero .nrd-ub-dot { background:#3a3a3c; animation:none; }
+.nrd-unread-badge.nrd-ub-zero .nrd-ub-text { color:#555; }
+
+/* Mark-all button */
+.nrd-markall {
+  background:none; border:1px solid rgba(255,255,255,0.1); color:#aaa;
+  font-family:inherit; font-size:12px; font-weight:600;
+  display:flex; align-items:center; gap:5px; cursor:pointer;
+  padding:7px 12px; border-radius:20px; margin-top:6px;
+  transition:border-color .2s, color .2s;
+}
+.nrd-markall:hover { border-color:rgba(52,217,111,0.4); color:#34d96f; }
+.nrd-markall:active { opacity:.7; }
+.nrd-markall.danger { color:#888; }
+.nrd-markall.danger:hover { border-color:rgba(239,68,68,0.4); color:#f87171; }
+
+/* ── Read/Unread tab switcher ── */
+.nrd-tab-switch {
+  display:flex; gap:0; background:#1a1a1a;
+  border-radius:14px; padding:3px; margin-bottom:0;
+}
+.nrd-tab-sw-btn {
+  flex:1; background:none; border:none; font-family:inherit;
+  font-size:13px; font-weight:600; color:#555;
+  padding:9px 8px; border-radius:11px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  transition:background .2s, color .2s;
+}
+.nrd-tab-sw-btn.active { background:#2c2c2e; color:#fff; }
+.nrd-tab-sw-btn .nrd-tsw-count {
+  font-size:11px; font-weight:700; min-width:18px; height:18px;
+  border-radius:9px; display:inline-flex; align-items:center; justify-content:center;
+  padding:0 5px; background:rgba(255,255,255,0.08); color:#888;
+}
+.nrd-tab-sw-btn.active .nrd-tsw-count { background:rgba(239,68,68,0.2); color:#f87171; }
+.nrd-tab-sw-btn[data-tab="read"].active .nrd-tsw-count { background:rgba(255,255,255,0.08); color:#888; }
 
 /* Segmented control */
 .nrd-seg { position:relative; margin:14px 16px 0; background:#1a1a1a; border-radius:11px; padding:3px; display:flex; }
@@ -3190,12 +3240,6 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
   <!-- ALERTS -->
   <div class="screen" id="screen-alerts">
-    <div class="phead">
-      <div class="ph-row">
-        <div class="ph-title">התראות</div>
-        <div id="alerts-count" style="font-size:13px;color:var(--t2)">0 התראות</div>
-      </div>
-    </div>
     <div class="content" id="alerts-content">
       <div class="empty hidden" id="alerts-empty">אין התראות פעילות</div>
     </div>

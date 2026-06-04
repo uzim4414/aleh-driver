@@ -2895,6 +2895,28 @@ function _nrdCategoryFor(alertType) { return _NRD_CATEGORY[alertType] || 'info';
 var _NRD_BADGE_CLASS = { reminder:'nrd-b-reminder', approved:'nrd-b-approved', danger:'nrd-b-danger', warning:'nrd-b-warning', info:'nrd-b-info' };
 var _NRD_BADGE_ICON  = { reminder:'calendar', approved:'check', danger:'x', warning:'warning', info:'chart' };
 var _NRD_DOT_COLOR   = { reminder:'#4aa8ff', approved:'#22c55e', danger:'#ef4444', warning:'#f97316', info:'#bf5af2' };
+var _nrdActiveTab = 'unread'; // 'unread' | 'read'
+function _nrdSetTab(tab) {
+  _nrdActiveTab = tab;
+  renderNotifHistory();
+}
+function _nrdMarkAllRead() {
+  try {
+    var list = getNotifHistory();
+    list.forEach(function(n) { n.read = true; });
+    localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+  } catch(_) {}
+  renderNotifHistory();
+  _applyBadgeCount(0);
+}
+function _nrdClearRead() {
+  try {
+    var list = getNotifHistory().filter(function(n) { return !n.read; });
+    localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+  } catch(_) {}
+  _nrdActiveTab = 'unread';
+  renderNotifHistory();
+}
 var _NRD_PILL = {
   reminder:{ c:'nrd-pill-reminder', t:'תזכורת' },
   approved:{ c:'nrd-pill-approved', t:'אושר' },
@@ -3252,35 +3274,59 @@ function renderNotifHistory() {
   var section = document.createElement('div');
   section.id = 'nrd-section';
 
-  var counts = { all: history.length, reminder: 0, approved: 0, info: 0 };
-  history.forEach(function(n) {
-    var cat = _nrdCategoryFor(n.alertType || 'plan');
-    var bucket = (cat === 'reminder') ? 'reminder' : (cat === 'approved') ? 'approved' : 'info';
-    counts[bucket]++;
-  });
+  var unread = history.filter(function(n) { return !n.read; });
+  var read   = history.filter(function(n) { return  n.read; });
+  var isUnreadTab = (_nrdActiveTab === 'unread');
+  var displayList = isUnreadTab ? unread : read;
 
-  var unread = history.filter(function(n) { return !n.read; }).length;
   var headHtml =
-    '<div class="nrd-head"><div class="nrd-head-row">' +
-      '<div><div class="nrd-title-h">התראות</div>' +
-        '<div class="nrd-sub-h">' + (unread ? unread + ' חדשות' : 'הכל נקרא') + '</div></div>' +
-      (history.length ?
-        '<button class="nrd-markall" onclick="APP.clearNotifHistory()">' +
-          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
-          'נקה הכל</button>' : '') +
-    '</div></div>';
+    '<div class="nrd-head">' +
+      '<div class="nrd-head-top">' +
+        '<div class="nrd-head-left">' +
+          '<div class="nrd-head-title">התראות</div>' +
+          '<div class="nrd-head-sub">' +
+            '<span class="nrd-unread-badge' + (unread.length === 0 ? ' nrd-ub-zero' : '') + '">' +
+              '<span class="nrd-ub-dot"></span>' +
+              '<span class="nrd-ub-text">' + (unread.length > 0 ? unread.length + ' חדשות' : 'הכל נקרא') + '</span>' +
+            '</span>' +
+          '</div>' +
+        '</div>' +
+        (isUnreadTab && unread.length > 0 ?
+          '<button class="nrd-markall" onclick="_nrdMarkAllRead()">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+            'סמן הכל כנקרא</button>' :
+          (!isUnreadTab && read.length > 0 ?
+            '<button class="nrd-markall danger" onclick="_nrdClearRead()">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>' +
+              'נקה נקראו</button>' : '')) +
+      '</div>' +
+      '<div class="nrd-tab-switch">' +
+        '<button class="nrd-tab-sw-btn' + (isUnreadTab ? ' active' : '') + '" data-tab="unread" onclick="_nrdSetTab(\'unread\')">' +
+          'חדשות <span class="nrd-tsw-count">' + unread.length + '</span></button>' +
+        '<button class="nrd-tab-sw-btn' + (!isUnreadTab ? ' active' : '') + '" data-tab="read" onclick="_nrdSetTab(\'read\')">' +
+          'נקראו <span class="nrd-tsw-count">' + read.length + '</span></button>' +
+      '</div>' +
+    '</div>';
 
-  if (!history.length) {
+  if (!displayList.length) {
+    var emptyTitle = isUnreadTab ? 'אין התראות חדשות' : 'אין התראות שנקראו';
     section.innerHTML = headHtml +
       '<div class="nrd-empty">' +
         '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
-        '<div class="nrd-empty-title">אין התראות חדשות</div>' +
+        '<div class="nrd-empty-title">' + emptyTitle + '</div>' +
         '<div class="nrd-empty-sub">נעדכן אותך כשיהיה משהו חשוב</div>' +
       '</div>';
     container.innerHTML = '';
     container.appendChild(section);
     return;
   }
+
+  var counts = { all: displayList.length, reminder: 0, approved: 0, info: 0 };
+  displayList.forEach(function(n) {
+    var cat = _nrdCategoryFor(n.alertType || 'plan');
+    var bucket = (cat === 'reminder') ? 'reminder' : (cat === 'approved') ? 'approved' : 'info';
+    counts[bucket]++;
+  });
 
   var segHtml =
     '<div class="nrd-seg" id="nrd-seg">' +
@@ -3293,7 +3339,7 @@ function renderNotifHistory() {
 
   var GROUPS = [ { k:'today', label:'היום' }, { k:'yesterday', label:'אתמול' }, { k:'earlier', label:'מוקדם יותר' } ];
   var grouped = { today: [], yesterday: [], earlier: [] };
-  history.forEach(function(n, i) { grouped[_nrdGroupOf(n.ts || n.id || Date.now())].push({ n: n, i: i }); });
+  displayList.forEach(function(n, i) { grouped[_nrdGroupOf(n.ts || n.id || Date.now())].push({ n: n, i: i }); });
 
   var listHtml = '';
   GROUPS.forEach(function(g) {
@@ -3479,7 +3525,8 @@ function _nrdInitSegmented(root) {
 function renderAlerts() {
   const container = document.getElementById('alerts-content');
   const empty = document.getElementById('alerts-empty');
-  document.getElementById('alerts-count').textContent = STATE.alerts.length + ' התראות';
+  var _ac = document.getElementById('alerts-count');
+  if (_ac) _ac.textContent = STATE.alerts.length + ' התראות';
 
   if (STATE.alerts.length === 0) {
     empty.classList.remove('hidden');
@@ -4716,6 +4763,9 @@ APP.clearNotifHistory = function() {
   clearNotifHistory();
   renderNotifHistory();
 };
+
+APP.markAllRead = _nrdMarkAllRead;
+APP.clearRead   = _nrdClearRead;
 
 APP.deleteNotif = function(id) {
   deleteNotifById(id);
