@@ -857,6 +857,9 @@ function deleteNotifById(id) {
       localStorage.setItem('driver_notif_deleted_ts', JSON.stringify(del));
     }
     _fbDeleteNotif(id); // ← Firebase sync — מחיקה + blacklist לכל המכשירים
+    var unread = list.filter(function(n) { return !n.read; }).length;
+    localStorage.setItem('driver_notif_unread', String(unread));
+    _applyBadgeCount(unread);
   } catch(e) {}
 }
 
@@ -873,10 +876,9 @@ function _applyBadgeCount(n) {
 
 function incrementUnreadBadge() {
   try {
-    var n = parseInt(localStorage.getItem('driver_notif_unread') || '0', 10) || 0;
-    n++;
-    localStorage.setItem('driver_notif_unread', String(n));
-    _applyBadgeCount(n);
+    var unread = getNotifHistory().filter(function(n) { return !n.read; }).length;
+    localStorage.setItem('driver_notif_unread', String(unread));
+    _applyBadgeCount(unread);
   } catch(e) {}
 }
 
@@ -2932,6 +2934,7 @@ function _nrdMarkAllRead() {
     list.forEach(function(n) { n.read = true; });
     localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
   } catch(_) {}
+  localStorage.setItem('driver_notif_unread', '0');
   renderNotifHistory();
   _applyBadgeCount(0);
 }
@@ -3527,7 +3530,7 @@ function _nrdMarkRead(id) {
       var unread = list.filter(function(n) { return !n.read; }).length;
       localStorage.setItem('driver_notif_unread', String(unread));
       _applyBadgeCount(unread);
-      setTimeout(function() { renderNotifHistory(); }, 220);
+      setTimeout(function() { if (typeof STATE !== 'undefined' && STATE.currentScreen === 'alerts') renderNotifHistory(); }, 220);
     }
   } catch(_) {}
 }
