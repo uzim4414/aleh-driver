@@ -3456,26 +3456,7 @@ function _nrdCardHtml(n, idx) {
 
 function _nrdToggleCard(card, ev) {
   if (ev && ev.target.closest && ev.target.closest('.nrd-btn')) return;
-  var willOpen = !card.classList.contains('open');
   card.classList.toggle('open');
-  if (willOpen) {
-    var id = card.getAttribute('data-id');
-    try {
-      var list = getNotifHistory();
-      var changed = false;
-      list.forEach(function(n) {
-        if (String(n.id || n.ts) === String(id) && !n.read) { n.read = true; changed = true; }
-      });
-      if (changed) {
-        localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
-        var unread = list.filter(function(n) { return !n.read; }).length;
-        localStorage.setItem('driver_notif_unread', String(unread));
-        _applyBadgeCount(unread);
-        var dot = card.querySelector('.nrd-unread-dot');
-        if (dot) dot.style.display = 'none';
-      }
-    } catch(_) {}
-  }
 }
 
 /* Swipe: LEFT = delete (red), RIGHT = mark read (green), threshold 90px. */
@@ -7085,8 +7066,8 @@ function showInAppNotification(payload) {
     setTimeout(function() { if (_old.parentNode) _old.parentNode.removeChild(_old); }, 320);
   }
 
-  var badgeCls = _NRD_BADGE_CLASS_BY_TYPE[type] || _NRD_BADGE_CLASS[cat];
-  var iconKey  = _NRD_BADGE_ICON_BY_TYPE[type]  || _NRD_BADGE_ICON[cat];
+  var badgeCls = _NRD_BADGE_CLASS_BY_TYPE[alertType] || _NRD_BADGE_CLASS[cat];
+  var iconKey  = _NRD_BADGE_ICON_BY_TYPE[alertType]  || _NRD_BADGE_ICON[cat];
   var duration = _NRD_TOAST_DURATION[cat] != null ? _NRD_TOAST_DURATION[cat] : 6000;
   var actHtml  = _nrdToastActions(n);
 
