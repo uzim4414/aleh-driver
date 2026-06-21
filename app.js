@@ -2880,7 +2880,15 @@ var _NRD_ICONS = {
   x:        '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   warning:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
   chev:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
-  swipe:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
+  swipe:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  wrench:   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>',
+  bolt:     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  clock:    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  fileclip: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
+  warntri:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  fuelpump: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 00-2-2H6a2 2 0 00-2 2v18"/><path d="M14 13h2a2 2 0 012 2v2a2 2 0 002 2 2 2 0 002-2V9.83a2 2 0 00-.59-1.42L18 5"/></svg>',
+  money24:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+  calx:     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="16" x2="15" y2="16"/></svg>'
 };
 
 /* alertType -> redesign category */
@@ -2894,6 +2902,24 @@ function _nrdCategoryFor(alertType) { return _NRD_CATEGORY[alertType] || 'info';
 
 var _NRD_BADGE_CLASS = { reminder:'nrd-b-reminder', approved:'nrd-b-approved', danger:'nrd-b-danger', warning:'nrd-b-warning', info:'nrd-b-info' };
 var _NRD_BADGE_ICON  = { reminder:'calendar', approved:'check', danger:'x', warning:'warning', info:'chart' };
+/* Per-type overrides — match mockup exact badge color+icon per alert type */
+var _NRD_BADGE_CLASS_BY_TYPE = {
+  garage_appointment_cancelled:'nrd-b-danger',
+  overdue:'nrd-b-approved', urgent:'nrd-b-approved',
+  maintenance_overdue:'nrd-b-approved', maintenance_urgent:'nrd-b-approved',
+  km_update:'nrd-b-info',
+  test_urgent:'nrd-b-danger',
+  fuel_high:'nrd-b-warning', fuel_km_high:'nrd-b-warning'
+};
+var _NRD_BADGE_ICON_BY_TYPE = {
+  plan:'wrench', maintenance_plan:'wrench',
+  overdue:'warntri', maintenance_overdue:'warntri',
+  urgent:'bolt', maintenance_urgent:'bolt',
+  km_update:'clock',
+  test_due:'fileclip', test_urgent:'warntri',
+  garage_appointment_cancelled:'calx',
+  fuel_high:'fuelpump', fuel_km_high:'money24'
+};
 var _NRD_DOT_COLOR   = { reminder:'#4aa8ff', approved:'#22c55e', danger:'#ef4444', warning:'#f97316', info:'#bf5af2' };
 var _nrdActiveTab = 'unread'; // 'unread' | 'read'
 function _nrdSetTab(tab) {
@@ -2941,7 +2967,7 @@ var _NRD_TITLES = {
   test_due:                     'תזכורת טסט רכב',
   test_urgent:                  'טסט רכב דחוף',
   fuel_high:                    'צריכת דלק גבוהה',
-  fuel_km_high:                 'עלות גבוהה לק"מ'
+  fuel_km_high:                 'עלות ק"מ גבוהה'
 };
 
 /* Status pill per alertType — replaces category-based pill */
@@ -3034,12 +3060,12 @@ function _nrdDetailRows(n) {
     case 'garage_appointment_set':
       V('calendar', 'תאריך', n.appointmentDate);
       V('clock',    'שעה',   n.appointmentTime);
-      /* garageInfo now in _nrdBodySections */
+      if (n.garageInfo) { var _gs = typeof n.garageInfo === 'string' ? n.garageInfo : (n.garageInfo.name || n.garageInfo.garageName || ''); if (_gs) V('garage', 'מוסך', _gs); }
       break;
     case 'garage_appointment_cancelled':
       V('calendar', 'תאריך', n.appointmentDate);
       V('clock',    'שעה',   n.appointmentTime);
-      /* garageInfo, managerNote now in _nrdBodySections */
+      if (n.garageInfo) { var _gc = typeof n.garageInfo === 'string' ? n.garageInfo : (n.garageInfo.name || n.garageInfo.garageName || ''); if (_gc) V('garage', 'מוסך', _gc); }
       break;
     case 'overdue': case 'urgent': case 'plan':
     case 'maintenance_overdue': case 'maintenance_urgent': case 'maintenance_plan':
@@ -3052,8 +3078,7 @@ function _nrdDetailRows(n) {
       V('hourglass', 'ימים מאז עדכון', n.daysSinceUpdate, 'ימים');
       break;
     case 'test_due': case 'test_urgent':
-      V('calendar',  'תאריך טסט', n.testDate);
-      V('hourglass', 'ימים שנותרו', n.daysLeft, 'ימים');
+      V('calendar', 'תאריך טסט', n.testDate);
       break;
     case 'fuel_high':
       V('fuel',  'צריכה',     n.fuelConsumption, 'ל׳/100ק"מ');
@@ -3061,8 +3086,8 @@ function _nrdDetailRows(n) {
       V('gauge', 'ממוצע צי',  n.fleetAverage,    'ל׳');
       break;
     case 'fuel_km_high':
-      if (n.costPerKm != null && n.costPerKm !== '') R('money', 'עלות לק"מ', '<span class="nrd-row-value">₪' + _escHtml(String(n.costPerKm)) + '</span>');
-      if (n.fleetAverage != null && n.fleetAverage !== '') R('money', 'ממוצע צי', '<span class="nrd-row-value">₪' + _escHtml(String(n.fleetAverage)) + '</span>');
+      if (n.costPerKm != null && n.costPerKm !== '') R('money', 'עלות לק"מ', '<span class="nrd-row-value"><span dir="ltr">₪' + _escHtml(String(n.costPerKm)) + '</span></span>');
+      if (n.fleetAverage != null && n.fleetAverage !== '') R('money', 'ממוצע צי', '<span class="nrd-row-value"><span dir="ltr">₪' + _escHtml(String(n.fleetAverage)) + '</span></span>');
       break;
   }
 
@@ -3115,8 +3140,10 @@ function _nrdCardActions(n) {
       primary = btn('קבע תור לטיפול במוסך', true); break;
     case 'km_update':
       primary = btn('עדכן ק"מ', true); break;
-    case 'test_due': case 'test_urgent':
+    case 'test_due':
       primary = btn('בקרוב — מכוני טסט', true); break;
+    case 'test_urgent':
+      primary = '<button class="nrd-btn" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;animation:nrd-alarm-pulse 1s ease-in-out infinite;font-size:15px;font-weight:800;" onclick="' + call + '"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-left:6px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>קבע טסט עכשיו — דחוף!</button>'; break;
     case 'fuel_high':
       primary = btn('דוח צריכה'); break;
     case 'fuel_km_high':
@@ -3159,7 +3186,7 @@ function _nrdBodySections(n) {
           '<div class="nrd-garage-icon-wrap">' + _NRD_BODY_ICONS.garage + '</div>' +
           '<div>' +
             '<div class="nrd-garage-name">' + _escHtml(gName) + '</div>' +
-            '<div class="nrd-garage-sub">מוסך מאושר</div>' +
+            '<div class="nrd-garage-sub">מוסך מורשה</div>' +
           '</div>' +
         '</div>'
       );
@@ -3188,6 +3215,22 @@ function _nrdBodySections(n) {
           '<div class="nrd-note-label">הערת מנהל</div>' +
           '<div class="nrd-note-text">' + _escHtml(n.managerNote) + '</div>' +
         '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ── KM hero box (plan / overdue / urgent) ── */
+  if (n.kmLeft != null && (type === 'plan' || type === 'overdue' || type === 'urgent' ||
+      type === 'maintenance_plan' || type === 'maintenance_overdue' || type === 'maintenance_urgent')) {
+    var kmNum = parseInt(n.kmLeft, 10) || 0;
+    var isNegKm = kmNum < 0;
+    parts.push(
+      '<div class="nrd-km-box' + (isNegKm ? ' km-overdue' : '') + '">' +
+        '<div class="nrd-km-num-wrap">' +
+          '<span class="nrd-km-number">' + Math.abs(kmNum).toLocaleString('he-IL') + '</span>' +
+          '<span class="nrd-km-unit">ק"מ</span>' +
+        '</div>' +
+        '<div class="nrd-km-label">' + (isNegKm ? 'באיחור מהטיפול האחרון' : 'נותר עד הטיפול הבא') + '</div>' +
       '</div>'
     );
   }
@@ -3361,8 +3404,8 @@ function _nrdCardHtml(n, idx) {
   var type = n.alertType || 'plan';
   var cat  = _nrdCategoryFor(type);
   var safeId = String(n.id || n.ts || idx);
-  var badgeCls = _NRD_BADGE_CLASS[cat];
-  var iconKey  = _NRD_BADGE_ICON[cat];
+  var badgeCls = _NRD_BADGE_CLASS_BY_TYPE[type] || _NRD_BADGE_CLASS[cat];
+  var iconKey  = _NRD_BADGE_ICON_BY_TYPE[type]  || _NRD_BADGE_ICON[cat];
   var dot      = _NRD_DOT_COLOR[cat] || '#bf5af2';
   /* Use computed clean title; fall back to raw n.title only if type unknown */
   var displayTitle = _NRD_TITLES[type] || _escHtml(n.title || 'עלה — התראה');
@@ -7017,8 +7060,8 @@ function showInAppNotification(payload) {
     setTimeout(function() { if (_old.parentNode) _old.parentNode.removeChild(_old); }, 320);
   }
 
-  var badgeCls = _NRD_BADGE_CLASS[cat];
-  var iconKey  = _NRD_BADGE_ICON[cat];
+  var badgeCls = _NRD_BADGE_CLASS_BY_TYPE[type] || _NRD_BADGE_CLASS[cat];
+  var iconKey  = _NRD_BADGE_ICON_BY_TYPE[type]  || _NRD_BADGE_ICON[cat];
   var duration = _NRD_TOAST_DURATION[cat] != null ? _NRD_TOAST_DURATION[cat] : 6000;
   var actHtml  = _nrdToastActions(n);
 
