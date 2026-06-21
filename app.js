@@ -955,6 +955,19 @@ function _showSessionExpiredOverlay() {
   el.style.display = 'flex';
 }
 
+function _showVehicleInactiveOverlay() {
+  var existing = document.getElementById('vehicle-inactive-overlay');
+  if (existing) return;
+  var el = document.createElement('div');
+  el.id = 'vehicle-inactive-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,10,.96);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:\'Noto Sans Hebrew\',sans-serif;direction:rtl;';
+  el.innerHTML = '<div style="font-size:56px;margin-bottom:20px;">🔒</div>' +
+    '<div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:12px;">הרכב אינו פעיל</div>' +
+    '<div style="font-size:14px;color:#888;line-height:1.7;max-width:280px;margin-bottom:32px;">הרכב שלך הוגדר כלא פעיל במערכת.<br>לפרטים נוספים פנה למנהל הצי.</div>' +
+    '<button onclick="location.reload()" style="background:#1c1c1e;color:#fff;border:1px solid #333;border-radius:14px;padding:14px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Hebrew\',sans-serif;">רענן</button>';
+  document.body.appendChild(el);
+}
+
 function _sessionExpired() {
   // Firebase signOut — מנתק listener + מנקה session
   try { if (_fbAuth) _fbAuth.signOut(); } catch(_e) {}
@@ -1008,7 +1021,9 @@ async function gasPost(action, extra, opts) {
       throw new Error('session_expired');
     }
     if (opts.silent) return data;
-    throw new Error(data.error || 'שגיאת שרת');
+    var _gErr = new Error(data.error || 'שגיאת שרת');
+    _gErr.error = data.error; // preserve error code (e.g. 'vehicle_inactive') for callers
+    throw _gErr;
   }
   return data;
 }
@@ -1319,7 +1334,11 @@ async function handleGoogleCredential(response) {
     startApp();
   } catch(err) {
     console.error('[auth] error:', err.message);
-    showLoginError(err.message);
+    if (err && (err.error === 'vehicle_inactive' || (err.message && err.message.indexOf('vehicle_inactive') >= 0))) {
+      showLoginError('הרכב שלך אינו פעיל במערכת. פנה למנהל הצי.');
+    } else {
+      showLoginError(err && err.message ? err.message : 'שגיאת התחברות');
+    }
   }
 }
 
@@ -1395,6 +1414,9 @@ async function loadFullData() {
     STATE.alerts    = buildAlerts(STATE.vehicle);
   } catch(e) {
     console.warn('loadFullData error:', e.message);
+    if (e && (e.error === 'vehicle_inactive' || (e.message && e.message.indexOf('vehicle_inactive') >= 0))) {
+      _showVehicleInactiveOverlay();
+    }
   }
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
