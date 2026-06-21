@@ -1324,11 +1324,16 @@ async function handleGoogleCredential(response) {
     const result = await gasPost('driver_auth');
     console.log('[auth] result ok:', result.ok);
     STATE.vehicle = result.vehicle;
+    STATE.isActualHolder = result.isActualHolder || false;
 
     saveSession(STATE.idToken, STATE.vehicle, STATE.user);
     _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth — non-blocking
     hideLoader();
-    showGreeting((result.vehicle && result.vehicle.holder) || STATE.user.name);
+    // actual holder sees their own JWT name (public data only has official holder)
+    var greetName = result.isActualHolder
+      ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
+      : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
+    showGreeting(greetName);
     await loadFullData();
     hideGreeting();
     startApp();
