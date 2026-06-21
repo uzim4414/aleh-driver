@@ -3456,7 +3456,26 @@ function _nrdCardHtml(n, idx) {
 
 function _nrdToggleCard(card, ev) {
   if (ev && ev.target.closest && ev.target.closest('.nrd-btn')) return;
+  var willOpen = !card.classList.contains('open');
   card.classList.toggle('open');
+  if (willOpen) {
+    var id = card.getAttribute('data-id');
+    try {
+      var list = getNotifHistory();
+      var changed = false;
+      list.forEach(function(n) {
+        if (String(n.id || n.ts) === String(id) && !n.read) { n.read = true; changed = true; }
+      });
+      if (changed) {
+        localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+        var unread = list.filter(function(n) { return !n.read; }).length;
+        localStorage.setItem('driver_notif_unread', String(unread));
+        _applyBadgeCount(unread);
+        var dot = card.querySelector('.nrd-unread-dot');
+        if (dot) dot.style.display = 'none';
+      }
+    } catch(_) {}
+  }
 }
 
 /* Swipe: LEFT = delete (red), RIGHT = mark read (green), threshold 90px. */
@@ -3522,7 +3541,13 @@ function _nrdMarkRead(id) {
     list.forEach(function(n) {
       if (String(n.id || n.ts) === String(id) && !n.read) { n.read = true; changed = true; }
     });
-    if (changed) localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+    if (changed) {
+      localStorage.setItem(_NOTIF_HISTORY_KEY, JSON.stringify(list));
+      var unread = list.filter(function(n) { return !n.read; }).length;
+      localStorage.setItem('driver_notif_unread', String(unread));
+      _applyBadgeCount(unread);
+      setTimeout(function() { renderNotifHistory(); }, 220);
+    }
   } catch(_) {}
 }
 
