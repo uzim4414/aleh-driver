@@ -4587,6 +4587,7 @@ const APP = {
     if (screen === 'alerts') {
       localStorage.setItem('driver_notif_last_seen', String(Date.now()));
       clearUnreadBadge();
+      _nrdActiveTab = 'unread';
       renderNotifHistory();
     }
   },
