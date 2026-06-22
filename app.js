@@ -906,7 +906,9 @@ let STATE = {
   govLoading: false,
   helpMenuOpen:  false,
   helpGps:       null,
-  firebaseUid:   null   // מאוכלס אחרי _fbSignIn — משמש כ-key ב-/driverData/{uid}/
+  firebaseUid:   null,   // מאוכלס אחרי _fbSignIn — משמש כ-key ב-/driverData/{uid}/
+  _pickerVehicles: [],   // multi-vehicle list from auth
+  _pickerCurrent: 0      // currently selected index in picker
 };
 
 /* ══ GAS API ══ */
@@ -1272,6 +1274,304 @@ async function _fireFieldEvent(type, details, opts) {
 
 window.addEventListener('online', function() { _syncPendingEvents(); });
 
+/* ══ Vehicle Picker Helpers ══ */
+
+function _vehKey(v) {
+  return String(v.id || v.num || '').replace(/[^0-9A-Za-z_-]/g, '_');
+}
+
+function _formatLastLogin(isoStr) {
+  if (!isoStr) return null;
+  try {
+    var d = new Date(isoStr);
+    var now = new Date();
+    var diffMs  = now - d;
+    var diffMin = Math.floor(diffMs / 60000);
+    var diffH   = Math.floor(diffMs / 3600000);
+    var diffD   = Math.floor(diffMs / 86400000);
+    var hhmm    = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    if (diffMin < 2)   return 'כרגע';
+    if (diffMin < 60)  return 'לפני ' + diffMin + ' דקות';
+    if (diffD === 0)   return 'היום, ' + hhmm;
+    if (diffD === 1)   return 'אתמול, ' + hhmm;
+    if (diffD < 7)     return 'לפני ' + diffD + ' ימים';
+    return 'לפני ' + Math.floor(diffD/7) + ' שבועות';
+  } catch(_e) { return null; }
+}
+
+function _fbWriteLastLogin(emailKey, vehicleKey) {
+  if (!_fbDb || !emailKey || !vehicleKey) return;
+  try {
+    _fbDb.ref('driverLogins/' + emailKey + '/' + vehicleKey + '/lastLogin')
+      .set(new Date().toISOString())
+      .catch(function() {});
+  } catch(_e) {}
+}
+
+function _fbReadLastLogins(emailKey, vehicleKeys, cb) {
+  if (!_fbDb || !emailKey || !vehicleKeys.length) { cb({}); return; }
+  try {
+    _fbDb.ref('driverLogins/' + emailKey).once('value')
+      .then(function(snap) {
+        var map = {};
+        var data = snap.val() || {};
+        vehicleKeys.forEach(function(k) {
+          map[k] = (data[k] && data[k].lastLogin) ? data[k].lastLogin : null;
+        });
+        cb(map);
+      })
+      .catch(function() { cb({}); });
+  } catch(_e) { cb({}); }
+}
+
+function renderPickerScreen(vehicles) {
+  STATE._pickerVehicles = vehicles;
+  STATE._pickerCurrent  = 0;
+
+  var el = document.getElementById('screen-picker');
+  if (!el) return;
+  el.classList.remove('hidden');
+
+  // Avatar initials
+  var av = document.getElementById('pk-avatar');
+  if (av && STATE.user) {
+    var parts = (STATE.user.name || '').split(' ');
+    av.textContent = ((parts[0]||'').charAt(0) + (parts[1]||'').charAt(0)).toUpperCase() || '?';
+  }
+
+  // Subtitle
+  var subTxt = document.getElementById('pk-sub-text');
+  if (subTxt) subTxt.textContent = 'מחזיק בפועל ב-' + vehicles.length + ' רכבים · גלול לבחירה';
+
+  // Build cards HTML
+  var emailKey = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+  var vehicleKeys = vehicles.map(_vehKey);
+
+  function buildCards(loginMap) {
+    var cardsEl = document.getElementById('pk-cards');
+    if (!cardsEl) return;
+    cardsEl.innerHTML = vehicles.map(function(v, i) {
+      var vk       = vehicleKeys[i];
+      var logoSlug = _getLogoSlug(v.make);
+      var logoHtml = logoSlug
+        ? '<img class="pk-brand-logo" src="https://cdn.simpleicons.org/' + logoSlug + '/ffffff" onerror="this.style.display=\'none\'">'
+        : '';
+      var photoUrl = driveToImgUrl(v.appPhotoLink || v.photoLink) || getCarImageUrl(v.make, v.model) || '';
+      var photoHtml = photoUrl
+        ? '<img src="' + photoUrl + '" onerror="this.parentNode.querySelector(\'.pk-photo-fallback\').style.display=\'flex\';this.style.display=\'none\'">'
+        : '';
+      var fallbackEmoji = _getVehicleEmoji(v.cat || v.make);
+      var alertHtml = (parseInt(v.alerts)||0) > 0
+        ? '<span class="pk-alert-badge"><span class="pk-alert-dot"></span>' + v.alerts + ' התראות</span>'
+        : '';
+      var lastLoginStr = loginMap[vk] ? _formatLastLogin(loginMap[vk]) : null;
+      var loginRow = lastLoginStr
+        ? '<div class="pk-login-row">🕐 כניסה אחרונה: ' + lastLoginStr + '</div>'
+        : '';
+      var accentColor = v.accentColor || '#1F8A3D';
+      return '<div class="pk-card" id="pk-card-' + i + '" onclick="pkSelectCard(' + i + ')" data-idx="' + i + '">' +
+        '<div class="pk-accent-line" style="background:' + accentColor + ';box-shadow:0 0 10px ' + accentColor + '"></div>' +
+        '<div class="pk-photo">' +
+          photoHtml +
+          '<div class="pk-photo-fallback" style="display:' + (photoUrl?'none':'flex') + '">' + fallbackEmoji + '</div>' +
+          '<div class="pk-photo-overlay"></div>' +
+          '<div class="pk-active-badge" id="pk-badge-' + i + '">● פעיל</div>' +
+        '</div>' +
+        '<div class="pk-info">' +
+          '<div class="pk-name-row">' + logoHtml + '<span class="pk-car-name">' + (v.make||'') + ' ' + (v.model||'') + '</span></div>' +
+          '<div class="pk-car-meta">' + (v.year||'') + ' · ' + (v.dept||'') + '</div>' +
+          '<div class="pk-holder-row">👤 מחזיק: ' + (v.holder||'—') + '</div>' +
+          loginRow +
+          '<div class="pk-badges-row"><span class="pk-plate">' + formatPlate(v.num||'') + '</span>' + alertHtml + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    pkRender();
+    // Entrance stagger
+    setTimeout(function() {
+      document.getElementById('pk-header') && document.getElementById('pk-header').classList.add('visible');
+      document.getElementById('pk-sub')    && document.getElementById('pk-sub').classList.add('visible');
+    }, 100);
+    setTimeout(function() {
+      var active = document.getElementById('pk-card-1') || document.getElementById('pk-card-0');
+      if (active) active.classList.add('pk-entered');
+      setTimeout(function() {
+        vehicles.forEach(function(_,i2) {
+          var c = document.getElementById('pk-card-' + i2);
+          if (c) c.classList.add('pk-entered');
+        });
+        document.getElementById('pk-cta-wrap') && document.getElementById('pk-cta-wrap').classList.add('visible');
+      }, 150);
+    }, 300);
+    // Aurora
+    pkUpdateAurora();
+    pkUpdateDots();
+    pkUpdateCta();
+    // Touch/drag
+    pkInitSwipe();
+  }
+
+  _fbReadLastLogins(emailKey, vehicleKeys, buildCards);
+}
+
+function _getLogoSlug(make) {
+  var map = {
+    'טויוטה':'toyota','הונדה':'honda','פולקסווגן':'volkswagen','פורד':'ford',
+    'יונדאי':'hyundai','קיה':'kia','מזדה':'mazda','מיצובישי':'mitsubishi',
+    'סובארו':'subaru','ניסן':'nissan','בי.מ.וו':'bmw','מרצדס':'mercedes',
+    'אאודי':'audi','סקודה':'skoda','פיאט':'fiat','רנו':'renault',
+    'סיטרואן':'citroen','פז\'ו':'peugeot','אופל':'opel','סאנגיונג':'ssangyong'
+  };
+  if (!make) return null;
+  var k = String(make).trim();
+  if (map[k]) return map[k];
+  var s = k.replace(/[\s.'׳]/g,'').toLowerCase();
+  for (var key in map) { if (key.replace(/[\s.'׳]/g,'').toLowerCase() === s) return map[key]; }
+  return null;
+}
+
+function _getVehicleEmoji(catOrMake) {
+  if (!catOrMake) return '🚗';
+  var s = String(catOrMake).toLowerCase();
+  if (s.includes('van') || s.includes('נגרר') || s.includes('ואן')) return '🚐';
+  if (s.includes('truck') || s.includes('פיקאפ') || s.includes('משאית')) return '🛻';
+  if (s.includes('bus') || s.includes('אוטובוס')) return '🚌';
+  return '🚗';
+}
+
+var _pkSwipeStartX = null;
+var _pkSwipeMoved  = false;
+function pkInitSwipe() {
+  var stage = document.getElementById('pk-cards');
+  if (!stage) return;
+  stage.ontouchstart = function(e) { _pkSwipeStartX = e.touches[0].clientX; _pkSwipeMoved = false; };
+  stage.ontouchmove  = function(e) { if (_pkSwipeStartX!==null && Math.abs(e.touches[0].clientX-_pkSwipeStartX)>8) _pkSwipeMoved=true; };
+  stage.ontouchend   = function(e) {
+    if (!_pkSwipeMoved || _pkSwipeStartX===null) return;
+    var delta = _pkSwipeStartX - e.changedTouches[0].clientX;
+    if (Math.abs(delta) > 55) pkSelectCard(STATE._pickerCurrent + (delta > 0 ? 1 : -1));
+    _pkSwipeStartX = null; _pkSwipeMoved = false;
+  };
+}
+
+function pkSelectCard(idx) {
+  var n = STATE._pickerVehicles.length;
+  if (idx < 0 || idx >= n) return;
+  STATE._pickerCurrent = idx;
+  pkRender();
+  pkUpdateAurora();
+  pkUpdateDots();
+  pkUpdateCta();
+}
+
+function pkRender() {
+  var n = STATE._pickerVehicles.length;
+  var cur = STATE._pickerCurrent;
+  for (var i = 0; i < n; i++) {
+    var card = document.getElementById('pk-card-' + i);
+    var badge = document.getElementById('pk-badge-' + i);
+    if (!card) continue;
+    var offset = i - cur;
+    var v = STATE._pickerVehicles[i];
+    var accent = v.accentColor || '#1F8A3D';
+    var glow   = v.accentColor ? v.accentColor.replace('#','') : '1F8A3D';
+    if (offset === 0) {
+      card.style.transform   = 'translateX(0) rotateY(0deg) scale(1) translateZ(20px)';
+      card.style.opacity     = '1';
+      card.style.filter      = '';
+      card.style.zIndex      = '10';
+      card.style.boxShadow   = '0 0 0 1.5px ' + accent + ', 0 24px 60px rgba(0,0,0,0.7), 0 0 60px rgba(' + parseInt(glow.slice(0,2),16) + ',' + parseInt(glow.slice(2,4),16) + ',' + parseInt(glow.slice(4,6),16) + ',0.35)';
+      card.style.borderColor = accent;
+      if (badge) badge.style.display = 'block';
+    } else if (offset === -1) {
+      card.style.transform   = 'translateX(-260px) rotateY(40deg) scale(0.78) translateZ(-80px)';
+      card.style.opacity     = '0.45';
+      card.style.filter      = 'brightness(0.5)';
+      card.style.zIndex      = '5';
+      card.style.boxShadow   = '';
+      card.style.borderColor = 'rgba(255,255,255,0.07)';
+      if (badge) badge.style.display = 'none';
+    } else if (offset === 1) {
+      card.style.transform   = 'translateX(260px) rotateY(-40deg) scale(0.78) translateZ(-80px)';
+      card.style.opacity     = '0.45';
+      card.style.filter      = 'brightness(0.5)';
+      card.style.zIndex      = '5';
+      card.style.boxShadow   = '';
+      card.style.borderColor = 'rgba(255,255,255,0.07)';
+      if (badge) badge.style.display = 'none';
+    } else {
+      card.style.transform = 'translateX(' + (offset*300) + 'px) scale(0.5)';
+      card.style.opacity   = '0';
+      card.style.zIndex    = '1';
+      if (badge) badge.style.display = 'none';
+    }
+  }
+  // 3D tilt on active card
+  var activeCard = document.getElementById('pk-card-' + cur);
+  if (activeCard && !activeCard._tiltBound) {
+    activeCard._tiltBound = true;
+    activeCard.addEventListener('mousemove', function(e) {
+      var r = activeCard.getBoundingClientRect();
+      var x = (e.clientX - r.left) / r.width  - 0.5;
+      var y = (e.clientY - r.top)  / r.height - 0.5;
+      activeCard.style.transform = 'translateZ(20px) rotateX(' + (-y*10) + 'deg) rotateY(' + (x*10) + 'deg)';
+    });
+    activeCard.addEventListener('mouseleave', function() {
+      activeCard.style.transform = '';
+      setTimeout(pkRender, 50);
+    });
+  }
+}
+
+function pkUpdateAurora() {
+  var v = STATE._pickerVehicles[STATE._pickerCurrent];
+  if (!v) return;
+  var col = v.accentColor || 'rgba(31,138,61,0.5)';
+  var blobs = document.querySelectorAll('#screen-picker .pk-blob');
+  if (blobs[0]) { blobs[0].style.background = col; blobs[0].style.opacity = '0.22'; }
+  if (blobs[1]) { blobs[1].style.background = col; blobs[1].style.opacity = '0.15'; }
+}
+
+function pkUpdateDots() {
+  var dotsEl = document.getElementById('pk-dots');
+  if (!dotsEl) return;
+  var n = STATE._pickerVehicles.length;
+  var v = STATE._pickerVehicles[STATE._pickerCurrent];
+  var accent = v ? (v.accentColor || '#1F8A3D') : '#1F8A3D';
+  dotsEl.innerHTML = Array.from({length:n}, function(_,i) {
+    var active = i === STATE._pickerCurrent;
+    return '<div class="pk-dot' + (active?' active':'') + '" onclick="pkSelectCard(' + i + ')" style="' + (active ? 'background:'+accent : '') + '"></div>';
+  }).join('');
+}
+
+function pkUpdateCta() {
+  var btn = document.getElementById('pk-cta-btn');
+  if (!btn) return;
+  var v = STATE._pickerVehicles[STATE._pickerCurrent];
+  if (v) btn.textContent = 'המשך עם ' + (v.make||'') + ' ' + (v.model||'') + ' ←';
+}
+
+function pkConfirmSelect() {
+  var vehicles = STATE._pickerVehicles;
+  var idx      = STATE._pickerCurrent;
+  if (!vehicles || !vehicles[idx]) return;
+  var chosen = vehicles[idx];
+  // Write lastLogin to Firebase
+  var emailKey = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+  _fbWriteLastLogin(emailKey, _vehKey(chosen));
+  // Hide picker, proceed
+  var el = document.getElementById('screen-picker');
+  if (el) el.classList.add('hidden');
+  STATE.vehicle      = chosen;
+  STATE.isActualHolder = chosen.isActualHolder || false;
+  saveSession(STATE.idToken, chosen, STATE.user);
+  showGreeting((chosen.holder) || STATE.user.name);
+  loadFullData().then(function() { hideGreeting(); startApp(); }).catch(function(err) {
+    hideGreeting();
+    showLoginError(err && err.message ? err.message : 'שגיאת טעינה');
+  });
+}
+
 /* ══ Session ══ */
 function saveSession(token, vehicleData, userInfo) {
   try {
@@ -1322,21 +1622,30 @@ async function handleGoogleCredential(response) {
 
     console.log('[auth] calling driver_auth for', STATE.user.email);
     const result = await gasPost('driver_auth');
-    console.log('[auth] result ok:', result.ok);
-    STATE.vehicle = result.vehicle;
-    STATE.isActualHolder = result.isActualHolder || false;
-
-    saveSession(STATE.idToken, STATE.vehicle, STATE.user);
+    console.log('[auth] result ok:', result.ok, 'vehicles:', result.vehicles && result.vehicles.length);
     _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth — non-blocking
     hideLoader();
-    // actual holder sees their own JWT name (public data only has official holder)
-    var greetName = result.isActualHolder
-      ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
-      : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
-    showGreeting(greetName);
-    await loadFullData();
-    hideGreeting();
-    startApp();
+    // Multi-vehicle: show picker if more than one vehicle
+    if (result.vehicles && result.vehicles.length > 1) {
+      STATE._pickerVehicles = result.vehicles;
+      STATE._pickerCurrent  = 0;
+      renderPickerScreen(result.vehicles);
+    } else {
+      // Single vehicle — proceed as before
+      STATE.vehicle      = result.vehicle;
+      STATE.isActualHolder = result.isActualHolder || false;
+      // Write lastLogin
+      var _ek = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+      _fbWriteLastLogin(_ek, _vehKey(result.vehicle));
+      saveSession(STATE.idToken, STATE.vehicle, STATE.user);
+      var greetName = result.isActualHolder
+        ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
+        : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
+      showGreeting(greetName);
+      await loadFullData();
+      hideGreeting();
+      startApp();
+    }
   } catch(err) {
     console.error('[auth] error:', err.message);
     if (err && (err.error === 'vehicle_inactive' || (err.message && err.message.indexOf('vehicle_inactive') >= 0))) {

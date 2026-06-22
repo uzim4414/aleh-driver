@@ -3060,6 +3060,183 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 #splash-update-banner.fade-out {
   animation: verSlideUp 0.5s ease-in reverse both;
 }
+
+/* ══ Vehicle Picker Screen ══ */
+#screen-picker {
+  position: fixed; inset: 0; background: #000; z-index: 120;
+  display: flex; flex-direction: column; align-items: center;
+  font-family: 'Noto Sans Hebrew', sans-serif; direction: rtl;
+  overflow: hidden;
+}
+#screen-picker.hidden { display: none; }
+
+.pk-aurora { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.pk-blob {
+  position: absolute; width: 380px; height: 380px; border-radius: 50%;
+  filter: blur(90px); opacity: 0; transition: background-color 1s ease, opacity 0.8s ease;
+}
+.pk-blob.b1 { top: -80px; right: -60px; animation: pkAurora1 9s ease-in-out infinite alternate; }
+.pk-blob.b2 { top: 180px; left: -100px; animation: pkAurora2 11s ease-in-out infinite alternate; }
+.pk-blob.b3 { bottom: 60px; right: 40px; background: rgba(31,138,61,0.5) !important; animation: pkAurora3 13s ease-in-out infinite alternate; }
+
+@keyframes pkAurora1 { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(25px,-30px) scale(1.12)} }
+@keyframes pkAurora2 { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(-20px,25px) scale(1.08)} }
+@keyframes pkAurora3 { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(15px,-15px) scale(1.05)} }
+
+.pk-header {
+  position: relative; z-index: 10; width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px 0; opacity: 0; transform: translateY(-16px);
+  transition: opacity 0.5s ease 0.1s, transform 0.5s ease 0.1s;
+}
+.pk-header.visible { opacity: 1; transform: translateY(0); }
+.pk-back-btn {
+  width: 40px; height: 40px; border-radius: 13px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.pk-title { font-size: 17px; font-weight: 700; color: #fff; }
+.pk-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #1a1a1a; border: 1.5px solid #1F8A3D;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+
+.pk-sub {
+  position: relative; z-index: 10; width: 100%;
+  padding: 6px 20px 0; text-align: center;
+  font-size: 12px; color: rgba(255,255,255,0.45);
+  opacity: 0; transition: opacity 0.4s ease 0.25s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.pk-sub.visible { opacity: 1; }
+.pk-pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #1F8A3D;
+  animation: pkDotPulse 2s ease-in-out infinite;
+}
+@keyframes pkDotPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+.pk-stage {
+  position: relative; z-index: 10; flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; overflow: visible;
+}
+.pk-cards {
+  position: relative; width: 300px; height: 480px;
+  perspective: 900px; perspective-origin: 50% 40%;
+}
+.pk-card {
+  position: absolute; inset: 0;
+  width: 300px; height: 480px; border-radius: 24px; overflow: hidden;
+  cursor: pointer; will-change: transform;
+  transition: transform 0.55s cubic-bezier(0.22,1,0.36,1),
+              opacity 0.55s cubic-bezier(0.22,1,0.36,1),
+              box-shadow 0.55s ease,
+              border-color 0.55s ease;
+  border: 1px solid rgba(255,255,255,0.07);
+  opacity: 0;
+}
+.pk-card.pk-entered { opacity: 1; }
+
+/* Photo area */
+.pk-photo {
+  width: 100%; height: 60%; position: relative; overflow: hidden;
+  background: linear-gradient(160deg, #0a0a0a 0%, #141414 100%);
+}
+.pk-photo img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.pk-photo-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.95) 100%);
+}
+.pk-photo-fallback {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 80px; animation: pkCarFloat 3s ease-in-out infinite;
+}
+@keyframes pkCarFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+.pk-active-badge {
+  position: absolute; top: 0; right: 0;
+  background: rgba(31,138,61,0.92); backdrop-filter: blur(8px);
+  color: #fff; font-size: 11px; font-weight: 700;
+  padding: 6px 13px; border-radius: 0 0 0 14px;
+  display: none;
+}
+
+/* Accent top line */
+.pk-accent-line {
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  animation: pkAccentPulse 2.5s ease-in-out infinite;
+}
+@keyframes pkAccentPulse { 0%,100%{opacity:0.7} 50%{opacity:1;filter:brightness(1.4)} }
+
+/* Info overlay */
+.pk-info {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 0 18px 18px; background: rgba(10,10,10,0.96);
+  height: 42%;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+}
+.pk-name-row {
+  display: flex; align-items: center; gap: 7px;
+}
+.pk-brand-logo { width: 22px; height: 22px; object-fit: contain; opacity: 0.75; flex-shrink: 0; }
+.pk-car-name { font-size: 18px; font-weight: 800; color: #fff; line-height: 1.1; }
+.pk-car-meta { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 1px; }
+.pk-holder-row { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 5px; }
+.pk-login-row  { font-size: 11px; color: rgba(255,255,255,0.32); margin-top: 1px; }
+.pk-badges-row { display: flex; align-items: center; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+.pk-plate {
+  background: #F9D100; color: #000; font-family: 'Outfit', monospace;
+  font-weight: 700; font-size: 13px; letter-spacing: 2px;
+  padding: 4px 11px; border-radius: 7px; direction: ltr; display: inline-block;
+}
+.pk-alert-badge {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(255,59,48,0.15); border: 1px solid rgba(255,59,48,0.4);
+  color: #ff453a; font-size: 11px; font-weight: 700;
+  padding: 3px 9px; border-radius: 20px;
+}
+.pk-alert-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: #ff453a;
+  animation: pkDotPulse 1.5s ease-in-out infinite;
+}
+
+/* Nav dots */
+.pk-dots {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 12px 0 8px;
+}
+.pk-dot {
+  height: 6px; border-radius: 3px; background: rgba(255,255,255,0.2);
+  transition: width 0.35s ease, background-color 0.5s ease;
+  width: 6px;
+}
+.pk-dot.active { width: 22px; }
+
+/* CTA */
+.pk-cta-wrap {
+  position: relative; z-index: 10; width: 100%;
+  padding: 0 20px calc(env(safe-area-inset-bottom) + 20px);
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.4s ease 0.65s, transform 0.4s ease 0.65s;
+}
+.pk-cta-wrap.visible { opacity: 1; transform: translateY(0); }
+.pk-cta-btn {
+  width: 100%; padding: 18px; border-radius: 18px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #1F8A3D 0%, #27a84d 100%);
+  color: #fff; font-family: 'Noto Sans Hebrew', sans-serif;
+  font-size: 17px; font-weight: 800;
+  box-shadow: 0 8px 32px rgba(31,138,61,0.4);
+  animation: pkBtnPulse 2.5s ease-in-out infinite;
+  -webkit-tap-highlight-color: transparent;
+}
+@keyframes pkBtnPulse { 0%,100%{box-shadow:0 8px 32px rgba(31,138,61,0.35)} 50%{box-shadow:0 8px 50px rgba(31,138,61,0.65)} }
 </style>
 </head>
 <body>
@@ -3133,6 +3310,31 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       </div>
       <div id="sub-ver-label"></div>
     </div>
+  </div>
+</div>
+
+<!-- ══ Vehicle Picker Screen ══ -->
+<div id="screen-picker" class="hidden">
+  <div class="pk-aurora">
+    <div class="pk-blob b1"></div>
+    <div class="pk-blob b2"></div>
+    <div class="pk-blob b3"></div>
+  </div>
+  <div class="pk-header" id="pk-header">
+    <button class="pk-back-btn" onclick="logout()" aria-label="חזרה">‹</button>
+    <div class="pk-title">בחר רכב</div>
+    <div class="pk-avatar" id="pk-avatar"></div>
+  </div>
+  <div class="pk-sub" id="pk-sub">
+    <div class="pk-pulse-dot"></div>
+    <span id="pk-sub-text"></span>
+  </div>
+  <div class="pk-stage">
+    <div class="pk-cards" id="pk-cards"></div>
+  </div>
+  <div class="pk-dots" id="pk-dots"></div>
+  <div class="pk-cta-wrap" id="pk-cta-wrap">
+    <button class="pk-cta-btn" id="pk-cta-btn" onclick="pkConfirmSelect()"></button>
   </div>
 </div>
 
