@@ -7871,10 +7871,10 @@ APP._initTestHub = function() {
   // Init stations panel (Leaflet map + cards)
   function _thStartStations() {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(pos) {
-        APP._initStationsPanel(pos.coords.latitude, pos.coords.longitude);
-      }, function() {
-        APP._initStationsPanel(null, null);
+      navigator.geolocation.getCurrentPosition(async function(pos) {
+        await APP._initStationsPanel(pos.coords.latitude, pos.coords.longitude);
+      }, async function() {
+        await APP._initStationsPanel(null, null);
       }, {timeout:5000});
     } else {
       APP._initStationsPanel(null, null);
@@ -8024,6 +8024,7 @@ function _thIsOpen(s) {
   var now = new Date(), day = now.getDay(), h = now.getHours() + now.getMinutes()/60;
   if (day === 6) return false; // שבת
   if (day === 5) return s.hoursFriday ? (h >= s.hoursFriday[0] && h < s.hoursFriday[1]) : false;
+  if (!s.hoursWeekday) return false; // unknown (e.g. API station without hours)
   return h >= s.hoursWeekday[0] && h < s.hoursWeekday[1];
 }
 
@@ -8041,12 +8042,36 @@ function _thMakeMarkerIcon(num, active) {
 
 APP._thMarkers = [];
 
-APP._initStationsPanel = function(userLat, userLng) {
+APP._initStationsPanel = async function(userLat, userLng) {
   var list = document.getElementById('th-station-list');
   if (!list) return;
 
+  // Source data: real Google Places via GAS, fallback to TH_STATIONS
+  var source = TH_STATIONS;
+  if (userLat && userLng) {
+    try {
+      var r = await gasPost('get_nearby_test_stations', {
+        idToken: STATE.idToken || STATE.token || '',
+        lat: userLat,
+        lng: userLng
+      });
+      if (r && r.ok && r.stations && r.stations.length > 0) {
+        source = r.stations.map(function(s, i) {
+          return Object.assign({}, s, {
+            id: i + 1,
+            rating: s.rating || 0,
+            ratingCount: s.ratingCount || 0,
+            hoursWeekday: null, // use isOpen from API
+            hoursFriday: null,
+            waze: s.waze || ('https://waze.com/ul?ll=' + s.lat + ',' + s.lng + '&navigate=yes')
+          });
+        });
+      }
+    } catch(e) { /* fallback to TH_STATIONS */ }
+  }
+
   // Sort by distance if GPS available
-  var stations = TH_STATIONS.map(function(s) {
+  var stations = source.map(function(s) {
     var dist = (userLat && userLng) ? _thHaversine(userLat, userLng, s.lat, s.lng) : null;
     return Object.assign({}, s, {dist: dist});
   });
@@ -8055,7 +8080,8 @@ APP._initStationsPanel = function(userLat, userLng) {
   // Build cards
   list.innerHTML = '';
   stations.forEach(function(s, idx) {
-    var open = _thIsOpen(s);
+    var open = (s.isOpen !== null && s.isOpen !== undefined) ? s.isOpen : _thIsOpen(s);
+    var hoursTxt = s.hours || '';
     var distTxt = s.dist !== null ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
     var card = document.createElement('div');
     card.className = 'th-sc' + (idx === 0 ? ' open' : '');
@@ -8071,7 +8097,7 @@ APP._initStationsPanel = function(userLat, userLng) {
         '</div>' +
         '<div class="th-sc-row2">' +
           '<div class="th-sc-status '+(open?'open':'closed')+'"><div class="th-sc-dot"></div>'+(open?'פתוח':'סגור')+'</div>' +
-          '<div class="th-sc-hours">'+s.hours+'</div>' +
+          '<div class="th-sc-hours">'+hoursTxt+'</div>' +
           '<svg class="th-sc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>' +
         '</div>' +
       '</div>' +
