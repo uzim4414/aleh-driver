@@ -87,8 +87,7 @@ function navigateForAlertType(alertType, meta) {
 
     case 'test_due':
     case 'test_urgent':
-      if (typeof APP.toast === 'function') APP.toast('פיצ\'ר בפיתוח — מכוני טסט בקרוב');
-      else if (typeof showToast === 'function') showToast('פיצ\'ר בפיתוח — מכוני טסט בקרוב');
+      APP.openTestHub();
       break;
 
     case 'garage_approved':
@@ -7775,3 +7774,305 @@ document.addEventListener('visibilitychange', async function() {
     console.warn('visibilitychange refresh error:', e.message);
   }
 });
+
+// ═══ TEST HUB ═══
+
+APP.openTestHub = function() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const hub = document.getElementById('screen-testhub');
+  if (hub) {
+    hub.classList.add('active');
+    APP._initTestHub();
+  }
+};
+
+APP.closeTestHub = function() {
+  document.getElementById('screen-testhub').classList.remove('active');
+  document.getElementById('screen-home').classList.add('active');
+};
+
+APP._initTestHub = function() {
+  const v = STATE.vehicle || {};
+  if (v.testDue) {
+    const days = Math.ceil((new Date(v.testDue) - new Date()) / 86400000);
+    const el = document.getElementById('th-days-num');
+    if (el) el.textContent = days > 0 ? days : 0;
+    const sub = document.getElementById('th-date-sub');
+    if (sub) sub.textContent = v.testDue;
+  }
+  if (v.licExpiry) {
+    const el = document.getElementById('th-lic-expiry');
+    if (el) el.textContent = 'בתוקף עד ' + v.licExpiry;
+  }
+  if (v.insExpiry) {
+    const el = document.getElementById('th-ins-expiry');
+    if (el) el.textContent = 'בתוקף עד ' + v.insExpiry;
+  }
+};
+
+APP.thSwitchStep = function(step) {
+  if (step === 1) {
+    const done = parseInt(document.getElementById('th-checked-count')?.textContent || '0');
+    if (done < 21) {
+      APP._showTestSkipGuard(done);
+      return;
+    }
+  }
+  document.querySelectorAll('.th-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('th-panel-' + step);
+  if (panel) panel.classList.add('active');
+  document.querySelectorAll('.th-step').forEach((s, i) => {
+    s.classList.toggle('active', i === step);
+    s.classList.toggle('done', i < step);
+  });
+};
+
+APP._showTestSkipGuard = function(done) {
+  const overlay = document.getElementById('th-skip-guard');
+  if (!overlay) return;
+  const el = document.getElementById('th-guard-count');
+  if (el) el.textContent = done + ' / 21';
+  overlay.style.display = 'flex';
+};
+
+APP.thDismissGuard = function(goAnyway) {
+  document.getElementById('th-skip-guard').style.display = 'none';
+  if (goAnyway) APP.thSwitchStep(1);
+};
+
+APP.thCheckItem = function(id, el) {
+  el.classList.toggle('checked');
+  const checked = document.querySelectorAll('.th-check-item.checked').length;
+  const countEl = document.getElementById('th-checked-count');
+  if (countEl) countEl.textContent = checked;
+  const ring = document.getElementById('th-global-ring-fill');
+  if (ring) {
+    const pct = checked / 21;
+    const circ = 2 * Math.PI * 26;
+    ring.style.strokeDashoffset = circ * (1 - pct);
+  }
+};
+
+APP.thToggleHint = function(id) {
+  const hint = document.getElementById('th-hint-' + id);
+  if (hint) hint.classList.toggle('open');
+};
+
+APP.thToggleSection = function(sec) {
+  document.querySelectorAll('.th-section').forEach(s => {
+    if (s.dataset.sec !== sec) s.classList.remove('open');
+  });
+  const el = document.querySelector('.th-section[data-sec="' + sec + '"]');
+  if (el) el.classList.toggle('open');
+};
+
+APP.thSendDocs = async function() {
+  const email = document.getElementById('th-station-email')?.value?.trim();
+  if (!email || !email.includes('@')) {
+    showToast('נא להזין כתובת מייל תקינה'); return;
+  }
+  const btn = document.getElementById('th-send-docs-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
+  try {
+    const r = await gasPost('send_test_documents', {
+      vehicleId: STATE.vehicleId,
+      stationEmail: email
+    });
+    if (r.ok) {
+      document.getElementById('th-send-docs-success')?.classList.remove('hidden');
+      btn.textContent = 'נשלח ✓';
+    } else {
+      showToast('שגיאה בשליחה: ' + (r.error || ''));
+      btn.disabled = false; btn.textContent = 'שלח מסמכים';
+    }
+  } catch(e) {
+    showToast('שגיאת רשת');
+    btn.disabled = false; btn.textContent = 'שלח מסמכים';
+  }
+};
+
+APP.thCaptureEmail = function() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const overlay = document.getElementById('th-ocr-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    const b64 = await APP._fileToBase64(file);
+    try {
+      const r = await gasPost('ocr_extract_email', { imageBase64: b64 });
+      if (overlay) overlay.style.display = 'none';
+      if (r.ok && r.email) {
+        const inp = document.getElementById('th-station-email');
+        if (inp) inp.value = r.email;
+        showToast('מייל זוהה: ' + r.email);
+      } else {
+        showToast('לא זוהה מייל, נסה שוב');
+      }
+    } catch(e) {
+      if (overlay) overlay.style.display = 'none';
+      showToast('שגיאה בזיהוי');
+    }
+  };
+  input.click();
+};
+
+APP.thSelectResult = function(type) {
+  document.getElementById('th-result-pass')?.classList.toggle('selected', type === 'pass');
+  document.getElementById('th-result-fail')?.classList.toggle('selected', type === 'fail');
+  document.getElementById('th-pass-drawer')?.classList.toggle('open', type === 'pass');
+  document.getElementById('th-fail-drawer')?.classList.toggle('open', type === 'fail');
+};
+
+APP.thCaptureTestForm = function() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*,application/pdf'; input.capture = 'environment';
+  input.onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const preview = document.getElementById('th-form-preview');
+    if (preview && file.type.startsWith('image/')) {
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+    }
+    const btn = document.getElementById('th-confirm-pass-btn');
+    if (btn) btn.disabled = false;
+    APP._testFormFile = file;
+  };
+  input.click();
+};
+
+APP.thConfirmTestPass = async function() {
+  if (!APP._testFormFile) { showToast('נא להעלות טופס טסט'); return; }
+  const btn = document.getElementById('th-confirm-pass-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  const b64 = await APP._fileToBase64(APP._testFormFile);
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    const r = await gasPost('save_test_completion', {
+      vehicleId: STATE.vehicleId,
+      data: { date: today, formBase64: b64 }
+    });
+    if (r.ok) {
+      document.getElementById('th-pass-success')?.classList.remove('hidden');
+      if (STATE.vehicle) STATE.vehicle.testDone = today;
+      APP._clearTestAlert && APP._clearTestAlert();
+    } else {
+      showToast('שגיאה: ' + (r.error || ''));
+      if (btn) { btn.disabled = false; btn.textContent = 'אשר — טסט בוצע'; }
+    }
+  } catch(e) {
+    showToast('שגיאת רשת');
+    if (btn) { btn.disabled = false; btn.textContent = 'אשר — טסט בוצע'; }
+  }
+};
+
+APP.thSubmitFailReason = async function() {
+  const reason = document.getElementById('th-fail-reason')?.value?.trim();
+  if (!reason) { showToast('נא לציין סיבה'); return; }
+  const btn = document.getElementById('th-submit-fail-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  try {
+    const r = await gasPost('save_test_failure', {
+      vehicleId: STATE.vehicleId, reason
+    });
+    if (r.ok) {
+      document.getElementById('th-fail-success')?.classList.remove('hidden');
+    } else {
+      showToast('שגיאה');
+      if (btn) { btn.disabled = false; btn.textContent = 'שמור'; }
+    }
+  } catch(e) {
+    showToast('שגיאת רשת');
+    if (btn) { btn.disabled = false; btn.textContent = 'שמור'; }
+  }
+};
+
+APP.thSendInvoice = async function() {
+  const amount = document.getElementById('th-inv-amount')?.value?.trim();
+  const date   = document.getElementById('th-inv-date')?.value?.trim();
+  if (!amount || !APP._invoiceFile) { showToast('נא למלא סכום ולצרף חשבונית'); return; }
+  const btn = document.getElementById('th-send-inv-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
+  const b64 = await APP._fileToBase64(APP._invoiceFile);
+  try {
+    const r = await gasPost('send_test_invoice', {
+      vehicleId: STATE.vehicleId, invoiceBase64: b64, amount, testDate: date
+    });
+    if (r.ok) {
+      document.getElementById('th-inv-success')?.classList.remove('hidden');
+    } else {
+      showToast('שגיאה: ' + (r.error || ''));
+      if (btn) { btn.disabled = false; btn.textContent = 'שלח למזכירות'; }
+    }
+  } catch(e) {
+    showToast('שגיאת רשת');
+    if (btn) { btn.disabled = false; btn.textContent = 'שלח למזכירות'; }
+  }
+};
+
+APP.thCaptureInvoice = function() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*,application/pdf'; input.capture = 'environment';
+  input.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    APP._invoiceFile = file;
+    const lbl = document.getElementById('th-inv-filename');
+    if (lbl) lbl.textContent = file.name;
+    const btn = document.getElementById('th-send-inv-btn');
+    if (btn) btn.disabled = false;
+  };
+  input.click();
+};
+
+APP._fileToBase64 = function(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+};
+
+APP._clearTestAlert = function() {
+  const alertEl = document.getElementById('home-alert');
+  if (alertEl && alertEl.dataset.alertType?.includes('test')) {
+    alertEl.classList.add('hidden');
+  }
+};
+
+APP.thOpenDocViewer = function(docType) {
+  const overlay = document.getElementById('th-doc-viewer');
+  if (!overlay) return;
+  const iframe = document.getElementById('th-doc-iframe');
+  const title  = document.getElementById('th-doc-title');
+  const v = STATE.vehicle || {};
+  const urls = {
+    license: v.licLink,
+    insurance: v.insCompLink
+  };
+  const titles = { license: 'רישיון רכב', insurance: 'ביטוח חובה' };
+  if (iframe && urls[docType]) iframe.src = urls[docType].replace('/view', '/preview');
+  if (title) title.textContent = titles[docType] || docType;
+  overlay.style.display = 'flex';
+};
+
+APP.thCloseDocViewer = function() {
+  const overlay = document.getElementById('th-doc-viewer');
+  if (overlay) { overlay.style.display = 'none'; }
+  const iframe = document.getElementById('th-doc-iframe');
+  if (iframe) iframe.src = '';
+};
+
+// Aliases for screen-testhub HTML onclick handlers
+APP.thSetStep = function(step) { APP.thSwitchStep && APP.thSwitchStep(step); };
+APP.thToggleItem = function(idx) {
+  var item = document.querySelector('[data-idx="' + idx + '"]');
+  if (!item) return;
+  var box = item.querySelector('.chk-box');
+  if (!box) return;
+  var done = item.classList.toggle('checked');
+  // update global counter
+  if (typeof APP._thUpdateProgress === 'function') APP._thUpdateProgress();
+};
+APP.thConfirmPass = function() { APP.thConfirmTestPass && APP.thConfirmTestPass(); };
+APP.thSubmitFail = function() { APP.thSubmitFailReason && APP.thSubmitFailReason(); };

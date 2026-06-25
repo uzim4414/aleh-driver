@@ -3237,6 +3237,295 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   -webkit-tap-highlight-color: transparent;
 }
 @keyframes pkBtnPulse { 0%,100%{box-shadow:0 8px 32px rgba(31,138,61,0.35)} 50%{box-shadow:0 8px 50px rgba(31,138,61,0.65)} }
+
+/* ══ TEST HUB — qa card ring ══ */
+@keyframes testRingPulse { 0%,100%{filter:drop-shadow(0 0 0px transparent)} 50%{filter:drop-shadow(0 0 6px var(--ring-glow,rgba(48,209,88,0.5)))} }
+@keyframes testCardReveal { from{opacity:0;transform:translateY(14px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes testHintBlink { 0%,80%,100%{opacity:0.45} 40%{opacity:1} }
+.qa-card--test { position:relative; padding:14px 10px 12px; gap:6px; overflow:hidden; animation:testCardReveal .5s cubic-bezier(.16,1,.3,1) .6s both; }
+.qa-card--test::after { content:''; position:absolute; top:12px; bottom:12px; right:0; width:3px; border-radius:0 18px 18px 0; background:var(--test-status-color,var(--ok)); transition:background .4s ease; }
+.test-ring-wrap { position:relative; width:46px; height:46px; flex-shrink:0; animation:testRingPulse var(--test-ring-dur,4s) ease-in-out infinite; }
+.test-ring-bg { stroke:rgba(255,255,255,0.07); fill:none; stroke-width:3.5; }
+.test-ring-fill { fill:none; stroke-width:3.5; stroke:var(--test-status-color,var(--ok)); stroke-linecap:round; stroke-dasharray:113.1; stroke-dashoffset:var(--test-ring-offset,0); transform-origin:center; transform:rotate(-90deg); transition:stroke-dashoffset .8s cubic-bezier(.16,1,.3,1),stroke .4s ease; }
+.test-ring-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'Outfit','Manrope',sans-serif; font-size:13px; font-weight:700; color:var(--test-status-color,var(--ok)); letter-spacing:-0.5px; line-height:1; transition:color .4s ease; }
+.qa-lbl--test { font-size:11px; color:var(--t2); font-weight:500; text-align:center; line-height:1.3; margin-top:0; }
+.test-hint { font-size:9px; color:var(--test-status-color,var(--ok)); font-weight:600; letter-spacing:0.1px; text-align:center; animation:testHintBlink 3s ease-in-out infinite; opacity:0.45; margin-top:-2px; transition:color .4s ease; }
+
+/* ══ TEST HUB — Stepper ══ */
+@keyframes stepComplete { 0%{transform:scale(1)} 40%{transform:scale(1.35);box-shadow:0 0 0 8px rgba(48,209,88,0.25)} 70%{transform:scale(0.92)} 100%{transform:scale(1);box-shadow:0 0 0 0 rgba(48,209,88,0)} }
+@keyframes stepActivate { 0%{transform:scale(0.8);opacity:0.3} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1);opacity:1} }
+@keyframes lineFlood { from{width:0%} to{width:100%} }
+@keyframes stepGlow { 0%,100%{box-shadow:0 0 0 0 rgba(31,138,61,0.4),0 0 16px rgba(31,138,61,0.2)} 50%{box-shadow:0 0 0 6px rgba(31,138,61,0.15),0 0 28px rgba(31,138,61,0.45)} }
+@keyframes checkPop { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.25) rotate(6deg);opacity:1} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+@keyframes pulseRing { 0%{transform:scale(1);opacity:0.7} 100%{transform:scale(1.55);opacity:0} }
+.stp-wrap { padding:18px 20px 14px; flex-shrink:0; background:#000; }
+.stp-track { display:flex; align-items:flex-start; justify-content:space-between; position:relative; direction:rtl; }
+.stp-line-seg { flex:1; height:3px; background:rgba(255,255,255,0.07); border-radius:100px; margin-top:20px; position:relative; overflow:hidden; }
+.stp-line-fill { position:absolute; top:0; bottom:0; right:0; width:0%; background:linear-gradient(90deg,#1a7a35 0%,#1F8A3D 55%,#30D158 100%); border-radius:100px; box-shadow:0 0 10px rgba(48,209,88,0.45); transition:width 0.6s cubic-bezier(.16,1,.3,1); }
+.stp-line-fill.filled { width:100%; animation:lineFlood 0.6s cubic-bezier(.16,1,.3,1) both; }
+.stp-node { display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0; position:relative; cursor:pointer; }
+.stp-circle { width:40px; height:40px; border-radius:50%; background:var(--card); border:2px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; position:relative; transition:background .3s,border-color .3s,transform .2s; font-size:15px; font-weight:800; color:var(--t2); font-family:'Outfit','Manrope',sans-serif; }
+.stp-circle::before { content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid rgba(31,138,61,0.5); opacity:0; pointer-events:none; }
+.stp-node.active .stp-circle::before { animation:pulseRing 1.8s ease-out infinite; }
+.stp-node.active .stp-circle { background:linear-gradient(135deg,rgba(31,138,61,0.25) 0%,rgba(31,138,61,0.12) 100%); border-color:#1F8A3D; color:#fff; animation:stepActivate .4s cubic-bezier(.34,1.56,.64,1) both,stepGlow 2.5s ease-in-out infinite .4s; }
+.stp-node.completed .stp-circle { background:linear-gradient(135deg,#1F8A3D 0%,#30D158 100%); border-color:#30D158; color:#fff; box-shadow:0 4px 18px rgba(48,209,88,0.4); }
+.stp-check { display:none; animation:checkPop .4s cubic-bezier(.34,1.56,.64,1) both; }
+.stp-node.completed .stp-check { display:block; }
+.stp-node.completed .stp-num { display:none; }
+.stp-icon { font-size:13px; opacity:0.35; transition:opacity .25s,transform .25s; }
+.stp-node.active .stp-icon { opacity:0.9; transform:scale(1.1); }
+.stp-node.completed .stp-icon { opacity:0.65; }
+.stp-label { font-size:10px; font-weight:600; color:var(--t2); text-align:center; letter-spacing:0.1px; white-space:nowrap; transition:color .25s,font-weight .25s; line-height:1.2; max-width:64px; }
+.stp-node.active .stp-label { color:#e8f5ec; font-weight:700; }
+.stp-node.completed .stp-label { color:#30D158; font-weight:700; }
+.stp-progress-line { display:flex; align-items:center; justify-content:space-between; padding:10px 0 0; }
+.stp-progress-text { font-size:11px; color:var(--t2); font-family:'Outfit','Manrope',sans-serif; font-weight:500; }
+.stp-progress-pct { font-size:11px; color:#1F8A3D; font-weight:700; font-family:'Outfit','Manrope',sans-serif; }
+
+/* ══ TEST HUB — Panel system ══ */
+.test-panel { display:none; }
+.test-panel.active { display:block; }
+
+/* ══ TEST HUB — Checklist ══ */
+@keyframes borderGlow { 0%,100%{box-shadow:0 0 0 0 rgba(31,138,61,0)} 50%{box-shadow:0 0 12px 3px rgba(31,138,61,0.35)} }
+@keyframes rippleOutChk { 0%{transform:scale(0.8);opacity:0.6} 100%{transform:scale(2.2);opacity:0} }
+@keyframes wiperSweepChk { 0%,100%{transform:rotate(-30deg)} 50%{transform:rotate(30deg)} }
+@keyframes needleWiggleChk { 0%,100%{transform:rotate(-20deg)} 40%{transform:rotate(15deg)} 70%{transform:rotate(-5deg)} }
+@keyframes gearSpinChk { to{transform:rotate(360deg)} }
+@keyframes wheelSpinChk { to{transform:rotate(360deg)} }
+@keyframes bulbGlowChk { 0%,100%{filter:drop-shadow(0 0 2px #FFE066)} 50%{filter:drop-shadow(0 0 10px #FFE066) drop-shadow(0 0 20px rgba(255,220,0,0.4))} }
+@keyframes plateGlowChk { 0%,100%{filter:drop-shadow(0 0 0px rgba(31,138,61,0))} 50%{filter:drop-shadow(0 0 6px rgba(31,138,61,0.7))} }
+@keyframes diskPulseChk { 0%,100%{opacity:1} 50%{opacity:0.6;filter:drop-shadow(0 0 5px rgba(255,59,48,0.6))} }
+@keyframes checkDrawChk { from{stroke-dashoffset:80} to{stroke-dashoffset:0} }
+.chk-wrap { padding:0 0 40px; animation:heroReveal .5s cubic-bezier(.16,1,.3,1) both; }
+.chk-header { background:#000; padding:16px 20px 14px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:90; }
+.chk-header-text { flex:1; }
+.chk-header-title { font-size:17px; font-weight:800; letter-spacing:-0.4px; }
+.chk-header-sub { font-size:12px; color:var(--t2); margin-top:3px; }
+.global-ring { width:56px; height:56px; flex-shrink:0; position:relative; }
+.global-ring svg { transform:rotate(-90deg); width:56px; height:56px; }
+.ring-bg { fill:none; stroke:rgba(255,255,255,0.07); stroke-width:4; }
+.ring-fill { fill:none; stroke:var(--red); stroke-width:4; stroke-linecap:round; stroke-dasharray:138; stroke-dashoffset:138; transition:stroke-dashoffset 0.6s cubic-bezier(.16,1,.3,1); filter:drop-shadow(0 0 4px rgba(31,138,61,0.6)); }
+.ring-label { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; }
+.ring-count { font-size:14px; font-weight:800; letter-spacing:-0.5px; line-height:1; }
+.ring-total { font-size:9px; color:var(--t2); font-weight:600; margin-top:1px; }
+.chk-section { margin:10px 14px 0; background:var(--card); border-radius:22px; border:1px solid var(--border); overflow:hidden; animation:fadeUp .5s ease both; }
+.chk-section:nth-child(2){animation-delay:.05s} .chk-section:nth-child(3){animation-delay:.1s} .chk-section:nth-child(4){animation-delay:.15s} .chk-section:nth-child(5){animation-delay:.2s} .chk-section:nth-child(6){animation-delay:.25s} .chk-section:nth-child(7){animation-delay:.3s} .chk-section:nth-child(8){animation-delay:.35s} .chk-section:nth-child(9){animation-delay:.4s}
+.sec-header { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; user-select:none; -webkit-user-select:none; transition:background .2s; }
+.sec-header:active { background:rgba(255,255,255,0.03); }
+.sec-icon-box { width:40px; height:40px; border-radius:13px; background:var(--red-dim); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(31,138,61,0.18); }
+.sec-title-group { flex:1; min-width:0; }
+.sec-title { font-size:14px; font-weight:700; letter-spacing:-0.2px; }
+.sec-subtitle { font-size:11px; color:var(--t2); margin-top:2px; }
+.sec-ring { width:32px; height:32px; position:relative; flex-shrink:0; }
+.sec-ring svg { transform:rotate(-90deg); width:32px; height:32px; }
+.sec-ring-bg { fill:none; stroke:rgba(255,255,255,0.07); stroke-width:3; }
+.sec-ring-fill { fill:none; stroke:var(--red); stroke-width:3; stroke-linecap:round; stroke-dasharray:72; stroke-dashoffset:72; transition:stroke-dashoffset 0.5s cubic-bezier(.16,1,.3,1); }
+.sec-ring-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800; color:var(--t2); }
+.sec-ring-label.done { color:var(--ok); }
+.sec-chevron { width:20px; height:20px; flex-shrink:0; color:var(--t2); transition:transform 0.35s cubic-bezier(.16,1,.3,1); }
+.chk-section.open .sec-chevron { transform:rotate(180deg); }
+.sec-body { overflow:hidden; max-height:0; transition:max-height 0.4s cubic-bezier(.16,1,.3,1),opacity 0.35s ease; opacity:0; }
+.chk-section.open .sec-body { max-height:2000px; opacity:1; }
+.sec-divider { height:1px; background:var(--border); margin:0 16px; }
+.chk-item { position:relative; }
+.chk-item-row { display:flex; align-items:center; gap:12px; padding:13px 16px; cursor:pointer; transition:background .15s; }
+.chk-item-row:active { background:rgba(255,255,255,0.03); }
+.chk-box { width:26px; height:26px; border-radius:8px; border:2px solid var(--border); background:transparent; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative; transition:border-color 0.2s,background 0.2s,transform 0.15s; overflow:visible; }
+.chk-box svg.check-mark { opacity:0; transition:opacity 0.15s; width:14px; height:14px; }
+.chk-box svg.check-mark path { stroke:#fff; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; fill:none; stroke-dasharray:30; stroke-dashoffset:30; }
+.chk-box::after { content:''; position:absolute; inset:-4px; border-radius:12px; background:var(--red-glow); opacity:0; pointer-events:none; transform:scale(0.8); }
+.chk-item.checked .chk-box { background:var(--red); border-color:var(--red); transform:scale(1); transition:transform 0.3s cubic-bezier(.34,1.56,.64,1),background 0.2s,border-color 0.2s; }
+.chk-item.checked .chk-box svg.check-mark { opacity:1; }
+.chk-item.checked .chk-box svg.check-mark path { animation:checkDrawChk .3s ease forwards 0.05s; stroke-dashoffset:0; }
+.chk-item.just-checked .chk-box::after { animation:rippleOutChk 0.4s ease forwards; }
+.chk-item-text { flex:1; min-width:0; }
+.chk-item-name { font-size:13.5px; font-weight:600; letter-spacing:-0.2px; transition:color 0.2s; }
+.chk-item.checked .chk-item-name { color:var(--t2); text-decoration:line-through; text-decoration-color:rgba(255,255,255,0.2); }
+.hint-btn { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.05); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer; color:var(--t2); font-size:14px; font-weight:700; transition:background .2s,color .2s; font-family:inherit; }
+.hint-btn:active { background:rgba(255,255,255,0.1); }
+.hint-btn.open { background:rgba(31,138,61,0.15); color:var(--red); border-color:rgba(31,138,61,0.3); }
+.chk-hint { overflow:hidden; max-height:0; transition:max-height 0.35s ease,opacity 0.2s; opacity:0; }
+.chk-hint.open { max-height:260px; opacity:1; }
+.chk-hint-inner { margin:0 16px 12px; padding:10px 12px; background:rgba(31,138,61,0.06); border-radius:12px; border-right:2px solid rgba(31,138,61,0.35); font-size:12px; color:rgba(31,138,61,0.9); line-height:1.7; letter-spacing:-0.1px; }
+.chk-item:not(:last-child)::after { content:''; display:block; height:1px; background:var(--border); margin:0 16px; }
+.doc-item { padding:13px 16px; display:flex; align-items:center; gap:12px; }
+.doc-item:not(:last-child) { border-bottom:1px solid var(--border); }
+.doc-info { flex:1; min-width:0; }
+.doc-name { font-size:13.5px; font-weight:600; }
+.doc-date { font-size:11px; color:var(--t2); margin-top:3px; }
+.doc-btn { width:34px; height:34px; border-radius:11px; background:var(--card2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer; color:var(--t2); }
+.doc-btn:active { background:rgba(31,138,61,0.15); color:var(--red); }
+.doc-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:11px; font-weight:700; }
+.doc-badge.ok { background:rgba(48,209,88,0.12); color:var(--ok); }
+.chk-section.complete .sec-icon-box { background:rgba(48,209,88,0.12); border-color:rgba(48,209,88,0.25); animation:borderGlow 2s ease-in-out infinite; }
+.chk-section.complete .sec-title { color:var(--ok); }
+.done-banner { margin:14px 14px 0; background:linear-gradient(135deg,rgba(48,209,88,0.12) 0%,rgba(31,138,61,0.08) 100%); border:1px solid rgba(48,209,88,0.2); border-radius:18px; padding:16px 20px; display:flex; align-items:center; gap:14px; opacity:0; transform:translateY(10px); transition:opacity 0.4s,transform 0.4s cubic-bezier(.16,1,.3,1); pointer-events:none; }
+.done-banner.visible { opacity:1; transform:translateY(0); pointer-events:auto; }
+.done-banner-icon { width:44px; height:44px; border-radius:14px; background:rgba(48,209,88,0.15); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.done-banner-text { flex:1; }
+.done-banner-title { font-size:15px; font-weight:700; color:var(--ok); }
+.done-banner-sub { font-size:12px; color:var(--t2); margin-top:3px; }
+.icon-bulb-th { animation:bulbGlowChk 2.5s ease-in-out infinite; color:#FFE066; }
+.icon-wheel-th { animation:wheelSpinChk 8s linear infinite; }
+.icon-wiper-th { transform-origin:50% 90%; animation:wiperSweepChk 2.5s ease-in-out infinite; }
+.icon-gauge-needle-th { transform-origin:50% 85%; animation:needleWiggleChk 3s ease-in-out infinite; }
+.icon-disk-th { animation:diskPulseChk 2s ease-in-out infinite; }
+.icon-plate-th { animation:plateGlowChk 2.5s ease-in-out infinite; }
+.icon-gear-th { animation:gearSpinChk 6s linear infinite; }
+
+/* ══ TEST HUB — Station cards ══ */
+@keyframes stationCardEnterTH { 0%{transform:translateY(18px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+@keyframes stationOpenPulseTH { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.65);transform:scale(1)} 50%{box-shadow:0 0 0 6px rgba(34,197,94,0);transform:scale(1.18)} }
+@keyframes stationClosedDotTH { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.65)} }
+@keyframes stationRatingGlowTH { 0%,100%{text-shadow:none} 50%{text-shadow:0 0 8px rgba(255,185,0,0.7)} }
+.station-screen-wrap { padding:0 0 24px; }
+.station-screen-head { padding:14px 20px 6px; display:flex; align-items:baseline; justify-content:space-between; }
+.station-screen-title { font-size:18px; font-weight:800; letter-spacing:-0.4px; color:var(--t1); }
+.station-screen-sub { font-size:12px; color:var(--t2); font-weight:500; }
+.station-map-overview { margin:6px 16px 14px; border-radius:20px; overflow:hidden; border:1px solid var(--border); position:relative; height:170px; background:#080a0d; animation:stationCardEnterTH .45s ease .05s both; }
+.station-map-overview-placeholder { width:100%; height:100%; position:relative; display:flex; align-items:center; justify-content:center; }
+.station-map-open-btn { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(17,17,17,0.88); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.12); border-radius:100px; color:#fff; font-size:12px; font-weight:700; padding:7px 18px; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:inherit; letter-spacing:-0.2px; z-index:5; transition:background .15s; }
+.station-map-open-btn:active { background:rgba(40,40,40,0.95); }
+.station-list { display:flex; flex-direction:column; gap:12px; padding:0 16px; }
+.station-card { background:var(--card); border-radius:22px; border:1px solid var(--border); border-right:3px solid var(--ok); overflow:hidden; position:relative; transition:transform .12s; animation:stationCardEnterTH .5s cubic-bezier(.16,1,.3,1) both; }
+.station-card:nth-child(1){animation-delay:.15s} .station-card:nth-child(2){animation-delay:.22s} .station-card:nth-child(3){animation-delay:.29s}
+.station-card:active { transform:scale(0.99); }
+.station-card.open { border-right-color:var(--ok); }
+.station-card.closed { border-right-color:var(--t2); }
+.station-card-header { padding:16px 18px 12px; background:linear-gradient(135deg,rgba(31,138,61,0.07) 0%,transparent 60%); border-bottom:1px solid var(--border); }
+.station-card.closed .station-card-header { background:linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 60%); }
+.station-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.station-card-title-block { flex:1; min-width:0; }
+.station-card-name { font-size:17px; font-weight:800; letter-spacing:-0.4px; color:var(--t1); line-height:1.25; }
+.station-card-address { font-size:12px; color:var(--t2); font-weight:500; margin-top:3px; }
+.station-card-badges { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
+.station-dist-badge { font-size:11px; font-weight:700; color:var(--t2); background:var(--card2); border-radius:100px; padding:4px 10px; direction:ltr; }
+.station-rating { font-size:12px; font-weight:700; color:#FFB800; display:flex; align-items:center; gap:3px; animation:stationRatingGlowTH 3s ease-in-out infinite; }
+.station-status-row { display:flex; align-items:center; gap:8px; }
+.station-status-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:11.5px; font-weight:800; }
+.station-status-chip.open { background:rgba(34,197,94,0.14); color:#4ade80; border:1px solid rgba(34,197,94,0.38); }
+.station-status-chip.closed { background:rgba(100,116,139,0.14); color:#94a3b8; border:1px solid rgba(100,116,139,0.28); }
+.station-status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.station-status-chip.open .station-status-dot { animation:stationOpenPulseTH 1.6s ease-in-out infinite; }
+.station-status-chip.closed .station-status-dot { animation:stationClosedDotTH 1.4s ease-in-out infinite; }
+.station-hours-text { font-size:11.5px; color:var(--t2); font-weight:600; }
+.station-card-map { height:160px; background:#0a0a0a; position:relative; overflow:hidden; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.station-map-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; position:relative; }
+.station-card-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; }
+.station-action-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:13px 6px; border:none; background:transparent; color:var(--t1); cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; letter-spacing:-0.1px; position:relative; overflow:hidden; transition:background .15s; text-decoration:none; }
+.station-action-btn + .station-action-btn { border-right:1px solid var(--border); }
+.station-action-btn:active { background:rgba(255,255,255,0.06); }
+.station-action-btn .sa-icon { width:34px; height:34px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.station-action-btn.call .sa-icon { background:var(--red); }
+.station-action-btn.waze .sa-icon { background:#33CCFF; }
+.station-action-btn.web .sa-icon { background:var(--card2); border:1px solid var(--border); }
+.station-action-btn .sa-lbl { color:var(--t2); font-size:11px; font-weight:600; }
+
+/* ══ TEST HUB — Docs panel ══ */
+@keyframes sendProgressTH { 0%{width:0%} 100%{width:100%} }
+@keyframes docBadgeGlowTH { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,0)} 50%{box-shadow:0 0 8px 3px rgba(74,222,128,0.45)} }
+.pds-section { margin:14px 16px 0; background:var(--card); border-radius:18px; border:1px solid var(--border); overflow:hidden; animation:fadeUp .4s ease both; }
+.pds-section-head { display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid var(--border); }
+.pds-section-icon { width:32px; height:32px; border-radius:10px; background:var(--red-dim); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pds-section-title { font-size:14px; font-weight:700; color:var(--t1); letter-spacing:-0.2px; }
+.pds-section-sub { font-size:11px; color:var(--t2); margin-top:1px; }
+.pds-doc-row { display:flex; align-items:center; gap:12px; padding:13px 16px; border-bottom:1px solid var(--border); transition:background .15s; cursor:pointer; }
+.pds-doc-row:last-of-type { border-bottom:none; }
+.pds-doc-row:active { background:var(--card2); }
+.pds-doc-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pds-doc-icon.green { background:linear-gradient(135deg,#166534,#22c55e); }
+.pds-doc-icon.blue { background:linear-gradient(135deg,#0369a1,#0ea5e9); }
+.pds-doc-icon.amber { background:linear-gradient(135deg,#92400e,#f59e0b); }
+.pds-doc-icon.purple { background:linear-gradient(135deg,#5b21b6,#8b5cf6); }
+.pds-doc-body { flex:1; min-width:0; }
+.pds-doc-title { font-size:13px; font-weight:700; letter-spacing:-0.2px; color:var(--t1); }
+.pds-doc-sub { font-size:11px; color:var(--t2); margin-top:2px; }
+.pds-doc-end { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.pds-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:100px; font-size:10px; font-weight:700; white-space:nowrap; }
+.pds-badge.ok { background:rgba(48,209,88,0.14); color:#4ade80; border:1px solid rgba(48,209,88,0.28); }
+.pds-badge.ok .pds-dot { width:5px; height:5px; border-radius:50%; background:#4ade80; animation:docBadgeGlowTH 2s ease-in-out infinite; }
+.pds-badge.auto { background:rgba(245,158,11,0.13); color:#fbbf24; border:1px solid rgba(245,158,11,0.28); }
+.pds-badge.fixed { background:rgba(139,92,246,0.12); color:#c4b5fd; border:1px solid rgba(139,92,246,0.22); }
+.pds-view-btn { display:inline-flex; align-items:center; gap:4px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:600; color:#fff; cursor:pointer; font-family:inherit; white-space:nowrap; transition:background .15s; }
+.pds-view-btn:active { background:rgba(255,255,255,0.14); }
+.pds-email-row { display:flex; gap:8px; padding:14px 16px 0; }
+.pds-email-input { flex:1; background:rgba(255,255,255,0.05); border:1.5px solid rgba(255,255,255,0.1); border-radius:12px; padding:10px 13px; color:#fff; font-size:14px; font-family:inherit; direction:ltr; outline:none; transition:border-color .2s,box-shadow .2s; height:44px; }
+.pds-email-input:focus { border-color:rgba(31,138,61,0.55); box-shadow:0 0 0 3px rgba(31,138,61,0.12); }
+.pds-cam-btn { width:44px; height:44px; background:var(--card2); border:1.5px solid var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--t2); flex-shrink:0; }
+.pds-cam-btn:active { background:rgba(255,255,255,0.1); }
+.pds-send-cta { margin:14px 16px 16px; background:var(--red); border:none; border-radius:16px; padding:16px 24px; color:#fff; font-family:inherit; font-size:15px; font-weight:800; letter-spacing:-0.3px; cursor:pointer; width:calc(100% - 32px); display:flex; align-items:center; justify-content:center; gap:10px; transition:opacity .2s,transform .15s; position:relative; overflow:hidden; box-shadow:0 6px 28px var(--red-glow); animation:fabPulse 2.5s ease-in-out infinite; }
+.pds-send-cta:active { transform:scale(0.98); opacity:0.9; }
+.pds-send-cta-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; background:rgba(0,0,0,0.25); border-radius:100px; font-size:11px; font-weight:800; padding:0 5px; }
+.pds-cta-progress { display:none; position:absolute; bottom:0; left:0; height:3px; background:rgba(255,255,255,0.45); border-radius:0 0 16px 16px; animation:sendProgressTH 1.8s ease forwards; }
+.pds-send-cta.loading .pds-cta-progress { display:block; }
+.pds-send-cta.sent { background:linear-gradient(135deg,#166534,#22c55e); pointer-events:none; animation:none; box-shadow:0 4px 20px rgba(48,209,88,0.35); }
+.pds-success-banner { display:none; margin:0 16px 16px; background:rgba(48,209,88,0.1); border:1px solid rgba(48,209,88,0.28); border-radius:14px; padding:12px 16px; gap:12px; align-items:center; animation:fadeUp .35s ease both; }
+.pds-success-banner.visible { display:flex; }
+.pds-success-icon { width:36px; height:36px; background:rgba(48,209,88,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pds-success-text { font-size:13px; font-weight:700; color:var(--ok); }
+.pds-success-sub { font-size:11px; color:var(--t2); margin-top:2px; }
+.docs-divider { margin:20px 16px; display:flex; align-items:center; gap:10px; animation:fadeUp .4s ease .44s both; }
+.docs-divider-line { flex:1; height:1px; background:rgba(255,255,255,0.07); }
+.docs-divider-text { font-size:11px; font-weight:600; color:var(--t2); white-space:nowrap; }
+.sec-result { padding:20px 20px 12px; font-size:18px; font-weight:700; letter-spacing:-0.4px; animation:fadeUp .5s ease .5s both; }
+.sec-result-sub { font-size:12px; color:var(--t2); font-weight:400; margin-top:2px; letter-spacing:0; }
+.result-choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 16px 16px; animation:fadeUp .5s ease .55s both; }
+.result-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:20px 12px; background:var(--card2); border:2px solid var(--border); border-radius:20px; cursor:pointer; font-family:inherit; color:var(--t1); transition:border-color .2s,background .2s,transform .15s; position:relative; overflow:hidden; -webkit-tap-highlight-color:transparent; }
+.result-btn:active { transform:scale(1.02); }
+.result-btn .rb-icon { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background .2s; }
+.result-btn .rb-label { font-size:15px; font-weight:700; letter-spacing:-0.3px; text-align:center; line-height:1.25; }
+.result-btn .rb-sub { font-size:11px; color:var(--t2); font-weight:500; text-align:center; }
+.result-btn.pass .rb-icon { background:rgba(48,209,88,0.12); }
+.result-btn.pass.selected { border-color:var(--ok); background:rgba(48,209,88,0.07); }
+.result-btn.pass.selected .rb-icon { background:rgba(48,209,88,0.2); }
+.result-btn.pass.selected .rb-label { color:var(--ok); }
+.result-btn.fail .rb-icon { background:rgba(255,59,48,0.10); }
+.result-btn.fail.selected { border-color:#FF453A; background:rgba(255,59,48,0.07); }
+.result-btn.fail.selected .rb-icon { background:rgba(255,59,48,0.18); }
+.result-btn.fail.selected .rb-label { color:#FF453A; }
+.result-drawer { overflow:hidden; max-height:0; opacity:0; transition:max-height .45s cubic-bezier(.16,1,.3,1),opacity .3s ease,transform .35s cubic-bezier(.16,1,.3,1); transform:translateY(-8px); padding:0 16px; }
+.result-drawer.open { max-height:900px; opacity:1; transform:translateY(0); }
+.result-drawer-inner { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:18px 16px 16px; margin-bottom:12px; }
+.result-upload-label { font-size:14px; font-weight:700; color:var(--t1); margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+.result-upload-sublabel { font-size:12px; color:var(--t2); margin-bottom:14px; padding-right:2px; }
+.result-upload-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.result-upload-btn { display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 10px; border-radius:14px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:transform .15s; border:none; }
+.result-upload-btn:active { transform:scale(0.97); }
+.result-upload-btn.cam { background:var(--red-dim); color:var(--red); border:1.5px solid rgba(31,138,61,0.3); }
+.result-upload-btn.file { background:rgba(255,255,255,0.05); color:var(--t1); border:1.5px solid var(--border); }
+.result-file-preview { display:none; align-items:center; gap:10px; background:rgba(48,209,88,0.08); border:1px solid rgba(48,209,88,0.25); border-radius:12px; padding:10px 14px; margin-bottom:12px; }
+.result-file-preview.visible { display:flex; }
+.result-file-preview-thumb { width:44px; height:44px; border-radius:8px; background:rgba(48,209,88,0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.result-file-preview-name { font-size:13px; font-weight:600; color:var(--ok); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:ltr; text-align:right; }
+.result-file-preview-remove { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.07); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--t2); flex-shrink:0; font-size:14px; font-family:inherit; }
+.result-confirm-cta { width:100%; padding:15px 0; background:linear-gradient(135deg,#1F8A3D 0%,#176B2F 100%); border:none; border-radius:100px; color:#fff; font-size:16px; font-weight:700; font-family:inherit; letter-spacing:-0.3px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 24px rgba(31,138,61,0.4); transition:transform .15s,box-shadow .15s,opacity .2s; opacity:0.45; }
+.result-confirm-cta.ready { opacity:1; animation:fabPulse 2.5s ease-in-out infinite; }
+.result-confirm-cta:active { transform:scale(0.97); }
+.result-confirm-hint { font-size:11px; color:var(--t2); text-align:center; margin-top:8px; font-weight:500; }
+.result-invoice-section { margin-top:14px; border-top:1px solid var(--border); padding-top:14px; overflow:hidden; max-height:0; opacity:0; transition:max-height .4s cubic-bezier(.16,1,.3,1),opacity .3s ease; }
+.result-invoice-section.open { max-height:400px; opacity:1; }
+.result-invoice-label { font-size:13px; font-weight:700; color:var(--t1); margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+.result-invoice-sub { font-size:11px; color:var(--t2); margin-bottom:12px; }
+.result-invoice-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.result-inv-field-label { font-size:11px; color:var(--t2); font-weight:600; margin-bottom:4px; }
+.result-inv-input { width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--t1); font-size:14px; padding:10px 12px; font-family:inherit; outline:none; transition:border-color .2s; box-sizing:border-box; }
+.result-inv-input:focus { border-color:rgba(255,159,10,0.5); }
+.result-inv-amount-wrap { position:relative; }
+.result-inv-currency { position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--t2); font-size:14px; font-weight:600; pointer-events:none; }
+.result-inv-amount-wrap .result-inv-input { padding-right:28px; }
+.result-inv-upload-row { display:flex; gap:8px; margin-bottom:10px; }
+.result-inv-upload-btn { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; color:var(--t2); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; transition:background .15s,color .15s; }
+.result-inv-upload-btn:active { background:rgba(255,255,255,0.08); color:var(--t1); }
+.result-invoice-cta { width:100%; padding:12px 0; background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.14); border-radius:100px; color:var(--t1); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .2s,border-color .2s,transform .15s; }
+.result-invoice-cta:active { transform:scale(0.97); background:rgba(255,255,255,0.09); }
+.result-fail-label { font-size:14px; font-weight:700; color:var(--t1); margin-bottom:4px; }
+.result-fail-sub { font-size:12px; color:var(--t2); margin-bottom:12px; }
+.result-fail-textarea { width:100%; box-sizing:border-box; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; color:var(--t1); font-size:14px; padding:12px 14px; resize:none; font-family:inherit; min-height:90px; outline:none; direction:rtl; margin-bottom:12px; transition:border-color .2s; }
+.result-fail-textarea:focus { border-color:rgba(255,59,48,0.45); }
+.result-fail-cta { width:100%; padding:14px 0; background:rgba(255,59,48,0.12); border:1.5px solid rgba(255,59,48,0.3); border-radius:100px; color:#FF453A; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .2s,transform .15s; opacity:0.5; }
+.result-fail-cta:active { transform:scale(0.97); background:rgba(255,59,48,0.18); }
+.result-fail-cta-sub { font-size:11px; color:var(--t2); text-align:center; margin-top:7px; }
 </style>
 </head>
 <body>
@@ -3431,6 +3720,22 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-gauge" color="#1F8A3D"/></svg></div>
           <div class="qa-lbl">עדכון<br>ק"מ</div>
         </div>
+
+        <!-- כרטיס טסט הרכב -->
+        <div class="qa-card qa-card--test" id="qa-test-card" onclick="APP.openTestHub ? APP.openTestHub() : APP.nav('testhub')">
+          <div class="test-ring-wrap" id="test-ring-wrap">
+            <svg width="46" height="46" viewBox="0 0 46 46">
+              <circle class="test-ring-bg" cx="23" cy="23" r="18"/>
+              <circle class="test-ring-fill" id="test-ring-fill" cx="23" cy="23" r="18"/>
+            </svg>
+            <div class="test-ring-num" id="test-ring-num">–</div>
+          </div>
+          <div class="qa-lbl--test">טסט<br>רכב</div>
+          <div class="test-hint" id="test-hint">לחץ להכנה ›</div>
+        </div>
+
+        <!-- עמודה 3: placeholder -->
+        <div class="qa-card" style="visibility:hidden" aria-hidden="true"></div>
       </div>
       <div style="height:120px"></div>
     </div>
@@ -3477,6 +3782,359 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       <div style="height:100px"></div>
     </div>
   </div>
+
+  <!-- TEST HUB SCREEN -->
+  <div class="screen" id="screen-testhub" style="display:none; flex-direction:column; min-height:0;">
+    <div class="phead">
+      <div class="ph-row">
+        <div class="ph-title">טסט הרכב</div>
+        <div class="pill ok" id="test-hub-status-pill">תקין</div>
+      </div>
+      <div class="ph-sub" id="test-hub-plate-sub">— · —</div>
+    </div>
+    <!-- Stepper -->
+    <div class="stp-wrap" id="testHubStepper">
+      <div class="stp-track">
+        <div class="stp-node active" id="stp-node-1" onclick="APP.thSetStep && APP.thSetStep(1)">
+          <div class="stp-circle">
+            <span class="stp-num">1</span>
+            <svg class="stp-check" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 9.5L7.5 13L14 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="stp-icon">📋</div>
+          <div class="stp-label">בדיקות<br>רכב</div>
+        </div>
+        <div class="stp-line-seg" id="stp-line-1"><div class="stp-line-fill" id="stp-fill-1"></div></div>
+        <div class="stp-node" id="stp-node-2" onclick="APP.thSetStep && APP.thSetStep(2)">
+          <div class="stp-circle">
+            <span class="stp-num">2</span>
+            <svg class="stp-check" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 9.5L7.5 13L14 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="stp-icon">🏢</div>
+          <div class="stp-label">מכוני<br>טסט</div>
+        </div>
+        <div class="stp-line-seg" id="stp-line-2"><div class="stp-line-fill" id="stp-fill-2"></div></div>
+        <div class="stp-node" id="stp-node-3" onclick="APP.thSetStep && APP.thSetStep(3)">
+          <div class="stp-circle">
+            <span class="stp-num">3</span>
+            <svg class="stp-check" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 9.5L7.5 13L14 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="stp-icon">📄</div>
+          <div class="stp-label">שליחת<br>מסמכים</div>
+        </div>
+      </div>
+      <div class="stp-progress-line">
+        <div class="stp-progress-text" id="stp-progress-text">שלב 1 מתוך 3</div>
+        <div class="stp-progress-pct" id="stp-progress-pct">0%</div>
+      </div>
+    </div>
+    <div class="content" id="test-hub-content">
+
+      <!-- PANEL 1: Checklist -->
+      <div id="test-panel-checklist" class="test-panel active">
+        <div class="chk-wrap" id="chkWrap" style="padding-bottom:20px;">
+          <div class="chk-header">
+            <div class="chk-header-text">
+              <div class="chk-header-title">בדיקת רכב לפני טסט</div>
+              <div class="chk-header-sub" id="globalSub">0 מתוך 19 סעיפים הושלמו</div>
+            </div>
+            <div class="global-ring">
+              <svg viewBox="0 0 56 56"><circle class="ring-bg" cx="28" cy="28" r="22"/><circle class="ring-fill" cx="28" cy="28" r="22" id="globalRingFill"/></svg>
+              <div class="ring-label"><span class="ring-count" id="globalCount">0</span><span class="ring-total">/ 19</span></div>
+            </div>
+          </div>
+          <div class="done-banner" id="doneBanner">
+            <div class="done-banner-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 12L9 17L20 7" stroke="#30D158" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="done-banner-text"><div class="done-banner-title">הרכב עבר בדיקה מלאה!</div><div class="done-banner-sub">כל 19 הסעיפים הושלמו — נסיעה בטוחה</div></div>
+          </div>
+
+          <!-- Section 1: תאורה -->
+          <div class="chk-section open" data-section="0">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(0)">
+              <div class="sec-icon-box"><svg class="icon-bulb-th" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26C17.81 13.47 19 11.38 19 9c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M9 21h6M10 18h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">תאורה</div><div class="sec-subtitle">3 סעיפים</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="3"/></svg><div class="sec-ring-label" data-ring-label="0">0/3</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="0"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(0)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">פנסים קדמיים</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(0)">?</button></div><div class="chk-hint" id="th-hint-0"><div class="chk-hint-inner">הדלק אורות קדמיים<br>• האם שני הפנסים דולקים?<br>• אין שבר או עכירות בעדשה?</div></div></div>
+              <div class="chk-item" data-idx="1"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(1)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">פנסים אחוריים</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(1)">?</button></div><div class="chk-hint" id="th-hint-1"><div class="chk-hint-inner">דרוש על הבלם ובקש עזרה מאחור<br>• האם 3 אורות הבלם דולקים?</div></div></div>
+              <div class="chk-item" data-idx="2"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(2)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">איתותים ואורות חניה</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(2)">?</button></div><div class="chk-hint" id="th-hint-2"><div class="chk-hint-inner">הפעל ימין → שמאל → אזהרה<br>• האם כולם מהבהבים בקצב אחיד?</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 2: צמיגים -->
+          <div class="chk-section" data-section="1">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(1)">
+              <div class="sec-icon-box"><svg class="icon-wheel-th" width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="3" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="12" y1="15" x2="12" y2="21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="3" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="15" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">צמיגים</div><div class="sec-subtitle">2 סעיפים</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="2"/></svg><div class="sec-ring-label" data-ring-label="1">0/2</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="3"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(3)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">עומק חריצים תקין</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(3)">?</button></div><div class="chk-hint" id="th-hint-3"><div class="chk-hint-inner">מינימום חוקי: 1.6 מ"מ<br>• הכנס מטבע 10 אג׳ לחריץ — אם אין שוליים גלויים, תקין</div></div></div>
+              <div class="chk-item" data-idx="4"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(4)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">לחץ אוויר תקין</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(4)">?</button></div><div class="chk-hint" id="th-hint-4"><div class="chk-hint-inner">ערכי הלחץ מודבקים על מסגרת דלת הנהג<br>• בדוק עם מד לחץ</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 3: מגבים -->
+          <div class="chk-section" data-section="2">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(2)">
+              <div class="sec-icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#60a5fa"><g class="icon-wiper-th"><path d="M4 20 Q12 6 20 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M4 20 Q12 9 18 12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.4"/></g><circle cx="4" cy="20" r="2" fill="currentColor"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">מגבים</div><div class="sec-subtitle">2 סעיפים</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="2"/></svg><div class="sec-ring-label" data-ring-label="2">0/2</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="5"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(5)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">מגבים תקינים</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(5)">?</button></div><div class="chk-hint" id="th-hint-5"><div class="chk-hint-inner">הפעל מגבים<br>• מנקים ללא פסים או ריצודים?</div></div></div>
+              <div class="chk-item" data-idx="6"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(6)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">נוזל מתזים קיים</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(6)">?</button></div><div class="chk-hint" id="th-hint-6"><div class="chk-hint-inner">לחץ על כפתור ריסוס<br>• האם נוזל יוצא מהזרבוביות?</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 4: בטיחות -->
+          <div class="chk-section" data-section="3">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(3)">
+              <div class="sec-icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#a78bfa"><path d="M12 2L4 6V12C4 16.4 7.4 20.5 12 22C16.6 20.5 20 16.4 20 12V6L12 2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="rgba(167,139,250,0.08)"/><path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">בטיחות</div><div class="sec-subtitle">2 סעיפים</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="2"/></svg><div class="sec-ring-label" data-ring-label="3">0/2</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="7"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(7)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">חגורות בטיחות תקינות</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(7)">?</button></div><div class="chk-hint" id="th-hint-7"><div class="chk-hint-inner">בדוק את כל מקומות הישיבה<br>• הגוש נועל בקליק? הרצועה מתחזרת חלק?</div></div></div>
+              <div class="chk-item" data-idx="8"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(8)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">צופר עובד</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(8)">?</button></div><div class="chk-hint" id="th-hint-8"><div class="chk-hint-inner">לחץ על מרכז ההגה<br>• נשמע צלצול ברור ורציף?</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 5: לוח מחוונים -->
+          <div class="chk-section" data-section="4">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(4)">
+              <div class="sec-icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#fb923c"><path d="M4.93 4.93C3.12 6.74 2 9.24 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 9.24 20.88 6.74 19.07 4.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line class="icon-gauge-needle-th" x1="12" y1="12" x2="8" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">לוח מחוונים</div><div class="sec-subtitle">סעיף אחד</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="1"/></svg><div class="sec-ring-label" data-ring-label="4">0/1</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="9"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(9)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">אין נורות אזהרה דולקות</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(9)">?</button></div><div class="chk-hint" id="th-hint-9"><div class="chk-hint-inner">לאחר נסיעה של 2 דקות<br>• לוח מחוונים נקי? בדוק: 🔴 מנוע/שמן/בלמים/ABS</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 6: בלמים -->
+          <div class="chk-section" data-section="5">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(5)">
+              <div class="sec-icon-box"><svg class="icon-disk-th" width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#FF453A"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M12 3V7M12 17V21M3 12H7M17 12H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">בלמים</div><div class="sec-subtitle">2 סעיפים</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="2"/></svg><div class="sec-ring-label" data-ring-label="5">0/2</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="10"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(10)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">בלם יד תקין</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(10)">?</button></div><div class="chk-hint" id="th-hint-10"><div class="chk-hint-inner">משוך בלם יד חזק<br>• הרכב לא זז בהפסקת מנוע?</div></div></div>
+              <div class="chk-item" data-idx="11"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(11)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">אין רעשים חריגים בבלימה</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(11)">?</button></div><div class="chk-hint" id="th-hint-11"><div class="chk-hint-inner">בלימה מתונה ב-30 קמ"ש<br>• חריקות, רעידות, משיכה לצד?</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 7: זיהוי -->
+          <div class="chk-section" data-section="6">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(6)">
+              <div class="sec-icon-box"><svg class="icon-plate-th" width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#1F8A3D"><rect x="2" y="7" width="20" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><text x="5" y="16" font-size="6" fill="currentColor" font-family="monospace" font-weight="700">AB-123</text></svg></div>
+              <div class="sec-title-group"><div class="sec-title">זיהוי</div><div class="sec-subtitle">סעיף אחד</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="1"/></svg><div class="sec-ring-label" data-ring-label="6">0/1</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="12"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(12)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">לוחיות רישוי תקינות</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(12)">?</button></div><div class="chk-hint" id="th-hint-12"><div class="chk-hint-inner">בדוק קדמית ואחורית<br>• ברורות לקריאה? מחוברות בחוזקה?</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 8: מנוע -->
+          <div class="chk-section" data-section="7">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(7)">
+              <div class="sec-icon-box"><svg class="icon-gear-th" width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#94a3b8"><path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.8"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">מנוע</div><div class="sec-subtitle">3 סעיפים</div></div>
+              <div class="sec-ring"><svg viewBox="0 0 32 32"><circle class="sec-ring-bg" cx="16" cy="16" r="11.5"/><circle class="sec-ring-fill" cx="16" cy="16" r="11.5" data-total="3"/></svg><div class="sec-ring-label" data-ring-label="7">0/3</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="chk-item" data-idx="13"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(13)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">שמן מנוע תקין</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(13)">?</button></div><div class="chk-hint" id="th-hint-13"><div class="chk-hint-inner">מד שמן — הרמה בין MIN ל-MAX?<br>• צבע חום בהיר = תקין</div></div></div>
+              <div class="chk-item" data-idx="14"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(14)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">נוזל קירור תקין</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(14)">?</button></div><div class="chk-hint" id="th-hint-14"><div class="chk-hint-inner">מיכל קירור — הרמה בין MIN ל-MAX?<br>• צבע ירוק/כחול = תקין</div></div></div>
+              <div class="chk-item" data-idx="15"><div class="chk-item-row" onclick="APP.thToggleItem && APP.thToggleItem(15)"><div class="chk-box"><svg class="check-mark" viewBox="0 0 14 14"><path d="M2 7L5.5 10.5L12 3.5"/></svg></div><div class="chk-item-text"><div class="chk-item-name">אין נזילות משמעותיות</div></div><button class="hint-btn" onclick="event.stopPropagation();APP.thToggleHint && APP.thToggleHint(15)">?</button></div><div class="chk-hint" id="th-hint-15"><div class="chk-hint-inner">בדוק על הרצפה מתחת לרכב<br>• נוזל בלמים = עצור! אסור לנסוע</div></div></div>
+            </div>
+          </div>
+
+          <!-- Section 9: מסמכים -->
+          <div class="chk-section" data-section="8">
+            <div class="sec-header" onclick="APP.thToggleSection && APP.thToggleSection(8)">
+              <div class="sec-icon-box"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color:#e2e8f0"><path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="8" y1="17" x2="14" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div class="sec-title-group"><div class="sec-title">מסמכים</div><div class="sec-subtitle">מוצג אוטומטית</div></div>
+              <svg class="sec-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sec-body"><div class="sec-divider"></div>
+              <div class="doc-item">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="flex-shrink:0"><rect width="32" height="32" rx="10" fill="rgba(48,209,88,0.1)"/><path d="M10 16l4 4 8-8" stroke="#30D158" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="doc-info"><div class="doc-name">רישיון רכב ואגרת רישוי</div><div class="doc-date" id="th-doc-license-date">תוקף עד: —</div></div>
+                <span class="doc-badge ok">תקין</span>
+                <button class="doc-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></button>
+              </div>
+              <div class="doc-item">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="flex-shrink:0"><rect width="32" height="32" rx="10" fill="rgba(48,209,88,0.1)"/><path d="M10 16l4 4 8-8" stroke="#30D158" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="doc-info"><div class="doc-name">ביטוח חובה בתוקף</div><div class="doc-date" id="th-doc-insurance-date">תוקף עד: —</div></div>
+                <span class="doc-badge ok">תקין</span>
+                <button class="doc-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:20px;"></div>
+        </div><!-- /chk-wrap -->
+        <div style="height:80px;"></div>
+      </div><!-- /panel-checklist -->
+
+      <!-- PANEL 2: Stations -->
+      <div id="test-panel-stations" class="test-panel">
+        <div class="station-screen-wrap">
+          <div class="station-screen-head">
+            <span class="station-screen-title">מכוני טסט קרובים</span>
+            <span class="station-screen-sub">3 תוצאות · לפי מרחק</span>
+          </div>
+          <div class="station-map-overview">
+            <div class="station-map-overview-placeholder">
+              <svg viewBox="0 0 380 170" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+                <rect width="380" height="170" fill="#0a0c10"/>
+                <rect x="0" y="74" width="380" height="7" fill="#181e28" rx="1"/>
+                <rect x="0" y="118" width="380" height="5" fill="#141820" rx="1"/>
+                <rect x="90" y="0" width="6" height="170" fill="#181e28" rx="1"/>
+                <rect x="200" y="0" width="5" height="170" fill="#141820" rx="1"/>
+                <rect x="310" y="0" width="4" height="170" fill="#141820" rx="1"/>
+                <circle cx="190" cy="77.5" r="6" fill="#1F8A3D" opacity="0.95"/>
+                <circle cx="190" cy="77.5" r="11" fill="#1F8A3D" opacity="0.2"/>
+                <g transform="translate(52,52)"><ellipse cx="0" cy="20" rx="5" ry="2" fill="rgba(0,0,0,0.4)"/><path d="M0,0 C-10,0 -10,14 0,20 C10,14 10,0 0,0Z" fill="#22c55e"/><circle cx="0" cy="7" r="4.5" fill="#fff" opacity="0.9"/><text x="0" y="11" text-anchor="middle" font-size="7" font-weight="800" fill="#16a34a" font-family="sans-serif">1</text></g>
+                <g transform="translate(147,48)"><ellipse cx="0" cy="20" rx="5" ry="2" fill="rgba(0,0,0,0.4)"/><path d="M0,0 C-10,0 -10,14 0,20 C10,14 10,0 0,0Z" fill="#22c55e"/><circle cx="0" cy="7" r="4.5" fill="#fff" opacity="0.9"/><text x="0" y="11" text-anchor="middle" font-size="7" font-weight="800" fill="#16a34a" font-family="sans-serif">2</text></g>
+                <g transform="translate(258,46)"><ellipse cx="0" cy="20" rx="5" ry="2" fill="rgba(0,0,0,0.4)"/><path d="M0,0 C-10,0 -10,14 0,20 C10,14 10,0 0,0Z" fill="#64748b"/><circle cx="0" cy="7" r="4.5" fill="#fff" opacity="0.7"/><text x="0" y="11" text-anchor="middle" font-size="7" font-weight="800" fill="#475569" font-family="sans-serif">3</text></g>
+              </svg>
+              <button class="station-map-open-btn" onclick="window.open('https://www.google.com/maps/search/מכון+טסט+קרוב','_blank')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                פתח מפה מלאה
+              </button>
+            </div>
+          </div>
+          <div class="station-list">
+            <div class="station-card open">
+              <div class="station-card-header">
+                <div class="station-card-top"><div class="station-card-title-block"><div class="station-card-name">מכון רישוי הרצליה</div><div class="station-card-address">רח׳ סוקולוב 12, הרצליה</div></div><div class="station-card-badges"><span class="station-dist-badge">2.3 ק״מ</span><span class="station-rating"><svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB800" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>4.6</span></div></div>
+                <div class="station-status-row"><div class="station-status-chip open"><span class="station-status-dot"></span>פתוח</div><span class="station-hours-text">עד 17:00</span></div>
+              </div>
+              <div class="station-card-actions">
+                <button class="station-action-btn call" onclick="window.open('tel:0999501234')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.07 3.21 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div><span class="sa-lbl">חייג</span></button>
+                <a class="station-action-btn waze" href="https://waze.com/ul?q=הרצליה+סוקולוב+12&navigate=yes" target="_blank" rel="noopener"><div class="sa-icon"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="26" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="32" r="3" fill="#333"/><circle cx="30" cy="32" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="34" cy="16" r="5" fill="#FFB800"/></svg></div><span class="sa-lbl">Waze</span></a>
+                <button class="station-action-btn web" onclick="window.open('https://www.gov.il/he/departments/bureaus/moti_merkaz','_blank')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span class="sa-lbl">אתר</span></button>
+              </div>
+            </div>
+            <div class="station-card open">
+              <div class="station-card-header">
+                <div class="station-card-top"><div class="station-card-title-block"><div class="station-card-name">מכון טסט תל אביב</div><div class="station-card-address">רח׳ הרכבת 48, תל אביב</div></div><div class="station-card-badges"><span class="station-dist-badge">4.1 ק״מ</span><span class="station-rating"><svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB800" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>4.2</span></div></div>
+                <div class="station-status-row"><div class="station-status-chip open"><span class="station-status-dot"></span>פתוח</div><span class="station-hours-text">עד 16:30</span></div>
+              </div>
+              <div class="station-card-actions">
+                <button class="station-action-btn call" onclick="window.open('tel:0355551234')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.07 3.21 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div><span class="sa-lbl">חייג</span></button>
+                <a class="station-action-btn waze" href="https://waze.com/ul?q=תל+אביב+הרכבת+48&navigate=yes" target="_blank" rel="noopener"><div class="sa-icon"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="26" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="32" r="3" fill="#333"/><circle cx="30" cy="32" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="34" cy="16" r="5" fill="#FFB800"/></svg></div><span class="sa-lbl">Waze</span></a>
+                <button class="station-action-btn web" onclick="window.open('https://www.gov.il/he/departments/bureaus/moti_tel_aviv','_blank')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span class="sa-lbl">אתר</span></button>
+              </div>
+            </div>
+            <div class="station-card closed">
+              <div class="station-card-header">
+                <div class="station-card-top"><div class="station-card-title-block"><div class="station-card-name">מכון בדיקה רמת גן</div><div class="station-card-address">רח׳ ביאליק 22, רמת גן</div></div><div class="station-card-badges"><span class="station-dist-badge">5.8 ק״מ</span><span class="station-rating" style="opacity:0.6;"><svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB800" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>3.9</span></div></div>
+                <div class="station-status-row"><div class="station-status-chip closed"><span class="station-status-dot"></span>סגור היום</div></div>
+              </div>
+              <div class="station-card-actions">
+                <button class="station-action-btn call" onclick="window.open('tel:0366661234')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.07 3.21 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div><span class="sa-lbl">חייג</span></button>
+                <a class="station-action-btn waze" href="https://waze.com/ul?q=רמת+גן+ביאליק+22&navigate=yes" target="_blank" rel="noopener"><div class="sa-icon"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="26" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="32" r="3" fill="#333"/><circle cx="30" cy="32" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="34" cy="16" r="5" fill="#FFB800"/></svg></div><span class="sa-lbl">Waze</span></a>
+                <button class="station-action-btn web" onclick="window.open('https://www.gov.il/he/departments/bureaus/moti_ramat_gan','_blank')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span class="sa-lbl">אתר</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:80px;"></div>
+      </div><!-- /panel-stations -->
+
+      <!-- PANEL 3: Docs -->
+      <div id="test-panel-docs" class="test-panel">
+        <!-- Section A: מסמכי הרכב -->
+        <div class="pds-section" style="animation-delay:.08s;">
+          <div class="pds-section-head">
+            <div class="pds-section-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+            <div><div class="pds-section-title">מסמכי הרכב</div><div class="pds-section-sub">4 מסמכים לשליחה</div></div>
+          </div>
+          <div class="pds-doc-row"><div class="pds-doc-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/></svg></div><div class="pds-doc-body"><div class="pds-doc-title">רישיון רכב</div><div class="pds-doc-sub" id="th-pds-license-date">בתוקף —</div></div><div class="pds-doc-end"><span class="pds-badge ok"><span class="pds-dot"></span>בתוקף</span></div></div>
+          <div class="pds-doc-row"><div class="pds-doc-icon blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div><div class="pds-doc-body"><div class="pds-doc-title">ביטוח חובה</div><div class="pds-doc-sub" id="th-pds-insurance-date">בתוקף —</div></div><div class="pds-doc-end"><span class="pds-badge ok"><span class="pds-dot"></span>בתוקף</span></div></div>
+          <div class="pds-doc-row"><div class="pds-doc-icon amber"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="pds-doc-body"><div class="pds-doc-title">ייפוי כוח</div><div class="pds-doc-sub">נוצר אוטומטית</div></div><div class="pds-doc-end"><span class="pds-badge auto">📄 אוטומטי</span></div></div>
+          <div class="pds-doc-row"><div class="pds-doc-icon purple"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="pds-doc-body"><div class="pds-doc-title">אישור מורשי חתימה</div><div class="pds-doc-sub">קבוע</div></div><div class="pds-doc-end"><span class="pds-badge fixed">📄 קבוע</span></div></div>
+        </div>
+
+        <!-- Section B: שליחה -->
+        <div class="pds-section" style="animation-delay:.18s;">
+          <div class="pds-section-head">
+            <div class="pds-section-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
+            <div><div class="pds-section-title">שליחה למכון הטסט</div><div class="pds-section-sub">הזן מייל מכון ושלח הכל בלחיצה</div></div>
+          </div>
+          <div class="pds-email-row">
+            <input class="pds-email-input" type="email" id="th-pds-email" placeholder="מייל מכון הטסט..." dir="ltr"/>
+            <button class="pds-cam-btn" aria-label="סרוק מייל"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+          </div>
+          <button class="pds-send-cta" id="th-pds-send-cta" onclick="APP.thSendDocs && APP.thSendDocs()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            שלח <span class="pds-send-cta-count">4</span> מסמכים
+            <div class="pds-cta-progress" id="th-pds-progress"></div>
+          </button>
+          <div class="pds-success-banner" id="th-pds-success" style="display:none;">
+            <div class="pds-success-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div><div class="pds-success-text">נשלח בהצלחה ✓</div><div class="pds-success-sub">המסמכים הועברו למכון</div></div>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="docs-divider"><div class="docs-divider-line"></div><div class="docs-divider-text">לאחר הטסט</div><div class="docs-divider-line"></div></div>
+
+        <!-- Section C: תוצאת הטסט -->
+        <div class="sec-result"><div>מה תוצאת הטסט?</div><div class="sec-result-sub">בחר לפי התוצאה שקיבלת במכון</div></div>
+        <div class="result-choice-grid">
+          <button class="result-btn pass" id="th-result-pass" onclick="APP.thSelectResult && APP.thSelectResult('pass')"><div class="rb-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="rb-label">עברתי<br>את הטסט</div><div class="rb-sub">הרכב אושר</div></button>
+          <button class="result-btn fail" id="th-result-fail" onclick="APP.thSelectResult && APP.thSelectResult('fail')"><div class="rb-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF453A" stroke-width="2.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="rb-label">לא עברתי<br>את הטסט</div><div class="rb-sub">יש להגיש שוב</div></button>
+        </div>
+
+        <!-- Drawer pass -->
+        <div class="result-drawer" id="th-drawer-pass">
+          <div class="result-drawer-inner">
+            <div class="result-upload-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>צלם / העלה טופס טסט מאושר</div>
+            <div class="result-upload-sublabel">הטופס החתום שקיבלת במכון — הוא המסמך הרשמי</div>
+            <div class="result-upload-btns">
+              <button class="result-upload-btn cam"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>צלם טופס</button>
+              <button class="result-upload-btn file"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>העלה קובץ</button>
+            </div>
+            <button class="result-confirm-cta" id="th-confirm-cta" onclick="APP.thConfirmPass && APP.thConfirmPass()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              אשר — טסט בוצע!
+            </button>
+            <div class="result-confirm-hint">מסמן את הרכב כ"טסט בוצע" במערכת הציים</div>
+          </div>
+        </div>
+
+        <!-- Drawer fail -->
+        <div class="result-drawer" id="th-drawer-fail">
+          <div class="result-drawer-inner">
+            <div class="result-fail-label">מה הסיבה? (נטפל בזה)</div>
+            <div class="result-fail-sub">תיאור קצר יעזור לנו לסייע ולתזמן טסט חוזר</div>
+            <textarea class="result-fail-textarea" id="th-fail-reason" placeholder="תאר בקצרה מה היתה הבעיה במהלך הטסט..." rows="4"></textarea>
+            <button class="result-fail-cta" id="th-fail-cta" onclick="APP.thSubmitFail && APP.thSubmitFail()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              שמור ותזמן טסט חוזר
+            </button>
+            <div class="result-fail-cta-sub">שולח הודעה למנהל הציים</div>
+          </div>
+        </div>
+
+        <div style="height:80px;"></div>
+      </div><!-- /panel-docs -->
+
+    </div><!-- /test-hub-content -->
+  </div><!-- /screen-testhub -->
 
   <!-- Help FAB (draggable) -->
   <button class="help-fab" id="help-fab" aria-label="עלה בקשר" style="display:none">
