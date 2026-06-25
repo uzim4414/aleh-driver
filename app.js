@@ -2503,6 +2503,7 @@ function renderHomeScreen() {
   renderServiceProgress();
   renderGarageApptWidget();
   renderFuelWidget();
+  renderTestCard();
 
   const homeAlert = document.getElementById('home-alert');
   const topAlert = STATE.alerts.find(function(a) { return a.type === 'red'; }) || STATE.alerts[0];
@@ -2515,6 +2516,38 @@ function renderHomeScreen() {
   } else {
     homeAlert.classList.add('hidden');
   }
+}
+
+function renderTestCard() {
+  var v = STATE.vehicle || {};
+  var numEl  = document.getElementById('test-ring-num');
+  var fillEl = document.getElementById('test-ring-fill');
+  var wrapEl = document.getElementById('test-ring-wrap');
+  var hintEl = document.getElementById('test-hint');
+  if (!numEl) return;
+
+  // טסט בוצע / אין תאריך
+  if (v.testDone || !v.testDue) {
+    numEl.textContent = '✓';
+    if (fillEl) fillEl.style.strokeDashoffset = '0';
+    if (wrapEl) wrapEl.style.setProperty('--test-status-color', 'var(--ok)');
+    if (hintEl) hintEl.textContent = v.testDone ? 'הטסט בוצע ✓' : 'לחץ להכנה ›';
+    return;
+  }
+
+  var days = Math.round((new Date(v.testDue) - new Date()) / 86400000);
+  if (days < 0) days = 0;
+  numEl.textContent = days;
+
+  // צבע לפי דחיפות (7 ימים=אדום, 30=כתום, אחרת תקין)
+  var color = days <= 7 ? 'var(--red)' : (days <= 30 ? 'var(--warn)' : 'var(--ok)');
+  if (wrapEl) wrapEl.style.setProperty('--test-status-color', color);
+
+  // מילוי טבעת — ככל שנשארו פחות ימים (חלון 60 יום), הטבעת מתמלאת יותר
+  var C = 113.1;
+  var frac = Math.max(0, Math.min(1, (60 - days) / 60));
+  if (fillEl) fillEl.style.strokeDashoffset = String(C * (1 - frac));
+  if (hintEl) hintEl.textContent = days + ' ימים לטסט ›';
 }
 
 function renderFuelWidget() {
@@ -7793,20 +7826,26 @@ APP.closeTestHub = function() {
 
 APP._initTestHub = function() {
   const v = STATE.vehicle || {};
-  if (v.testDue) {
-    const days = Math.ceil((new Date(v.testDue) - new Date()) / 86400000);
-    const el = document.getElementById('th-days-num');
-    if (el) el.textContent = days > 0 ? days : 0;
-    const sub = document.getElementById('th-date-sub');
-    if (sub) sub.textContent = v.testDue;
+
+  // כותרת משנה: מספר רכב · תאריך טסט
+  const sub = document.getElementById('test-hub-plate-sub');
+  if (sub) {
+    const plate = v.num ? formatPlate(v.num) : '—';
+    const dateTxt = v.testDue ? formatDate(v.testDue) : '—';
+    sub.textContent = plate + ' · ' + dateTxt;
   }
-  if (v.licExpiry) {
-    const el = document.getElementById('th-lic-expiry');
-    if (el) el.textContent = 'בתוקף עד ' + v.licExpiry;
-  }
-  if (v.insExpiry) {
-    const el = document.getElementById('th-ins-expiry');
-    if (el) el.textContent = 'בתוקף עד ' + v.insExpiry;
+
+  // pill סטטוס לפי ימים שנותרו
+  const pill = document.getElementById('test-hub-status-pill');
+  if (pill && v.testDue && !v.testDone) {
+    const days = Math.round((new Date(v.testDue) - new Date()) / 86400000);
+    pill.classList.remove('ok', 'warn', 'red');
+    if (days <= 7)       { pill.classList.add('red');  pill.textContent = 'דחוף · ' + days + ' ימים'; }
+    else if (days <= 30) { pill.classList.add('warn'); pill.textContent = days + ' ימים לטסט'; }
+    else                 { pill.classList.add('ok');   pill.textContent = days + ' ימים לטסט'; }
+  } else if (pill && v.testDone) {
+    pill.classList.remove('warn', 'red'); pill.classList.add('ok');
+    pill.textContent = 'בוצע ✓';
   }
 };
 
