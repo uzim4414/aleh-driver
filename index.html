@@ -3526,7 +3526,53 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .result-fail-cta { width:100%; padding:14px 0; background:rgba(255,59,48,0.12); border:1.5px solid rgba(255,59,48,0.3); border-radius:100px; color:#FF453A; font-size:15px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .2s,transform .15s; opacity:0.5; }
 .result-fail-cta:active { transform:scale(0.97); background:rgba(255,59,48,0.18); }
 .result-fail-cta-sub { font-size:11px; color:var(--t2); text-align:center; margin-top:7px; }
+
+/* ── TestHub Stations v2 ── */
+.th-stations-wrap { padding: 0 16px; padding-top: 8px; }
+.th-map-container { margin-bottom: 16px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+.th-station-list  { display: flex; flex-direction: column; gap: 12px; }
+
+.th-sc { background: var(--card); border-radius: 20px; border: 1px solid var(--border); border-right: 3px solid var(--ok); overflow: hidden; transition: border-right-color .2s; }
+.th-sc.highlight  { border-right-color: #30D158; box-shadow: 0 0 0 2px rgba(48,209,88,.25); }
+
+.th-sc-head { padding: 14px 16px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; background: linear-gradient(135deg,rgba(31,138,61,.08) 0%,transparent 60%); }
+.th-sc-row1 { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.th-sc-name { font-size: 16px; font-weight: 800; color: var(--t1); letter-spacing: -.3px; }
+.th-sc-addr { font-size: 12px; color: var(--t2); margin-top: 2px; }
+.th-sc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.th-sc-dist { font-size: 11px; font-weight: 700; color: var(--t2); background: rgba(255,255,255,.06); border-radius: 100px; padding: 3px 10px; direction: ltr; }
+.th-sc-stars { font-size: 13px; color: #FFB800; display: flex; align-items: center; gap: 3px; }
+.th-sc-stars span { font-size: 11px; color: var(--t2); }
+
+.th-sc-row2 { display: flex; align-items: center; gap: 8px; }
+.th-sc-status { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 100px; }
+.th-sc-status.open  { background: rgba(48,209,88,.12); color: #30D158; }
+.th-sc-status.closed{ background: rgba(255,69,58,.12);  color: #FF453A; }
+.th-sc-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.th-sc-hours { font-size: 11px; color: var(--t2); flex: 1; }
+.th-sc-chev { transition: transform .25s; color: var(--t3); flex-shrink: 0; }
+.th-sc.open .th-sc-chev { transform: rotate(180deg); }
+
+.th-sc-body { max-height: 0; overflow: hidden; transition: max-height .3s cubic-bezier(.16,1,.3,1); }
+.th-sc.open .th-sc-body { max-height: 200px; }
+.th-sc-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 1px solid var(--border); }
+.th-sc-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 13px 8px; background: transparent; border: none; color: var(--t1); font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.th-sc-btn + .th-sc-btn { border-right: 1px solid var(--border); }
+.th-sc-btn:active { background: rgba(255,255,255,.06); }
+.th-sc-btn-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.th-sc-btn.call .th-sc-btn-icon  { background: rgba(48,209,88,.15); }
+.th-sc-btn.waze .th-sc-btn-icon  { background: rgba(51,153,255,.15); }
+.th-sc-btn.site .th-sc-btn-icon  { background: rgba(255,255,255,.07); }
+
+/* Leaflet overrides for dark theme */
+.leaflet-container { background: #0d1117 !important; font-family: inherit !important; }
+.leaflet-control-zoom a { background: var(--card) !important; color: var(--t1) !important; border-color: var(--border) !important; }
+.leaflet-popup-content-wrapper { background: var(--card) !important; color: var(--t1) !important; border: 1px solid var(--border); border-radius: 12px !important; box-shadow: 0 8px 24px rgba(0,0,0,.6) !important; }
+.leaflet-popup-tip { background: var(--card) !important; }
+.leaflet-popup-content { font-family: inherit !important; font-size: 13px !important; font-weight: 700 !important; margin: 10px 14px !important; text-align: right !important; direction: rtl !important; }
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -3989,62 +4035,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
       <!-- PANEL 2: Stations -->
       <div id="test-panel-stations" class="test-panel">
-        <div class="station-screen-wrap">
-          <div class="station-screen-head">
-            <span class="station-screen-title">מכוני טסט קרובים</span>
-            <span class="station-screen-sub">לפי חיפוש Google · מבוסס מיקום GPS</span>
+        <div class="th-stations-wrap">
+          <!-- Map -->
+          <div class="th-map-container">
+            <div id="th-leaflet-map" style="width:100%;height:240px;border-radius:16px;overflow:hidden;position:relative;z-index:1;"></div>
           </div>
-          <div class="station-map-overview" id="th-station-map-wrap">
-            <div id="th-map-static" style="width:100%;height:180px;border-radius:12px;background:linear-gradient(135deg,#0d1117 0%,#0f1923 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:1px solid rgba(255,255,255,0.07);position:relative;overflow:hidden;">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <div style="color:var(--t2);font-size:13px;font-weight:600;">לחץ לחיפוש מכוני טסט קרובים</div>
-            </div>
-            <button class="station-map-open-btn" onclick="APP.thOpenStationsMap && APP.thOpenStationsMap()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              פתח מפה מלאה
-            </button>
-          </div>
-          <div class="station-list">
-            <div class="station-card" id="sc-0">
-              <div class="station-card-header" onclick="APP.thToggleStationCard('sc-0')">
-                <div class="station-card-top"><div class="station-card-title-block"><div class="station-card-name">מכון טסט קרוב 1 (לפי GPS)</div><div class="station-card-address">תוצאת חיפוש Google לפי מיקומך</div></div><div class="station-card-badges"><span class="station-dist-badge">קרוב</span></div></div>
-                <div class="station-status-row">
-                  <span class="station-hours-text">פתח Waze / חיפוש לפרטים</span>
-                  <svg class="sc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-              <div class="station-card-actions" style="display:none;">
-                <a class="station-action-btn waze" href="https://waze.com/ul?q=מכון+טסט+קרוב&navigate=yes" target="_blank" rel="noopener"><div class="sa-icon"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="26" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="32" r="3" fill="#333"/><circle cx="30" cy="32" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="34" cy="16" r="5" fill="#FFB800"/></svg></div><span class="sa-lbl">Waze</span></a>
-                <button class="station-action-btn web" onclick="window.open('https://www.google.com/maps/search/מכון+טסט+קרוב','_blank')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span class="sa-lbl">חיפוש</span></button>
-              </div>
-            </div>
-            <div class="station-card" id="sc-1">
-              <div class="station-card-header" onclick="APP.thToggleStationCard('sc-1')">
-                <div class="station-card-top"><div class="station-card-title-block"><div class="station-card-name">מכון טסט קרוב 2 (לפי GPS)</div><div class="station-card-address">תוצאת חיפוש Google לפי מיקומך</div></div><div class="station-card-badges"><span class="station-dist-badge">קרוב</span></div></div>
-                <div class="station-status-row">
-                  <span class="station-hours-text">פתח Waze / חיפוש לפרטים</span>
-                  <svg class="sc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-              <div class="station-card-actions" style="display:none;">
-                <a class="station-action-btn waze" href="https://waze.com/ul?q=מכון+טסט+קרוב&navigate=yes" target="_blank" rel="noopener"><div class="sa-icon"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="26" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="32" r="3" fill="#333"/><circle cx="30" cy="32" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="34" cy="16" r="5" fill="#FFB800"/></svg></div><span class="sa-lbl">Waze</span></a>
-                <button class="station-action-btn web" onclick="window.open('https://www.google.com/maps/search/מכון+טסט+קרוב','_blank')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span class="sa-lbl">חיפוש</span></button>
-              </div>
-            </div>
-            <div class="station-card" id="sc-2">
-              <div class="station-card-header" onclick="APP.thToggleStationCard('sc-2')">
-                <div class="station-card-top"><div class="station-card-title-block"><div class="station-card-name">מכון טסט קרוב 3 (לפי GPS)</div><div class="station-card-address">תוצאת חיפוש Google לפי מיקומך</div></div><div class="station-card-badges"><span class="station-dist-badge">קרוב</span></div></div>
-                <div class="station-status-row">
-                  <span class="station-hours-text">פתח Waze / חיפוש לפרטים</span>
-                  <svg class="sc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-              <div class="station-card-actions" style="display:none;">
-                <a class="station-action-btn waze" href="https://waze.com/ul?q=מכון+טסט+קרוב&navigate=yes" target="_blank" rel="noopener"><div class="sa-icon"><svg width="18" height="18" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="26" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="32" r="3" fill="#333"/><circle cx="30" cy="32" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="34" cy="16" r="5" fill="#FFB800"/></svg></div><span class="sa-lbl">Waze</span></a>
-                <button class="station-action-btn web" onclick="window.open('https://www.google.com/maps/search/מכון+טסט+קרוב','_blank')"><div class="sa-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span class="sa-lbl">חיפוש</span></button>
-              </div>
-            </div>
-          </div>
+          <!-- Cards -->
+          <div class="th-station-list" id="th-station-list"></div>
         </div>
         <div style="height:80px;"></div>
       </div><!-- /panel-stations -->

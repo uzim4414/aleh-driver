@@ -7865,6 +7865,30 @@ APP._initTestHub = function() {
       if (typeof APP._updateStationDistances === 'function') APP._updateStationDistances(lat, lng);
     }, null, {timeout:5000});
   }
+
+  // Init stations panel (Leaflet map + cards)
+  function _thStartStations() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        APP._initStationsPanel(pos.coords.latitude, pos.coords.longitude);
+      }, function() {
+        APP._initStationsPanel(null, null);
+      }, {timeout:5000});
+    } else {
+      APP._initStationsPanel(null, null);
+    }
+  }
+  if (typeof L !== 'undefined') {
+    _thStartStations();
+  } else {
+    // Leaflet not loaded yet — load and retry
+    if (!document.getElementById('th-leaflet-css')) {
+      var lCss = document.createElement('link'); lCss.id='th-leaflet-css'; lCss.rel='stylesheet'; lCss.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(lCss);
+    }
+    var lJs = document.createElement('script'); lJs.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    lJs.onload = _thStartStations;
+    document.head.appendChild(lJs);
+  }
 };
 
 APP.thSwitchStep = function(step) {
@@ -7962,6 +7986,140 @@ APP.thOpenStationsMap = function() {
     }, {timeout: 4000});
   } else {
     window.open('https://www.google.com/maps/search/מכון+טסט+קרוב', '_blank');
+  }
+};
+
+// ── TestHub Stations v2 ──
+var TH_STATIONS = [
+  { id:1, name:'מכון רישוי הרצליה',    addr:'סוקולוב 10, הרצליה',     lat:32.1636, lng:34.8440, phone:'09-9507714', rating:4.2, ratingCount:187, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.1636,34.8440&navigate=yes' },
+  { id:2, name:'מכון רישוי ת"א מרכז',  addr:'הרכבת 40, תל אביב',      lat:32.0553, lng:34.7750, phone:'03-6888700', rating:3.8, ratingCount:312, hours:'א-ה 07:00–18:00',                    hoursWeekday:[7,18],   hoursFriday:[7,13],   waze:'https://waze.com/ul?ll=32.0553,34.7750&navigate=yes' },
+  { id:3, name:'מכון רישוי ראשל"צ',    addr:'הלל יפה 19, ראשל"צ',     lat:31.9700, lng:34.8020, phone:'03-9524820', rating:4.0, ratingCount:143, hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.9700,34.8020&navigate=yes' },
+  { id:4, name:'מכון רישוי בת ים',      addr:'בילו 1, בת ים',          lat:32.0220, lng:34.7420, phone:'03-5099940', rating:4.1, ratingCount:98,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0220,34.7420&navigate=yes' },
+  { id:5, name:'מכון רישוי פ"ת',        addr:'אחד העם 2, פתח תקווה',   lat:32.0874, lng:34.8880, phone:'03-9394000', rating:3.9, ratingCount:76,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0874,34.8880&navigate=yes' },
+];
+
+function _thHaversine(lat1, lng1, lat2, lng2) {
+  var R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function _thIsOpen(s) {
+  var now = new Date(), day = now.getDay(), h = now.getHours() + now.getMinutes()/60;
+  if (day === 6) return false; // שבת
+  if (day === 5) return s.hoursFriday ? (h >= s.hoursFriday[0] && h < s.hoursFriday[1]) : false;
+  return h >= s.hoursWeekday[0] && h < s.hoursWeekday[1];
+}
+
+function _thStars(r) {
+  var s = ''; for (var i=1;i<=5;i++) s += (i <= Math.round(r)) ? '★' : '☆'; return s;
+}
+
+function _thMakeMarkerIcon(num, active) {
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:32px;height:32px;border-radius:50%;background:' + (active?'#30D158':'#1F8A3D') + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;box-shadow:0 2px 12px rgba(48,209,88,.5);border:2px solid ' + (active?'#fff':'rgba(255,255,255,.3)') + ';font-family:inherit;">' + num + '</div>',
+    iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0,-18]
+  });
+}
+
+APP._thMarkers = [];
+
+APP._initStationsPanel = function(userLat, userLng) {
+  var list = document.getElementById('th-station-list');
+  if (!list) return;
+
+  // Sort by distance if GPS available
+  var stations = TH_STATIONS.map(function(s) {
+    var dist = (userLat && userLng) ? _thHaversine(userLat, userLng, s.lat, s.lng) : null;
+    return Object.assign({}, s, {dist: dist});
+  });
+  if (userLat) stations.sort(function(a,b){ return a.dist - b.dist; });
+
+  // Build cards
+  list.innerHTML = '';
+  stations.forEach(function(s, idx) {
+    var open = _thIsOpen(s);
+    var distTxt = s.dist !== null ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
+    var card = document.createElement('div');
+    card.className = 'th-sc' + (idx === 0 ? ' open' : '');
+    card.id = 'th-sc-' + s.id;
+    card.innerHTML =
+      '<div class="th-sc-head" onclick="APP._thToggleSC('+s.id+')">' +
+        '<div class="th-sc-row1">' +
+          '<div><div class="th-sc-name">'+s.name+'</div><div class="th-sc-addr">'+s.addr+'</div></div>' +
+          '<div class="th-sc-right">' +
+            '<div class="th-sc-dist">'+distTxt+'</div>' +
+            '<div class="th-sc-stars">'+_thStars(s.rating)+'<span>'+s.rating+' ('+s.ratingCount+')</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="th-sc-row2">' +
+          '<div class="th-sc-status '+(open?'open':'closed')+'"><div class="th-sc-dot"></div>'+(open?'פתוח':'סגור')+'</div>' +
+          '<div class="th-sc-hours">'+s.hours+'</div>' +
+          '<svg class="th-sc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>' +
+        '</div>' +
+      '</div>' +
+      '<div class="th-sc-body">' +
+        '<div class="th-sc-actions">' +
+          '<button class="th-sc-btn call" onclick="window.open(\'tel:'+s.phone+'\')"><div class="th-sc-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.07 3.21 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div>חייג</button>' +
+          '<a class="th-sc-btn waze" href="'+s.waze+'" target="_blank" rel="noopener"><div class="th-sc-btn-icon"><svg width="20" height="20" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="27" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="33" r="3" fill="#333"/><circle cx="30" cy="33" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="35" cy="15" r="6" fill="#FFB800"/></svg></div>Waze</a>' +
+          '<button class="th-sc-btn site" onclick="window.open(\'https://www.gov.il/he/service/vehicle_test_scheduling\',\'_blank\')"><div class="th-sc-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>תור</button>' +
+        '</div>' +
+      '</div>';
+    list.appendChild(card);
+  });
+
+  // Init Leaflet map
+  var mapEl = document.getElementById('th-leaflet-map');
+  if (!mapEl || !window.L) return;
+  if (APP._thMap) { APP._thMap.remove(); APP._thMap = null; }
+  var centerLat = userLat || 32.08, centerLng = userLng || 34.78;
+  var map = L.map('th-leaflet-map', { zoomControl:true, attributionControl:false }).setView([centerLat, centerLng], 12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, subdomains:'abcd' }).addTo(map);
+  APP._thMap = map;
+  APP._thMapMarkers = {};
+
+  // User marker
+  if (userLat) {
+    L.circleMarker([userLat, userLng], { radius:8, color:'#30D158', fillColor:'#30D158', fillOpacity:1, weight:3 })
+      .addTo(map).bindPopup('מיקומך');
+  }
+
+  // Station markers
+  stations.forEach(function(s, idx) {
+    var marker = L.marker([s.lat, s.lng], { icon: _thMakeMarkerIcon(idx+1, false) }).addTo(map);
+    marker.bindPopup('<div style="direction:rtl">'+s.name+'<br><small>'+s.addr+'</small></div>');
+    marker.on('click', function() {
+      APP._thToggleSC(s.id, true);
+      var el = document.getElementById('th-sc-'+s.id);
+      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+      // Update all markers
+      stations.forEach(function(ss, ii) {
+        APP._thMapMarkers[ss.id].setIcon(_thMakeMarkerIcon(ii+1, ss.id===s.id));
+      });
+    });
+    APP._thMapMarkers[s.id] = marker;
+  });
+
+  // Fix Leaflet sizing when panel becomes visible
+  setTimeout(function(){ if (APP._thMap) APP._thMap.invalidateSize(); }, 250);
+};
+
+APP._thToggleSC = function(id, forceOpen) {
+  var card = document.getElementById('th-sc-'+id);
+  if (!card) return;
+  var wasOpen = card.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.th-sc').forEach(function(c){ c.classList.remove('open','highlight'); });
+  // Toggle or force
+  if (!wasOpen || forceOpen) { card.classList.add('open','highlight'); }
+  // Update map marker highlight
+  if (APP._thMapMarkers) {
+    TH_STATIONS.forEach(function(s, idx) {
+      if (APP._thMapMarkers[s.id]) {
+        APP._thMapMarkers[s.id].setIcon(_thMakeMarkerIcon(idx+1, s.id===id && (!wasOpen||forceOpen)));
+      }
+    });
   }
 };
 
