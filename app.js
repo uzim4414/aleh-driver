@@ -8341,7 +8341,7 @@ APP.thSendDocs = async function() {
   if (!email || !email.includes('@')) {
     showToast('נא להזין כתובת מייל תקינה'); return;
   }
-  const btn = document.getElementById('th-send-docs-btn');
+  const btn = document.getElementById('th-pds-send-cta');
   if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
   try {
     const r = await gasPost('send_test_documents', {
@@ -8349,7 +8349,8 @@ APP.thSendDocs = async function() {
       stationEmail: email
     });
     if (r.ok) {
-      document.getElementById('th-send-docs-success')?.classList.remove('hidden');
+      var sb = document.getElementById('th-pds-success');
+      if (sb) sb.style.display = 'flex';
       btn.textContent = 'נשלח ✓';
     } else {
       showToast('שגיאה בשליחה: ' + (r.error || ''));
@@ -8397,17 +8398,16 @@ APP.thSelectResult = function(type) {
   if (failDrawer) failDrawer.classList.toggle('open', type === 'fail');
 };
 
-APP.thCaptureTestForm = function() {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*,application/pdf'; input.capture = 'environment';
-  input.onchange = async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const preview = document.getElementById('th-form-preview');
-    if (preview && file.type.startsWith('image/')) {
-      preview.src = URL.createObjectURL(file);
-      preview.style.display = 'block';
-    }
-    const btn = document.getElementById('th-confirm-pass-btn');
+APP.thCaptureTestForm = function(mode) {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,application/pdf';
+  if (mode === 'camera') input.capture = 'environment';
+  input.onchange = async function(e) {
+    var file = e.target.files[0]; if (!file) return;
+    var preview = document.getElementById('th-form-preview');
+    if (preview) { preview.textContent = '📎 ' + file.name; preview.style.display = 'block'; }
+    var btn = document.getElementById('th-confirm-cta');
     if (btn) btn.disabled = false;
     APP._testFormFile = file;
   };
@@ -8416,7 +8416,7 @@ APP.thCaptureTestForm = function() {
 
 APP.thConfirmTestPass = async function() {
   if (!APP._testFormFile) { showToast('נא להעלות טופס טסט'); return; }
-  const btn = document.getElementById('th-confirm-pass-btn');
+  const btn = document.getElementById('th-confirm-cta');
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
   const b64 = await APP._fileToBase64(APP._testFormFile);
   const today = new Date().toISOString().slice(0,10);
@@ -8426,7 +8426,8 @@ APP.thConfirmTestPass = async function() {
       data: { date: today, formBase64: b64 }
     });
     if (r.ok) {
-      document.getElementById('th-pass-success')?.classList.remove('hidden');
+      var ps = document.getElementById('th-pass-success');
+      if (ps) ps.style.display = 'flex';
       if (STATE.vehicle) STATE.vehicle.testDone = today;
       APP._clearTestAlert && APP._clearTestAlert();
     } else {
