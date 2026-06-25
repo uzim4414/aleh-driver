@@ -8137,20 +8137,25 @@ APP._initStationsPanel = async function(userLat, userLng) {
     var marker = L.marker([s.lat, s.lng], { icon: _thMakeMarkerIcon(idx+1, false) }).addTo(map);
     marker.bindPopup('<div style="direction:rtl">'+s.name+'<br><small>'+s.addr+'</small></div>');
     marker.on('click', function() {
+      APP._thMarkerClicking = true; // suppress moveend reload
       APP._thToggleSC(s.id, true);
+      marker.openPopup();
       var el = document.getElementById('th-sc-'+s.id);
       if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
       // Update all markers
       stations.forEach(function(ss, ii) {
-        APP._thMapMarkers[ss.id].setIcon(_thMakeMarkerIcon(ii+1, ss.id===s.id));
+        if (APP._thMapMarkers[ss.id]) APP._thMapMarkers[ss.id].setIcon(_thMakeMarkerIcon(ii+1, ss.id===s.id));
       });
     });
     APP._thMapMarkers[s.id] = marker;
   });
 
   // Reload stations by new map center on drag/zoom (debounced)
+  // Skip reload when triggered by marker click pan
+  APP._thMarkerClicking = false;
   var _mapLoadTimer = null;
   map.on('moveend', function() {
+    if (APP._thMarkerClicking) { APP._thMarkerClicking = false; return; }
     clearTimeout(_mapLoadTimer);
     _mapLoadTimer = setTimeout(function() {
       var center = map.getCenter();
