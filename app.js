@@ -7850,19 +7850,15 @@ APP._initTestHub = function() {
 };
 
 APP.thSwitchStep = function(step) {
-  if (step === 1) {
-    const done = parseInt(document.getElementById('th-checked-count')?.textContent || '0');
-    if (done < 21) {
-      APP._showTestSkipGuard(done);
-      return;
-    }
-  }
-  document.querySelectorAll('.th-panel').forEach(p => p.classList.remove('active'));
-  const panel = document.getElementById('th-panel-' + step);
+  // step nodes use 1-based ids (stp-node-1..3). Accept either 0-based or 1-based.
+  var idx = (step >= 1 && step <= 3) ? (step - 1) : step; // normalize to 0-based
+  var panelMap = ['test-panel-checklist', 'test-panel-stations', 'test-panel-docs'];
+  document.querySelectorAll('.test-panel').forEach(p => p.classList.remove('active'));
+  var panel = document.getElementById(panelMap[idx]);
   if (panel) panel.classList.add('active');
-  document.querySelectorAll('.th-step').forEach((s, i) => {
-    s.classList.toggle('active', i === step);
-    s.classList.toggle('done', i < step);
+  document.querySelectorAll('.stp-node').forEach((s, i) => {
+    s.classList.toggle('active', i === idx);
+    s.classList.toggle('completed', i < idx);
   });
 };
 
@@ -7880,16 +7876,13 @@ APP.thDismissGuard = function(goAnyway) {
 };
 
 APP.thCheckItem = function(id, el) {
-  el.classList.toggle('checked');
-  const checked = document.querySelectorAll('.th-check-item.checked').length;
-  const countEl = document.getElementById('th-checked-count');
-  if (countEl) countEl.textContent = checked;
-  const ring = document.getElementById('th-global-ring-fill');
-  if (ring) {
-    const pct = checked / 21;
-    const circ = 2 * Math.PI * 26;
-    ring.style.strokeDashoffset = circ * (1 - pct);
+  // legacy entry point — real markup uses .chk-item; delegate to the working path
+  if (el) {
+    var item = el.closest ? el.closest('.chk-item') : null;
+    if (item) item.classList.toggle('checked');
+    else el.classList.toggle('checked');
   }
+  if (typeof APP._thUpdateProgress === 'function') APP._thUpdateProgress();
 };
 
 APP.thToggleHint = function(id) {
@@ -7898,10 +7891,11 @@ APP.thToggleHint = function(id) {
 };
 
 APP.thToggleSection = function(sec) {
-  document.querySelectorAll('.th-section').forEach(s => {
-    if (s.dataset.sec !== sec) s.classList.remove('open');
+  var key = String(sec);
+  document.querySelectorAll('.chk-section').forEach(s => {
+    if (String(s.dataset.section) !== key) s.classList.remove('open');
   });
-  const el = document.querySelector('.th-section[data-sec="' + sec + '"]');
+  const el = document.querySelector('.chk-section[data-section="' + key + '"]');
   if (el) el.classList.toggle('open');
 };
 
@@ -8112,6 +8106,29 @@ APP.thToggleItem = function(idx) {
   var done = item.classList.toggle('checked');
   // update global counter
   if (typeof APP._thUpdateProgress === 'function') APP._thUpdateProgress();
+};
+APP._thUpdateProgress = function() {
+  var checked = document.querySelectorAll('.chk-section .chk-item.checked').length;
+  var total = document.querySelectorAll('.chk-section .chk-item').length || 19;
+  var countEl = document.getElementById('globalCount');
+  if (countEl) countEl.textContent = checked;
+  var subEl = document.getElementById('globalSub');
+  if (subEl) subEl.textContent = checked + ' מתוך ' + total + ' סעיפים הושלמו';
+  var ring = document.getElementById('globalRingFill');
+  if (ring) {
+    var r = ring.r && ring.r.baseVal ? ring.r.baseVal.value : 22;
+    var circ = 2 * Math.PI * r;
+    ring.style.strokeDasharray = circ;
+    ring.style.strokeDashoffset = circ * (1 - (checked / total));
+  }
+  // per-section rings
+  document.querySelectorAll('.chk-section').forEach(function(sec) {
+    var items = sec.querySelectorAll('.chk-item');
+    var ok = sec.querySelectorAll('.chk-item.checked').length;
+    var lbl = sec.querySelector('[data-ring-label]');
+    if (lbl) lbl.textContent = ok + '/' + items.length;
+    sec.classList.toggle('complete', items.length > 0 && ok === items.length);
+  });
 };
 APP.thConfirmPass = function() { APP.thConfirmTestPass && APP.thConfirmTestPass(); };
 APP.thSubmitFail = function() { APP.thSubmitFailReason && APP.thSubmitFailReason(); };
