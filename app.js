@@ -8163,6 +8163,29 @@ APP._initStationsPanel = async function(userLat, userLng) {
     }, 800);
   });
 
+  // Locate-me button
+  var locateBtn = L.control({ position: 'bottomright' });
+  locateBtn.onAdd = function() {
+    var btn = L.DomUtil.create('button', 'th-locate-btn');
+    btn.title = 'מיקום נוכחי';
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+    L.DomEvent.on(btn, 'click', function(e) {
+      L.DomEvent.stopPropagation(e);
+      btn.classList.add('loading');
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        btn.classList.remove('loading');
+        APP._thMarkerClicking = true;
+        map.setView([pos.coords.latitude, pos.coords.longitude], 13, { animate: true });
+        APP._thLoadStations(pos.coords.latitude, pos.coords.longitude);
+      }, function() {
+        btn.classList.remove('loading');
+        showToast('לא ניתן לאתר מיקום');
+      }, { timeout: 6000 });
+    });
+    return btn;
+  };
+  locateBtn.addTo(map);
+
   // Fix Leaflet sizing when panel becomes visible
   setTimeout(function(){ if (APP._thMap) APP._thMap.invalidateSize(); }, 250);
 };
