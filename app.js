@@ -7850,11 +7850,12 @@ APP._initTestHub = function() {
     pill.textContent = 'בוצע ✓';
   }
 
-  // Populate doc expiry dates from STATE.vehicle (bug 9)
+  // Populate doc expiry dates from STATE.vehicle.
+  // Real field names are licExp / insCompExp (see driver_vehicle response & docs builder).
   var licEl = document.getElementById('th-pds-license-date');
-  if (licEl) licEl.textContent = v.licenseExpiry ? 'בתוקף עד ' + v.licenseExpiry : 'בתוקף —';
+  if (licEl) licEl.textContent = v.licExp ? 'בתוקף עד ' + formatDate(v.licExp) : 'בתוקף —';
   var insEl = document.getElementById('th-pds-insurance-date');
-  if (insEl) insEl.textContent = v.insuranceExpiry ? 'בתוקף עד ' + v.insuranceExpiry : 'בתוקף —';
+  if (insEl) insEl.textContent = v.insCompExp ? 'בתוקף עד ' + formatDate(v.insCompExp) : 'בתוקף —';
 
   // Update map with real GPS (bug 2)
   if (navigator.geolocation) {
@@ -7975,7 +7976,18 @@ APP.thToggleStationCard = function(id) {
 
 APP.thToggleDocRow = function(el) {
   var title = el.querySelector('.pds-doc-title')?.textContent || '';
-  showToast(title + ' — נלחץ');
+  var v = STATE.vehicle || {};
+  // Map row title → document type the viewer understands.
+  if (title.indexOf('רישיון') >= 0) {
+    if (v.licLink) return APP.thOpenDocViewer('license');
+    return showToast('אין קובץ רישיון רכב מקושר');
+  }
+  if (title.indexOf('ביטוח') >= 0) {
+    if (v.insCompLink) return APP.thOpenDocViewer('insurance');
+    return showToast('אין קובץ ביטוח חובה מקושר');
+  }
+  // ייפוי כוח / אישור מורשי חתימה — נוצרים אוטומטית, אין תצוגה מקדימה
+  showToast(title + ' — נוצר אוטומטית בשליחה');
 };
 
 APP.thOpenStationsMap = function() {
@@ -8323,17 +8335,26 @@ APP.thOcrScanEmail = function() {
     try {
       var r = await gasPost('ocr_extract_email', { imageBase64: b64 });
       if (overlay) overlay.style.display = 'none';
-      if (r.ok && r.email) {
+      if (r && r.ok && r.email) {
         var inp = document.getElementById('th-pds-email') || document.getElementById('th-station-email');
-        if (inp) inp.value = r.email;
+        if (inp) { inp.value = r.email; inp.focus(); }
         showToast('מייל זוהה: ' + r.email);
-      } else showToast('לא זוהה מייל בתמונה');
+      } else {
+        APP._thEmailManualFallback('לא זוהה מייל בתמונה — הזן ידנית');
+      }
     } catch(err) {
       if (overlay) overlay.style.display = 'none';
-      showToast('שגיאה בזיהוי');
+      APP._thEmailManualFallback('זיהוי אוטומטי נכשל — הזן מייל ידנית');
     }
   };
   input.click();
+};
+
+// Fallback when OCR fails: focus the email field so the user can type manually.
+APP._thEmailManualFallback = function(msg) {
+  showToast(msg || 'הזן כתובת מייל ידנית');
+  var inp = document.getElementById('th-pds-email') || document.getElementById('th-station-email');
+  if (inp) { try { inp.focus(); inp.scrollIntoView({behavior:'smooth', block:'center'}); } catch(_) {} }
 };
 
 APP.thSendDocs = async function() {
@@ -8550,9 +8571,17 @@ APP.thOpenDocViewer = function(docType) {
     insurance: v.insCompLink
   };
   const titles = { license: 'רישיון רכב', insurance: 'ביטוח חובה' };
-  if (iframe && urls[docType]) iframe.src = urls[docType].replace('/view', '/preview');
+  if (iframe && urls[docType]) iframe.src = APP._thDrivePreviewUrl(urls[docType]);
   if (title) title.textContent = titles[docType] || docType;
   overlay.style.display = 'flex';
+};
+
+// Convert any Google Drive link to its embeddable /preview form.
+APP._thDrivePreviewUrl = function(url) {
+  if (!url) return '';
+  var m = url.match(/\/file\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
+  if (m && m[1]) return 'https://drive.google.com/file/d/' + m[1] + '/preview';
+  return url.replace('/view', '/preview');
 };
 
 APP.thCloseDocViewer = function() {
