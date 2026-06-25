@@ -7991,11 +7991,25 @@ APP.thOpenStationsMap = function() {
 
 // ── TestHub Stations v2 ──
 var TH_STATIONS = [
-  { id:1, name:'מכון רישוי הרצליה',    addr:'סוקולוב 10, הרצליה',     lat:32.1636, lng:34.8440, phone:'09-9507714', rating:4.2, ratingCount:187, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.1636,34.8440&navigate=yes' },
-  { id:2, name:'מכון רישוי ת"א מרכז',  addr:'הרכבת 40, תל אביב',      lat:32.0553, lng:34.7750, phone:'03-6888700', rating:3.8, ratingCount:312, hours:'א-ה 07:00–18:00',                    hoursWeekday:[7,18],   hoursFriday:[7,13],   waze:'https://waze.com/ul?ll=32.0553,34.7750&navigate=yes' },
-  { id:3, name:'מכון רישוי ראשל"צ',    addr:'הלל יפה 19, ראשל"צ',     lat:31.9700, lng:34.8020, phone:'03-9524820', rating:4.0, ratingCount:143, hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.9700,34.8020&navigate=yes' },
-  { id:4, name:'מכון רישוי בת ים',      addr:'בילו 1, בת ים',          lat:32.0220, lng:34.7420, phone:'03-5099940', rating:4.1, ratingCount:98,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0220,34.7420&navigate=yes' },
-  { id:5, name:'מכון רישוי פ"ת',        addr:'אחד העם 2, פתח תקווה',   lat:32.0874, lng:34.8880, phone:'03-9394000', rating:3.9, ratingCount:76,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0874,34.8880&navigate=yes' },
+  // גוש דן
+  { id:1,  name:'מכון רישוי הרצליה',       addr:'סוקולוב 10, הרצליה',          lat:32.1636, lng:34.8440, phone:'09-9507714', rating:4.2, ratingCount:187, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.1636,34.8440&navigate=yes' },
+  { id:2,  name:'מכון רישוי ת"א מרכז',     addr:'הרכבת 40, תל אביב',            lat:32.0553, lng:34.7750, phone:'03-6888700', rating:3.8, ratingCount:312, hours:'א-ה 07:00–18:00 | ו 07:00–13:00', hoursWeekday:[7,18],   hoursFriday:[7,13],   waze:'https://waze.com/ul?ll=32.0553,34.7750&navigate=yes' },
+  { id:3,  name:'מכון רישוי ת"א צפון',     addr:'הכובשים 2, תל אביב',           lat:32.1050, lng:34.8050, phone:'03-6474747', rating:3.9, ratingCount:201, hours:'א-ה 07:00–17:00 | ו 07:00–13:00', hoursWeekday:[7,17],   hoursFriday:[7,13],   waze:'https://waze.com/ul?ll=32.1050,34.8050&navigate=yes' },
+  { id:4,  name:'מכון רישוי ראשל"צ',       addr:'הלל יפה 19, ראשון לציון',      lat:31.9700, lng:34.8020, phone:'03-9524820', rating:4.0, ratingCount:143, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.9700,34.8020&navigate=yes' },
+  { id:5,  name:'מכון רישוי בת ים',        addr:'בילו 1, בת ים',                lat:32.0220, lng:34.7420, phone:'03-5099940', rating:4.1, ratingCount:98,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0220,34.7420&navigate=yes' },
+  { id:6,  name:'מכון רישוי חולון',        addr:'ויצמן 3, חולון',               lat:32.0115, lng:34.7720, phone:'03-5030303', rating:3.7, ratingCount:165, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.0115,34.7720&navigate=yes' },
+  { id:7,  name:'מכון רישוי פ"ת',          addr:'אחד העם 2, פתח תקווה',         lat:32.0874, lng:34.8880, phone:'03-9394000', rating:3.9, ratingCount:76,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0874,34.8880&navigate=yes' },
+  { id:8,  name:'מכון רישוי רמת גן',       addr:'ביאליק 18, רמת גן',            lat:32.0750, lng:34.8200, phone:'03-6133333', rating:4.0, ratingCount:134, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.0750,34.8200&navigate=yes' },
+  { id:9,  name:'מכון רישוי בני ברק',      addr:'רבי עקיבא 100, בני ברק',       lat:32.0804, lng:34.8387, phone:'03-5771234', rating:3.6, ratingCount:89,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=32.0804,34.8387&navigate=yes' },
+  { id:10, name:'מכון רישוי נתניה',        addr:'הבנאי 1, נתניה',               lat:32.3215, lng:34.8530, phone:'09-8601234', rating:4.1, ratingCount:210, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.3215,34.8530&navigate=yes' },
+  { id:11, name:'מכון רישוי רחובות',       addr:'הרצל 84, רחובות',              lat:31.8978, lng:34.8100, phone:'08-9452222', rating:4.2, ratingCount:156, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.8978,34.8100&navigate=yes' },
+  { id:12, name:'מכון רישוי אשדוד',        addr:'הגפן 16, אשדוד',               lat:31.8040, lng:34.6550, phone:'08-8566789', rating:3.9, ratingCount:178, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.8040,34.6550&navigate=yes' },
+  { id:13, name:'מכון רישוי מודיעין',      addr:'האומן 19, מודיעין',             lat:31.9000, lng:35.0100, phone:'08-9727777', rating:4.3, ratingCount:245, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.9000,35.0100&navigate=yes' },
+  { id:14, name:'מכון רישוי ירושלים',      addr:'יגאל אלון 68, ירושלים',        lat:31.7767, lng:35.2132, phone:'02-5387777', rating:3.8, ratingCount:298, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.7767,35.2132&navigate=yes' },
+  { id:15, name:'מכון רישוי חיפה',         addr:'ישראל גלילי 10, חיפה',          lat:32.8184, lng:35.0037, phone:'04-8400400', rating:4.0, ratingCount:189, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=32.8184,35.0037&navigate=yes' },
+  { id:16, name:'מכון רישוי באר שבע',      addr:'הנגב 1, באר שבע',              lat:31.2518, lng:34.7913, phone:'08-6230000', rating:3.7, ratingCount:134, hours:'א-ה 07:30–17:00 | ו 07:30–13:00', hoursWeekday:[7.5,17], hoursFriday:[7.5,13], waze:'https://waze.com/ul?ll=31.2518,34.7913&navigate=yes' },
+  { id:17, name:'מכון רישוי רמלה',         addr:'ז\'בוטינסקי 22, רמלה',          lat:31.9330, lng:34.8720, phone:'08-9272222', rating:3.8, ratingCount:67,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=31.9330,34.8720&navigate=yes' },
+  { id:18, name:'מכון רישוי לוד',          addr:'בן גוריון 30, לוד',             lat:31.9510, lng:34.8960, phone:'08-9241234', rating:3.6, ratingCount:88,  hours:'א-ה 07:30–17:00',                    hoursWeekday:[7.5,17], hoursFriday:null,     waze:'https://waze.com/ul?ll=31.9510,34.8960&navigate=yes' },
 ];
 
 function _thHaversine(lat1, lng1, lat2, lng2) {
@@ -8078,6 +8092,13 @@ APP._initStationsPanel = function(userLat, userLng) {
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, subdomains:'abcd' }).addTo(map);
   APP._thMap = map;
   APP._thMapMarkers = {};
+
+  // Prevent map touch events from bubbling to the screen swipe handler (bug: map pan triggered screen swipe)
+  var mapContainer = map.getContainer();
+  L.DomEvent.on(mapContainer, 'touchstart', L.DomEvent.stopPropagation);
+  L.DomEvent.on(mapContainer, 'touchmove',  L.DomEvent.stopPropagation);
+  L.DomEvent.on(mapContainer, 'touchend',   L.DomEvent.stopPropagation);
+  mapContainer.style.touchAction = 'pan-x pan-y';
 
   // User marker
   if (userLat) {
