@@ -3570,6 +3570,17 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .leaflet-popup-content-wrapper { background: var(--card) !important; color: var(--t1) !important; border: 1px solid var(--border); border-radius: 12px !important; box-shadow: 0 8px 24px rgba(0,0,0,.6) !important; }
 .leaflet-popup-tip { background: var(--card) !important; }
 .leaflet-popup-content { font-family: inherit !important; font-size: 13px !important; font-weight: 700 !important; margin: 10px 14px !important; text-align: right !important; direction: rtl !important; }
+/* Stations — sort bar + hours table */
+.th-sort-bar { display:flex; align-items:center; gap:8px; padding:0 0 12px; direction:rtl; }
+.th-sort-label { font-size:12px; color:var(--t2); font-weight:600; }
+.th-sort-btn { font-size:12px; font-weight:700; padding:6px 14px; border-radius:100px; border:1px solid var(--border); background:transparent; color:var(--t2); cursor:pointer; font-family:inherit; transition:all .2s; }
+.th-sort-btn.active { background:var(--ok); color:#fff; border-color:var(--ok); }
+.th-hours-table { padding: 12px 16px; border-top: 1px solid var(--border); }
+.th-hours-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px; color: var(--t2); gap: 12px; }
+.th-hours-row.today { color: var(--t1); font-weight: 700; }
+.th-hours-row.today .th-hours-day { color: #30D158; }
+.th-hours-day { min-width: 70px; text-align: right; }
+.th-hours-val { direction: ltr; text-align: left; flex: 1; }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -4039,6 +4050,12 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <!-- Map -->
           <div class="th-map-container">
             <div id="th-leaflet-map" style="width:100%;height:240px;border-radius:16px;overflow:hidden;position:relative;z-index:1;"></div>
+          </div>
+          <!-- Sort bar -->
+          <div class="th-sort-bar">
+            <span class="th-sort-label">מיון:</span>
+            <button class="th-sort-btn active" id="th-sort-dist" onclick="APP._thSort('dist')">קרבה</button>
+            <button class="th-sort-btn" id="th-sort-rating" onclick="APP._thSort('rating')">דירוג</button>
           </div>
           <!-- Cards -->
           <div class="th-station-list" id="th-station-list"></div>

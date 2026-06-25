@@ -8042,6 +8042,38 @@ function _thMakeMarkerIcon(num, active) {
 
 APP._thMarkers = [];
 
+// Parse Google weekday descriptions array into structured days
+// Input: ["יום ראשון: 7:00–16:15", "יום שני: 7:00–16:15", ...]
+// Output: [{day:'ראשון', hours:'7:00–16:15', isToday:bool}, ...]
+function _thParseHours(weekdayDescArr) {
+  if (!weekdayDescArr || !weekdayDescArr.length) return [];
+  var todayIdx = new Date().getDay(); // 0=Sun
+  return weekdayDescArr.map(function(line, i) {
+    var parts = String(line).split(': ');
+    var dayLabel = parts[0] ? parts[0].replace('יום ','') : '';
+    var hoursStr = parts.slice(1).join(': ') || 'סגור';
+    return { day: dayLabel, hours: hoursStr, isToday: (i === todayIdx) };
+  });
+}
+
+function _thHoursTableHtml(parsed) {
+  if (!parsed || !parsed.length) return '<div style="color:var(--t2);font-size:12px;padding:8px 16px;">שעות לא ידועות</div>';
+  return '<div class="th-hours-table">' +
+    parsed.map(function(d) {
+      return '<div class="th-hours-row' + (d.isToday ? ' today' : '') + '">' +
+        '<div class="th-hours-day">' + (d.isToday ? '▶ ' : '') + 'יום ' + d.day + '</div>' +
+        '<div class="th-hours-val">' + d.hours + '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+function _thTodayHours(parsed) {
+  if (!parsed || !parsed.length) return null;
+  var today = parsed.find(function(d){ return d.isToday; });
+  return today ? today.hours : null;
+}
+
 APP._initStationsPanel = async function(userLat, userLng) {
   var list = document.getElementById('th-station-list');
   if (!list) return;
@@ -8077,39 +8109,12 @@ APP._initStationsPanel = async function(userLat, userLng) {
   });
   if (userLat) stations.sort(function(a,b){ return a.dist - b.dist; });
 
+  // Save for re-sort / re-render
+  APP._thStationsData = stations;
+  APP._thSortMode = 'dist';
+
   // Build cards
-  list.innerHTML = '';
-  stations.forEach(function(s, idx) {
-    var open = (s.isOpen !== null && s.isOpen !== undefined) ? s.isOpen : _thIsOpen(s);
-    var hoursTxt = s.hours || '';
-    var distTxt = s.dist !== null ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
-    var card = document.createElement('div');
-    card.className = 'th-sc' + (idx === 0 ? ' open' : '');
-    card.id = 'th-sc-' + s.id;
-    card.innerHTML =
-      '<div class="th-sc-head" onclick="APP._thToggleSC('+s.id+')">' +
-        '<div class="th-sc-row1">' +
-          '<div><div class="th-sc-name">'+s.name+'</div><div class="th-sc-addr">'+s.addr+'</div></div>' +
-          '<div class="th-sc-right">' +
-            '<div class="th-sc-dist">'+distTxt+'</div>' +
-            '<div class="th-sc-stars">'+_thStars(s.rating)+'<span>'+s.rating+' ('+s.ratingCount+')</span></div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="th-sc-row2">' +
-          '<div class="th-sc-status '+(open?'open':'closed')+'"><div class="th-sc-dot"></div>'+(open?'פתוח':'סגור')+'</div>' +
-          '<div class="th-sc-hours">'+hoursTxt+'</div>' +
-          '<svg class="th-sc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>' +
-        '</div>' +
-      '</div>' +
-      '<div class="th-sc-body">' +
-        '<div class="th-sc-actions">' +
-          '<button class="th-sc-btn call" onclick="window.open(\'tel:'+s.phone+'\')"><div class="th-sc-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.07 3.21 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div>חייג</button>' +
-          '<a class="th-sc-btn waze" href="'+s.waze+'" target="_blank" rel="noopener"><div class="th-sc-btn-icon"><svg width="20" height="20" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="27" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="33" r="3" fill="#333"/><circle cx="30" cy="33" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="35" cy="15" r="6" fill="#FFB800"/></svg></div>Waze</a>' +
-          '<button class="th-sc-btn site" onclick="window.open(\'https://www.gov.il/he/service/vehicle_test_scheduling\',\'_blank\')"><div class="th-sc-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>תור</button>' +
-        '</div>' +
-      '</div>';
-    list.appendChild(card);
-  });
+  APP._thRenderCards(stations);
 
   // Init Leaflet map
   var mapEl = document.getElementById('th-leaflet-map');
@@ -8143,8 +8148,121 @@ APP._initStationsPanel = async function(userLat, userLng) {
     APP._thMapMarkers[s.id] = marker;
   });
 
+  // Reload stations by new map center on drag/zoom (debounced)
+  var _mapLoadTimer = null;
+  map.on('moveend', function() {
+    clearTimeout(_mapLoadTimer);
+    _mapLoadTimer = setTimeout(function() {
+      var center = map.getCenter();
+      APP._thLoadStations(center.lat, center.lng);
+    }, 800);
+  });
+
   // Fix Leaflet sizing when panel becomes visible
   setTimeout(function(){ if (APP._thMap) APP._thMap.invalidateSize(); }, 250);
+};
+
+// Render station cards from a list into #th-station-list
+APP._thRenderCards = function(stations) {
+  var list = document.getElementById('th-station-list');
+  if (!list) return;
+  list.innerHTML = '';
+  stations.forEach(function(s, idx) {
+    var open = (s.isOpen !== null && s.isOpen !== undefined) ? s.isOpen : _thIsOpen(s);
+    var parsedHours = _thParseHours(s.hoursArr || (s.hours ? s.hours.split(' | ') : []));
+    var todayHours = _thTodayHours(parsedHours);
+    var distTxt = s.dist !== null && s.dist !== undefined ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
+    var card = document.createElement('div');
+    card.className = 'th-sc' + (idx === 0 ? ' open' : '');
+    card.id = 'th-sc-' + s.id;
+    card.innerHTML =
+      '<div class="th-sc-head" onclick="APP._thToggleSC('+s.id+')">' +
+        '<div class="th-sc-row1">' +
+          '<div><div class="th-sc-name">'+s.name+'</div><div class="th-sc-addr">'+s.addr+'</div></div>' +
+          '<div class="th-sc-right">' +
+            '<div class="th-sc-dist">'+distTxt+'</div>' +
+            '<div class="th-sc-stars">'+_thStars(s.rating)+'<span>'+s.rating+' ('+s.ratingCount+')</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="th-sc-row2">' +
+          '<div class="th-sc-status '+(open?'open':'closed')+'"><div class="th-sc-dot"></div>'+(open?'פתוח':'סגור')+'</div>' +
+          '<div class="th-sc-hours">'+(todayHours || '')+'</div>' +
+          '<svg class="th-sc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>' +
+        '</div>' +
+      '</div>' +
+      '<div class="th-sc-body">' +
+        _thHoursTableHtml(parsedHours) +
+        '<div class="th-sc-actions">' +
+          '<button class="th-sc-btn call" onclick="window.open(\'tel:'+s.phone+'\')"><div class="th-sc-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 11.88 19.79 19.79 0 0 1 1.07 3.21 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/></svg></div>חייג</button>' +
+          '<a class="th-sc-btn waze" href="'+s.waze+'" target="_blank" rel="noopener"><div class="th-sc-btn-icon"><svg width="20" height="20" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="27" rx="17" ry="14" fill="#fff"/><circle cx="18" cy="33" r="3" fill="#333"/><circle cx="30" cy="33" r="3" fill="#333"/><path d="M15 24 Q24 14 33 24" stroke="#333" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="35" cy="15" r="6" fill="#FFB800"/></svg></div>Waze</a>' +
+          '<button class="th-sc-btn site" onclick="window.open(\'https://www.gov.il/he/service/vehicle_test_scheduling\',\'_blank\')"><div class="th-sc-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>תור</button>' +
+        '</div>' +
+      '</div>';
+    list.appendChild(card);
+  });
+};
+
+// Re-sort stations by distance or rating
+APP._thSort = function(mode) {
+  APP._thSortMode = mode;
+  var db = document.getElementById('th-sort-dist'); if (db) db.classList.toggle('active', mode==='dist');
+  var rb = document.getElementById('th-sort-rating'); if (rb) rb.classList.toggle('active', mode==='rating');
+  if (!APP._thStationsData) return;
+  var sorted = APP._thStationsData.slice().sort(function(a,b){
+    if (mode === 'rating') return (b.rating||0) - (a.rating||0);
+    return (a.dist||9999) - (b.dist||9999);
+  });
+  APP._thRenderCards(sorted);
+};
+
+// Load stations near (lat,lng) — used on map drag/zoom
+APP._thLoadStations = async function(lat, lng) {
+  var list = document.getElementById('th-station-list');
+  if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t2);">טוען מכונים...</div>';
+
+  var stations = TH_STATIONS; // fallback
+  try {
+    var r = await gasPost('get_nearby_test_stations', {
+      idToken: STATE.idToken || STATE.token || '',
+      lat: lat, lng: lng
+    });
+    if (r && r.ok && r.stations && r.stations.length > 0) {
+      stations = r.stations.map(function(s, i) {
+        var dist = _thHaversine(lat, lng, s.lat, s.lng);
+        return Object.assign({}, s, {
+          id: i+1, dist: dist,
+          waze: s.waze || ('https://waze.com/ul?ll='+s.lat+','+s.lng+'&navigate=yes')
+        });
+      });
+    }
+  } catch(e) {}
+
+  stations = stations.map(function(s) {
+    var dist = (s.dist != null) ? s.dist : _thHaversine(lat, lng, s.lat, s.lng);
+    return Object.assign({}, s, {dist: dist});
+  });
+  stations.sort(function(a,b){ return a.dist - b.dist; });
+
+  APP._thStationsData = stations;
+  APP._thRenderCards(stations);
+
+  // Update map markers
+  if (APP._thMapMarkers) {
+    Object.values(APP._thMapMarkers).forEach(function(m){ m.remove(); });
+    APP._thMapMarkers = {};
+  }
+  stations.forEach(function(s, idx) {
+    if (!s.lat || !s.lng || !APP._thMap) return;
+    var marker = L.marker([s.lat, s.lng], { icon: _thMakeMarkerIcon(idx+1, false) }).addTo(APP._thMap);
+    marker.bindPopup('<div style="direction:rtl">'+s.name+'</div>');
+    marker.on('click', function() {
+      APP._thToggleSC(s.id, true);
+      var el = document.getElementById('th-sc-'+s.id);
+      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+      stations.forEach(function(ss,ii){ if(APP._thMapMarkers[ss.id]) APP._thMapMarkers[ss.id].setIcon(_thMakeMarkerIcon(ii+1, ss.id===s.id)); });
+    });
+    APP._thMapMarkers[s.id] = marker;
+  });
 };
 
 APP._thToggleSC = function(id, forceOpen) {
