@@ -4129,6 +4129,19 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       </div><!-- /panel-docs -->
 
     </div><!-- /test-hub-content -->
+
+    <!-- Guard overlay: not all checklist items done -->
+    <div id="th-skip-guard" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9999;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);">
+      <div style="background:var(--card);border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:480px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+        <div style="font-size:18px;font-weight:800;color:var(--t1);margin-bottom:8px;">הצ'קליסט לא הושלם</div>
+        <div style="font-size:14px;color:var(--t2);margin-bottom:6px;">השלמת <strong id="th-guard-count">0 / 21</strong> סעיפים</div>
+        <div style="font-size:13px;color:var(--t2);margin-bottom:28px;">מומלץ להשלים את הצ'קליסט לפני הגעה למכון</div>
+        <button onclick="APP.thDismissGuard && APP.thDismissGuard(false)" style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:var(--t1);font-size:15px;font-weight:700;font-family:inherit;margin-bottom:10px;cursor:pointer;">חזור להשלים</button>
+        <button onclick="APP.thDismissGuard && APP.thDismissGuard(true)" style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--ok);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;">עבור בכל זאת</button>
+      </div>
+    </div>
+
   </div><!-- /screen-testhub -->
 
   <!-- Help FAB (draggable) -->
