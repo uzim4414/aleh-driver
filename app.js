@@ -2181,6 +2181,8 @@ function initSwipe() {
   let startX = 0, startY = 0, _swipeOnItem = false;
 
   document.getElementById('app').addEventListener('touchstart', function(e) {
+    var mapEl = document.getElementById('th-leaflet-map');
+    if (mapEl && mapEl.contains(e.target)) { _swipeOnItem = true; return; } // don't swipe when touching map
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     // Flag if touch started on a swipeable notification item — let item handler own it
@@ -8092,13 +8094,6 @@ APP._initStationsPanel = function(userLat, userLng) {
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, subdomains:'abcd' }).addTo(map);
   APP._thMap = map;
   APP._thMapMarkers = {};
-
-  // Prevent map touch events from bubbling to the screen swipe handler (bug: map pan triggered screen swipe)
-  var mapContainer = map.getContainer();
-  L.DomEvent.on(mapContainer, 'touchstart', L.DomEvent.stopPropagation);
-  L.DomEvent.on(mapContainer, 'touchmove',  L.DomEvent.stopPropagation);
-  L.DomEvent.on(mapContainer, 'touchend',   L.DomEvent.stopPropagation);
-  mapContainer.style.touchAction = 'pan-x pan-y';
 
   // User marker
   if (userLat) {
