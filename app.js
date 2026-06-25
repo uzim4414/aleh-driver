@@ -7899,7 +7899,17 @@ APP._showTestSkipGuard = function(done) {
 
 APP.thDismissGuard = function(goAnyway) {
   document.getElementById('th-skip-guard').style.display = 'none';
-  if (goAnyway) APP.thSwitchStep(1);
+  if (goAnyway) APP._thForceStep(1); // bypass guard, go directly to stations
+};
+APP._thForceStep = function(idx) {
+  var panelMap = ['test-panel-checklist', 'test-panel-stations', 'test-panel-docs'];
+  document.querySelectorAll('.test-panel').forEach(p => p.classList.remove('active'));
+  var panel = document.getElementById(panelMap[idx]);
+  if (panel) panel.classList.add('active');
+  document.querySelectorAll('.stp-node').forEach((s, i) => {
+    s.classList.toggle('active', i === idx);
+    s.classList.toggle('completed', i < idx);
+  });
 };
 
 APP.thCheckItem = function(id, el) {
@@ -7940,6 +7950,19 @@ APP.thToggleStationCard = function(id) {
 APP.thToggleDocRow = function(el) {
   var title = el.querySelector('.pds-doc-title')?.textContent || '';
   showToast(title + ' — נלחץ');
+};
+
+APP.thOpenStationsMap = function() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var url = 'https://www.google.com/maps/search/מכון+טסט/@' + pos.coords.latitude + ',' + pos.coords.longitude + ',14z';
+      window.open(url, '_blank');
+    }, function() {
+      window.open('https://www.google.com/maps/search/מכון+טסט+קרוב', '_blank');
+    }, {timeout: 4000});
+  } else {
+    window.open('https://www.google.com/maps/search/מכון+טסט+קרוב', '_blank');
+  }
 };
 
 APP.thOcrScanEmail = function() {

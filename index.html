@@ -3995,11 +3995,11 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
             <span class="station-screen-sub">לפי חיפוש Google · מבוסס מיקום GPS</span>
           </div>
           <div class="station-map-overview" id="th-station-map-wrap">
-            <iframe id="th-map-iframe" class="th-map-iframe"
-              src="https://maps.google.com/maps?q=מכון+טסט+קרוב&output=embed&hl=he&z=14"
-              style="width:100%;height:220px;border:0;border-radius:12px;display:block;"
-              loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="מכוני טסט"></iframe>
-            <button class="station-map-open-btn" onclick="window.open('https://www.google.com/maps/search/מכון+טסט+קרוב+' + encodeURIComponent((typeof STATE!=='undefined'&&STATE.vehicle&&STATE.vehicle.city)||''), '_blank')">
+            <div id="th-map-static" style="width:100%;height:180px;border-radius:12px;background:linear-gradient(135deg,#0d1117 0%,#0f1923 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:1px solid rgba(255,255,255,0.07);position:relative;overflow:hidden;">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <div style="color:var(--t2);font-size:13px;font-weight:600;">לחץ לחיפוש מכוני טסט קרובים</div>
+            </div>
+            <button class="station-map-open-btn" onclick="APP.thOpenStationsMap && APP.thOpenStationsMap()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               פתח מפה מלאה
             </button>
