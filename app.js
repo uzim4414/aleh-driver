@@ -7847,11 +7847,38 @@ APP._initTestHub = function() {
     pill.classList.remove('warn', 'red'); pill.classList.add('ok');
     pill.textContent = 'בוצע ✓';
   }
+
+  // Populate doc expiry dates from STATE.vehicle (bug 9)
+  var licEl = document.getElementById('th-pds-license-date');
+  if (licEl) licEl.textContent = v.licenseExpiry ? 'בתוקף עד ' + v.licenseExpiry : 'בתוקף —';
+  var insEl = document.getElementById('th-pds-insurance-date');
+  if (insEl) insEl.textContent = v.insuranceExpiry ? 'בתוקף עד ' + v.insuranceExpiry : 'בתוקף —';
+
+  // Update map with real GPS (bug 2)
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      var iframe = document.getElementById('th-map-iframe');
+      if (iframe) {
+        iframe.src = 'https://maps.google.com/maps?q=מכון+טסט+קרוב&ll=' + lat + ',' + lng + '&z=13&output=embed&hl=he';
+      }
+      if (typeof APP._updateStationDistances === 'function') APP._updateStationDistances(lat, lng);
+    }, null, {timeout:5000});
+  }
 };
 
 APP.thSwitchStep = function(step) {
   // step nodes use 1-based ids (stp-node-1..3). Accept either 0-based or 1-based.
   var idx = (step >= 1 && step <= 3) ? (step - 1) : step; // normalize to 0-based
+  // guard: if moving from checklist to stations, verify all items checked
+  if (idx === 1) {
+    var total   = document.querySelectorAll('.chk-section .chk-item').length;
+    var checked = document.querySelectorAll('.chk-section .chk-item.checked').length;
+    if (total > 0 && checked < total) {
+      APP._showTestSkipGuard(checked);
+      return;
+    }
+  }
   var panelMap = ['test-panel-checklist', 'test-panel-stations', 'test-panel-docs'];
   document.querySelectorAll('.test-panel').forEach(p => p.classList.remove('active'));
   var panel = document.getElementById(panelMap[idx]);
@@ -7899,8 +7926,48 @@ APP.thToggleSection = function(sec) {
   if (el) el.classList.toggle('open');
 };
 
+APP.thToggleStationCard = function(id) {
+  var card = document.getElementById(id);
+  if (!card) return;
+  var actions = card.querySelector('.station-card-actions');
+  var chevron = card.querySelector('.sc-chevron');
+  if (!actions) return;
+  var open = actions.style.display !== 'none';
+  actions.style.display = open ? 'none' : 'flex';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(180deg)';
+};
+
+APP.thToggleDocRow = function(el) {
+  var title = el.querySelector('.pds-doc-title')?.textContent || '';
+  showToast(title + ' — נלחץ');
+};
+
+APP.thOcrScanEmail = function() {
+  var input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = async function(e) {
+    var file = e.target.files[0]; if (!file) return;
+    var overlay = document.getElementById('th-ocr-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    var b64 = await APP._fileToBase64(file);
+    try {
+      var r = await gasPost('ocr_extract_email', { imageBase64: b64 });
+      if (overlay) overlay.style.display = 'none';
+      if (r.ok && r.email) {
+        var inp = document.getElementById('th-pds-email') || document.getElementById('th-station-email');
+        if (inp) inp.value = r.email;
+        showToast('מייל זוהה: ' + r.email);
+      } else showToast('לא זוהה מייל בתמונה');
+    } catch(err) {
+      if (overlay) overlay.style.display = 'none';
+      showToast('שגיאה בזיהוי');
+    }
+  };
+  input.click();
+};
+
 APP.thSendDocs = async function() {
-  const email = document.getElementById('th-station-email')?.value?.trim();
+  const email = (document.getElementById('th-station-email') || document.getElementById('th-pds-email'))?.value?.trim();
   if (!email || !email.includes('@')) {
     showToast('נא להזין כתובת מייל תקינה'); return;
   }
@@ -7953,8 +8020,11 @@ APP.thCaptureEmail = function() {
 APP.thSelectResult = function(type) {
   document.getElementById('th-result-pass')?.classList.toggle('selected', type === 'pass');
   document.getElementById('th-result-fail')?.classList.toggle('selected', type === 'fail');
-  document.getElementById('th-pass-drawer')?.classList.toggle('open', type === 'pass');
-  document.getElementById('th-fail-drawer')?.classList.toggle('open', type === 'fail');
+  // Support both ID variants
+  var passDrawer = document.getElementById('th-pass-drawer') || document.getElementById('th-drawer-pass');
+  var failDrawer = document.getElementById('th-fail-drawer') || document.getElementById('th-drawer-fail');
+  if (passDrawer) passDrawer.classList.toggle('open', type === 'pass');
+  if (failDrawer) failDrawer.classList.toggle('open', type === 'fail');
 };
 
 APP.thCaptureTestForm = function() {
@@ -7996,6 +8066,31 @@ APP.thConfirmTestPass = async function() {
   } catch(e) {
     showToast('שגיאת רשת');
     if (btn) { btn.disabled = false; btn.textContent = 'אשר — טסט בוצע'; }
+  }
+};
+
+APP.thConfirmPass = function() { return APP.thConfirmTestPass && APP.thConfirmTestPass(); };
+
+APP.thSubmitFail = async function() {
+  var reason = document.getElementById('th-fail-reason')?.value?.trim();
+  var btn = document.getElementById('th-fail-cta');
+  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  try {
+    var r = await gasPost('save_test_failure', {
+      vehicleId: STATE.vehicleId,
+      failReason: reason || '',
+      failDate: new Date().toISOString().slice(0,10)
+    });
+    if (r.ok) {
+      showToast('נשמר — נתזמן טסט חוזר');
+      APP.closeTestHub && APP.closeTestHub();
+    } else {
+      showToast('שגיאה: ' + (r.error || 'לא ידוע'));
+      if (btn) { btn.disabled = false; btn.textContent = 'שמור ותזמן טסט חוזר'; }
+    }
+  } catch(e) {
+    showToast('שגיאה בשמירה');
+    if (btn) { btn.disabled = false; btn.textContent = 'שמור ותזמן טסט חוזר'; }
   }
 };
 
