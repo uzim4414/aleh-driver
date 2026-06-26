@@ -1050,6 +1050,31 @@ async function gasPost(action, extra, opts) {
   return data;
 }
 
+async function gasPostForm(action, params) {
+  // שולח POST עם FormData — לפעולות עם payload גדול (תמונה base64)
+  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken)) {
+    _sessionExpired(); throw new Error('session_expired');
+  }
+  var fd = new FormData();
+  fd.append('action', action);
+  if (STATE.idToken) fd.append('idToken', STATE.idToken);
+  Object.keys(params).forEach(function(k) { fd.append(k, params[k]); });
+  var resp;
+  try {
+    resp = await fetch(GAS_URL, { method: 'POST', body: fd });
+  } catch(netErr) {
+    throw new Error('שגיאת חיבור: ' + (netErr.message || netErr));
+  }
+  var text = await resp.text();
+  var data;
+  try { data = JSON.parse(text); }
+  catch(e) {
+    throw new Error('שגיאת שרת: ' + text.replace(/<[^>]+>/g,' ').trim().substring(0,150));
+  }
+  if (data && !data.ok) throw new Error(data.error || 'שגיאת שרת');
+  return data;
+}
+
 /* ══ Demo / Mock mode (כשאין GAS_URL) ══ */
 function mockResponse(action, params) {
   const mockVehicle = {
@@ -8409,6 +8434,33 @@ APP._thToggleSC = function(id, forceOpen) {
   }
 };
 
+APP._thResizeImage = function(file) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function() {
+      URL.revokeObjectURL(url);
+      var MAX = 800; // max width/height in px
+      var w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // JPEG quality 0.75 — מספיק לOCR, קטן בהרבה
+      var b64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+      resolve(b64);
+    };
+    img.onerror = function() {
+      // fallback — שלח כמות שהיא
+      APP._fileToBase64(file).then(resolve).catch(function() { resolve(''); });
+    };
+    img.src = url;
+  });
+};
+
 APP.thOcrScanEmail = function() {
   var input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
@@ -8420,8 +8472,9 @@ APP.thOcrScanEmail = function() {
     var overlay = document.getElementById('th-ocr-overlay');
     if (overlay) overlay.style.display = 'flex';
     try {
-      var b64 = await APP._fileToBase64(file);
-      var r = await gasPost('ocr_extract_email', { imageBase64: b64 });
+      var b64 = await APP._thResizeImage(file);
+      if (!b64) { if (overlay) overlay.style.display = 'none'; APP._thEmailManualFallback('שגיאה בעיבוד התמונה'); return; }
+      var r = await gasPostForm('ocr_extract_email', { imageBase64: b64 });
       if (overlay) overlay.style.display = 'none';
       if (r && r.ok && r.email) {
         var inp = document.getElementById('th-pds-email') || document.getElementById('th-station-email');
