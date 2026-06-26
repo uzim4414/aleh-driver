@@ -8009,6 +8009,7 @@ APP._thForceStep = function(idx) {
     s.classList.toggle('active', i === idx);
     s.classList.toggle('completed', i < idx);
   });
+  if (idx === 2) setTimeout(function(){ APP._initCamTooltip && APP._initCamTooltip(); }, 300);
 };
 
 APP.thCheckItem = function(id, el) {
@@ -8459,6 +8460,37 @@ APP._thResizeImage = function(file) {
     };
     img.src = url;
   });
+};
+
+// Camera tooltip — position:fixed, immune to overflow:hidden on parents
+APP._initCamTooltip = function() {
+  var btn = document.getElementById('pds-cam-btn');
+  var tip = document.getElementById('pds-cam-tip-fixed');
+  if (!btn || !tip) return;
+  var hideTimer, showTimer;
+  function positionTip() {
+    var r = btn.getBoundingClientRect();
+    var left = r.right - 252;
+    if (left < 8) left = 8;
+    tip.style.left = left + 'px';
+    tip.style.top  = (r.bottom + 10) + 'px';
+  }
+  function showTip() {
+    clearTimeout(hideTimer);
+    positionTip();
+    tip.classList.remove('hiding');
+    tip.classList.add('visible');
+    hideTimer = setTimeout(hideTip, 5000);
+  }
+  function hideTip() {
+    tip.classList.add('hiding');
+    setTimeout(function(){ tip.classList.remove('visible','hiding'); }, 300);
+  }
+  showTimer = setTimeout(showTip, 1400);
+  btn.addEventListener('click', function(){ clearTimeout(showTimer); clearTimeout(hideTimer); hideTip(); });
+  document.addEventListener('touchstart', function(e){
+    if (!tip.contains(e.target) && e.target !== btn){ clearTimeout(hideTimer); hideTip(); }
+  }, {passive:true});
 };
 
 APP.thOcrScanEmail = function() {

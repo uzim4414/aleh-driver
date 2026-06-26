@@ -3453,72 +3453,51 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .pds-email-row { display:flex; gap:8px; padding:14px 16px 0; }
 .pds-email-input { flex:1; background:rgba(255,255,255,0.05); border:1.5px solid rgba(255,255,255,0.1); border-radius:12px; padding:10px 13px; color:#fff; font-size:14px; font-family:inherit; direction:ltr; outline:none; transition:border-color .2s,box-shadow .2s; height:44px; }
 .pds-email-input:focus { border-color:rgba(31,138,61,0.55); box-shadow:0 0 0 3px rgba(31,138,61,0.12); }
-.pds-cam-wrap { position:relative; flex-shrink:0; }
+.pds-cam-wrap { flex-shrink:0; }
 .pds-cam-btn { width:44px; height:44px; background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.12); border-radius:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:rgba(255,255,255,0.55); transition:background .2s,border-color .2s,color .2s; }
 .pds-cam-btn:active { background:rgba(48,209,88,0.15); border-color:rgba(48,209,88,0.4); color:#30D158; }
 
-/* Tooltip — מופיע מתחת לכפתור (לא למעלה — כדי לא לחרוג) */
-.pds-cam-tooltip {
-  position:absolute;
-  top:calc(100% + 10px);
-  right:0;
-  min-width:220px;
-  max-width:260px;
-  background:linear-gradient(135deg,rgba(10,24,16,0.98),rgba(6,18,10,0.98));
-  border:1px solid rgba(48,209,88,0.3);
-  border-radius:16px;
-  padding:14px 16px 14px 14px;
+/* Fixed tooltip — מחוץ לכל overflow:hidden */
+#pds-cam-tip-fixed {
+  position:fixed;
+  z-index:99999;
+  width:252px;
+  background:linear-gradient(145deg,rgba(8,20,12,0.99),rgba(4,14,8,0.99));
+  border:1px solid rgba(48,209,88,0.35);
+  border-radius:18px;
+  padding:15px 16px;
   direction:rtl;
   pointer-events:none;
-  z-index:9999;
-  box-shadow:0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(48,209,88,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
-  backdrop-filter:blur(12px);
+  box-shadow:0 16px 48px rgba(0,0,0,0.8),0 0 0 1px rgba(48,209,88,0.06),inset 0 1px 0 rgba(255,255,255,0.05);
+  backdrop-filter:blur(20px);
   opacity:0;
-  transform:translateY(-8px) scale(0.94);
-  animation:camTipIn 0.45s cubic-bezier(0.34,1.56,0.64,1) 1.5s forwards,
-             camTipOut 0.35s ease-in 5.5s forwards;
+  transform:scale(0.88) translateY(8px);
+  transition:opacity 0.38s cubic-bezier(0.34,1.56,0.64,1),transform 0.38s cubic-bezier(0.34,1.56,0.64,1);
+}
+#pds-cam-tip-fixed.visible { opacity:1; transform:scale(1) translateY(0); }
+#pds-cam-tip-fixed.hiding  { opacity:0; transform:scale(0.93) translateY(6px); transition:opacity 0.28s ease,transform 0.28s ease; }
+
+/* חץ */
+#pds-cam-tip-fixed::before {
+  content:''; position:absolute; top:-7px; right:18px;
+  border:7px solid transparent; border-bottom-color:rgba(48,209,88,0.35);
+  border-top:none;
+}
+#pds-cam-tip-fixed::after {
+  content:''; position:absolute; top:-5px; right:19px;
+  border:6px solid transparent; border-bottom-color:rgba(8,20,12,0.99);
+  border-top:none;
 }
 
-/* חץ כלפי מעלה */
-.pds-cam-tooltip::before {
-  content:'';
-  position:absolute;
-  bottom:100%;
-  right:16px;
-  border:7px solid transparent;
-  border-bottom-color:rgba(48,209,88,0.3);
-}
-.pds-cam-tooltip::after {
-  content:'';
-  position:absolute;
-  bottom:calc(100% - 1px);
-  right:17px;
-  border:6px solid transparent;
-  border-bottom-color:rgba(10,24,16,0.98);
-}
-
-.pds-cam-tip-icon {
-  width:34px; height:34px; border-radius:10px;
-  background:rgba(48,209,88,0.12);
-  border:1px solid rgba(48,209,88,0.2);
-  display:flex; align-items:center; justify-content:center;
-  font-size:18px; flex-shrink:0;
-  animation:tipIconPulse 2s ease-in-out 2s infinite;
-}
-.pds-cam-tip-text { flex:1; }
-.pds-cam-tip-title { font-size:13px; font-weight:800; color:#e8ffe8; letter-spacing:-0.2px; margin-bottom:3px; }
-.pds-cam-tip-sub { font-size:11px; color:rgba(200,240,200,0.6); line-height:1.5; }
-.pds-cam-tip-row { display:flex; align-items:center; gap:10px; }
-.pds-cam-tip-divider { height:1px; background:rgba(48,209,88,0.1); margin:10px 0 8px; }
-.pds-cam-tip-step { display:flex; align-items:center; gap:7px; font-size:11px; color:rgba(200,240,200,0.7); margin-bottom:4px; }
-.pds-cam-tip-step-num { width:18px; height:18px; border-radius:50%; background:rgba(48,209,88,0.15); border:1px solid rgba(48,209,88,0.25); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#30D158; flex-shrink:0; }
-
-@keyframes camTipIn  { to { opacity:1; transform:translateY(0) scale(1); } }
-@keyframes camTipOut { to { opacity:0; transform:translateY(-4px) scale(0.96); } }
-@keyframes tipIconPulse {
-  0%,100% { box-shadow:0 0 0 0 rgba(48,209,88,0.3); }
-  50% { box-shadow:0 0 0 6px rgba(48,209,88,0); }
-}
+.pds-cam-tip-row   { display:flex; align-items:center; gap:11px; margin-bottom:11px; }
+.pds-cam-tip-icon  { width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,rgba(48,209,88,0.18),rgba(48,209,88,0.06)); border:1px solid rgba(48,209,88,0.25); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#30D158; }
+.pds-cam-tip-text  { flex:1; }
+.pds-cam-tip-title { font-size:13px; font-weight:800; color:#e8ffe8; letter-spacing:-0.2px; margin-bottom:2px; }
+.pds-cam-tip-sub   { font-size:11px; color:rgba(180,230,180,0.55); line-height:1.4; }
+.pds-cam-tip-divider { height:1px; background:linear-gradient(90deg,rgba(48,209,88,0.2),transparent); margin:0 0 10px; }
+.pds-cam-tip-step  { display:flex; align-items:center; gap:8px; font-size:11.5px; color:rgba(200,240,200,0.72); margin-bottom:6px; }
+.pds-cam-tip-step:last-child { margin-bottom:0; }
+.pds-cam-tip-num   { width:20px; height:20px; border-radius:50%; background:rgba(48,209,88,0.13); border:1px solid rgba(48,209,88,0.28); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; color:#30D158; flex-shrink:0; }
 .pds-send-cta { margin:14px 16px 16px; background:var(--red); border:none; border-radius:16px; padding:16px 24px; color:#fff; font-family:inherit; font-size:15px; font-weight:800; letter-spacing:-0.3px; cursor:pointer; width:calc(100% - 32px); display:flex; align-items:center; justify-content:center; gap:10px; transition:opacity .2s,transform .15s; position:relative; overflow:hidden; box-shadow:0 6px 28px var(--red-glow); animation:fabPulse 2.5s ease-in-out infinite; }
 .pds-send-cta:active { transform:scale(0.98); opacity:0.9; }
 .pds-send-cta-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; background:rgba(0,0,0,0.25); border-radius:100px; font-size:11px; font-weight:800; padding:0 5px; }
@@ -4209,20 +4188,9 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <div class="pds-email-row">
             <input class="pds-email-input" type="email" id="th-pds-email" placeholder="מייל מכון הטסט..." dir="ltr"/>
             <div class="pds-cam-wrap" id="pds-cam-wrap">
-              <button class="pds-cam-btn" aria-label="סרוק מייל מהלוחית" onclick="APP.thOcrScanEmail && APP.thOcrScanEmail()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
-              <div class="pds-cam-tooltip">
-                <div class="pds-cam-tip-row">
-                  <div class="pds-cam-tip-icon">📸</div>
-                  <div class="pds-cam-tip-text">
-                    <div class="pds-cam-tip-title">זיהוי מייל אוטומטי</div>
-                    <div class="pds-cam-tip-sub">צלם שלט / לוחית של המכון</div>
-                  </div>
-                </div>
-                <div class="pds-cam-tip-divider"></div>
-                <div class="pds-cam-tip-step"><div class="pds-cam-tip-step-num">1</div>צלם את השלט</div>
-                <div class="pds-cam-tip-step"><div class="pds-cam-tip-step-num">2</div>המייל מזוהה אוטומטית</div>
-                <div class="pds-cam-tip-step"><div class="pds-cam-tip-step-num">3</div>לחץ שלח — הכל אוטומטי</div>
-              </div>
+              <button class="pds-cam-btn" id="pds-cam-btn" aria-label="סרוק מייל מהלוחית" onclick="APP.thOcrScanEmail && APP.thOcrScanEmail()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v-1m0 7v-1m-3-3H8m7 0h-1" stroke-width="1.5"/></svg>
+              </button>
             </div>
           </div>
           <button class="pds-send-cta" id="th-pds-send-cta" onclick="APP.thSendDocs && APP.thSendDocs()">
@@ -4311,6 +4279,23 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     </div>
 
     <!-- OCR scanning overlay (bug 3) -->
+    <!-- Camera tooltip — fixed, above all overflow:hidden parents -->
+    <div id="pds-cam-tip-fixed" role="tooltip" aria-hidden="true">
+      <div class="pds-cam-tip-row">
+        <div class="pds-cam-tip-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>
+        </div>
+        <div class="pds-cam-tip-text">
+          <div class="pds-cam-tip-title">זיהוי מייל אוטומטי</div>
+          <div class="pds-cam-tip-sub">צלם לוחית / שלט של המכון</div>
+        </div>
+      </div>
+      <div class="pds-cam-tip-divider"></div>
+      <div class="pds-cam-tip-step"><div class="pds-cam-tip-num">1</div>צלם את שלט המכון</div>
+      <div class="pds-cam-tip-step"><div class="pds-cam-tip-num">2</div>המייל מזוהה אוטומטית</div>
+      <div class="pds-cam-tip-step"><div class="pds-cam-tip-num">3</div>לחץ שלח — הכל מטופל</div>
+    </div>
+
     <div id="th-ocr-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10001;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
       <div style="background:var(--card);border-radius:20px;padding:30px 34px;text-align:center;max-width:300px;">
         <div class="th-ocr-spinner" style="width:42px;height:42px;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--red);border-radius:50%;margin:0 auto 16px;animation:thspin 0.8s linear infinite;"></div>
