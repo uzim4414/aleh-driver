@@ -8012,8 +8012,46 @@ APP.thToggleDocRow = function(el) {
     if (v.insCompLink) return APP.thOpenDocViewer('insurance');
     return showToast('אין קובץ ביטוח חובה מקושר');
   }
-  // ייפוי כוח / אישור מורשי חתימה — נוצרים אוטומטית, אין תצוגה מקדימה
+  // ייפוי כוח / אישור מורשי חתימה — נוצרים אוטומטית בשליחה.
+  // במקום toast — הצג overlay מסביר מה ייווצר.
+  if (title.indexOf('ייפוי') >= 0 || title.indexOf('יפוי') >= 0) {
+    return APP._thShowAutoDocInfo('poa');
+  }
+  if (title.indexOf('מורשי חתימה') >= 0 || title.indexOf('חתימה') >= 0) {
+    return APP._thShowAutoDocInfo('sig');
+  }
   showToast(title + ' — נוצר אוטומטית בשליחה');
+};
+
+// Info overlay for auto-generated documents (POA / signatory approval).
+// These docs have no URL until an email is sent, so we show a descriptive
+// panel inside the existing doc-viewer overlay instead of an iframe.
+APP._thShowAutoDocInfo = function(type) {
+  var titles = { poa: 'ייפוי כוח', sig: 'אישור מורשי חתימה' };
+  var descs = {
+    poa: 'מסמך ייפוי כוח ייווצר אוטומטית בעת השליחה ויכלול: שם בעל הרכב, מספר רכב, פרטי מורשי חתימה.',
+    sig: 'אישור מורשי חתימה הוא מסמך קבוע של הארגון — ייצורף אוטומטית לכל שליחה.'
+  };
+  var overlay = document.getElementById('th-doc-viewer');
+  var iframe  = document.getElementById('th-doc-iframe');
+  var titleEl = document.getElementById('th-doc-title');
+  if (!overlay) { showToast(descs[type]); return; }
+  if (titleEl) titleEl.textContent = titles[type] || type;
+  if (iframe) { iframe.src = 'about:blank'; iframe.style.display = 'none'; }
+  var info = overlay.querySelector('#th-doc-auto-info');
+  if (!info) {
+    info = document.createElement('div');
+    info.id = 'th-doc-auto-info';
+    info.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:40px;text-align:center;direction:rtl;';
+    overlay.appendChild(info);
+  }
+  info.innerHTML =
+    '<div style="font-size:48px;margin-bottom:20px">📄</div>' +
+    '<div style="font-size:18px;font-weight:700;margin-bottom:12px">' + titles[type] + '</div>' +
+    '<div style="font-size:14px;color:rgba(255,255,255,0.7);line-height:1.7">' + descs[type] + '</div>' +
+    '<div style="margin-top:24px;padding:12px 20px;background:rgba(48,209,88,0.15);border:1px solid rgba(48,209,88,0.3);border-radius:12px;font-size:13px;color:#30D158">ייווצר ויישלח אוטומטית</div>';
+  info.style.display = 'flex';
+  overlay.style.display = 'flex';
 };
 
 APP.thOpenStationsMap = function() {
@@ -8392,7 +8430,7 @@ APP.thSendDocs = async function() {
   if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
   try {
     const r = await gasPost('send_test_documents', {
-      vehicleId: STATE.vehicleId,
+      vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
       stationEmail: email
     });
     if (r.ok) {
@@ -8469,8 +8507,8 @@ APP.thConfirmTestPass = async function() {
   const today = new Date().toISOString().slice(0,10);
   try {
     const r = await gasPost('save_test_completion', {
-      vehicleId: STATE.vehicleId,
-      data: { date: today, formBase64: b64 }
+      vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
+      data: JSON.stringify({ date: today, formBase64: b64 })
     });
     if (r.ok) {
       var ps = document.getElementById('th-pass-success');
@@ -8495,7 +8533,7 @@ APP.thSubmitFail = async function() {
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
   try {
     var r = await gasPost('save_test_failure', {
-      vehicleId: STATE.vehicleId,
+      vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
       failReason: reason || '',
       failDate: new Date().toISOString().slice(0,10)
     });
@@ -8519,7 +8557,7 @@ APP.thSubmitFailReason = async function() {
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
   try {
     const r = await gasPost('save_test_failure', {
-      vehicleId: STATE.vehicleId, reason
+      vehicleId: (STATE.vehicle && STATE.vehicle.id) || '', reason
     });
     if (r.ok) {
       document.getElementById('th-fail-success')?.classList.remove('hidden');
@@ -8542,7 +8580,7 @@ APP.thSendInvoice = async function() {
   const b64 = await APP._fileToBase64(APP._invoiceFile);
   try {
     const r = await gasPost('send_test_invoice', {
-      vehicleId: STATE.vehicleId, invoiceBase64: b64, amount, testDate: date
+      vehicleId: (STATE.vehicle && STATE.vehicle.id) || '', invoiceBase64: b64, amount, testDate: date
     });
     if (r.ok) {
       document.getElementById('th-inv-success')?.classList.remove('hidden');
@@ -8597,6 +8635,10 @@ APP.thOpenDocViewer = function(docType) {
     insurance: v.insCompLink
   };
   const titles = { license: 'רישיון רכב', insurance: 'ביטוח חובה' };
+  // Restore iframe view in case the auto-doc info panel was shown previously.
+  var info = document.getElementById('th-doc-auto-info');
+  if (info) info.style.display = 'none';
+  if (iframe) iframe.style.display = '';
   if (iframe && urls[docType]) iframe.src = APP._thDrivePreviewUrl(urls[docType]);
   if (title) title.textContent = titles[docType] || docType;
   overlay.style.display = 'flex';
@@ -8614,7 +8656,10 @@ APP.thCloseDocViewer = function() {
   const overlay = document.getElementById('th-doc-viewer');
   if (overlay) { overlay.style.display = 'none'; }
   const iframe = document.getElementById('th-doc-iframe');
-  if (iframe) iframe.src = '';
+  if (iframe) { iframe.src = ''; iframe.style.display = ''; }
+  // Hide and reset the auto-doc info panel so the next open is clean.
+  const info = document.getElementById('th-doc-auto-info');
+  if (info) info.style.display = 'none';
 };
 
 // Aliases for screen-testhub HTML onclick handlers
