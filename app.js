@@ -8458,6 +8458,11 @@ APP.thSendDocs = async function() {
       var sb = document.getElementById('th-pds-success');
       if (sb) sb.style.display = 'flex';
       btn.textContent = 'נשלח ✓';
+      // אפשר שליחה חוזרת אחרי 3 שניות
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.textContent = 'שלח שוב';
+      }, 3000);
     } else {
       showToast('שגיאה בשליחה: ' + (r.error || ''));
       btn.disabled = false; btn.textContent = 'שלח מסמכים';
