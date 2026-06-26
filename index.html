@@ -320,14 +320,14 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .tc-lbl { font-size:12px; color:var(--t2); }
 .tc-tag { display:inline-block; border:1.5px solid rgba(255,255,255,0.18); border-radius:100px; padding:5px 14px; font-size:12px; font-weight:600; margin-top:10px; }
 
-/* KM MODAL - redesigned (compact) */
+/* KM MODAL — redesigned (dark/green iOS) */
 #km-modal-form.hidden, #km-modal-success.hidden { display:none !important; }
 
 .km-modal-overlay {
   position:fixed; inset:0; z-index:300;
-  background:rgba(0,0,0,0.75);
-  -webkit-backdrop-filter:blur(8px);
-  backdrop-filter:blur(8px);
+  background:rgba(0,0,0,0.85);
+  -webkit-backdrop-filter:blur(20px);
+  backdrop-filter:blur(20px);
   display:flex; align-items:flex-end; justify-content:center;
   animation:kmFade .25s ease both;
 }
@@ -335,287 +335,208 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
 .km-modal-card {
   width:100%; max-width:520px;
-  background:linear-gradient(180deg, #0f1729 0%, #0a0f1e 100%);
-  border-top:1px solid rgba(99,102,241,0.30);
+  background:#111;
+  border-top:1px solid rgba(48,209,88,0.15);
   border-radius:28px 28px 0 0;
-  padding:10px 16px 22px;
-  box-shadow:0 -20px 60px rgba(0,0,0,0.55), 0 -2px 0 rgba(99,102,241,0.18) inset;
+  padding:8px 18px 26px;
+  box-shadow:0 -24px 70px rgba(0,0,0,0.7), 0 -1px 0 rgba(48,209,88,0.12) inset;
   animation:kmSlideUp .42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  position:relative;
-  overflow:hidden;
+  position:relative; overflow:hidden;
 }
 .km-modal-card::before {
   content:""; position:absolute; top:0; left:50%; transform:translateX(-50%);
-  width:140px; height:140px; border-radius:50%;
-  background:radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%);
+  width:200px; height:140px; border-radius:50%;
+  background:radial-gradient(circle, rgba(48,209,88,0.10) 0%, transparent 70%);
   pointer-events:none;
 }
 
 .km-drag-handle {
-  width:40px; height:4px; border-radius:2px;
-  background:rgba(255,255,255,0.20);
-  margin:0 auto 12px;
+  width:38px; height:5px; border-radius:3px;
+  background:rgba(255,255,255,0.18);
+  margin:8px auto 16px;
 }
 
 .km-modal-header {
-  display:flex; align-items:center; gap:12px;
-  padding:0 2px;
-  margin-bottom:14px;
-  position:relative;
-  z-index:1;
+  display:flex; align-items:center; gap:13px;
+  padding:0 2px; margin-bottom:16px;
+  position:relative; z-index:1;
 }
 .km-modal-icon-tile {
-  width:48px; height:48px; flex-shrink:0;
-  border-radius:14px;
-  background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  width:50px; height:50px; flex-shrink:0;
+  border-radius:15px;
+  background:rgba(48,209,88,0.12);
+  border:1px solid rgba(48,209,88,0.20);
   display:flex; align-items:center; justify-content:center;
-  box-shadow:0 8px 20px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.10) inset;
 }
-.km-modal-icon-tile svg { width:26px; height:26px; }
+.km-modal-icon-tile svg { width:27px; height:27px; stroke:#30D158; }
 .km-modal-header-text { flex:1; min-width:0; }
 .km-modal-title {
-  font-size:18px; font-weight:800; color:#f8fafc;
+  font-size:19px; font-weight:800; color:#fff;
   letter-spacing:-0.02em; line-height:1.15;
 }
 .km-modal-subtitle {
-  font-size:12px; color:#94a3b8; margin-top:2px;
-  font-weight:500;
+  font-size:12.5px; color:#8A8A8E; margin-top:3px; font-weight:500;
 }
 
 .km-modal-close {
-  flex-shrink:0;
-  width:36px; height:36px;
-  border-radius:12px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.10);
-  -webkit-backdrop-filter:blur(10px);
-  backdrop-filter:blur(10px);
-  color:#cbd5e1;
+  flex-shrink:0; width:36px; height:36px; border-radius:12px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.07);
+  color:#8A8A8E;
   display:flex; align-items:center; justify-content:center;
-  cursor:pointer;
-  transition:background .18s ease, color .18s ease, transform .15s ease, border-color .18s ease;
-  padding:0;
+  cursor:pointer; padding:0;
+  transition:background .18s ease, color .18s ease, transform .15s ease;
 }
-.km-modal-close:hover {
-  background:rgba(255,255,255,0.12);
-  border-color:rgba(255,255,255,0.20);
-  color:#f8fafc;
-}
+.km-modal-close:hover { background:rgba(255,255,255,0.10); color:#fff; }
 .km-modal-close:active { transform:scale(0.92); }
 .km-modal-close svg { width:18px; height:18px; }
 
 .km-modal-prev {
-  display:flex; align-items:center; justify-content:space-between;
-  background:rgba(15,23,42,0.6);
-  border:1px solid rgba(99,102,241,0.15);
-  border-right:3px solid #8b5cf6;
-  border-radius:12px;
-  padding:9px 14px;
-  margin-bottom:10px;
-  font-size:12px; color:#cbd5e1;
+  display:inline-flex; align-items:center; gap:7px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:11px;
+  padding:7px 13px;
+  margin-bottom:20px;
+  font-size:12.5px; color:#8A8A8E; font-weight:600;
   position:relative; z-index:1;
 }
-.km-modal-prev strong {
-  color:#f8fafc; font-weight:800; font-size:14px;
-  letter-spacing:-0.01em;
-}
+.km-modal-prev strong { color:#30D158; font-weight:800; font-size:13.5px; letter-spacing:-0.01em; }
 
-.km-modal-input-wrap {
-  position:relative;
-  z-index:1;
+.km-stepper-row {
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  position:relative; z-index:1;
 }
+.km-stepper-btn {
+  flex-shrink:0; width:52px; height:52px; border-radius:50%;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.10);
+  color:#fff; font-size:30px; font-weight:300; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none;
+  transition:background .15s ease, transform .12s ease, border-color .15s ease;
+}
+.km-stepper-btn:hover { background:rgba(48,209,88,0.10); border-color:rgba(48,209,88,0.30); }
+.km-stepper-btn:active { transform:scale(0.90); }
+
+.km-modal-input-wrap { position:relative; flex:1; min-width:0; z-index:1; }
 .km-modal-input-wrap::before {
-  content:""; position:absolute; inset:-2px;
-  border-radius:18px;
-  background:radial-gradient(circle at 50% 50%, rgba(99,102,241,0.35), rgba(168,85,247,0.20) 45%, transparent 75%);
-  opacity:0;
-  filter:blur(14px);
-  transition:opacity .35s ease;
-  pointer-events:none;
-  z-index:-1;
+  content:""; position:absolute; inset:-3px; border-radius:20px;
+  background:radial-gradient(circle at 50% 50%, rgba(48,209,88,0.30), transparent 72%);
+  opacity:0; filter:blur(16px); transition:opacity .35s ease;
+  pointer-events:none; z-index:-1;
 }
-.km-modal-input-wrap.focused::before {
-  opacity:1;
-  animation:kmGlowPulse 2.2s ease-in-out infinite;
-}
+.km-modal-input-wrap.focused::before { opacity:1; animation:kmGlowPulse 2.2s ease-in-out infinite; }
 
 .km-modal-input {
   width:100%; box-sizing:border-box;
-  background:rgba(15,23,42,0.80);
-  border:2px solid rgba(99,102,241,0.30);
-  border-radius:16px;
-  padding:14px;
-  color:#f8fafc;
-  font-size:36px; font-weight:900;
-  font-family:inherit;
-  text-align:center;
-  outline:none;
-  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  background:rgba(255,255,255,0.03);
+  border:2px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  padding:14px 8px;
+  color:#fff;
+  font-size:48px; font-weight:900; font-family:inherit;
+  text-align:center; outline:none;
   -moz-appearance:textfield;
-  letter-spacing:-0.02em;
-  position:relative; z-index:1;
+  letter-spacing:-0.03em;
+  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 .km-modal-input::-webkit-outer-spin-button,
 .km-modal-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.km-modal-input::placeholder { color:#475569; font-weight:800; }
+.km-modal-input::placeholder { color:#3a3a3c; font-weight:900; }
 .km-modal-input:focus {
-  border-color:rgba(99,102,241,0.75);
-  background:rgba(15,23,42,0.95);
-  box-shadow:0 0 0 3px rgba(99,102,241,0.18);
+  border-color:rgba(48,209,88,0.65);
+  background:rgba(48,209,88,0.04);
+  box-shadow:0 0 0 4px rgba(48,209,88,0.12), 0 0 24px rgba(48,209,88,0.18);
+}
+
+.km-input-unit {
+  text-align:center; font-size:12px; color:#8A8A8E;
+  font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  margin:10px 0 0; position:relative; z-index:1;
 }
 
 .km-modal-error {
   background:rgba(255,59,48,0.10);
-  border:1px solid rgba(255,59,48,0.30);
-  border-radius:10px;
-  padding:8px 12px;
-  margin-top:8px;
-  color:#fca5a5; font-size:12px; font-weight:600;
-  text-align:center;
+  border:1px solid rgba(255,59,48,0.28);
+  border-radius:11px; padding:9px 13px; margin-top:14px;
+  color:#ff6961; font-size:12.5px; font-weight:600; text-align:center;
   animation:kmErrSlide .25s ease both;
   position:relative; z-index:1;
 }
 .km-modal-error.hidden { display:none !important; }
 
 .km-modal-submit {
-  width:100%; margin-top:12px;
-  height:50px;
-  background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-  border:none;
-  border-radius:14px;
-  color:#fff;
-  font-size:15px; font-weight:800; font-family:inherit;
-  cursor:pointer;
-  letter-spacing:0.01em;
+  width:100%; margin-top:20px; height:54px;
+  background:#30D158; border:none; border-radius:18px;
+  color:#000; font-size:16px; font-weight:800; font-family:inherit;
+  cursor:pointer; letter-spacing:0.01em;
   display:flex; align-items:center; justify-content:center; gap:10px;
-  box-shadow:0 12px 26px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.10) inset;
+  box-shadow:0 12px 28px rgba(48,209,88,0.30);
   transition:transform .15s ease, box-shadow .25s ease, filter .2s ease;
   position:relative; z-index:1;
 }
-.km-modal-submit:hover { filter:brightness(1.08); }
-.km-modal-submit:active { transform:scale(0.97); box-shadow:0 6px 18px rgba(99,102,241,0.35); }
-.km-modal-submit:disabled { opacity:.6; cursor:not-allowed; transform:none; filter:none; }
+.km-modal-submit:hover { filter:brightness(1.06); }
+.km-modal-submit:active { transform:scale(0.97); box-shadow:0 6px 18px rgba(48,209,88,0.28); }
+.km-modal-submit:disabled { opacity:.55; cursor:not-allowed; transform:none; filter:none; }
 
 .km-modal-spinner {
   width:22px; height:22px;
-  border:2.5px solid rgba(255,255,255,0.35);
-  border-top-color:#fff;
-  border-radius:50%;
+  border:2.5px solid rgba(0,0,0,0.30);
+  border-top-color:#000; border-radius:50%;
   animation:spin 0.7s linear infinite;
 }
 .km-modal-spinner.hidden { display:none; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
-/* ---- SUCCESS STATE ---- */
-.km-modal-success {
-  text-align:center; padding:14px 0 6px;
-  position:relative; z-index:1;
-}
-.km-modal-success.hidden { display:none; }
+.km-modal-success { text-align:center; padding:18px 0 8px; position:relative; z-index:1; }
 
 .km-success-burst {
-  position:relative;
-  width:160px; height:160px;
-  margin:0 auto 18px;
+  position:relative; width:150px; height:150px;
+  margin:0 auto 22px;
   display:flex; align-items:center; justify-content:center;
 }
 .km-success-burst::before {
-  content:""; position:absolute; inset:-10px;
-  background:radial-gradient(circle, rgba(34,197,94,0.30) 0%, rgba(99,102,241,0.18) 40%, transparent 70%);
-  border-radius:50%;
-  animation:kmGlow 1.8s ease-in-out infinite;
-}
-.km-success-burst::after {
-  content:""; position:absolute; inset:0;
-  background:
-    radial-gradient(circle at 50% 10%, #22c55e 1.5px, transparent 2px),
-    radial-gradient(circle at 90% 30%, #6366f1 1.5px, transparent 2px),
-    radial-gradient(circle at 85% 75%, #a855f7 1.5px, transparent 2px),
-    radial-gradient(circle at 50% 90%, #22c55e 1.5px, transparent 2px),
-    radial-gradient(circle at 15% 75%, #6366f1 1.5px, transparent 2px),
-    radial-gradient(circle at 10% 30%, #a855f7 1.5px, transparent 2px);
-  animation:kmConfetti 1.2s ease-out both;
-  pointer-events:none;
+  content:""; position:absolute; inset:-8px;
+  background:radial-gradient(circle, rgba(48,209,88,0.30) 0%, transparent 70%);
+  border-radius:50%; animation:kmGlow 1.8s ease-in-out infinite;
 }
 .km-success-ring {
   position:relative; z-index:2;
-  width:100px; height:100px;
-  border-radius:50%;
-  background:linear-gradient(135deg, rgba(34,197,94,0.18), rgba(99,102,241,0.18));
-  border:2px solid rgba(34,197,94,0.50);
+  width:104px; height:104px; border-radius:50%;
+  background:rgba(48,209,88,0.10);
+  border:2px solid rgba(48,209,88,0.45);
   display:flex; align-items:center; justify-content:center;
-  box-shadow:0 0 40px rgba(34,197,94,0.35), 0 0 0 1px rgba(255,255,255,0.05) inset;
+  box-shadow:0 0 44px rgba(48,209,88,0.30);
+  animation:kmPop .5s cubic-bezier(0.34,1.56,0.64,1) both;
 }
-.km-success-ring svg { width:62px; height:62px; }
+.km-success-ring svg { width:64px; height:64px; }
 .km-check-circle {
-  fill:none; stroke:#22c55e; stroke-width:2;
+  fill:none; stroke:#30D158; stroke-width:2;
   stroke-dasharray:166; stroke-dashoffset:166;
   animation:kmDraw .55s ease-out .1s forwards;
 }
 .km-check-mark {
-  fill:none; stroke:#22c55e; stroke-width:3.5;
+  fill:none; stroke:#30D158; stroke-width:3.5;
   stroke-linecap:round; stroke-linejoin:round;
   stroke-dasharray:48; stroke-dashoffset:48;
   animation:kmDraw .35s ease-out .55s forwards;
 }
+.km-success-val { font-size:34px; font-weight:900; color:#fff; letter-spacing:-0.02em; margin-bottom:8px; animation:kmFadeUp .4s ease .7s both; }
+.km-success-title { font-size:18px; font-weight:800; color:#30D158; margin-bottom:9px; animation:kmFadeUp .4s ease .85s both; }
+.km-success-sub { font-size:13px; color:#8A8A8E; line-height:1.5; padding:0 24px; animation:kmFadeUp .4s ease 1s both; }
 
-.km-success-val {
-  font-size:32px; font-weight:900;
-  color:#f8fafc;
-  letter-spacing:-0.02em;
-  margin-bottom:6px;
-  animation:kmFadeUp .4s ease .7s both;
-}
-.km-success-title {
-  font-size:17px; font-weight:800;
-  background:linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  -webkit-background-clip:text; background-clip:text;
-  -webkit-text-fill-color:transparent;
-  margin-bottom:8px;
-  animation:kmFadeUp .4s ease .85s both;
-}
-.km-success-sub {
-  font-size:13px; color:#94a3b8;
-  line-height:1.5; padding:0 24px;
-  animation:kmFadeUp .4s ease 1s both;
-}
-
-/* ---- ANIMATIONS ---- */
 @keyframes kmFade { from { opacity:0; } to { opacity:1; } }
-@keyframes kmSlideUp {
-  from { transform:translateY(100%); }
-  to   { transform:translateY(0); }
-}
-@keyframes kmSlideDown {
-  from { transform:translateY(0); }
-  to   { transform:translateY(100%); }
-}
-@keyframes kmErrSlide {
-  from { opacity:0; transform:translateY(-6px); }
-  to   { opacity:1; transform:translateY(0); }
-}
+@keyframes kmSlideUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+@keyframes kmSlideDown { from { transform:translateY(0); } to { transform:translateY(100%); } }
+@keyframes kmErrSlide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
 @keyframes kmDraw { to { stroke-dashoffset:0; } }
-@keyframes kmGlowPulse {
-  0%,100% { opacity:.55; transform:scale(0.98); }
-  50%     { opacity:1;   transform:scale(1.04); }
-}
-@keyframes kmGlow {
-  0%,100% { opacity:.6; transform:scale(1); }
-  50%     { opacity:1;  transform:scale(1.08); }
-}
-@keyframes kmConfetti {
-  0%   { opacity:0; transform:scale(0.5); }
-  60%  { opacity:1; transform:scale(1.15); }
-  100% { opacity:.85; transform:scale(1); }
-}
-@keyframes kmFadeUp {
-  from { opacity:0; transform:translateY(8px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-
+@keyframes kmPop { 0% { transform:scale(0.4); opacity:0; } 60% { transform:scale(1.08); } 100% { transform:scale(1); opacity:1; } }
+@keyframes kmGlowPulse { 0%,100% { opacity:.5; transform:scale(0.98); } 50% { opacity:1; transform:scale(1.04); } }
+@keyframes kmGlow { 0%,100% { opacity:.6; transform:scale(1); } 50% { opacity:1; transform:scale(1.08); } }
+@keyframes kmFadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 .km-modal-overlay.closing { animation:kmFade .3s ease reverse forwards; }
 .km-modal-overlay.closing .km-modal-card { animation:kmSlideDown .3s ease-in forwards; }
-@keyframes kmOverlayOut { to{opacity:0} }
 /* legacy km-card kept for service screen */
 .km-card { margin:16px 16px 0; background:var(--card); border-radius:18px; padding:18px; border:1px solid rgba(48,209,88,0.15); animation:fadeUp .4s ease .1s both; }
 .km-label { font-size:12px; color:var(--ok); font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
@@ -4665,10 +4586,10 @@ window.fcmDebug = async function() {
     <div id="km-modal-form">
       <div class="km-modal-header">
         <div class="km-modal-icon-tile">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 14l4-4"/>
             <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
-            <circle cx="12" cy="14" r="1.5" fill="#fff"/>
+            <circle cx="12" cy="14" r="1.5" fill="#30D158" stroke="none"/>
           </svg>
         </div>
         <div class="km-modal-header-text">
@@ -4677,20 +4598,22 @@ window.fcmDebug = async function() {
         </div>
         <button type="button" class="km-modal-close" aria-label="סגירה" onclick="APP.closeKmModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 6l12 12"/>
-            <path d="M18 6L6 18"/>
+            <path d="M6 6l12 12"/><path d="M18 6L6 18"/>
           </svg>
         </button>
       </div>
       <div class="km-modal-prev" id="km-modal-prev">ק"מ אחרון: <strong>—</strong></div>
-      <div class="km-modal-input-wrap" id="km-modal-input-wrap">
-        <input class="km-modal-input" id="km-modal-input" type="number" placeholder="0" inputmode="numeric"
-               onfocus="this.parentNode.classList.add('focused')"
-               onblur="this.parentNode.classList.remove('focused')">
+      <div class="km-stepper-row">
+        <button type="button" class="km-stepper-btn" aria-label="הפחת 10" onclick="var i=document.getElementById('km-modal-input');i.value=Math.max(0,(parseInt(i.value,10)||0)-10);i.dispatchEvent(new Event('input'));">−</button>
+        <div class="km-modal-input-wrap" id="km-modal-input-wrap">
+          <input class="km-modal-input" id="km-modal-input" type="number" placeholder="0" inputmode="numeric" onfocus="this.parentNode.classList.add('focused')" onblur="this.parentNode.classList.remove('focused')">
+        </div>
+        <button type="button" class="km-stepper-btn" aria-label="הוסף 10" onclick="var i=document.getElementById('km-modal-input');i.value=(parseInt(i.value,10)||0)+10;i.dispatchEvent(new Event('input'));">+</button>
       </div>
+      <div class="km-input-unit">קילומטרים</div>
       <div class="km-modal-error hidden" id="km-modal-error"></div>
       <button class="km-modal-submit" id="km-modal-submit" onclick="APP.submitKm()">
-        <span id="km-modal-btn-text">עדכן ק"מ ←</span>
+        <span id="km-modal-btn-text">עדכן ק"מ</span>
         <div class="km-modal-spinner hidden" id="km-modal-spinner"></div>
       </button>
     </div>
@@ -4704,7 +4627,7 @@ window.fcmDebug = async function() {
         </div>
       </div>
       <div class="km-success-val" id="km-success-val"></div>
-      <div class="km-success-title">✅ עודכן בהצלחה!</div>
+      <div class="km-success-title">ק"מ עודכן בהצלחה!</div>
       <div class="km-success-sub">הדיווח שלך מאפשר לנו לנהל את הצי בצורה מיטבית</div>
     </div>
   </div>
