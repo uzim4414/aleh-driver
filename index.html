@@ -157,6 +157,41 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .wash-screen-header{display:flex;align-items:center;gap:12px;padding:18px 16px 6px}
 .wash-screen-header .back-btn{width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer}
 .wash-screen-title{font-size:20px;font-weight:800;color:#fff}
+/* ══ WASH SCREEN (ws-) ══ */
+.wash-quota-pill { font-size:12px; font-weight:800; padding:4px 12px; border-radius:100px; background:rgba(8,145,178,0.15); color:#0891b2; border:1px solid rgba(8,145,178,0.3); }
+.ws-quota-row { display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px 0 0; }
+.ws-quota-dots { display:flex; gap:10px; }
+.ws-quota-dot { width:22px; height:22px; border-radius:50%; border:2px solid rgba(255,255,255,0.12); transition:all .3s; }
+.ws-quota-dot.used { background:#0891b2; border-color:#0891b2; box-shadow:0 0 10px rgba(8,145,178,0.5); }
+.ws-quota-label { font-size:12px; color:var(--t2); font-weight:600; }
+.ws-station-list { display:flex; flex-direction:column; gap:12px; padding:0 16px; }
+.ws-sc { background:var(--card); border-radius:20px; border:1px solid var(--border); border-right:3px solid #0891b2; overflow:hidden; transition:border-right-color .2s; }
+.ws-sc.highlight { border-right-color:#0891b2; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
+.ws-sc-head { padding:14px 16px 12px; cursor:pointer; display:flex; flex-direction:column; gap:8px; background:linear-gradient(135deg,rgba(8,145,178,.08) 0%,transparent 60%); }
+.ws-sc-row1 { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.ws-sc-name { font-size:16px; font-weight:800; color:var(--t1); letter-spacing:-.3px; }
+.ws-sc-addr { font-size:12px; color:var(--t2); margin-top:2px; }
+.ws-sc-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+.ws-sc-dist { font-size:11px; font-weight:700; color:var(--t2); background:rgba(255,255,255,.06); border-radius:100px; padding:3px 10px; direction:ltr; }
+.ws-sc-stars { font-size:13px; color:#FFB800; display:flex; align-items:center; gap:3px; }
+.ws-sc-stars span { font-size:11px; color:var(--t2); }
+.ws-sc-row2 { display:flex; align-items:center; gap:8px; }
+.ws-sc-status { display:flex; align-items:center; gap:5px; font-size:12px; font-weight:700; padding:4px 10px; border-radius:100px; }
+.ws-sc-status.open { background:rgba(8,145,178,.12); color:#0891b2; }
+.ws-sc-status.closed { background:rgba(255,69,58,.12); color:#FF453A; }
+.ws-sc-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.ws-sc-hours { font-size:11px; color:var(--t2); flex:1; }
+.ws-sc-chev { transition:transform .25s; color:var(--t3); flex-shrink:0; }
+.ws-sc.open .ws-sc-chev { transform:rotate(180deg); }
+.ws-sc-body { max-height:0; overflow:hidden; transition:max-height .3s cubic-bezier(.16,1,.3,1); }
+.ws-sc.open .ws-sc-body { max-height:320px; }
+.ws-sc-actions { display:grid; grid-template-columns:1fr; border-top:1px solid var(--border); }
+.ws-sc-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:14px 8px; background:transparent; border:none; color:var(--t1); font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; width:100%; }
+.ws-sc-btn:active { background:rgba(255,255,255,.06); }
+.ws-sc-btn-icon { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(8,145,178,.2); }
+.ws-confirm-bar { display:none; border-top:1px solid var(--border); padding:12px 16px; background:rgba(8,145,178,.05); }
+.ws-confirm-bar.visible { display:block; }
+.ws-confirm-btn { width:100%; padding:14px; background:#0891b2; color:#fff; font-weight:800; font-size:15px; border:none; border-radius:14px; cursor:pointer; font-family:inherit; box-shadow:0 8px 20px rgba(8,145,178,.3); }
 
 .bnav { background:rgba(16,16,16,0.93); backdrop-filter:blur(24px) saturate(1.8); -webkit-backdrop-filter:blur(24px) saturate(1.8); border:1px solid rgba(255,255,255,0.09); border-radius:28px; margin:6px 12px; margin-bottom:max(16px,env(safe-area-inset-bottom,16px)); display:flex; align-items:center; justify-content:space-around; padding:6px; flex-shrink:0; gap:3px; }
 .bn-item { display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; border-radius:22px; cursor:pointer; flex:1; transition:all .25s cubic-bezier(.16,1,.3,1); min-width:0; position:relative; }
@@ -4301,17 +4336,36 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
   <!-- WASH SCREEN -->
   <div class="screen" id="screen-wash" style="display:none">
-    <div class="wash-screen-header">
-      <button class="back-btn" onclick="APP.closeWash()" aria-label="חזרה">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <h2 class="wash-screen-title">רחיצת רכב</h2>
+    <div class="phead">
+      <div class="ph-row">
+        <button class="back-btn" onclick="APP.closeWash()" aria-label="חזרה" style="background:transparent;border:none;color:var(--t1);cursor:pointer;padding:0;display:flex;align-items:center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="ph-title">רחיצת רכב</div>
+        <div class="wash-quota-pill" id="wash-quota-pill">0/4</div>
+      </div>
+      <div class="ph-sub" id="wash-quota-sub">בחר תחנת פז עם שירות שטיפה</div>
     </div>
-    <div class="wash-quota-bar" id="wash-quota-bar">
-      <div class="wash-quota-dots" id="wash-quota-dots"></div>
-      <div class="wash-quota-label" id="wash-quota-label">רחיצות החודש</div>
+    <div class="content">
+      <!-- Quota dots -->
+      <div class="ws-quota-row" id="ws-quota-row">
+        <div class="ws-quota-dots" id="ws-quota-dots"></div>
+        <div class="ws-quota-label" id="ws-quota-label">0/4 רחיצות החודש</div>
+      </div>
+      <!-- Map -->
+      <div class="th-map-container" id="ws-map-wrap" style="position:relative;">
+        <div id="ws-leaflet-map" style="width:100%;height:240px;border-radius:16px;overflow:hidden;position:relative;z-index:1;"></div>
+      </div>
+      <!-- Sort bar -->
+      <div class="th-sort-bar">
+        <span class="th-sort-label">מיון:</span>
+        <button class="th-sort-btn active" id="ws-sort-dist" onclick="APP._wsSort('dist')">קרבה</button>
+        <button class="th-sort-btn" id="ws-sort-rating" onclick="APP._wsSort('rating')">דירוג</button>
+      </div>
+      <!-- Station cards -->
+      <div class="ws-station-list" id="ws-station-list"></div>
+      <div style="height:100px;"></div>
     </div>
-    <div class="wash-stations-list" id="wash-stations-list" style="overflow-y:auto"></div>
   </div><!-- /screen-wash -->
 
   <!-- Help FAB (draggable) -->

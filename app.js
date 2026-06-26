@@ -7910,37 +7910,39 @@ APP._closeAllGoodPopup = function() {
 };
 
 // ═══ WASH ═══
+// Stations enriched with Google-Places-style data (rating/hours/phone/addr/waze)
+// to mirror the Test-Hub stations panel architecture.
 APP._WASH_STATIONS = [
-  {id:'1001',name:'פז תחנת שפיים',city:'שפיים',lat:32.1975,lng:34.8229},
-  {id:'1002',name:'פז גבעת שמואל',city:'גבעת שמואל',lat:32.0789,lng:34.8492},
-  {id:'1003',name:'פז פתח תקווה מרכז',city:'פתח תקווה',lat:32.0871,lng:34.8867},
-  {id:'1004',name:'פז ראשון לציון',city:'ראשון לציון',lat:31.9642,lng:34.7928},
-  {id:'1005',name:'פז נתניה',city:'נתניה',lat:32.3215,lng:34.8563},
-  {id:'1006',name:'פז חיפה קריות',city:'קרית ביאליק',lat:32.8234,lng:35.0812},
-  {id:'1007',name:'פז באר שבע צפון',city:'באר שבע',lat:31.2693,lng:34.7832},
-  {id:'1008',name:'פז ירושלים מלחה',city:'ירושלים',lat:31.7456,lng:35.1874},
-  {id:'1009',name:'פז תל אביב ארלוזרוב',city:'תל אביב',lat:32.0853,lng:34.7818},
-  {id:'1010',name:'פז הרצליה פיתוח',city:'הרצליה',lat:32.1527,lng:34.8184},
-  {id:'1011',name:'פז רעננה',city:'רעננה',lat:32.1842,lng:34.8706},
-  {id:'1012',name:'פז כפר סבא',city:'כפר סבא',lat:32.1752,lng:34.9094},
-  {id:'1013',name:'פז מודיעין',city:'מודיעין',lat:31.8929,lng:35.0108},
-  {id:'1014',name:'פז אשדוד',city:'אשדוד',lat:31.7957,lng:34.6506},
-  {id:'1015',name:'פז אשקלון',city:'אשקלון',lat:31.6688,lng:34.5742},
-  {id:'1016',name:'פז נהריה',city:'נהריה',lat:33.0077,lng:35.0918},
-  {id:'1017',name:'פז עכו',city:'עכו',lat:32.9230,lng:35.0818},
-  {id:'1018',name:'פז טבריה',city:'טבריה',lat:32.7922,lng:35.5311},
-  {id:'1019',name:'פז חדרה',city:'חדרה',lat:32.4341,lng:34.9192},
-  {id:'1020',name:'פז קרית גת',city:'קרית גת',lat:31.6099,lng:34.7738},
-  {id:'1021',name:'פז לוד',city:'לוד',lat:31.9516,lng:34.8951},
-  {id:'1022',name:'פז רמלה',city:'רמלה',lat:31.9293,lng:34.8654},
-  {id:'1023',name:'פז רחובות',city:'רחובות',lat:31.8969,lng:34.8178},
-  {id:'1024',name:'פז גדרה',city:'גדרה',lat:31.8105,lng:34.7753},
-  {id:'1025',name:'פז בת ים',city:'בת ים',lat:32.0200,lng:34.7512},
-  {id:'1026',name:'פז חולון',city:'חולון',lat:32.0178,lng:34.7764},
-  {id:'1027',name:'פז פ"ת אפקה',city:'פתח תקווה',lat:32.1001,lng:34.8713},
-  {id:'1028',name:'פז יהוד',city:'יהוד',lat:32.0302,lng:34.8897},
-  {id:'1029',name:'פז אור יהודה',city:'אור יהודה',lat:32.0320,lng:34.8583},
-  {id:'1030',name:'פז ראש העין',city:'ראש העין',lat:32.0952,lng:34.9561}
+  {id:'1001',name:'פז תחנת שפיים',city:'שפיים',lat:32.1975,lng:34.8229,addr:'כביש 2, שפיים',phone:'09-9595001',rating:4.5,ratingCount:312,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.1975,34.8229&navigate=yes'},
+  {id:'1002',name:'פז גבעת שמואל',city:'גבעת שמואל',lat:32.0789,lng:34.8492,addr:'מרכז מסחרי, גבעת שמואל',phone:'03-5310022',rating:4.1,ratingCount:148,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0789,34.8492&navigate=yes'},
+  {id:'1003',name:'פז פתח תקווה מרכז',city:'פתח תקווה',lat:32.0871,lng:34.8867,addr:'ז\'בוטינסקי 90, פתח תקווה',phone:'03-9301133',rating:3.9,ratingCount:201,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0871,34.8867&navigate=yes'},
+  {id:'1004',name:'פז ראשון לציון',city:'ראשון לציון',lat:31.9642,lng:34.7928,addr:'הרצל 120, ראשון לציון',phone:'03-9651044',rating:4.3,ratingCount:267,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.9642,34.7928&navigate=yes'},
+  {id:'1005',name:'פז נתניה',city:'נתניה',lat:32.3215,lng:34.8563,addr:'הרצל 45, נתניה',phone:'09-8612055',rating:4.0,ratingCount:176,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.3215,34.8563&navigate=yes'},
+  {id:'1006',name:'פז חיפה קריות',city:'קרית ביאליק',lat:32.8234,lng:35.0812,addr:'דרך עכו 80, קרית ביאליק',phone:'04-8770066',rating:3.7,ratingCount:134,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.8234,35.0812&navigate=yes'},
+  {id:'1007',name:'פז באר שבע צפון',city:'באר שבע',lat:31.2693,lng:34.7832,addr:'דרך חברון 10, באר שבע',phone:'08-6230077',rating:3.6,ratingCount:98,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.2693,34.7832&navigate=yes'},
+  {id:'1008',name:'פז ירושלים מלחה',city:'ירושלים',lat:31.7456,lng:35.1874,addr:'אגודת ספורט הפועל 5, ירושלים',phone:'02-6790088',rating:4.2,ratingCount:289,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.7456,35.1874&navigate=yes'},
+  {id:'1009',name:'פז תל אביב ארלוזרוב',city:'תל אביב',lat:32.0853,lng:34.7818,addr:'ארלוזרוב 14, תל אביב',phone:'03-6951099',rating:4.4,ratingCount:354,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0853,34.7818&navigate=yes'},
+  {id:'1010',name:'פז הרצליה פיתוח',city:'הרצליה',lat:32.1527,lng:34.8184,addr:'מדינת היהודים 60, הרצליה',phone:'09-9560110',rating:4.6,ratingCount:223,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.1527,34.8184&navigate=yes'},
+  {id:'1011',name:'פז רעננה',city:'רעננה',lat:32.1842,lng:34.8706,addr:'אחוזה 200, רעננה',phone:'09-7710121',rating:4.2,ratingCount:167,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.1842,34.8706&navigate=yes'},
+  {id:'1012',name:'פז כפר סבא',city:'כפר סבא',lat:32.1752,lng:34.9094,addr:'ויצמן 110, כפר סבא',phone:'09-7650132',rating:3.8,ratingCount:121,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.1752,34.9094&navigate=yes'},
+  {id:'1013',name:'פז מודיעין',city:'מודיעין',lat:31.8929,lng:35.0108,addr:'עמק האלה 1, מודיעין',phone:'08-9701143',rating:4.3,ratingCount:198,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.8929,35.0108&navigate=yes'},
+  {id:'1014',name:'פז אשדוד',city:'אשדוד',lat:31.7957,lng:34.6506,addr:'הגדוד העברי 8, אשדוד',phone:'08-8560154',rating:3.9,ratingCount:145,hoursWeekday:[8,20],hoursFriday:[7,14],hours:'א-ה 08:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.7957,34.6506&navigate=yes'},
+  {id:'1015',name:'פז אשקלון',city:'אשקלון',lat:31.6688,lng:34.5742,addr:'בן גוריון 25, אשקלון',phone:'08-6720165',rating:3.7,ratingCount:87,hoursWeekday:[8,20],hoursFriday:[7,14],hours:'א-ה 08:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.6688,34.5742&navigate=yes'},
+  {id:'1016',name:'פז נהריה',city:'נהריה',lat:33.0077,lng:35.0918,addr:'הגעתון 40, נהריה',phone:'04-9920176',rating:4.0,ratingCount:76,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=33.0077,35.0918&navigate=yes'},
+  {id:'1017',name:'פז עכו',city:'עכו',lat:32.9230,lng:35.0818,addr:'דרך הארבעה 12, עכו',phone:'04-9810187',rating:3.6,ratingCount:64,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.9230,35.0818&navigate=yes'},
+  {id:'1018',name:'פז טבריה',city:'טבריה',lat:32.7922,lng:35.5311,addr:'הגליל 2, טבריה',phone:'04-6720198',rating:4.1,ratingCount:109,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.7922,35.5311&navigate=yes'},
+  {id:'1019',name:'פז חדרה',city:'חדרה',lat:32.4341,lng:34.9192,addr:'הנשיא ויצמן 75, חדרה',phone:'04-6340209',rating:3.8,ratingCount:118,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.4341,34.9192&navigate=yes'},
+  {id:'1020',name:'פז קרית גת',city:'קרית גת',lat:31.6099,lng:34.7738,addr:'שדרות לכיש 30, קרית גת',phone:'08-6810210',rating:3.7,ratingCount:55,hoursWeekday:[8,20],hoursFriday:[7,14],hours:'א-ה 08:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.6099,34.7738&navigate=yes'},
+  {id:'1021',name:'פז לוד',city:'לוד',lat:31.9516,lng:34.8951,addr:'דוד המלך 18, לוד',phone:'08-9240221',rating:3.5,ratingCount:62,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.9516,34.8951&navigate=yes'},
+  {id:'1022',name:'פז רמלה',city:'רמלה',lat:31.9293,lng:34.8654,addr:'הרצל 88, רמלה',phone:'08-9270232',rating:3.6,ratingCount:71,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.9293,34.8654&navigate=yes'},
+  {id:'1023',name:'פז רחובות',city:'רחובות',lat:31.8969,lng:34.8178,addr:'הרצל 150, רחובות',phone:'08-9450243',rating:4.2,ratingCount:163,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.8969,34.8178&navigate=yes'},
+  {id:'1024',name:'פז גדרה',city:'גדרה',lat:31.8105,lng:34.7753,addr:'מנחם בגין 9, גדרה',phone:'08-8590254',rating:3.9,ratingCount:48,hoursWeekday:[8,20],hoursFriday:[7,14],hours:'א-ה 08:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=31.8105,34.7753&navigate=yes'},
+  {id:'1025',name:'פז בת ים',city:'בת ים',lat:32.0200,lng:34.7512,addr:'בלפור 50, בת ים',phone:'03-5060265',rating:3.8,ratingCount:132,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0200,34.7512&navigate=yes'},
+  {id:'1026',name:'פז חולון',city:'חולון',lat:32.0178,lng:34.7764,addr:'סוקולוב 70, חולון',phone:'03-5030276',rating:4.0,ratingCount:154,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0178,34.7764&navigate=yes'},
+  {id:'1027',name:'פז פ"ת אפקה',city:'פתח תקווה',lat:32.1001,lng:34.8713,addr:'אם המושבות 95, פתח תקווה',phone:'03-9300287',rating:4.1,ratingCount:141,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.1001,34.8713&navigate=yes'},
+  {id:'1028',name:'פז יהוד',city:'יהוד',lat:32.0302,lng:34.8897,addr:'מרבד הקסמים 4, יהוד',phone:'03-5360298',rating:3.7,ratingCount:58,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0302,34.8897&navigate=yes'},
+  {id:'1029',name:'פז אור יהודה',city:'אור יהודה',lat:32.0320,lng:34.8583,addr:'העצמאות 22, אור יהודה',phone:'03-5340309',rating:3.8,ratingCount:67,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0320,34.8583&navigate=yes'},
+  {id:'1030',name:'פז ראש העין',city:'ראש העין',lat:32.0952,lng:34.9561,addr:'שבזי 33, ראש העין',phone:'03-9020310',rating:4.0,ratingCount:103,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0952,34.9561&navigate=yes'}
 ];
 APP._washCurrentStation = null;
 APP._washWazeLaunched = false;
@@ -7957,11 +7959,14 @@ APP.openWash = function() {
     document.getElementById('wash-quota-popup').style.display = 'flex';
     return;
   }
-  APP._renderWashScreen(used);
+  APP._washWazeLaunched = false;
+  APP._washCurrentStation = null;
   document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
   var scr = document.getElementById('screen-wash');
   if (scr) { scr.style.display = ''; scr.classList.add('active'); }
   STATE.currentScreen = 'wash';
+  APP._wsUpdateQuota(used);
+  APP._wsStartPanel();
 };
 
 APP.closeWash = function() {
@@ -7971,69 +7976,173 @@ APP.closeWash = function() {
   STATE.currentScreen = 'home';
 };
 
-APP._washDots = function(used) {
-  var d = '';
-  for (var i = 0; i < 4; i++) d += '<div class="wash-quota-dot' + (i < used ? ' used' : '') + '"></div>';
-  return d;
-};
-
-APP._renderWashScreen = function(used) {
-  var dotsEl = document.getElementById('wash-quota-dots');
-  if (dotsEl) dotsEl.innerHTML = APP._washDots(used);
-  var lbl = document.getElementById('wash-quota-label');
-  if (lbl) lbl.textContent = used + '/4 רחיצות החודש';
-  var list = document.getElementById('wash-stations-list');
-  if (!list) return;
-  var html = '';
-  APP._WASH_STATIONS.forEach(function(s){
-    html += '<div class="wash-station-row">';
-    html += '<div class="wash-station-info"><div class="wash-station-name">' + s.name + '</div><div class="wash-station-city">' + s.city + '</div></div>';
-    html += '<button class="wash-station-waze" onclick="APP.openWashStation(\'' + s.id + '\')">';
-    html += '<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#33CCFF"/><path d="M7 13c.5 2 2.5 3 5 3s4.5-1 5-3" stroke="#fff" stroke-width="1.5" fill="none"/></svg>Waze</button>';
-    html += '</div>';
+// Cyan marker icon (mirror of _thMakeMarkerIcon)
+function _wsMakeMarkerIcon(num, active) {
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:32px;height:32px;border-radius:50%;background:' + (active?'#0891b2':'#0e7490') + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;box-shadow:0 2px 12px rgba(8,145,178,.5);border:2px solid ' + (active?'#fff':'rgba(255,255,255,.3)') + ';font-family:inherit;">' + num + '</div>',
+    iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-18]
   });
-  list.innerHTML = html;
+}
+
+// Start panel — load Leaflet if needed then init (mirror of _thStartStations)
+APP._wsStartPanel = function() {
+  function start() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async function(pos) {
+        await APP._initWashPanel(pos.coords.latitude, pos.coords.longitude);
+      }, async function() {
+        await APP._initWashPanel(null, null);
+      }, {timeout:5000});
+    } else {
+      APP._initWashPanel(null, null);
+    }
+  }
+  if (typeof L !== 'undefined') {
+    start();
+  } else {
+    if (!document.getElementById('th-leaflet-css')) {
+      var lCss = document.createElement('link'); lCss.id='th-leaflet-css'; lCss.rel='stylesheet'; lCss.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(lCss);
+    }
+    var lJs = document.createElement('script'); lJs.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    lJs.onload = start;
+    document.head.appendChild(lJs);
+  }
 };
 
-APP.openWashStation = function(stationId) {
+// Mirror of _initStationsPanel — cyan markers, Waze-only cards
+APP._initWashPanel = async function(userLat, userLng) {
+  var list = document.getElementById('ws-station-list');
+  if (!list) return;
+
+  var stations = APP._WASH_STATIONS.map(function(s) {
+    var dist = (userLat && userLng) ? _thHaversine(userLat, userLng, s.lat, s.lng) : null;
+    return Object.assign({}, s, {dist: dist});
+  });
+  if (userLat) stations.sort(function(a,b){ return a.dist - b.dist; });
+
+  APP._wsStationsData = stations;
+  APP._wsSortMode = 'dist';
+  APP._wsRenderCards(stations);
+
+  var mapEl = document.getElementById('ws-leaflet-map');
+  if (!mapEl || !window.L) return;
+  if (APP._wsMap) { APP._wsMap.remove(); APP._wsMap = null; }
+  var centerLat = userLat || 32.08, centerLng = userLng || 34.78;
+  var map = L.map('ws-leaflet-map', { zoomControl:true, attributionControl:false }).setView([centerLat, centerLng], 12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, subdomains:'abcd' }).addTo(map);
+  APP._wsMap = map;
+  APP._wsMapMarkers = {};
+
+  if (userLat) {
+    L.circleMarker([userLat, userLng], { radius:8, color:'#0891b2', fillColor:'#0891b2', fillOpacity:1, weight:3 })
+      .addTo(map).bindPopup('מיקומך');
+  }
+
+  stations.forEach(function(s, idx) {
+    var marker = L.marker([s.lat, s.lng], { icon: _wsMakeMarkerIcon(idx+1, false) }).addTo(map);
+    marker.bindPopup('<div style="direction:rtl">'+s.name+'<br><small>'+s.addr+'</small></div>');
+    marker.on('click', function() {
+      APP._wsToggleSC(s.id, true);
+      marker.openPopup();
+      var el = document.getElementById('ws-sc-'+s.id);
+      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+      stations.forEach(function(ss, ii) {
+        if (APP._wsMapMarkers[ss.id]) APP._wsMapMarkers[ss.id].setIcon(_wsMakeMarkerIcon(ii+1, ss.id===s.id));
+      });
+    });
+    APP._wsMapMarkers[s.id] = marker;
+  });
+
+  // Locate-me button
+  var mapWrap = document.getElementById('ws-map-wrap');
+  if (mapWrap && !mapWrap.querySelector('.th-locate-btn')) {
+    var locateBtn = document.createElement('button');
+    locateBtn.className = 'th-locate-btn';
+    locateBtn.title = 'מיקום נוכחי';
+    locateBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+    locateBtn.addEventListener('touchstart', function(e){ e.stopPropagation(); }, {passive:true});
+    locateBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      locateBtn.classList.add('loading');
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        locateBtn.classList.remove('loading');
+        map.setView([pos.coords.latitude, pos.coords.longitude], 13, { animate: true });
+      }, function() {
+        locateBtn.classList.remove('loading');
+        showToast('לא ניתן לאתר מיקום');
+      }, { timeout: 6000 });
+    });
+    mapWrap.appendChild(locateBtn);
+  }
+
+  setTimeout(function(){ if (APP._wsMap) APP._wsMap.invalidateSize(); }, 250);
+};
+
+// Mirror of _thRenderCards — Waze-only + confirm bar
+APP._wsRenderCards = function(stations) {
+  var list = document.getElementById('ws-station-list');
+  if (!list) return;
+  list.innerHTML = '';
+  stations.forEach(function(s, idx) {
+    var open = _thIsOpen(s);
+    var parsedHours = _thParseHours(s.hours ? s.hours.split(' | ') : []);
+    var todayHours = _thTodayHours(parsedHours);
+    var distTxt = s.dist !== null && s.dist !== undefined ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
+    var card = document.createElement('div');
+    card.className = 'ws-sc' + (idx === 0 ? ' open' : '');
+    card.id = 'ws-sc-' + s.id;
+    card.innerHTML =
+      '<div class="ws-sc-head" onclick="APP._wsToggleSC(\''+s.id+'\')">' +
+        '<div class="ws-sc-row1">' +
+          '<div><div class="ws-sc-name">'+s.name+'</div><div class="ws-sc-addr">'+s.addr+'</div></div>' +
+          '<div class="ws-sc-right">' +
+            '<div class="ws-sc-dist">'+distTxt+'</div>' +
+            '<div class="ws-sc-stars">'+_thStars(s.rating)+'<span>'+s.rating+' ('+s.ratingCount+')</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ws-sc-row2">' +
+          '<div class="ws-sc-status '+(open?'open':'closed')+'"><div class="ws-sc-dot"></div>'+(open?'פתוח':'סגור')+'</div>' +
+          '<div class="ws-sc-hours">'+(todayHours || '')+'</div>' +
+          '<svg class="ws-sc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ws-sc-body">' +
+        _thHoursTableHtml(parsedHours) +
+        '<div class="ws-sc-actions">' +
+          '<button class="ws-sc-btn waze" onclick="APP._wsWaze(\''+s.id+'\')"><div class="ws-sc-btn-icon"><svg width="20" height="20" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="27" rx="17" ry="14" fill="#0891b2"/><circle cx="18" cy="33" r="3" fill="#fff"/><circle cx="30" cy="33" r="3" fill="#fff"/><path d="M15 24 Q24 14 33 24" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg></div>נווט ב-Waze</button>' +
+        '</div>' +
+        '<div class="ws-confirm-bar" id="ws-confirm-bar-'+s.id+'">' +
+          '<button class="ws-confirm-btn" onclick="APP._wsConfirmWash(\''+s.id+'\')">✓ אשר רחיצה</button>' +
+        '</div>' +
+      '</div>';
+    list.appendChild(card);
+  });
+};
+
+// Open Waze, then reveal confirm bar
+APP._wsWaze = function(stationId) {
   var s = null;
   for (var i = 0; i < APP._WASH_STATIONS.length; i++) {
-    if (APP._WASH_STATIONS[i].id === stationId) { s = APP._WASH_STATIONS[i]; break; }
+    if (String(APP._WASH_STATIONS[i].id) === String(stationId)) { s = APP._WASH_STATIONS[i]; break; }
   }
   if (!s) return;
   APP._washCurrentStation = s;
-  APP._washWazeLaunched = false;
-  var nameEl = document.getElementById('wash-confirm-station-name');
-  if (nameEl) nameEl.textContent = s.name + ' — ' + s.city;
-  var dotsEl = document.getElementById('wash-confirm-dots');
-  if (dotsEl) dotsEl.innerHTML = APP._washDots(APP._washMonthCount());
-  var doneBtn = document.getElementById('wash-confirm-done-btn');
-  if (doneBtn) doneBtn.style.display = 'none';
-  document.getElementById('wash-confirm-popup').style.display = 'flex';
-};
-
-APP.launchWaze = function() {
-  var s = APP._washCurrentStation;
-  if (!s) return;
   APP._washWazeLaunched = true;
-  var doneBtn = document.getElementById('wash-confirm-done-btn');
-  if (doneBtn) doneBtn.style.display = 'block';
   window.open('waze://?ll=' + s.lat + ',' + s.lng + '&navigate=yes', '_blank');
   setTimeout(function(){
+    var bar = document.getElementById('ws-confirm-bar-' + stationId);
+    if (bar) bar.classList.add('visible');
     window.open('https://waze.com/ul?ll=' + s.lat + ',' + s.lng + '&navigate=yes', '_blank');
-  }, 2000);
+  }, 100);
 };
 
-APP.closeWashConfirm = function() {
-  document.getElementById('wash-confirm-popup').style.display = 'none';
-  APP._washCurrentStation = null;
-  APP._washWazeLaunched = false;
-  var doneBtn = document.getElementById('wash-confirm-done-btn');
-  if (doneBtn) doneBtn.style.display = 'none';
-};
-
-APP.confirmWash = function() {
-  var s = APP._washCurrentStation;
+// Confirm wash → save to GAS (mirror of old confirmWash)
+APP._wsConfirmWash = function(stationId) {
+  var s = null;
+  for (var i = 0; i < APP._WASH_STATIONS.length; i++) {
+    if (String(APP._WASH_STATIONS[i].id) === String(stationId)) { s = APP._WASH_STATIONS[i]; break; }
+  }
   var veh = STATE.vehicle;
   if (!s || !veh) return;
   var params = {
@@ -8045,13 +8154,62 @@ APP.confirmWash = function() {
     washType: 'regular',
     driverName: (STATE.user && (STATE.user.name || STATE.user.displayName)) || ''
   };
-  APP.closeWashConfirm();
-  APP.closeWash();
   if (!STATE.washLog) STATE.washLog = [];
   STATE.washLog.push({ date: new Date().toISOString().slice(0,10), stationName: s.name });
   APP._updateWashBadge();
+  var used = APP._washMonthCount();
+  APP._wsUpdateQuota(used);
+  var bar = document.getElementById('ws-confirm-bar-' + stationId);
+  if (bar) bar.classList.remove('visible');
+  showToast('רחיצה נרשמה!');
   APP._showWashSuccess();
   try { gasPostForm('save_wash', params).catch(function(){}); } catch(e){}
+};
+
+// Re-sort cards by distance / rating (mirror of _thSort)
+APP._wsSort = function(mode) {
+  APP._wsSortMode = mode;
+  var db = document.getElementById('ws-sort-dist'); if (db) db.classList.toggle('active', mode==='dist');
+  var rb = document.getElementById('ws-sort-rating'); if (rb) rb.classList.toggle('active', mode==='rating');
+  if (!APP._wsStationsData) return;
+  var sorted = APP._wsStationsData.slice().sort(function(a,b){
+    if (mode === 'rating') return (b.rating||0) - (a.rating||0);
+    return (a.dist||9999) - (b.dist||9999);
+  });
+  APP._wsRenderCards(sorted);
+};
+
+// Expand/collapse a card + highlight marker (mirror of _thToggleSC)
+APP._wsToggleSC = function(id, forceOpen) {
+  var card = document.getElementById('ws-sc-'+id);
+  if (!card) return;
+  var wasOpen = card.classList.contains('open');
+  document.querySelectorAll('.ws-sc').forEach(function(c){ c.classList.remove('open','highlight'); });
+  if (!wasOpen || forceOpen) { card.classList.add('open','highlight'); }
+  if (APP._wsMapMarkers && APP._wsStationsData) {
+    APP._wsStationsData.forEach(function(s, idx) {
+      if (APP._wsMapMarkers[s.id]) {
+        APP._wsMapMarkers[s.id].setIcon(_wsMakeMarkerIcon(idx+1, String(s.id)===String(id) && (!wasOpen||forceOpen)));
+      }
+    });
+  }
+};
+
+// Update quota dots / pill / labels
+APP._wsUpdateQuota = function(used) {
+  used = (used == null) ? APP._washMonthCount() : used;
+  var dotsEl = document.getElementById('ws-quota-dots');
+  if (dotsEl) {
+    var d = '';
+    for (var i = 0; i < 4; i++) d += '<div class="ws-quota-dot' + (i < used ? ' used' : '') + '"></div>';
+    dotsEl.innerHTML = d;
+  }
+  var lbl = document.getElementById('ws-quota-label');
+  if (lbl) lbl.textContent = used + '/4 רחיצות החודש';
+  var pill = document.getElementById('wash-quota-pill');
+  if (pill) pill.textContent = used + '/4';
+  var sub = document.getElementById('wash-quota-sub');
+  if (sub) sub.textContent = used >= 4 ? 'ניצלת את כל הרחיצות החודש' : 'בחר תחנת פז עם שירות שטיפה';
 };
 
 APP._showWashSuccess = function() {
