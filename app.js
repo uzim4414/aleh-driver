@@ -8546,10 +8546,13 @@ APP.thSendDocs = async function() {
   // הסר error div קודם אם יש
   var prevErr = document.getElementById('th-send-error');
   if (prevErr) prevErr.style.display = 'none';
+  var _docsGps = {lat:'', lng:''};
+  try { var _dg = await APP._getGps(4000); if (_dg && _dg.lat) { _docsGps = {lat:String(_dg.lat), lng:String(_dg.lng)}; } } catch(_dge){}
   try {
     var r = await gasPost('send_test_documents', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
-      stationEmail: email
+      stationEmail: email,
+      lat: _docsGps.lat, lng: _docsGps.lng
     });
     if (r && r.ok) {
       // success — הצג banner
@@ -8627,10 +8630,13 @@ APP.thConfirmTestPass = async function() {
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
   const b64 = await APP._fileToBase64(APP._testFormFile);
   const today = new Date().toISOString().slice(0,10);
+  // GPS — ניסיון silent, לא חוסם אם נכשל
+  var gpsCoords = {lat:'', lng:''};
+  try { var _g = await APP._getGps(4000); if (_g && _g.lat) { gpsCoords = {lat:String(_g.lat), lng:String(_g.lng)}; } } catch(_ge){}
   try {
     const r = await gasPostForm('save_test_completion', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
-      data: JSON.stringify({ date: today, formBase64: b64 })
+      data: JSON.stringify({ date: today, formBase64: b64, lat: gpsCoords.lat, lng: gpsCoords.lng })
     });
     if (r.ok) {
       var ps = document.getElementById('th-pass-success');
