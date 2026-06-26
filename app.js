@@ -8412,12 +8412,15 @@ APP._thToggleSC = function(id, forceOpen) {
 APP.thOcrScanEmail = function() {
   var input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
   input.onchange = async function(e) {
-    var file = e.target.files[0]; if (!file) return;
+    var file = e.target.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
     var overlay = document.getElementById('th-ocr-overlay');
     if (overlay) overlay.style.display = 'flex';
-    var b64 = await APP._fileToBase64(file);
     try {
+      var b64 = await APP._fileToBase64(file);
       var r = await gasPost('ocr_extract_email', { imageBase64: b64 });
       if (overlay) overlay.style.display = 'none';
       if (r && r.ok && r.email) {
@@ -8425,13 +8428,15 @@ APP.thOcrScanEmail = function() {
         if (inp) { inp.value = r.email; inp.focus(); }
         showToast('מייל זוהה: ' + r.email);
       } else {
-        APP._thEmailManualFallback('לא זוהה מייל בתמונה — הזן ידנית');
+        APP._thEmailManualFallback('לא זוהה מייל — הזן ידנית');
       }
     } catch(err) {
       if (overlay) overlay.style.display = 'none';
-      APP._thEmailManualFallback('זיהוי אוטומטי נכשל — הזן מייל ידנית');
+      APP._thEmailManualFallback('שגיאה: ' + ((err && err.message) || 'נסה שנית'));
     }
   };
+  // חייב להיות ב-DOM לפני click — נדרש על iOS/Android PWA
+  document.body.appendChild(input);
   input.click();
 };
 
@@ -8467,7 +8472,7 @@ APP.thSendDocs = async function() {
       if (sb) sb.style.display = 'flex';
       // מצב "נשלח" — אנימציה 3 שניות
       btn.className = btn.className.replace(/\b(sending|resend)\b/g, '').trim() + ' sent';
-      btn.innerHTML = '<span style="display:flex;align-items:center;gap:8px;position:relative;z-index:1"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>נשלח בהצלחה!</span>';
+      btn.innerHTML = '<span style="font-size:17px;font-weight:800;position:relative;z-index:1;letter-spacing:-0.3px">נשלח בהצלחה!</span>';
       // אחרי 3 שניות — מצב "שלח שוב"
       setTimeout(function() {
         btn.className = btn.className.replace(/\b(sent)\b/g, '').trim() + ' resend';
