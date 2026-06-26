@@ -976,6 +976,7 @@ function _sessionExpired() {
   localStorage.removeItem(SESSION_KEY);
   STATE.idToken = null;
   STATE.vehicle = null;
+  STATE._washLogLoaded = false; STATE.washLog = [];
   STATE.user = null;
   var _hfab2 = document.getElementById('help-fab'); if (_hfab2) _hfab2.style.display = 'none';
 
@@ -1608,6 +1609,7 @@ function pkConfirmSelect() {
   var el = document.getElementById('screen-picker');
   if (el) el.classList.add('hidden');
   STATE.vehicle      = chosen;
+  STATE._washLogLoaded = false; STATE.washLog = [];
   STATE.isActualHolder = chosen.isActualHolder || false;
   saveSession(STATE.idToken, chosen, STATE.user);
   showGreeting((chosen.holder) || STATE.user.name);
@@ -1678,6 +1680,7 @@ async function handleGoogleCredential(response) {
     } else {
       // Single vehicle — proceed as before
       STATE.vehicle      = result.vehicle;
+      STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.isActualHolder = result.isActualHolder || false;
       // Write lastLogin
       var _ek = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
@@ -1707,6 +1710,7 @@ async function demoLogin() {
     STATE.idToken = 'demo_token';
     const result = await gasPost('driver_auth');
     STATE.vehicle = result.vehicle;
+    STATE._washLogLoaded = false; STATE.washLog = [];
     STATE.user = { email: 'demo@aleh.org', name: 'משה כהן', picture: '' };
     saveSession(STATE.idToken, STATE.vehicle, STATE.user);
     await loadFullData();
@@ -1764,6 +1768,7 @@ async function loadFullData() {
   try {
     const result = await gasPost('driver_vehicle');
     STATE.vehicle   = result.vehicle;
+    STATE._washLogLoaded = false; STATE.washLog = [];
     STATE.fuelData  = result.fuelData  || null;
     STATE.documents = (result.documents && result.documents.length)
       ? result.documents
@@ -7795,6 +7800,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (session && session.token !== 'demo_token') {
     STATE.idToken = session.token;
     STATE.vehicle = session.vehicleData;
+    STATE._washLogLoaded = false; STATE.washLog = [];
     STATE.user    = session.userInfo;
 
     // If token already expired — clear silently and fall through to login (no scary overlay)
@@ -7802,6 +7808,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       localStorage.removeItem(SESSION_KEY);
       STATE.idToken = null;
       STATE.vehicle = null;
+      STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.user    = null;
     } else {
       try {
@@ -7974,6 +7981,12 @@ APP.openWash = function() {
           APP._updateWashBadge();
           var used2 = APP._washMonthCount();
           APP._wsUpdateQuota(used2);
+          // Re-check quota now that Firebase data is loaded
+          if (used2 >= 4 && STATE.currentScreen === 'wash') {
+            var scr = document.getElementById('screen-wash');
+            if (scr) { scr.classList.remove('active'); scr.style.display = 'none'; }
+            document.getElementById('wash-quota-popup').style.display = 'flex';
+          }
         }
       }).catch(function(e){ console.warn('[washLog fetch]', e); });
     }
@@ -8213,7 +8226,6 @@ APP._wsWaze = function(stationId) {
   setTimeout(function(){
     var bar = document.getElementById('ws-confirm-bar-' + stationId);
     if (bar) bar.classList.add('visible');
-    window.open('https://waze.com/ul?ll=' + s.lat + ',' + s.lng + '&navigate=yes', '_blank');
   }, 100);
 };
 
@@ -8248,6 +8260,11 @@ APP._wsConfirmWash = function(stationId) {
   gasPostForm('save_wash', params).then(function(r) {
     if (r && r.quotaFull) showToast('מכסה חודשית מלאה (4/4)');
   }).catch(function(err) {
+    // Rollback optimistic update
+    if (STATE.washLog && STATE.washLog.length > 0) STATE.washLog.pop();
+    APP._updateWashBadge();
+    var usedAfter = APP._washMonthCount();
+    APP._wsUpdateQuota(usedAfter);
     showToast('שגיאה בשמירת הרחיצה: ' + (err.message || 'שגיאת שרת'));
     console.error('[save_wash]', err);
   });

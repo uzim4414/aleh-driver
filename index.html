@@ -4826,30 +4826,6 @@ window.fcmDebug = async function() {
   </div>
 </div>
 
-<!-- WASH CONFIRM POPUP -->
-<div id="wash-confirm-popup" style="display:none" class="overlay-backdrop">
-  <div class="wash-confirm-card">
-    <button class="modal-close-x" onclick="APP.closeWashConfirm()" aria-label="סגירה">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
-    </button>
-    <div class="wash-confirm-icon-tile">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 12c0-4 3-7 8-7s8 3 8 7"/><path d="M2 16c0 2.2 1.8 4 4 4h12c2.2 0 4-1.8 4-4v-1H2v1z"/>
-      </svg>
-    </div>
-    <div class="wash-confirm-title">לחץ על Waze להגעה</div>
-    <div class="wash-confirm-station" id="wash-confirm-station-name"></div>
-    <div class="wash-confirm-dots" id="wash-confirm-dots"></div>
-    <button class="wash-confirm-waze-btn" id="wash-confirm-waze-btn" onclick="APP.launchWaze()">
-      <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#33CCFF"/><path d="M7 13c.5 2 2.5 3 5 3s4.5-1 5-3" stroke="#fff" stroke-width="1.5" fill="none"/></svg>
-      פתח ב-Waze
-    </button>
-    <button class="wash-confirm-done-btn" id="wash-confirm-done-btn" onclick="APP.confirmWash()" style="display:none">
-      אישור רחיצה ✓
-    </button>
-  </div>
-</div>
-
 <!-- WASH SUCCESS POPUP -->
 <div id="wash-success-popup" style="display:none" class="overlay-backdrop">
   <div class="wash-confirm-card" style="background:linear-gradient(160deg,rgba(48,209,88,0.12) 0%,#111 55%);border-color:rgba(48,209,88,0.2)">
