@@ -164,6 +164,24 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .ws-quota-dot { width:22px; height:22px; border-radius:50%; border:2px solid rgba(255,255,255,0.12); transition:all .3s; }
 .ws-quota-dot.used { background:#0891b2; border-color:#0891b2; box-shadow:0 0 10px rgba(8,145,178,0.5); }
 .ws-quota-label { font-size:12px; color:var(--t2); font-weight:600; }
+/* ── WASH QUOTA WAVE BAR ─────────────────────────────── */
+.ws-wave-bar { margin:14px 16px 4px; position:relative; height:72px; background:rgba(8,145,178,0.06); border:1px solid rgba(8,145,178,0.2); border-radius:20px; overflow:hidden; }
+.ws-wave-fill { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(180deg,rgba(8,145,178,0.7) 0%,rgba(8,145,178,0.9) 100%); transition:height .8s cubic-bezier(.16,1,.3,1); }
+.ws-wave-svg { position:absolute; top:-14px; left:-10px; right:-10px; width:calc(100% + 20px); animation:wsWaveMove 2.5s linear infinite; }
+.ws-wave-svg2 { position:absolute; top:-10px; left:-10px; right:-10px; width:calc(100% + 20px); animation:wsWaveMove 3.8s linear infinite reverse; opacity:0.5; }
+@keyframes wsWaveMove { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+.ws-wave-count { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:2; }
+.ws-wave-num { font-size:26px; font-weight:900; color:#fff; letter-spacing:-1px; text-shadow:0 2px 8px rgba(0,0,0,0.5); line-height:1; }
+.ws-wave-sub { font-size:11px; font-weight:600; color:rgba(255,255,255,0.75); margin-top:3px; }
+.ws-wave-drops { position:absolute; top:8px; right:12px; display:flex; gap:5px; z-index:2; }
+.ws-drop { width:8px; height:10px; border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; background:rgba(255,255,255,0.4); transition:all .4s; }
+.ws-drop.filled { background:#fff; box-shadow:0 0 6px rgba(255,255,255,0.6); }
+.ws-drop.filled:nth-child(1) { animation:wsDrop 1.8s ease-in-out infinite; }
+.ws-drop.filled:nth-child(2) { animation:wsDrop 1.8s ease-in-out .2s infinite; }
+.ws-drop.filled:nth-child(3) { animation:wsDrop 1.8s ease-in-out .4s infinite; }
+.ws-drop.filled:nth-child(4) { animation:wsDrop 1.8s ease-in-out .6s infinite; }
+@keyframes wsDrop { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-3px) scale(1.15)} }
+.ws-wave-border-glow { position:absolute; inset:0; border-radius:20px; box-shadow:inset 0 0 20px rgba(8,145,178,0.1); pointer-events:none; }
 .ws-station-list { display:flex; flex-direction:column; gap:12px; padding:0 16px; }
 .ws-sc { background:var(--card); border-radius:20px; border:1px solid var(--border); border-right:3px solid #0891b2; overflow:hidden; transition:border-right-color .2s; }
 .ws-sc.highlight { border-right-color:#0891b2; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
@@ -177,8 +195,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .ws-sc-stars span { font-size:11px; color:var(--t2); }
 .ws-sc-row2 { display:flex; align-items:center; gap:8px; }
 .ws-sc-status { display:flex; align-items:center; gap:5px; font-size:12px; font-weight:700; padding:4px 10px; border-radius:100px; }
-.ws-sc-status.open { background:rgba(8,145,178,.12); color:#0891b2; }
+.ws-sc-status.open { background:rgba(8,145,178,.12); color:#0891b2; animation:wsStatusGlow 3s ease-in-out infinite; }
 .ws-sc-status.closed { background:rgba(255,69,58,.12); color:#FF453A; }
+@keyframes wsStatusGlow { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 10px rgba(8,145,178,0.4)} }
+.ws-sc-status.open .ws-sc-dot { animation:wsOpenPulse 1.6s ease-in-out infinite; }
+.ws-sc-status.closed .ws-sc-dot { animation:wsClosedBlink 1.4s ease-in-out infinite; }
+@keyframes wsOpenPulse { 0%,100%{box-shadow:0 0 0 0 rgba(8,145,178,0.7);transform:scale(1)} 50%{box-shadow:0 0 0 5px rgba(8,145,178,0);transform:scale(1.25)} }
+@keyframes wsClosedBlink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.65)} }
 .ws-sc-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
 .ws-sc-hours { font-size:11px; color:var(--t2); flex:1; }
 .ws-sc-chev { transition:transform .25s; color:var(--t3); flex-shrink:0; }
@@ -4347,10 +4370,22 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       <div class="ph-sub" id="wash-quota-sub">בחר תחנת פז עם שירות שטיפה</div>
     </div>
     <div class="content">
-      <!-- Quota dots -->
-      <div class="ws-quota-row" id="ws-quota-row">
-        <div class="ws-quota-dots" id="ws-quota-dots"></div>
-        <div class="ws-quota-label" id="ws-quota-label">0/4 רחיצות החודש</div>
+      <!-- Quota wave bar -->
+      <div class="ws-wave-bar" id="ws-wave-bar">
+        <div class="ws-wave-fill" id="ws-wave-fill" style="height:0%">
+          <svg class="ws-wave-svg" viewBox="0 0 400 30" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+            <path d="M0,15 C50,5 100,25 150,15 C200,5 250,25 300,15 C350,5 400,25 400,15 L800,15 C850,5 900,25 950,15 C1000,5 1050,25 1100,15 C1150,5 1200,25 1200,15 L1200,30 L0,30 Z" fill="rgba(8,145,178,0.6)"/>
+          </svg>
+          <svg class="ws-wave-svg2" viewBox="0 0 400 30" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+            <path d="M0,18 C60,8 120,28 180,18 C240,8 300,28 360,18 C420,8 480,28 540,18 C600,8 660,28 720,18 C780,8 800,28 800,18 L800,30 L0,30 Z" fill="rgba(8,145,178,0.4)"/>
+          </svg>
+        </div>
+        <div class="ws-wave-count">
+          <div class="ws-wave-num" id="ws-wave-num">0/4</div>
+          <div class="ws-wave-sub" id="ws-wave-sub">רחיצות החודש</div>
+        </div>
+        <div class="ws-wave-drops" id="ws-wave-drops"></div>
+        <div class="ws-wave-border-glow"></div>
       </div>
       <!-- Map -->
       <div class="th-map-container" id="ws-map-wrap" style="position:relative;">

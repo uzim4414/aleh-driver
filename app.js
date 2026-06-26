@@ -7954,6 +7954,30 @@ APP._washMonthCount = function() {
 
 APP.openWash = function() {
   if (!STATE.vehicle) return;
+  // Ensure washLog is loaded from Firebase (survives reload)
+  if (!STATE._washLogLoaded) {
+    STATE._washLogLoaded = true;
+    var vehFb = STATE.vehicle;
+    var vid = vehFb && (vehFb.id || vehFb.num);
+    if (vid && typeof firebase !== 'undefined') {
+      var thisMonth = new Date().toISOString().slice(0,7).replace('-','');
+      firebase.database().ref('washLog/' + vid + '/' + thisMonth).once('value').then(function(snap) {
+        if (snap.exists()) {
+          var data = snap.val();
+          if (!STATE.washLog) STATE.washLog = [];
+          Object.values(data).forEach(function(entry) {
+            if (entry && entry.date) {
+              var exists = STATE.washLog.some(function(w){ return w.date === entry.date && w.stationName === entry.stationName; });
+              if (!exists) STATE.washLog.push({ date: entry.date, stationName: entry.stationName || '' });
+            }
+          });
+          APP._updateWashBadge();
+          var used2 = APP._washMonthCount();
+          APP._wsUpdateQuota(used2);
+        }
+      }).catch(function(e){ console.warn('[washLog fetch]', e); });
+    }
+  }
   var used = APP._washMonthCount();
   if (used >= 4) {
     document.getElementById('wash-quota-popup').style.display = 'flex';
@@ -8019,7 +8043,14 @@ APP._initWashPanel = async function(userLat, userLng) {
     var dist = (userLat && userLng) ? _thHaversine(userLat, userLng, s.lat, s.lng) : null;
     return Object.assign({}, s, {dist: dist});
   });
-  if (userLat) stations.sort(function(a,b){ return a.dist - b.dist; });
+  if (userLat) {
+    // Show only stations within 30km — expand to 100km if fewer than 3 found
+    var nearby = stations.filter(function(s){ return s.dist !== null && s.dist <= 30; });
+    if (nearby.length < 3) nearby = stations.filter(function(s){ return s.dist !== null && s.dist <= 100; });
+    if (nearby.length < 3) nearby = stations; // fallback: show all
+    stations = nearby;
+    stations.sort(function(a,b){ return a.dist - b.dist; });
+  }
 
   APP._wsStationsData = stations;
   APP._wsSortMode = 'dist';
@@ -8076,8 +8107,57 @@ APP._initWashPanel = async function(userLat, userLng) {
     mapWrap.appendChild(locateBtn);
   }
 
+  // Re-filter cards when map is panned/zoomed
+  var _wsMapTimer = null;
+  map.on('moveend', function() {
+    clearTimeout(_wsMapTimer);
+    _wsMapTimer = setTimeout(function() {
+      var bounds = map.getBounds();
+      var visible = APP._WASH_STATIONS.filter(function(s) {
+        return bounds.contains([s.lat, s.lng]);
+      }).map(function(s) {
+        var dist = (userLat && userLng) ? _thHaversine(userLat, userLng, s.lat, s.lng) : null;
+        return Object.assign({}, s, {dist: dist});
+      });
+      if (visible.length === 0) return; // don't clear list if nothing in bounds
+      if (APP._wsSortMode === 'rating') {
+        visible.sort(function(a,b){ return (b.rating||0) - (a.rating||0); });
+      } else {
+        visible.sort(function(a,b){ return (a.dist||9999) - (b.dist||9999); });
+      }
+      APP._wsStationsData = visible;
+      APP._wsRenderCards(visible);
+    }, 600);
+  });
+
   setTimeout(function(){ if (APP._wsMap) APP._wsMap.invalidateSize(); }, 250);
 };
+
+// Parse wash station hours string "א-ה HH:MM–HH:MM | ו HH:MM–HH:MM" into 7-day array
+function _wsParseHoursStr(hoursStr) {
+  var dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  var todayIdx = new Date().getDay(); // 0=Sun
+  var weekdayHours = 'סגור', fridayHours = 'סגור';
+  if (hoursStr) {
+    var parts = hoursStr.split(' | ');
+    var timeRe = /(\d{1,2}:\d{2}[–\-]\d{1,2}:\d{2})/;
+    if (parts.length >= 2) {
+      var m1 = parts[0].match(timeRe), m2 = parts[1].match(timeRe);
+      if (m1) weekdayHours = m1[1];
+      if (m2) fridayHours = m2[1];
+    } else if (parts.length === 1) {
+      var m0 = parts[0].match(timeRe);
+      if (m0) weekdayHours = m0[1];
+    }
+  }
+  return dayNames.map(function(name, i) {
+    var h;
+    if (i === 6) h = 'סגור'; // שבת
+    else if (i === 5) h = fridayHours; // שישי
+    else h = weekdayHours; // ראשון-חמישי
+    return { day: name, hours: h, isToday: (i === todayIdx) };
+  });
+}
 
 // Mirror of _thRenderCards — Waze-only + confirm bar
 APP._wsRenderCards = function(stations) {
@@ -8086,7 +8166,7 @@ APP._wsRenderCards = function(stations) {
   list.innerHTML = '';
   stations.forEach(function(s, idx) {
     var open = _thIsOpen(s);
-    var parsedHours = _thParseHours(s.hours ? s.hours.split(' | ') : []);
+    var parsedHours = _wsParseHoursStr(s.hours || '');
     var todayHours = _thTodayHours(parsedHours);
     var distTxt = s.dist !== null && s.dist !== undefined ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
     var card = document.createElement('div');
@@ -8144,9 +8224,11 @@ APP._wsConfirmWash = function(stationId) {
     if (String(APP._WASH_STATIONS[i].id) === String(stationId)) { s = APP._WASH_STATIONS[i]; break; }
   }
   var veh = STATE.vehicle;
-  if (!s || !veh) return;
+  if (!s || !veh) { showToast('שגיאה: אין נתוני רכב'); return; }
+  var vehicleId = veh.id || veh.vehicleId || veh.num || '';
+  if (!vehicleId) { showToast('שגיאה: מזהה רכב חסר'); return; }
   var params = {
-    vehicleId: veh.id || veh.vehicleId || veh.num || '',
+    vehicleId: vehicleId,
     plate: veh.num || '',
     stationId: s.id,
     stationName: s.name,
@@ -8163,7 +8245,12 @@ APP._wsConfirmWash = function(stationId) {
   if (bar) bar.classList.remove('visible');
   showToast('רחיצה נרשמה!');
   APP._showWashSuccess();
-  try { gasPostForm('save_wash', params).catch(function(){}); } catch(e){}
+  gasPostForm('save_wash', params).then(function(r) {
+    if (r && r.quotaFull) showToast('מכסה חודשית מלאה (4/4)');
+  }).catch(function(err) {
+    showToast('שגיאה בשמירת הרחיצה: ' + (err.message || 'שגיאת שרת'));
+    console.error('[save_wash]', err);
+  });
 };
 
 // Re-sort cards by distance / rating (mirror of _thSort)
@@ -8210,6 +8297,19 @@ APP._wsUpdateQuota = function(used) {
   if (pill) pill.textContent = used + '/4';
   var sub = document.getElementById('wash-quota-sub');
   if (sub) sub.textContent = used >= 4 ? 'ניצלת את כל הרחיצות החודש' : 'בחר תחנת פז עם שירות שטיפה';
+  // Wave bar
+  var fill = document.getElementById('ws-wave-fill');
+  if (fill) fill.style.height = Math.round(used/4*100) + '%';
+  var waveNum = document.getElementById('ws-wave-num');
+  if (waveNum) waveNum.textContent = used + '/4';
+  var waveSub = document.getElementById('ws-wave-sub');
+  if (waveSub) waveSub.textContent = used >= 4 ? 'מכסה מלאה!' : 'רחיצות החודש';
+  var dropsEl = document.getElementById('ws-wave-drops');
+  if (dropsEl) {
+    var dd = '';
+    for (var i = 0; i < 4; i++) dd += '<div class="ws-drop' + (i < used ? ' filled' : '') + '"></div>';
+    dropsEl.innerHTML = dd;
+  }
 };
 
 APP._showWashSuccess = function() {
