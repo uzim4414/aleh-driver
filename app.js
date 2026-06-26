@@ -7863,8 +7863,8 @@ document.addEventListener('visibilitychange', async function() {
 APP.openTestHub = function() {
   var v = STATE.vehicle || {};
   // date-gate: חלון 40 יום לפני testDue
-  if (v.testDue && !v.testPendingApproval) {
-    var daysToTest = Math.ceil((new Date(v.testDue) - new Date()) / 86400000);
+  if (v.testDue && !v.testDone && !v.testPendingApproval) {
+    var daysToTest = Math.round((new Date(v.testDue) - new Date()) / 86400000);
     if (daysToTest > 40) {
       APP._showAllGoodPopup(daysToTest);
       return;
@@ -7890,6 +7890,9 @@ APP._showAllGoodPopup = function(days) {
   if (daysEl) daysEl.textContent = days;
   var labelEl = document.getElementById('th-allgood-days-label');
   if (labelEl) labelEl.textContent = days === 1 ? 'יום' : 'ימים';
+  // retrigger one-shot CSS animation on reopen (animation-fill-mode:both blocks replay)
+  var _agCard = document.getElementById('th-allgood-card');
+  if (_agCard) { _agCard.style.animation = 'none'; void _agCard.offsetWidth; _agCard.style.animation = ''; }
   overlay.style.display = 'flex';
   // סגירה בלחיצה על backdrop
   overlay.onclick = function(e) {
