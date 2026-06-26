@@ -7857,6 +7857,32 @@ APP._initTestHub = function() {
   var insEl = document.getElementById('th-pds-insurance-date');
   if (insEl) insEl.textContent = v.insCompExp ? 'בתוקף עד ' + formatDate(v.insCompExp) : 'בתוקף —';
 
+  // ── Step 1 (Checklist) "מסמכים" category: fill expiry dates + auto-check by validity ──
+  function _thDocStatus(dateStr) {
+    if (!dateStr) return 'missing';
+    var d = new Date(dateStr);
+    if (isNaN(d)) return 'missing';
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    return d >= today ? 'valid' : 'expired';
+  }
+  function _thFillDoc(dateElId, dateVal) {
+    var dateEl = document.getElementById(dateElId);
+    if (!dateEl) return;
+    var status = _thDocStatus(dateVal);
+    dateEl.textContent = dateVal ? 'תוקף עד: ' + formatDate(dateVal) : 'תוקף עד: —';
+    var item = dateEl.closest('.doc-item');
+    if (!item) return;
+    var badge = item.querySelector('.doc-badge');
+    if (badge) {
+      badge.classList.remove('ok', 'expired', 'overdue', 'warn');
+      if (status === 'valid')       { badge.classList.add('ok');      badge.textContent = 'תקין'; }
+      else if (status === 'expired'){ badge.classList.add('expired'); badge.textContent = 'פג תוקף'; }
+      else                          { badge.classList.add('expired'); badge.textContent = 'חסר'; }
+    }
+  }
+  _thFillDoc('th-doc-license-date',   v.licExp);
+  _thFillDoc('th-doc-insurance-date', v.insCompExp);
+
   // Update map with real GPS (bug 2)
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
