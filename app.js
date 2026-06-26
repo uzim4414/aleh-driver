@@ -1014,8 +1014,29 @@ async function gasPost(action, extra, opts) {
 
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
   const url = GAS_URL + '?' + new URLSearchParams(params).toString();
-  const resp = await fetch(url, { method: 'GET' });
-  const data = await resp.json();
+  let resp;
+  try {
+    resp = await fetch(url, { method: 'GET' });
+  } catch(netErr) {
+    if (opts.silent) return { ok: false, error: 'network_error' };
+    throw new Error('שגיאת חיבור: ' + (netErr && netErr.message ? netErr.message : netErr));
+  }
+  let text;
+  try {
+    text = await resp.text();
+  } catch(e) {
+    if (opts.silent) return { ok: false, error: 'response_read_error' };
+    throw new Error('שגיאת קריאת תגובה');
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch(e) {
+    // GAS החזיר HTML במקום JSON — שגיאת שרת
+    var snippet = String(text || '').substring(0, 200).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (opts.silent) return { ok: false, error: 'server_html: ' + snippet };
+    throw new Error('שגיאת שרת: ' + snippet);
+  }
   if (!data.ok) {
     if (!opts.silent && data.error && (data.error.includes('idToken') || data.error === 'unauthorized')) {
       _sessionExpired();
@@ -8442,7 +8463,7 @@ APP.thSendDocs = async function() {
       btn.disabled = false; btn.textContent = 'שלח מסמכים';
     }
   } catch(e) {
-    showToast('שגיאת רשת');
+    showToast((e && e.message) ? e.message : 'שגיאת שליחה');
     btn.disabled = false; btn.textContent = 'שלח מסמכים';
   }
 };
