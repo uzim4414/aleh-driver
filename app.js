@@ -8443,45 +8443,63 @@ APP._thEmailManualFallback = function(msg) {
 };
 
 APP.thSendDocs = async function() {
-  const email = (document.getElementById('th-station-email') || document.getElementById('th-pds-email'))?.value?.trim();
+  var email = ((document.getElementById('th-station-email') || document.getElementById('th-pds-email')) || {}).value;
+  email = email ? email.trim() : '';
   if (!email || !email.includes('@')) {
     showToast('נא להזין כתובת מייל תקינה'); return;
   }
-  const btn = document.getElementById('th-pds-send-cta');
-  if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
+  var btn = document.getElementById('th-pds-send-cta');
+  if (!btn) return;
+  // מצב שליחה
+  btn.className = btn.className.replace(/\b(sent|resend|sending)\b/g, '').trim() + ' sending';
+  btn.innerHTML = '<span style="display:flex;align-items:center;gap:8px;position:relative;z-index:1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="50" stroke-dashoffset="50" style="animation:dashAnim 1s linear infinite"><circle cx="12" cy="12" r="9"/></svg>שולח...</span>';
+  // הסר error div קודם אם יש
+  var prevErr = document.getElementById('th-send-error');
+  if (prevErr) prevErr.style.display = 'none';
   try {
-    const r = await gasPost('send_test_documents', {
+    var r = await gasPost('send_test_documents', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
       stationEmail: email
     });
-    if (r.ok) {
+    if (r && r.ok) {
+      // success — הצג banner
       var sb = document.getElementById('th-pds-success');
       if (sb) sb.style.display = 'flex';
-      btn.textContent = 'נשלח ✓';
-      // אפשר שליחה חוזרת אחרי 3 שניות
+      // מצב "נשלח" — אנימציה 3 שניות
+      btn.className = btn.className.replace(/\b(sending|resend)\b/g, '').trim() + ' sent';
+      btn.innerHTML = '<span style="display:flex;align-items:center;gap:8px;position:relative;z-index:1"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>נשלח בהצלחה!</span>';
+      // אחרי 3 שניות — מצב "שלח שוב"
       setTimeout(function() {
-        btn.disabled = false;
-        btn.textContent = 'שלח שוב';
+        btn.className = btn.className.replace(/\b(sent)\b/g, '').trim() + ' resend';
+        btn.innerHTML = '<span style="display:flex;align-items:center;gap:8px;position:relative;z-index:1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>שלח שוב</span>';
       }, 3000);
     } else {
-      showToast('שגיאה בשליחה: ' + (r.error || ''));
-      btn.disabled = false; btn.textContent = 'שלח מסמכים';
+      // שגיאת שרת
+      btn.className = btn.className.replace(/\b(sending|sent|resend)\b/g, '').trim();
+      btn.innerHTML = '<span style="position:relative;z-index:1">שלח מסמכים</span>';
+      var errDiv = document.getElementById('th-send-error');
+      if (!errDiv) {
+        errDiv = document.createElement('div');
+        errDiv.id = 'th-send-error';
+        errDiv.style.cssText = 'background:#3D1A1A;color:#FF6B6B;border:1px solid #FF453A;border-radius:10px;padding:12px 16px;font-size:13px;direction:rtl;margin-top:8px;white-space:pre-wrap;word-break:break-all;';
+        btn.parentNode && btn.parentNode.appendChild(errDiv);
+      }
+      errDiv.textContent = '⚠ ' + (r.error || 'שגיאה לא ידועה');
+      errDiv.style.display = 'block';
     }
   } catch(e) {
-    var errMsg = (e && e.message) ? e.message : 'שגיאת שליחה';
-    console.error('[thSendDocs]', errMsg, e);
-    // הצג שגיאה ב-div קבוע (לא toast שנעלם)
-    var errDiv = document.getElementById('th-send-error');
-    if (!errDiv) {
-      errDiv = document.createElement('div');
-      errDiv.id = 'th-send-error';
-      errDiv.style.cssText = 'background:#3D1A1A;color:#FF6B6B;border:1px solid #FF453A;border-radius:10px;padding:12px 16px;font-size:13px;direction:rtl;margin-top:8px;white-space:pre-wrap;word-break:break-all;';
-      var sendArea = btn && btn.parentNode;
-      if (sendArea) sendArea.appendChild(errDiv);
+    btn.className = btn.className.replace(/\b(sending|sent|resend)\b/g, '').trim();
+    btn.innerHTML = '<span style="position:relative;z-index:1">שלח מסמכים</span>';
+    var errDiv2 = document.getElementById('th-send-error');
+    if (!errDiv2) {
+      errDiv2 = document.createElement('div');
+      errDiv2.id = 'th-send-error';
+      errDiv2.style.cssText = 'background:#3D1A1A;color:#FF6B6B;border:1px solid #FF453A;border-radius:10px;padding:12px 16px;font-size:13px;direction:rtl;margin-top:8px;white-space:pre-wrap;word-break:break-all;';
+      btn.parentNode && btn.parentNode.appendChild(errDiv2);
     }
-    errDiv.textContent = '⚠ ' + errMsg;
-    errDiv.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'שלח מסמכים';
+    errDiv2.textContent = '⚠ ' + ((e && e.message) ? e.message : 'שגיאת שליחה');
+    errDiv2.style.display = 'block';
+    console.error('[thSendDocs]', e);
   }
 };
 
