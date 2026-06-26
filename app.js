@@ -8463,7 +8463,19 @@ APP.thSendDocs = async function() {
       btn.disabled = false; btn.textContent = 'שלח מסמכים';
     }
   } catch(e) {
-    showToast((e && e.message) ? e.message : 'שגיאת שליחה');
+    var errMsg = (e && e.message) ? e.message : 'שגיאת שליחה';
+    console.error('[thSendDocs]', errMsg, e);
+    // הצג שגיאה ב-div קבוע (לא toast שנעלם)
+    var errDiv = document.getElementById('th-send-error');
+    if (!errDiv) {
+      errDiv = document.createElement('div');
+      errDiv.id = 'th-send-error';
+      errDiv.style.cssText = 'background:#3D1A1A;color:#FF6B6B;border:1px solid #FF453A;border-radius:10px;padding:12px 16px;font-size:13px;direction:rtl;margin-top:8px;white-space:pre-wrap;word-break:break-all;';
+      var sendArea = btn && btn.parentNode;
+      if (sendArea) sendArea.appendChild(errDiv);
+    }
+    errDiv.textContent = '⚠ ' + errMsg;
+    errDiv.style.display = 'block';
     btn.disabled = false; btn.textContent = 'שלח מסמכים';
   }
 };
