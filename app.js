@@ -8593,31 +8593,7 @@ APP.thSendDocs = async function() {
   }
 };
 
-APP.thCaptureEmail = function() {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-  input.onchange = async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const overlay = document.getElementById('th-ocr-overlay');
-    if (overlay) overlay.style.display = 'flex';
-    const b64 = await APP._fileToBase64(file);
-    try {
-      const r = await gasPost('ocr_extract_email', { imageBase64: b64 });
-      if (overlay) overlay.style.display = 'none';
-      if (r.ok && r.email) {
-        const inp = document.getElementById('th-station-email');
-        if (inp) inp.value = r.email;
-        showToast('מייל זוהה: ' + r.email);
-      } else {
-        showToast('לא זוהה מייל, נסה שוב');
-      }
-    } catch(e) {
-      if (overlay) overlay.style.display = 'none';
-      showToast('שגיאה בזיהוי');
-    }
-  };
-  input.click();
-};
+// thCaptureEmail removed — thOcrScanEmail (POST) replaces it
 
 APP.thSelectResult = function(type) {
   document.getElementById('th-result-pass')?.classList.toggle('selected', type === 'pass');
@@ -8652,7 +8628,7 @@ APP.thConfirmTestPass = async function() {
   const b64 = await APP._fileToBase64(APP._testFormFile);
   const today = new Date().toISOString().slice(0,10);
   try {
-    const r = await gasPost('save_test_completion', {
+    const r = await gasPostForm('save_test_completion', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
       data: JSON.stringify({ date: today, formBase64: b64 })
     });
@@ -8674,46 +8650,26 @@ APP.thConfirmTestPass = async function() {
 APP.thConfirmPass = function() { return APP.thConfirmTestPass && APP.thConfirmTestPass(); };
 
 APP.thSubmitFail = async function() {
-  var reason = document.getElementById('th-fail-reason')?.value?.trim();
+  var reason = (document.getElementById('th-fail-reason')?.value || '').trim();
+  if (!reason) { showToast('נא לציין סיבה'); return; }
   var btn = document.getElementById('th-fail-cta');
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
   try {
     var r = await gasPost('save_test_failure', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
-      failReason: reason || '',
-      failDate: new Date().toISOString().slice(0,10)
+      reason: reason
     });
     if (r.ok) {
-      showToast('נשמר — נתזמן טסט חוזר');
-      APP.closeTestHub && APP.closeTestHub();
+      var banner = document.getElementById('th-fail-success');
+      if (banner) banner.style.display = 'flex';
+      if (btn) btn.style.display = 'none';
     } else {
       showToast('שגיאה: ' + (r.error || 'לא ידוע'));
       if (btn) { btn.disabled = false; btn.textContent = 'שמור ותזמן טסט חוזר'; }
     }
   } catch(e) {
-    showToast('שגיאה בשמירה');
-    if (btn) { btn.disabled = false; btn.textContent = 'שמור ותזמן טסט חוזר'; }
-  }
-};
-
-APP.thSubmitFailReason = async function() {
-  const reason = document.getElementById('th-fail-reason')?.value?.trim();
-  if (!reason) { showToast('נא לציין סיבה'); return; }
-  const btn = document.getElementById('th-submit-fail-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
-  try {
-    const r = await gasPost('save_test_failure', {
-      vehicleId: (STATE.vehicle && STATE.vehicle.id) || '', reason
-    });
-    if (r.ok) {
-      document.getElementById('th-fail-success')?.classList.remove('hidden');
-    } else {
-      showToast('שגיאה');
-      if (btn) { btn.disabled = false; btn.textContent = 'שמור'; }
-    }
-  } catch(e) {
     showToast('שגיאת רשת');
-    if (btn) { btn.disabled = false; btn.textContent = 'שמור'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'שמור ותזמן טסט חוזר'; }
   }
 };
 
@@ -8725,7 +8681,7 @@ APP.thSendInvoice = async function() {
   if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
   const b64 = await APP._fileToBase64(APP._invoiceFile);
   try {
-    const r = await gasPost('send_test_invoice', {
+    const r = await gasPostForm('send_test_invoice', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '', invoiceBase64: b64, amount, testDate: date
     });
     if (r.ok) {
@@ -8843,4 +8799,3 @@ APP._thUpdateProgress = function() {
   });
 };
 APP.thConfirmPass = function() { APP.thConfirmTestPass && APP.thConfirmTestPass(); };
-APP.thSubmitFail = function() { APP.thSubmitFailReason && APP.thSubmitFailReason(); };
