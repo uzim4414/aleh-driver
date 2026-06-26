@@ -3685,28 +3685,28 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .th-hours-val { direction: ltr; text-align: left; flex: 1; }
 /* ── All-Good Popup Animations ── */
 @keyframes agPopIn {
-  from { opacity:0; transform:scale(0.8) translateY(20px); }
-  to   { opacity:1; transform:scale(1)   translateY(0); }
+  0%   { opacity:0; transform:scale(0.75) translateY(40px); }
+  60%  { transform:scale(1.04) translateY(-4px); }
+  100% { opacity:1; transform:scale(1) translateY(0); }
 }
-@keyframes agIconPop {
-  from { opacity:0; transform:scale(0.5); }
-  to   { opacity:1; transform:scale(1); }
+@keyframes agRingPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(48,209,88,0.4); }
+  50%     { box-shadow: 0 0 0 14px rgba(48,209,88,0); }
 }
 @keyframes agCheck {
   to { stroke-dashoffset:0; }
 }
-@keyframes agCount {
-  from { opacity:0; transform:scale(0.6); }
-  to   { opacity:1; transform:scale(1); }
+@keyframes agNumPop {
+  0%   { opacity:0; transform:scale(0.5); }
+  70%  { transform:scale(1.1); }
+  100% { opacity:1; transform:scale(1); }
 }
-@keyframes agConf1 {
-  from { opacity:1; transform:translate(0,0) scale(1); }
-  to   { opacity:0; transform:translate(-30px,-60px) scale(0.5); }
-}
-@keyframes agConf2 {
-  from { opacity:1; transform:translate(0,0) scale(1); }
-  to   { opacity:0; transform:translate(30px,-70px) scale(0.5); }
-}
+@keyframes agP1 { to { transform:translate(-28px,-42px); opacity:0; } }
+@keyframes agP2 { to { transform:translate(32px,-38px); opacity:0; } }
+@keyframes agP3 { to { transform:translate(-36px,8px); opacity:0; } }
+@keyframes agP4 { to { transform:translate(34px,10px); opacity:0; } }
+@keyframes agP5 { to { transform:translate(-12px,-50px); opacity:0; } }
+@keyframes agP6 { to { transform:translate(16px,-46px); opacity:0; } }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -4729,32 +4729,39 @@ window.fcmDebug = async function() {
 <!-- ══════════════════════════════════════════
      POPUP "הכל סבבה" — מחוץ לחלון הטסט
 ══════════════════════════════════════════ -->
-<div id="th-allgood-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
-  <div id="th-allgood-card" style="background:#fff;border-radius:28px;padding:40px 32px 36px;max-width:360px;width:100%;text-align:center;position:relative;box-shadow:0 24px 80px rgba(0,0,0,0.25);animation:agPopIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) forwards">
-    <button onclick="APP._closeAllGoodPopup()" style="position:absolute;top:16px;left:16px;background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px">✕</button>
-    <!-- אייקון אנימציה -->
-    <div style="margin-bottom:20px">
-      <div id="th-allgood-icon" style="width:88px;height:88px;margin:0 auto;border-radius:50%;background:linear-gradient(135deg,#d1fae5,#a7f3d0);display:flex;align-items:center;justify-content:center;animation:agIconPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) 0.15s both">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:agCheck 0.4s ease-out 0.35s both;stroke-dasharray:40;stroke-dashoffset:40"><polyline points="20 6 9 17 4 12"/></svg>
-      </div>
-      <!-- קונפטי -->
-      <div style="position:absolute;top:60px;left:50%;transform:translateX(-50%);pointer-events:none">
-        <span style="position:absolute;font-size:16px;animation:agConf1 1.2s ease-out 0.3s both">🎉</span>
-        <span style="position:absolute;font-size:14px;animation:agConf2 1.2s ease-out 0.45s both;left:40px">✨</span>
-        <span style="position:absolute;font-size:14px;animation:agConf2 1.2s ease-out 0.6s both;left:-50px">⭐</span>
+<div id="th-allgood-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);align-items:center;justify-content:center;padding:20px">
+  <div id="th-allgood-card" style="background:linear-gradient(160deg,rgba(48,209,88,0.12) 0%,#111 55%);border:1px solid rgba(48,209,88,0.2);border-radius:28px;padding:36px 28px 32px;max-width:340px;width:100%;text-align:center;position:relative;animation:agPopIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275) forwards">
+    <!-- כפתור סגירה -->
+    <button onclick="APP._closeAllGoodPopup()" style="position:absolute;top:14px;left:14px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg>
+    </button>
+    <!-- אייקון עם particles -->
+    <div style="position:relative;display:inline-block;margin-bottom:24px;margin-top:8px">
+      <!-- particles -->
+      <span style="position:absolute;top:50%;left:50%;width:8px;height:8px;margin:-4px;border-radius:50%;background:#30D158;animation:agP1 0.7s ease-out 0.3s both;opacity:1"></span>
+      <span style="position:absolute;top:50%;left:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;background:#FF9F0A;animation:agP2 0.7s ease-out 0.35s both;opacity:1"></span>
+      <span style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#30D158;animation:agP3 0.6s ease-out 0.4s both;opacity:1"></span>
+      <span style="position:absolute;top:50%;left:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;background:#FF9F0A;animation:agP4 0.65s ease-out 0.25s both;opacity:1"></span>
+      <span style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#30D158;animation:agP5 0.7s ease-out 0.45s both;opacity:1"></span>
+      <span style="position:absolute;top:50%;left:50%;width:8px;height:8px;margin:-4px;border-radius:50%;background:#fff;animation:agP6 0.6s ease-out 0.3s both;opacity:1"></span>
+      <!-- עיגול ראשי -->
+      <div style="width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,rgba(48,209,88,0.25),rgba(48,209,88,0.04));border:1.5px solid rgba(48,209,88,0.4);display:flex;align-items:center;justify-content:center;animation:agRingPulse 2s ease-in-out 0.6s infinite">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px rgba(48,209,88,0.6));animation:agCheck 0.45s ease-out 0.25s both;stroke-dasharray:40;stroke-dashoffset:40"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
     </div>
     <!-- כותרת -->
-    <h2 style="font-size:22px;font-weight:800;color:#0f172a;margin:0 0 10px;line-height:1.2">הכל בסדר גמור! 🎉</h2>
-    <!-- ספירת ימים -->
-    <div style="margin:16px 0 20px">
-      <div style="font-size:56px;font-weight:900;color:#059669;line-height:1;animation:agCount 0.5s cubic-bezier(0.175,0.885,0.32,1.275) 0.2s both"><span id="th-allgood-days">—</span></div>
-      <div style="font-size:16px;font-weight:600;color:#64748b;margin-top:4px"><span id="th-allgood-days-label">ימים</span> עד מועד הטסט</div>
+    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:18px;letter-spacing:-0.3px">הכל בסדר גמור</div>
+    <!-- מספר ימים -->
+    <div style="animation:agNumPop 0.45s cubic-bezier(0.175,0.885,0.32,1.275) 0.2s both">
+      <div style="font-size:72px;font-weight:900;color:#30D158;line-height:1;letter-spacing:-2px;filter:drop-shadow(0 0 20px rgba(48,209,88,0.35))"><span id="th-allgood-days">—</span></div>
+      <div style="font-size:14px;font-weight:500;color:#8A8A8E;margin-top:6px"><span id="th-allgood-days-label">ימים</span> עד מועד הטסט</div>
     </div>
+    <!-- separator -->
+    <div style="border-top:1px solid rgba(255,255,255,0.07);margin:22px 0 18px"></div>
     <!-- טקסט -->
-    <p style="font-size:14px;color:#64748b;line-height:1.6;margin:0 0 28px">אין צורך לעשות כלום עכשיו —<br>נזכיר לך כשמתקרב המועד 😊</p>
+    <div style="font-size:13px;color:#8A8A8E;line-height:1.6;margin-bottom:26px">אין צורך לעשות כלום עכשיו<br>נזכיר לך כשמתקרב המועד</div>
     <!-- כפתור -->
-    <button onclick="APP._closeAllGoodPopup()" style="width:100%;padding:14px;border-radius:14px;background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,0.35)">מעולה, סגור</button>
+    <button onclick="APP._closeAllGoodPopup()" style="width:100%;padding:15px;border-radius:16px;background:#30D158;border:none;color:#000;font-size:16px;font-weight:800;cursor:pointer;letter-spacing:-0.2px;font-family:inherit">מעולה, סגור</button>
   </div>
 </div>
 </body>
