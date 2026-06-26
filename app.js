@@ -2154,7 +2154,9 @@ function buildAlerts(v) {
   }
 
   // טסט — רלוונטי לנהג (60 ימים מראש)
-  if (!v.testDone && v.testDue) {
+  if (String(v.testPendingApproval) === 'true') {
+    alerts.push({ type: 'warn', title: 'טסט ממתין לאישור', sub: 'נשלח ב-' + formatDate(v.testPendingDate || ''), days: 0, label: 'בהמתנה' });
+  } else if (!v.testDone && v.testDue) {
     const d = daysLeft(v.testDue);
     if (d !== null && d <= 60) {
       const type = d <= 7 ? 'red' : 'warn';
@@ -7859,6 +7861,15 @@ document.addEventListener('visibilitychange', async function() {
 // ═══ TEST HUB ═══
 
 APP.openTestHub = function() {
+  var v = STATE.vehicle || {};
+  // date-gate: חלון 40 יום לפני testDue
+  if (v.testDue && !v.testPendingApproval) {
+    var daysToTest = Math.ceil((new Date(v.testDue) - new Date()) / 86400000);
+    if (daysToTest > 40) {
+      APP._showAllGoodPopup(daysToTest);
+      return;
+    }
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const hub = document.getElementById('screen-testhub');
   if (hub) {
@@ -7870,6 +7881,25 @@ APP.openTestHub = function() {
 APP.closeTestHub = function() {
   document.getElementById('screen-testhub').classList.remove('active');
   document.getElementById('screen-home').classList.add('active');
+};
+
+APP._showAllGoodPopup = function(days) {
+  var overlay = document.getElementById('th-allgood-overlay');
+  if (!overlay) return;
+  var daysEl = document.getElementById('th-allgood-days');
+  if (daysEl) daysEl.textContent = days;
+  var labelEl = document.getElementById('th-allgood-days-label');
+  if (labelEl) labelEl.textContent = days === 1 ? 'יום' : 'ימים';
+  overlay.style.display = 'flex';
+  // סגירה בלחיצה על backdrop
+  overlay.onclick = function(e) {
+    if (e.target === overlay) APP._closeAllGoodPopup();
+  };
+};
+
+APP._closeAllGoodPopup = function() {
+  var overlay = document.getElementById('th-allgood-overlay');
+  if (overlay) overlay.style.display = 'none';
 };
 
 APP._initTestHub = function() {
@@ -7885,7 +7915,10 @@ APP._initTestHub = function() {
 
   // pill סטטוס לפי ימים שנותרו
   const pill = document.getElementById('test-hub-status-pill');
-  if (pill && v.testDue && !v.testDone) {
+  if (pill && String(v.testPendingApproval) === 'true') {
+    pill.classList.remove('ok', 'red'); pill.classList.add('warn');
+    pill.textContent = '⏳ ממתין לאישור מנהל';
+  } else if (pill && v.testDue && !v.testDone) {
     const days = Math.round((new Date(v.testDue) - new Date()) / 86400000);
     pill.classList.remove('ok', 'warn', 'red');
     if (days <= 7)       { pill.classList.add('red');  pill.textContent = 'דחוף · ' + days + ' ימים'; }
@@ -8627,21 +8660,28 @@ APP.thCaptureTestForm = function(mode) {
 APP.thConfirmTestPass = async function() {
   if (!APP._testFormFile) { showToast('נא להעלות טופס טסט'); return; }
   const btn = document.getElementById('th-confirm-cta');
-  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'שולח לאישור...'; }
   const b64 = await APP._fileToBase64(APP._testFormFile);
   const today = new Date().toISOString().slice(0,10);
-  // GPS — ניסיון silent, לא חוסם אם נכשל
   var gpsCoords = {lat:'', lng:''};
   try { var _g = await APP._getGps(4000); if (_g && _g.lat) { gpsCoords = {lat:String(_g.lat), lng:String(_g.lng)}; } } catch(_ge){}
+  var driverId = (STATE.driver && (STATE.driver.id || STATE.driver.uid)) || '';
   try {
     const r = await gasPostForm('save_test_completion', {
       vehicleId: (STATE.vehicle && STATE.vehicle.id) || '',
-      data: JSON.stringify({ date: today, formBase64: b64, lat: gpsCoords.lat, lng: gpsCoords.lng })
+      data: JSON.stringify({ date: today, formBase64: b64, lat: gpsCoords.lat, lng: gpsCoords.lng, driverId: driverId })
     });
     if (r.ok) {
+      // מצב pending — לא testDone עדיין
+      if (STATE.vehicle) {
+        STATE.vehicle.testPendingApproval = 'true';
+        STATE.vehicle.testPendingDate = today;
+      }
+      // הסתר drawer pass הרגיל, הצג מסך "נשלח לאישור"
       var ps = document.getElementById('th-pass-success');
-      if (ps) ps.style.display = 'flex';
-      if (STATE.vehicle) STATE.vehicle.testDone = today;
+      if (ps) ps.style.display = 'none';
+      var pendingScreen = document.getElementById('th-pending-approval');
+      if (pendingScreen) pendingScreen.style.display = 'flex';
       APP._clearTestAlert && APP._clearTestAlert();
     } else {
       showToast('שגיאה: ' + (r.error || ''));

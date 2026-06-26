@@ -3683,6 +3683,30 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .th-hours-row.today .th-hours-day { color: #30D158; }
 .th-hours-day { min-width: 70px; text-align: right; }
 .th-hours-val { direction: ltr; text-align: left; flex: 1; }
+/* ── All-Good Popup Animations ── */
+@keyframes agPopIn {
+  from { opacity:0; transform:scale(0.8) translateY(20px); }
+  to   { opacity:1; transform:scale(1)   translateY(0); }
+}
+@keyframes agIconPop {
+  from { opacity:0; transform:scale(0.5); }
+  to   { opacity:1; transform:scale(1); }
+}
+@keyframes agCheck {
+  to { stroke-dashoffset:0; }
+}
+@keyframes agCount {
+  from { opacity:0; transform:scale(0.6); }
+  to   { opacity:1; transform:scale(1); }
+}
+@keyframes agConf1 {
+  from { opacity:1; transform:translate(0,0) scale(1); }
+  to   { opacity:0; transform:translate(-30px,-60px) scale(0.5); }
+}
+@keyframes agConf2 {
+  from { opacity:1; transform:translate(0,0) scale(1); }
+  to   { opacity:0; transform:translate(30px,-70px) scale(0.5); }
+}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -4233,6 +4257,12 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
               <div class="pds-success-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
               <div><div class="pds-success-text">טסט אושר ✓</div><div class="pds-success-sub">הרכב סומן כ"טסט בוצע" במערכת</div></div>
             </div>
+            <!-- מסך ממתין לאישור -->
+            <div id="th-pending-approval" style="display:none;flex-direction:column;align-items:center;gap:12px;padding:20px 16px;background:linear-gradient(135deg,#fefce8,#fef9c3);border-radius:16px;border:1.5px solid #fde047;margin-top:12px">
+              <div style="font-size:36px">⏳</div>
+              <div style="font-size:16px;font-weight:800;color:#854d0e;text-align:center">הבקשה נשלחה לאישור המנהל</div>
+              <div style="font-size:13px;color:#92400e;text-align:center;line-height:1.5">המנהל יאשר את הטסט בקרוב.<br>נעדכן אותך ברגע שזה יאושר 👍</div>
+            </div>
           </div>
         </div>
 
@@ -4696,5 +4726,36 @@ window.fcmDebug = async function() {
   }
 })();
 </script>
+<!-- ══════════════════════════════════════════
+     POPUP "הכל סבבה" — מחוץ לחלון הטסט
+══════════════════════════════════════════ -->
+<div id="th-allgood-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px">
+  <div id="th-allgood-card" style="background:#fff;border-radius:28px;padding:40px 32px 36px;max-width:360px;width:100%;text-align:center;position:relative;box-shadow:0 24px 80px rgba(0,0,0,0.25);animation:agPopIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) forwards">
+    <button onclick="APP._closeAllGoodPopup()" style="position:absolute;top:16px;left:16px;background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px">✕</button>
+    <!-- אייקון אנימציה -->
+    <div style="margin-bottom:20px">
+      <div id="th-allgood-icon" style="width:88px;height:88px;margin:0 auto;border-radius:50%;background:linear-gradient(135deg,#d1fae5,#a7f3d0);display:flex;align-items:center;justify-content:center;animation:agIconPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) 0.15s both">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:agCheck 0.4s ease-out 0.35s both;stroke-dasharray:40;stroke-dashoffset:40"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <!-- קונפטי -->
+      <div style="position:absolute;top:60px;left:50%;transform:translateX(-50%);pointer-events:none">
+        <span style="position:absolute;font-size:16px;animation:agConf1 1.2s ease-out 0.3s both">🎉</span>
+        <span style="position:absolute;font-size:14px;animation:agConf2 1.2s ease-out 0.45s both;left:40px">✨</span>
+        <span style="position:absolute;font-size:14px;animation:agConf2 1.2s ease-out 0.6s both;left:-50px">⭐</span>
+      </div>
+    </div>
+    <!-- כותרת -->
+    <h2 style="font-size:22px;font-weight:800;color:#0f172a;margin:0 0 10px;line-height:1.2">הכל בסדר גמור! 🎉</h2>
+    <!-- ספירת ימים -->
+    <div style="margin:16px 0 20px">
+      <div style="font-size:56px;font-weight:900;color:#059669;line-height:1;animation:agCount 0.5s cubic-bezier(0.175,0.885,0.32,1.275) 0.2s both"><span id="th-allgood-days">—</span></div>
+      <div style="font-size:16px;font-weight:600;color:#64748b;margin-top:4px"><span id="th-allgood-days-label">ימים</span> עד מועד הטסט</div>
+    </div>
+    <!-- טקסט -->
+    <p style="font-size:14px;color:#64748b;line-height:1.6;margin:0 0 28px">אין צורך לעשות כלום עכשיו —<br>נזכיר לך כשמתקרב המועד 😊</p>
+    <!-- כפתור -->
+    <button onclick="APP._closeAllGoodPopup()" style="width:100%;padding:14px;border-radius:14px;background:linear-gradient(135deg,#059669,#047857);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,0.35)">מעולה, סגור</button>
+  </div>
+</div>
 </body>
 </html>
