@@ -132,6 +132,31 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .qa-card:active{transform:scale(0.97)}
 .qa-icon-box { width:46px; height:46px; background:var(--red-dim); border-radius:14px; display:flex; align-items:center; justify-content:center; }
 .qa-lbl { font-size:11px; color:var(--t2); font-weight:500; text-align:center; line-height:1.3; }
+/* ── WASH ──────────────────────────────────────────── */
+.wash-count-badge{position:absolute;top:6px;left:6px;background:#0891b2;color:#fff;font-size:10px;font-weight:700;border-radius:8px;padding:2px 6px;line-height:1.4}
+.wash-quota-bar{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0 8px}
+.wash-quota-dots{display:flex;gap:8px}
+.wash-quota-dot{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);transition:all .3s}
+.wash-quota-dot.used{background:#0891b2;border-color:#0891b2;box-shadow:0 0 10px rgba(8,145,178,0.5)}
+.wash-quota-label{color:var(--t2);font-size:13px}
+.wash-stations-list{display:flex;flex-direction:column;gap:10px;padding:0 16px 120px}
+.wash-station-row{background:var(--card);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;border:1px solid var(--border)}
+.wash-station-info{flex:1;min-width:0}
+.wash-station-name{font-size:15px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wash-station-city{font-size:12px;color:var(--t2);margin-top:2px}
+.wash-station-waze{background:#0891b2;border:none;border-radius:12px;padding:8px 14px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.wash-confirm-card{background:linear-gradient(160deg,rgba(8,145,178,0.12) 0%,#111 55%);border:1px solid rgba(8,145,178,0.2);border-radius:28px;padding:28px 24px;width:min(320px,90vw);position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;animation:fadeUp .45s cubic-bezier(0.34,1.56,0.64,1)}
+.wash-confirm-icon-tile{width:56px;height:56px;border-radius:16px;background:rgba(8,145,178,0.12);border:1px solid rgba(8,145,178,0.2);display:flex;align-items:center;justify-content:center}
+.wash-confirm-title{font-size:18px;font-weight:700;color:#fff;text-align:center}
+.wash-confirm-station{font-size:14px;color:var(--t2);text-align:center}
+.wash-confirm-dots{display:flex;gap:8px;margin:4px 0}
+.wash-confirm-waze-btn{background:#33CCFF;color:#000;font-weight:800;border:none;border-radius:16px;padding:14px 28px;font-size:16px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 10px 24px rgba(51,204,255,0.3)}
+.wash-confirm-done-btn{background:#30D158;color:#000;font-weight:800;border:none;border-radius:16px;padding:14px 28px;font-size:16px;cursor:pointer;width:100%;box-shadow:0 10px 24px rgba(48,209,88,0.3)}
+.modal-close-x{position:absolute;top:14px;left:14px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.overlay-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:999}
+.wash-screen-header{display:flex;align-items:center;gap:12px;padding:18px 16px 6px}
+.wash-screen-header .back-btn{width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer}
+.wash-screen-title{font-size:20px;font-weight:800;color:#fff}
 
 .bnav { background:rgba(16,16,16,0.93); backdrop-filter:blur(24px) saturate(1.8); -webkit-backdrop-filter:blur(24px) saturate(1.8); border:1px solid rgba(255,255,255,0.09); border-radius:28px; margin:6px 12px; margin-bottom:max(16px,env(safe-area-inset-bottom,16px)); display:flex; align-items:center; justify-content:space-around; padding:6px; flex-shrink:0; gap:3px; }
 .bn-item { display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 10px; border-radius:22px; cursor:pointer; flex:1; transition:all .25s cubic-bezier(.16,1,.3,1); min-width:0; position:relative; }
@@ -3838,8 +3863,17 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <div class="test-hint" id="test-hint">לחץ להכנה ›</div>
         </div>
 
-        <!-- עמודה 3: placeholder -->
-        <div class="qa-card" style="visibility:hidden" aria-hidden="true"></div>
+        <!-- כרטיס רחיצה -->
+        <div class="qa-card" id="qa-wash-card" onclick="APP.openWash()" style="position:relative">
+          <div class="qa-icon-box" style="background:rgba(8,145,178,0.12)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12c0-4 3-7 8-7s8 3 8 7"/><path d="M2 16c0 2.2 1.8 4 4 4h12c2.2 0 4-1.8 4-4v-1H2v1z"/>
+              <path d="M8 16v1"/><path d="M12 16v1"/><path d="M16 16v1"/>
+            </svg>
+          </div>
+          <div class="qa-lbl">רחיצה<br>רכב</div>
+          <div class="wash-count-badge" id="wash-count-badge" style="display:none"></div>
+        </div>
       </div>
       <div style="height:120px"></div>
     </div>
@@ -4265,6 +4299,21 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
   </div><!-- /screen-testhub -->
 
+  <!-- WASH SCREEN -->
+  <div class="screen" id="screen-wash" style="display:none">
+    <div class="wash-screen-header">
+      <button class="back-btn" onclick="APP.closeWash()" aria-label="חזרה">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <h2 class="wash-screen-title">רחיצת רכב</h2>
+    </div>
+    <div class="wash-quota-bar" id="wash-quota-bar">
+      <div class="wash-quota-dots" id="wash-quota-dots"></div>
+      <div class="wash-quota-label" id="wash-quota-label">רחיצות החודש</div>
+    </div>
+    <div class="wash-stations-list" id="wash-stations-list" style="overflow-y:auto"></div>
+  </div><!-- /screen-wash -->
+
   <!-- Help FAB (draggable) -->
   <button class="help-fab" id="help-fab" aria-label="עלה בקשר" style="display:none">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -4685,6 +4734,56 @@ window.fcmDebug = async function() {
     <div style="font-size:13px;color:#8A8A8E;line-height:1.6;margin-bottom:26px">אין צורך לעשות כלום עכשיו<br>נזכיר לך כשמתקרב המועד</div>
     <!-- כפתור -->
     <button onclick="APP._closeAllGoodPopup()" style="width:100%;padding:15px;border-radius:16px;background:#30D158;border:none;color:#000;font-size:16px;font-weight:800;cursor:pointer;letter-spacing:-0.2px;font-family:inherit">מעולה, סגור</button>
+  </div>
+</div>
+
+<!-- WASH CONFIRM POPUP -->
+<div id="wash-confirm-popup" style="display:none" class="overlay-backdrop">
+  <div class="wash-confirm-card">
+    <button class="modal-close-x" onclick="APP.closeWashConfirm()" aria-label="סגירה">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <div class="wash-confirm-icon-tile">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12c0-4 3-7 8-7s8 3 8 7"/><path d="M2 16c0 2.2 1.8 4 4 4h12c2.2 0 4-1.8 4-4v-1H2v1z"/>
+      </svg>
+    </div>
+    <div class="wash-confirm-title">לחץ על Waze להגעה</div>
+    <div class="wash-confirm-station" id="wash-confirm-station-name"></div>
+    <div class="wash-confirm-dots" id="wash-confirm-dots"></div>
+    <button class="wash-confirm-waze-btn" id="wash-confirm-waze-btn" onclick="APP.launchWaze()">
+      <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#33CCFF"/><path d="M7 13c.5 2 2.5 3 5 3s4.5-1 5-3" stroke="#fff" stroke-width="1.5" fill="none"/></svg>
+      פתח ב-Waze
+    </button>
+    <button class="wash-confirm-done-btn" id="wash-confirm-done-btn" onclick="APP.confirmWash()" style="display:none">
+      אישור רחיצה ✓
+    </button>
+  </div>
+</div>
+
+<!-- WASH SUCCESS POPUP -->
+<div id="wash-success-popup" style="display:none" class="overlay-backdrop">
+  <div class="wash-confirm-card" style="background:linear-gradient(160deg,rgba(48,209,88,0.12) 0%,#111 55%);border-color:rgba(48,209,88,0.2)">
+    <div class="wash-confirm-icon-tile" style="background:rgba(48,209,88,0.12);border-color:rgba(48,209,88,0.3)">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="wash-confirm-title" style="color:#30D158">רחיצה נרשמה בהצלחה!</div>
+    <div class="wash-confirm-station">הרחיצה תיכנס למכסה החודשית שלך</div>
+  </div>
+</div>
+
+<!-- WASH QUOTA POPUP (4/4 used) -->
+<div id="wash-quota-popup" style="display:none" class="overlay-backdrop">
+  <div class="wash-confirm-card">
+    <button class="modal-close-x" onclick="document.getElementById('wash-quota-popup').style.display='none'" aria-label="סגירה">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <div class="wash-confirm-icon-tile" style="background:rgba(255,159,10,0.12);border-color:rgba(255,159,10,0.3)">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="#FF9F0A"/></svg>
+    </div>
+    <div class="wash-confirm-title" style="color:#FF9F0A">ניצלת את מכסת הרחיצות</div>
+    <div class="wash-confirm-station">4/4 רחיצות לחודש זה מוצו</div>
+    <div style="color:var(--t2);font-size:13px;text-align:center;margin-top:4px">המכסה תתחדש ב-1 לחודש הבא</div>
   </div>
 </div>
 </body>

@@ -2538,6 +2538,10 @@ function renderHomeScreen() {
   const v = STATE.vehicle;
   if (!v) return;
 
+  // washLog may arrive on the vehicle/data payload from GAS
+  if (!STATE.washLog && Array.isArray(v.washLog)) STATE.washLog = v.washLog;
+  if (typeof APP._updateWashBadge === 'function') APP._updateWashBadge();
+
   document.getElementById('car-name').textContent = ((v.make || '') + ' ' + (v.model || '')).trim();
   document.getElementById('car-plate').textContent = formatPlate(v.num);
 
@@ -7903,6 +7907,166 @@ APP._showAllGoodPopup = function(days) {
 APP._closeAllGoodPopup = function() {
   var overlay = document.getElementById('th-allgood-overlay');
   if (overlay) overlay.style.display = 'none';
+};
+
+// ═══ WASH ═══
+APP._WASH_STATIONS = [
+  {id:'1001',name:'פז תחנת שפיים',city:'שפיים',lat:32.1975,lng:34.8229},
+  {id:'1002',name:'פז גבעת שמואל',city:'גבעת שמואל',lat:32.0789,lng:34.8492},
+  {id:'1003',name:'פז פתח תקווה מרכז',city:'פתח תקווה',lat:32.0871,lng:34.8867},
+  {id:'1004',name:'פז ראשון לציון',city:'ראשון לציון',lat:31.9642,lng:34.7928},
+  {id:'1005',name:'פז נתניה',city:'נתניה',lat:32.3215,lng:34.8563},
+  {id:'1006',name:'פז חיפה קריות',city:'קרית ביאליק',lat:32.8234,lng:35.0812},
+  {id:'1007',name:'פז באר שבע צפון',city:'באר שבע',lat:31.2693,lng:34.7832},
+  {id:'1008',name:'פז ירושלים מלחה',city:'ירושלים',lat:31.7456,lng:35.1874},
+  {id:'1009',name:'פז תל אביב ארלוזרוב',city:'תל אביב',lat:32.0853,lng:34.7818},
+  {id:'1010',name:'פז הרצליה פיתוח',city:'הרצליה',lat:32.1527,lng:34.8184},
+  {id:'1011',name:'פז רעננה',city:'רעננה',lat:32.1842,lng:34.8706},
+  {id:'1012',name:'פז כפר סבא',city:'כפר סבא',lat:32.1752,lng:34.9094},
+  {id:'1013',name:'פז מודיעין',city:'מודיעין',lat:31.8929,lng:35.0108},
+  {id:'1014',name:'פז אשדוד',city:'אשדוד',lat:31.7957,lng:34.6506},
+  {id:'1015',name:'פז אשקלון',city:'אשקלון',lat:31.6688,lng:34.5742},
+  {id:'1016',name:'פז נהריה',city:'נהריה',lat:33.0077,lng:35.0918},
+  {id:'1017',name:'פז עכו',city:'עכו',lat:32.9230,lng:35.0818},
+  {id:'1018',name:'פז טבריה',city:'טבריה',lat:32.7922,lng:35.5311},
+  {id:'1019',name:'פז חדרה',city:'חדרה',lat:32.4341,lng:34.9192},
+  {id:'1020',name:'פז קרית גת',city:'קרית גת',lat:31.6099,lng:34.7738},
+  {id:'1021',name:'פז לוד',city:'לוד',lat:31.9516,lng:34.8951},
+  {id:'1022',name:'פז רמלה',city:'רמלה',lat:31.9293,lng:34.8654},
+  {id:'1023',name:'פז רחובות',city:'רחובות',lat:31.8969,lng:34.8178},
+  {id:'1024',name:'פז גדרה',city:'גדרה',lat:31.8105,lng:34.7753},
+  {id:'1025',name:'פז בת ים',city:'בת ים',lat:32.0200,lng:34.7512},
+  {id:'1026',name:'פז חולון',city:'חולון',lat:32.0178,lng:34.7764},
+  {id:'1027',name:'פז פ"ת אפקה',city:'פתח תקווה',lat:32.1001,lng:34.8713},
+  {id:'1028',name:'פז יהוד',city:'יהוד',lat:32.0302,lng:34.8897},
+  {id:'1029',name:'פז אור יהודה',city:'אור יהודה',lat:32.0320,lng:34.8583},
+  {id:'1030',name:'פז ראש העין',city:'ראש העין',lat:32.0952,lng:34.9561}
+];
+APP._washCurrentStation = null;
+APP._washWazeLaunched = false;
+
+APP._washMonthCount = function() {
+  var thisMonth = new Date().toISOString().slice(0,7);
+  return (STATE.washLog || []).filter(function(w){ return w.date && w.date.slice(0,7) === thisMonth; }).length;
+};
+
+APP.openWash = function() {
+  if (!STATE.vehicle) return;
+  var used = APP._washMonthCount();
+  if (used >= 4) {
+    document.getElementById('wash-quota-popup').style.display = 'flex';
+    return;
+  }
+  APP._renderWashScreen(used);
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  var scr = document.getElementById('screen-wash');
+  if (scr) { scr.style.display = ''; scr.classList.add('active'); }
+  STATE.currentScreen = 'wash';
+};
+
+APP.closeWash = function() {
+  var scr = document.getElementById('screen-wash');
+  if (scr) scr.classList.remove('active');
+  document.getElementById('screen-home').classList.add('active');
+  STATE.currentScreen = 'home';
+};
+
+APP._washDots = function(used) {
+  var d = '';
+  for (var i = 0; i < 4; i++) d += '<div class="wash-quota-dot' + (i < used ? ' used' : '') + '"></div>';
+  return d;
+};
+
+APP._renderWashScreen = function(used) {
+  var dotsEl = document.getElementById('wash-quota-dots');
+  if (dotsEl) dotsEl.innerHTML = APP._washDots(used);
+  var lbl = document.getElementById('wash-quota-label');
+  if (lbl) lbl.textContent = used + '/4 רחיצות החודש';
+  var list = document.getElementById('wash-stations-list');
+  if (!list) return;
+  var html = '';
+  APP._WASH_STATIONS.forEach(function(s){
+    html += '<div class="wash-station-row">';
+    html += '<div class="wash-station-info"><div class="wash-station-name">' + s.name + '</div><div class="wash-station-city">' + s.city + '</div></div>';
+    html += '<button class="wash-station-waze" onclick="APP.openWashStation(\'' + s.id + '\')">';
+    html += '<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#33CCFF"/><path d="M7 13c.5 2 2.5 3 5 3s4.5-1 5-3" stroke="#fff" stroke-width="1.5" fill="none"/></svg>Waze</button>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
+};
+
+APP.openWashStation = function(stationId) {
+  var s = null;
+  for (var i = 0; i < APP._WASH_STATIONS.length; i++) {
+    if (APP._WASH_STATIONS[i].id === stationId) { s = APP._WASH_STATIONS[i]; break; }
+  }
+  if (!s) return;
+  APP._washCurrentStation = s;
+  APP._washWazeLaunched = false;
+  var nameEl = document.getElementById('wash-confirm-station-name');
+  if (nameEl) nameEl.textContent = s.name + ' — ' + s.city;
+  var dotsEl = document.getElementById('wash-confirm-dots');
+  if (dotsEl) dotsEl.innerHTML = APP._washDots(APP._washMonthCount());
+  var doneBtn = document.getElementById('wash-confirm-done-btn');
+  if (doneBtn) doneBtn.style.display = 'none';
+  document.getElementById('wash-confirm-popup').style.display = 'flex';
+};
+
+APP.launchWaze = function() {
+  var s = APP._washCurrentStation;
+  if (!s) return;
+  APP._washWazeLaunched = true;
+  var doneBtn = document.getElementById('wash-confirm-done-btn');
+  if (doneBtn) doneBtn.style.display = 'block';
+  window.open('waze://?ll=' + s.lat + ',' + s.lng + '&navigate=yes', '_blank');
+  setTimeout(function(){
+    window.open('https://waze.com/ul?ll=' + s.lat + ',' + s.lng + '&navigate=yes', '_blank');
+  }, 2000);
+};
+
+APP.closeWashConfirm = function() {
+  document.getElementById('wash-confirm-popup').style.display = 'none';
+  APP._washCurrentStation = null;
+  APP._washWazeLaunched = false;
+  var doneBtn = document.getElementById('wash-confirm-done-btn');
+  if (doneBtn) doneBtn.style.display = 'none';
+};
+
+APP.confirmWash = function() {
+  var s = APP._washCurrentStation;
+  var veh = STATE.vehicle;
+  if (!s || !veh) return;
+  var params = {
+    vehicleId: veh.id || veh.vehicleId || veh.num || '',
+    plate: veh.num || '',
+    stationId: s.id,
+    stationName: s.name,
+    stationCity: s.city,
+    washType: 'regular',
+    driverName: (STATE.user && (STATE.user.name || STATE.user.displayName)) || ''
+  };
+  APP.closeWashConfirm();
+  APP.closeWash();
+  if (!STATE.washLog) STATE.washLog = [];
+  STATE.washLog.push({ date: new Date().toISOString().slice(0,10), stationName: s.name });
+  APP._updateWashBadge();
+  APP._showWashSuccess();
+  try { gasPostForm('save_wash', params).catch(function(){}); } catch(e){}
+};
+
+APP._showWashSuccess = function() {
+  var ov = document.getElementById('wash-success-popup');
+  if (!ov) return;
+  ov.style.display = 'flex';
+  setTimeout(function(){ ov.style.display = 'none'; }, 2200);
+};
+
+APP._updateWashBadge = function() {
+  var badge = document.getElementById('wash-count-badge');
+  if (!badge) return;
+  var cnt = APP._washMonthCount();
+  if (cnt > 0) { badge.textContent = cnt + '/4'; badge.style.display = 'block'; }
+  else { badge.style.display = 'none'; }
 };
 
 APP._initTestHub = function() {
