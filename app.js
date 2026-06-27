@@ -7949,7 +7949,13 @@ APP._WASH_STATIONS = [
   {id:'1027',name:'פז פ"ת אפקה',city:'פתח תקווה',lat:32.1001,lng:34.8713,addr:'אם המושבות 95, פתח תקווה',phone:'03-9300287',rating:4.1,ratingCount:141,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.1001,34.8713&navigate=yes'},
   {id:'1028',name:'פז יהוד',city:'יהוד',lat:32.0302,lng:34.8897,addr:'מרבד הקסמים 4, יהוד',phone:'03-5360298',rating:3.7,ratingCount:58,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0302,34.8897&navigate=yes'},
   {id:'1029',name:'פז אור יהודה',city:'אור יהודה',lat:32.0320,lng:34.8583,addr:'העצמאות 22, אור יהודה',phone:'03-5340309',rating:3.8,ratingCount:67,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0320,34.8583&navigate=yes'},
-  {id:'1030',name:'פז ראש העין',city:'ראש העין',lat:32.0952,lng:34.9561,addr:'שבזי 33, ראש העין',phone:'03-9020310',rating:4.0,ratingCount:103,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0952,34.9561&navigate=yes'}
+  {id:'1030',name:'פז ראש העין',city:'ראש העין',lat:32.0952,lng:34.9561,addr:'שבזי 33, ראש העין',phone:'03-9020310',rating:4.0,ratingCount:103,hoursWeekday:[7,20],hoursFriday:[7,14],hours:'א-ה 07:00–20:00 | ו 07:00–14:00',waze:'waze://?ll=32.0952,34.9561&navigate=yes'},
+  // Missing stations from Yellow app — added 2026-06-28
+  { id:'paz_ziv_on', name:'פז זיו און', city:'תל אביב-יפו', addr:'דרך הטייסים 126', lat:32.0483, lng:34.7558, rating:4.2, ratingCount:180, hoursWeekday:[7,20], hoursFriday:[7,14], hours:'א-ה 07:00–20:00 | ו 07:00–14:00', phone:'', waze:'waze://?ll=32.0483,34.7558&navigate=yes' },
+  { id:'paz_abu_kabir', name:'פז אבו כביר', city:'תל אביב-יפו', addr:'הרצל 188', lat:32.0488, lng:34.7658, rating:4.0, ratingCount:95, hoursWeekday:[6,22], hoursFriday:[6,14], hours:'א-ה 06:00–22:00 | ו 06:00–14:00', phone:'', waze:'waze://?ll=32.0488,34.7658&navigate=yes' },
+  { id:'paz_ben_zvi', name:'פז שדרות בן צבי', city:'תל אביב-יפו', addr:'שד\' בן צבי 46', lat:32.0573, lng:34.7680, rating:4.1, ratingCount:210, hoursWeekday:[7,20], hoursFriday:[7,14], hours:'א-ה 07:00–20:00 | ו 07:00–14:00', phone:'', waze:'waze://?ll=32.0573,34.768&navigate=yes' },
+  { id:'paz_nachalat_yehuda', name:'פז נחלת יהודה', city:'ראשון לציון', addr:'כביש בית דגן-ראשל"צ', lat:31.9850, lng:34.8020, rating:4.3, ratingCount:150, hoursWeekday:[7,20], hoursFriday:[7,14], hours:'א-ה 07:00–20:00 | ו 07:00–14:00', phone:'', waze:'waze://?ll=31.985,34.802&navigate=yes' },
+  { id:'paz_aviel_superland', name:'פז אביאל (סופרלנד)', city:'ראשון לציון', addr:'שד\' מרילנד', lat:31.9972, lng:34.8140, rating:4.4, ratingCount:320, hoursWeekday:[7,20], hoursFriday:[7,14], hours:'א-ה 07:00–20:00 | ו 07:00–14:00', phone:'', waze:'waze://?ll=31.9972,34.814&navigate=yes' }
 ];
 APP._washCurrentStation = null;
 APP._washWazeLaunched = false;
@@ -8205,36 +8211,50 @@ APP._wsRenderCards = function(stations) {
         '<div class="ws-sc-actions">' +
           '<button class="ws-sc-btn waze" onclick="APP._wsWaze(\''+s.id+'\')"><div class="ws-sc-btn-icon"><svg width="20" height="20" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="27" rx="17" ry="14" fill="#0891b2"/><circle cx="18" cy="33" r="3" fill="#fff"/><circle cx="30" cy="33" r="3" fill="#fff"/><path d="M15 24 Q24 14 33 24" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg></div>נווט ב-Waze</button>' +
         '</div>' +
-        '<div class="ws-confirm-bar" id="ws-confirm-bar-'+s.id+'">' +
-          '<button class="ws-confirm-btn" onclick="APP._wsConfirmWash(\''+s.id+'\')">✓ אשר רחיצה</button>' +
-        '</div>' +
       '</div>';
     list.appendChild(card);
   });
 };
 
-// Open Waze, then reveal confirm bar
+// Tap Waze → show confirm popup FIRST (wash is saved only after confirmation)
 APP._wsWaze = function(stationId) {
-  var s = null;
-  for (var i = 0; i < APP._WASH_STATIONS.length; i++) {
-    if (String(APP._WASH_STATIONS[i].id) === String(stationId)) { s = APP._WASH_STATIONS[i]; break; }
-  }
+  var s = (APP._wsStationsData || APP._WASH_STATIONS).find(function(x){ return String(x.id) === String(stationId); });
   if (!s) return;
+  APP._wsPendingWazeStation = s;
   APP._washCurrentStation = s;
-  APP._washWazeLaunched = true;
-  window.open('waze://?ll=' + s.lat + ',' + s.lng + '&navigate=yes', '_blank');
-  setTimeout(function(){
-    var bar = document.getElementById('ws-confirm-bar-' + stationId);
-    if (bar) bar.classList.add('visible');
-  }, 100);
+  // Show confirm popup
+  var el = document.getElementById('ws-waze-confirm-popup');
+  var nameEl = document.getElementById('ws-wcp-station-name');
+  var quotaEl = document.getElementById('ws-wcp-quota-text');
+  if (nameEl) nameEl.textContent = s.name + (s.city ? ' — ' + s.city : '');
+  if (quotaEl) {
+    var used = APP._washMonthCount();
+    quotaEl.textContent = 'ניצלת ' + used + ' מתוך 4 רחיצות החודש';
+  }
+  if (el) el.style.display = 'flex';
+};
+
+APP._wsWazeConfirmGo = function() {
+  var el = document.getElementById('ws-waze-confirm-popup');
+  if (el) el.style.display = 'none';
+  var s = APP._wsPendingWazeStation;
+  if (!s) return;
+  // Save wash immediately
+  APP._wsConfirmWash(s.id);
+  // Open Waze
+  var url = s.wazeUrl || s.waze || ('waze://ul?ll=' + s.lat + ',' + s.lng + '&navigate=yes');
+  window.open(url, '_blank');
+};
+
+APP._wsWazeConfirmCancel = function() {
+  var el = document.getElementById('ws-waze-confirm-popup');
+  if (el) el.style.display = 'none';
+  APP._wsPendingWazeStation = null;
 };
 
 // Confirm wash → save to GAS (mirror of old confirmWash)
 APP._wsConfirmWash = function(stationId) {
-  var s = null;
-  for (var i = 0; i < APP._WASH_STATIONS.length; i++) {
-    if (String(APP._WASH_STATIONS[i].id) === String(stationId)) { s = APP._WASH_STATIONS[i]; break; }
-  }
+  var s = (APP._wsStationsData || APP._WASH_STATIONS).find(function(x){ return String(x.id) === String(stationId); });
   var veh = STATE.vehicle;
   if (!s || !veh) { showToast('שגיאה: אין נתוני רכב'); return; }
   var vehicleId = veh.id || veh.vehicleId || veh.num || '';
@@ -8253,8 +8273,6 @@ APP._wsConfirmWash = function(stationId) {
   APP._updateWashBadge();
   var used = APP._washMonthCount();
   APP._wsUpdateQuota(used);
-  var bar = document.getElementById('ws-confirm-bar-' + stationId);
-  if (bar) bar.classList.remove('visible');
   showToast('רחיצה נרשמה!');
   APP._showWashSuccess();
   gasPostForm('save_wash', params).then(function(r) {
