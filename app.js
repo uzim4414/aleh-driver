@@ -7716,10 +7716,18 @@ var __latestVerLabel = '';
 (function() {
   var el = document.getElementById('splash-ver-text');
   if (!el) return;
+  // Fallback: show SW version immediately while GitHub fetch runs
+  function _setSwFallback() {
+    if (el.textContent) return; // already set by GitHub
+    _getAppVersion().then(function(v) {
+      if (!el.textContent && v) el.textContent = v;
+    }).catch(function(){});
+  }
+  setTimeout(_setSwFallback, 2500); // fire if GitHub hasn't responded
   fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
     headers: { 'Accept': 'application/vnd.github.v3+json' }
   }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data || !data.sha) { el.textContent = ''; return; }
+    if (!data || !data.sha) { _setSwFallback(); return; }
     var sha = data.sha.slice(0, 7);
     var raw = (data.commit && data.commit.author && data.commit.author.date) || '';
     var dt = raw ? new Date(raw) : null;
@@ -7731,7 +7739,7 @@ var __latestVerLabel = '';
     ) : '';
     __latestVerLabel = 'commit ' + sha + (fmt ? ' · ' + fmt : '');
     el.textContent = sha + (fmt ? ' · ' + fmt : '');
-  }).catch(function() { el.textContent = ''; });
+  }).catch(function() { _setSwFallback(); });
 })();
 
 /* ── Update banner: stunning slide-up + animated progress, auto-reload ── */
@@ -7769,6 +7777,25 @@ function showUpToDate() {
   }, 1400);
 }
 
+// Ask the active service worker for its CACHE_NAME (the build version).
+// Returns a Promise that resolves to the version string, or '' if unavailable.
+function _getAppVersion() {
+  return new Promise(function(resolve) {
+    if (!('serviceWorker' in navigator)) { resolve(''); return; }
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      var reg = regs && regs[0];
+      var sw = reg && (reg.active || navigator.serviceWorker.controller);
+      if (!sw) { resolve(''); return; }
+      var ch = new MessageChannel();
+      var done = false;
+      ch.port1.onmessage = function(ev) { if (!done) { done = true; resolve(ev.data || ''); } };
+      try { sw.postMessage({ type: 'GET_VERSION' }, [ch.port2]); }
+      catch (_) { resolve(''); return; }
+      setTimeout(function() { if (!done) { done = true; resolve(''); } }, 2000);
+    }).catch(function() { resolve(''); });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
 
   if ('serviceWorker' in navigator) {
@@ -7794,6 +7821,15 @@ document.addEventListener('DOMContentLoaded', async function() {
       console.warn('SW:', e.message);
     });
   }
+
+  // Update splash footer version from the active SW cache name (e.g. "aleh-driver-v189" → "v189")
+  _getAppVersion().then(function(v) {
+    var el = document.getElementById('app-version-display');
+    if (el && v) {
+      var m = String(v).match(/v\d+/i);
+      el.textContent = m ? m[0] : v;
+    }
+  }).catch(function(){});
 
   // Try cached session
   const session = loadSession();
