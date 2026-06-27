@@ -183,6 +183,47 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 @keyframes wsDrop { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-3px) scale(1.15)} }
 .ws-wave-border-glow { position:absolute; inset:0; border-radius:20px; box-shadow:inset 0 0 20px rgba(8,145,178,0.1); pointer-events:none; }
 .ws-station-list { display:flex; flex-direction:column; gap:12px; padding:0 16px; }
+
+/* ── WASH TABS ─────────────────────────────── */
+.ws-tab-bar { display:flex; gap:8px; padding:12px 16px 0; }
+.ws-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:10px 12px; border-radius:14px; border:1px solid rgba(8,145,178,0.2); background:rgba(8,145,178,0.05); color:rgba(255,255,255,0.5); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .25s; }
+.ws-tab.active { background:rgba(8,145,178,0.15); border-color:rgba(8,145,178,0.5); color:#0891b2; }
+.ws-tab svg { opacity:.7; transition:opacity .25s; }
+.ws-tab.active svg { opacity:1; }
+
+/* ── WASH HISTORY LIST ─────────────────────── */
+#ws-panel-history { padding:12px 16px; overflow-y:auto; }
+.ws-history-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:16px; }
+.ws-history-empty-icon { font-size:48px; opacity:.4; }
+.ws-history-empty-text { font-size:15px; color:rgba(255,255,255,.4); font-weight:600; }
+
+.ws-hi { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px; margin-bottom:12px; animation:wsFadeSlideIn .35s ease-out both; }
+.ws-hi:nth-child(1){animation-delay:.03s} .ws-hi:nth-child(2){animation-delay:.06s} .ws-hi:nth-child(3){animation-delay:.09s} .ws-hi:nth-child(4){animation-delay:.12s} .ws-hi:nth-child(5){animation-delay:.15s}
+@keyframes wsFadeSlideIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.ws-hi-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.ws-hi-station { font-size:15px; font-weight:800; color:#fff; }
+.ws-hi-city { font-size:12px; color:rgba(255,255,255,.5); margin-top:2px; }
+.ws-hi-date { text-align:left; font-size:11px; color:rgba(255,255,255,.35); font-family:monospace; }
+.ws-hi-date span { display:block; line-height:1.5; }
+.ws-hi-divider { height:1px; background:rgba(255,255,255,.06); margin:10px 0; }
+
+/* ── ALEH STAR RATING ─────────────────────── */
+.ws-rating-label { font-size:11px; color:rgba(8,145,178,.8); font-weight:700; margin-bottom:8px; letter-spacing:.04em; }
+.ws-stars { display:flex; gap:6px; flex-direction:row-reverse; justify-content:flex-end; }
+.ws-star { font-size:28px; color:rgba(255,255,255,.15); cursor:pointer; transition:all .15s; line-height:1; user-select:none; }
+.ws-star.on { color:#f59e0b; filter:drop-shadow(0 0 6px rgba(245,158,11,.5)); animation:wsStar .2s ease-out; }
+@keyframes wsStar { 0%{transform:scale(1)} 50%{transform:scale(1.4)} 100%{transform:scale(1)} }
+.ws-hi-comment { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:10px; color:#fff; font-size:13px; padding:10px 12px; font-family:inherit; resize:none; margin-top:10px; direction:rtl; box-sizing:border-box; }
+.ws-hi-comment:focus { outline:none; border-color:rgba(8,145,178,.5); }
+.ws-hi-submit { width:100%; margin-top:10px; padding:12px; background:linear-gradient(135deg,#0891b2,#0e7490); border:none; border-radius:12px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .2s; }
+.ws-hi-submit:active { transform:scale(.97); }
+.ws-hi-rated { display:flex; align-items:center; gap:8px; padding:6px 0; }
+.ws-hi-rated-stars { font-size:18px; color:#f59e0b; }
+.ws-hi-rated-text { font-size:12px; color:rgba(255,255,255,.5); }
+
+/* ── ALEH BADGE on station cards ──────────── */
+.ws-aleh-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(8,145,178,.15); border:1px solid rgba(8,145,178,.3); border-radius:20px; padding:3px 8px; font-size:11px; font-weight:700; color:#0891b2; margin-top:4px; }
+.ws-aleh-badge svg { width:10px; height:10px; }
 .ws-sc { background:var(--card); border-radius:20px; border:1px solid var(--border); border-right:3px solid #0891b2; overflow:hidden; transition:border-right-color .2s; }
 .ws-sc.highlight { border-right-color:#0891b2; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
 .ws-sc-head { padding:14px 16px 12px; cursor:pointer; display:flex; flex-direction:column; gap:8px; background:linear-gradient(135deg,rgba(8,145,178,.08) 0%,transparent 60%); }
@@ -4379,6 +4420,18 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       <div class="ph-sub" id="wash-quota-sub">בחר תחנת פז עם שירות שטיפה</div>
     </div>
     <div class="content">
+      <!-- Wash tabs -->
+      <div class="ws-tab-bar">
+        <button class="ws-tab active" id="ws-tab-stations" onclick="APP._wsTab('stations')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          תחנות
+        </button>
+        <button class="ws-tab" id="ws-tab-history" onclick="APP._wsTab('history')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          הרחיצות שלי
+        </button>
+      </div>
+      <div id="ws-panel-stations">
       <!-- Quota wave bar -->
       <div class="ws-wave-bar" id="ws-wave-bar">
         <div class="ws-wave-fill" id="ws-wave-fill" style="height:0%">
@@ -4409,6 +4462,15 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       <!-- Station cards -->
       <div class="ws-station-list" id="ws-station-list"></div>
       <div style="height:100px;"></div>
+      </div><!-- /ws-panel-stations -->
+      <div id="ws-panel-history" style="display:none">
+        <div class="ws-history-empty" id="ws-history-empty" style="display:none">
+          <div class="ws-history-empty-icon">💧</div>
+          <div class="ws-history-empty-text">עדיין לא בוצעו רחיצות</div>
+        </div>
+        <div class="ws-history-list" id="ws-history-list"></div>
+        <div style="height:100px;"></div>
+      </div><!-- /ws-panel-history -->
     </div>
   </div><!-- /screen-wash -->
 

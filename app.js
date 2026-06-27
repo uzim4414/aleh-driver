@@ -8072,6 +8072,156 @@ APP.closeWash = function() {
   STATE.currentScreen = 'home';
 };
 
+// ═══ WASH TABS: stations / history ═══
+APP._wsTab = function(tab) {
+  var stationsPanel = document.getElementById('ws-panel-stations');
+  var historyPanel  = document.getElementById('ws-panel-history');
+  var tabStations   = document.getElementById('ws-tab-stations');
+  var tabHistory    = document.getElementById('ws-tab-history');
+  if (tab === 'history') {
+    if (stationsPanel) stationsPanel.style.display = 'none';
+    if (historyPanel)  historyPanel.style.display  = '';
+    if (tabStations)   tabStations.classList.remove('active');
+    if (tabHistory)    tabHistory.classList.add('active');
+    APP._wsLoadHistory();
+  } else {
+    if (stationsPanel) stationsPanel.style.display = '';
+    if (historyPanel)  historyPanel.style.display  = 'none';
+    if (tabStations)   tabStations.classList.add('active');
+    if (tabHistory)    tabHistory.classList.remove('active');
+  }
+};
+
+// Load wash history (last 3 months) from Firebase washLog
+APP._wsLoadHistory = function() {
+  var listEl = document.getElementById('ws-history-list');
+  var emptyEl = document.getElementById('ws-history-empty');
+  if (!listEl) return;
+  var veh = STATE.vehicle;
+  var vid = veh && (veh.id || veh.vehicleId || veh.num);
+  if (!vid || typeof firebase === 'undefined') {
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    return;
+  }
+  listEl.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.3);font-size:13px;">טוען...</div>';
+  if (emptyEl) emptyEl.style.display = 'none';
+  // Read last 3 months
+  var months = [];
+  var now = new Date();
+  for (var i = 0; i < 3; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.getFullYear() + '' + ('0'+(d.getMonth()+1)).slice(-2));
+  }
+  var allWashes = [];
+  var done = 0;
+  months.forEach(function(m) {
+    firebase.database().ref('washLog/' + vid + '/' + m).once('value').then(function(snap) {
+      if (snap.exists()) {
+        var val = snap.val();
+        Object.keys(val).forEach(function(k) {
+          var w = val[k];
+          if (w && w.date) allWashes.push(w);
+        });
+      }
+    }).catch(function(){}).finally(function() {
+      done++;
+      if (done === months.length) {
+        allWashes.sort(function(a,b){ return (b.date+' '+(b.time||'')).localeCompare(a.date+' '+(a.time||'')); });
+        APP._wsRenderHistory(allWashes);
+      }
+    });
+  });
+};
+
+// Render history list + per-wash rating UI
+APP._wsRenderHistory = function(washes) {
+  var listEl = document.getElementById('ws-history-list');
+  var emptyEl = document.getElementById('ws-history-empty');
+  if (!listEl) return;
+  if (!washes || !washes.length) {
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+  var veh = STATE.vehicle;
+  var vid = veh && (veh.id || veh.vehicleId || veh.num);
+  APP._wsMyRatings = APP._wsMyRatings || {};
+  var renderAll = function() {
+    listEl.innerHTML = washes.map(function(w, i) {
+      var myRating = APP._wsMyRatings[w.stationId] || null;
+      var dateStr = w.date || '';
+      var timeStr = w.time ? w.time.slice(0,5) : '';
+      var dateHeb = dateStr ? (function(){
+        var parts = dateStr.split('-');
+        return parts[2]+'/'+parts[1]+'/'+parts[0];
+      })() : '';
+      var stationName = w.stationName || 'תחנת פז';
+      var ratedHtml = myRating
+        ? '<div class="ws-hi-rated"><span class="ws-hi-rated-stars">' + '★'.repeat(myRating.rating) + '☆'.repeat(5-myRating.rating) + '</span><span class="ws-hi-rated-text">הדירוג שלך</span></div>'
+        : '<div class="ws-rating-label">דרג את הרחיצה</div>' +
+          '<div class="ws-stars" id="ws-stars-'+i+'">' +
+          [5,4,3,2,1].map(function(s){ return '<span class="ws-star" data-v="'+s+'" data-idx="'+i+'" onclick="APP._wsStarClick(this,' + i + ')">★</span>'; }).join('') +
+          '</div>' +
+          '<textarea class="ws-hi-comment" id="ws-comment-'+i+'" placeholder="הערה אופציונלית..." rows="2"></textarea>' +
+          '<button class="ws-hi-submit" onclick="APP._wsSubmitRating(\''+(w.stationId||'')+'\',\''+stationName.replace(/'/g,"\\'")+'\','+i+')">שלח דירוג</button>';
+      return '<div class="ws-hi"><div class="ws-hi-top"><div><div class="ws-hi-station">'+
+        stationName+'</div><div class="ws-hi-city">'+(w.stationCity||'')+'</div></div>'+
+        '<div class="ws-hi-date"><span>'+dateHeb+'</span><span>'+timeStr+'</span></div></div>'+
+        '<div class="ws-hi-divider"></div><div class="ws-hi-rating">'+ratedHtml+'</div></div>';
+    }).join('');
+    APP._wsHistoryWashes = washes;
+  };
+  if (vid && typeof firebase !== 'undefined') {
+    firebase.database().ref('washRatings').once('value').then(function(snap) {
+      if (snap.exists()) {
+        var all = snap.val();
+        Object.keys(all).forEach(function(stationId) {
+          if (all[stationId] && all[stationId][vid]) {
+            APP._wsMyRatings[stationId] = all[stationId][vid];
+          }
+        });
+      }
+    }).catch(function(){}).finally(function(){ renderAll(); });
+  } else { renderAll(); }
+};
+
+// Star tap → set selection
+APP._wsStarClick = function(el, idx) {
+  var val = parseInt(el.getAttribute('data-v'), 10);
+  var container = document.getElementById('ws-stars-' + idx);
+  if (!container) return;
+  container.querySelectorAll('.ws-star').forEach(function(s) {
+    var sv = parseInt(s.getAttribute('data-v'), 10);
+    s.classList.toggle('on', sv <= val);
+  });
+  container.setAttribute('data-selected', val);
+};
+
+// Submit rating → GAS
+APP._wsSubmitRating = function(stationId, stationName, idx) {
+  var container = document.getElementById('ws-stars-' + idx);
+  var rating = container ? parseInt(container.getAttribute('data-selected')||'0', 10) : 0;
+  if (!rating) { showToast('בחר דירוג (1-5 כוכבים)'); return; }
+  var comment = (document.getElementById('ws-comment-'+idx)||{}).value || '';
+  var veh = STATE.vehicle;
+  var vid = veh && (veh.id || veh.vehicleId || veh.num);
+  var driverName = (STATE.user && (STATE.user.name || STATE.user.displayName)) || '';
+  gasPostForm('save_wash_rating', {
+    vehicleId: vid||'', stationId: stationId, rating: rating,
+    comment: comment, driverName: driverName, stationName: stationName
+  }).then(function(r) {
+    APP._wsMyRatings = APP._wsMyRatings || {};
+    APP._wsMyRatings[stationId] = {rating: rating, comment: comment};
+    APP._wsRenderHistory(APP._wsHistoryWashes || []);
+    showToast('תודה! הדירוג נשמר');
+  }).catch(function(err) {
+    showToast('שגיאה בשמירת הדירוג');
+    console.error('[wash rating]', err);
+  });
+};
+
 // Cyan marker icon (mirror of _thMakeMarkerIcon)
 function _wsMakeMarkerIcon(num, active) {
   return L.divIcon({
@@ -8127,6 +8277,28 @@ APP._initWashPanel = async function(userLat, userLng) {
   APP._wsStationsData = stations;
   APP._wsSortMode = 'dist';
   APP._wsRenderCards(stations);
+
+  // Load Aleh driver ratings from Firebase and inject badge into cards
+  if (typeof firebase !== 'undefined') {
+    firebase.database().ref('washStationStats').once('value').then(function(snap) {
+      if (!snap.exists()) return;
+      APP._wsAlehStats = snap.val() || {};
+      document.querySelectorAll('.ws-sc').forEach(function(card) {
+        var sid = card.getAttribute('data-station-id');
+        if (!sid || !APP._wsAlehStats[sid]) return;
+        var stats = APP._wsAlehStats[sid];
+        if (stats.avg == null) return;
+        var badge = card.querySelector('.ws-aleh-badge');
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'ws-aleh-badge';
+          var anchor = card.querySelector('.ws-sc-right') || card.querySelector('.ws-sc-head');
+          if (anchor) anchor.appendChild(badge);
+        }
+        badge.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' + Number(stats.avg).toFixed(1) + ' (' + (stats.count||0) + ' נהגי עלה)';
+      });
+    }).catch(function(){});
+  }
 
   var mapEl = document.getElementById('ws-leaflet-map');
   if (!mapEl || !window.L) return;
@@ -8244,6 +8416,7 @@ APP._wsRenderCards = function(stations) {
     var card = document.createElement('div');
     card.className = 'ws-sc' + (idx === 0 ? ' open' : '');
     card.id = 'ws-sc-' + s.id;
+    card.setAttribute('data-station-id', s.id);
     card.innerHTML =
       '<div class="ws-sc-head" onclick="APP._wsToggleSC(\''+s.id+'\')">' +
         '<div class="ws-sc-row1">' +
