@@ -7718,12 +7718,15 @@ var __latestVerLabel = '';
   if (!el) return;
   // Fallback: show SW version immediately while GitHub fetch runs
   function _setSwFallback() {
-    if (el.textContent) return; // already set by GitHub
+    var cur = el.textContent || '';
+    if (cur && cur !== 'טוען...') return; // already set by GitHub
     _getAppVersion().then(function(v) {
-      if (!el.textContent && v) el.textContent = v;
-    }).catch(function(){});
+      var cur2 = el.textContent || '';
+      if ((!cur2 || cur2 === 'טוען...') && v) el.textContent = v;
+      else if (!v) el.textContent = '';
+    }).catch(function(){ el.textContent = ''; });
   }
-  setTimeout(_setSwFallback, 2500); // fire if GitHub hasn't responded
+  setTimeout(_setSwFallback, 1500); // fire if GitHub hasn't responded
   fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
     headers: { 'Accept': 'application/vnd.github.v3+json' }
   }).then(function(r) { return r.json(); }).then(function(data) {
