@@ -7718,29 +7718,45 @@ var __latestVerLabel = '';
   if (!el) return;
   var LS_KEY = '_aleh_ver_label';
   // Show cached label immediately (instant, no flicker)
-  var cached = localStorage.getItem(LS_KEY);
-  if (cached) { el.textContent = cached; __latestVerLabel = 'commit ' + cached; }
-  // Fetch fresh from GitHub (updates cache for next load)
-  fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
-    headers: { 'Accept': 'application/vnd.github.v3+json' }
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data || !data.sha) return;
-    var sha = data.sha.slice(0, 7);
-    var raw = (data.commit && data.commit.author && data.commit.author.date) || '';
-    var dt = raw ? new Date(raw) : null;
-    var fmt = dt ? (
-      ('0'+(dt.getDate())).slice(-2) + '/' +
-      ('0'+(dt.getMonth()+1)).slice(-2) + ' ' +
-      ('0'+dt.getHours()).slice(-2) + ':' +
-      ('0'+dt.getMinutes()).slice(-2)
-    ) : '';
-    var label = sha + (fmt ? ' · ' + fmt : '');
-    __latestVerLabel = 'commit ' + label;
-    el.textContent = label;
-    try { localStorage.setItem(LS_KEY, label); } catch(e){}
-  }).catch(function(){
-    // If fetch fails and nothing cached, show nothing (badge stays with cached or empty)
-  });
+  try {
+    var cached = localStorage.getItem(LS_KEY);
+    if (cached) { el.textContent = cached; __latestVerLabel = 'commit ' + cached; }
+  } catch(e) {}
+  // Fetch fresh from local version.json (always available, no rate limits)
+  fetch('version.json?_=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.sha) return;
+      var raw = data.date || '';
+      var dt = raw ? new Date(raw) : null;
+      var fmt = dt && !isNaN(dt) ? (
+        ('0'+dt.getDate()).slice(-2) + '/' +
+        ('0'+(dt.getMonth()+1)).slice(-2) + ' ' +
+        ('0'+dt.getHours()).slice(-2) + ':' +
+        ('0'+dt.getMinutes()).slice(-2)
+      ) : '';
+      var swV = data.swVersion ? ' [' + data.swVersion + ']' : '';
+      var label = data.sha + (fmt ? ' · ' + fmt : '') + swV;
+      __latestVerLabel = 'commit ' + label;
+      el.textContent = label;
+      try { localStorage.setItem(LS_KEY, label); } catch(e){}
+    })
+    .catch(function() {
+      // version.json not found — try GitHub API as last resort
+      fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
+        headers: { 'Accept': 'application/vnd.github.v3+json' }
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data || !data.sha) return;
+        var sha = data.sha.slice(0,7);
+        var raw = (data.commit&&data.commit.author&&data.commit.author.date)||'';
+        var dt = raw ? new Date(raw) : null;
+        var fmt = dt ? (('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+' '+('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2)) : '';
+        var label = sha + (fmt ? ' · ' + fmt : '');
+        __latestVerLabel = 'commit ' + label;
+        el.textContent = label;
+        try { localStorage.setItem(LS_KEY, label); } catch(e){}
+      }).catch(function(){});
+    });
 })();
 
 /* ── Update banner: stunning slide-up + animated progress, auto-reload ── */
