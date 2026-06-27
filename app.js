@@ -8024,7 +8024,7 @@ APP.openWash = function() {
   if (!STATE._washLogLoaded) {
     STATE._washLogLoaded = true;
     var vehFb = STATE.vehicle;
-    var vid = vehFb && (vehFb.id || vehFb.num);
+    var vid = vehFb && (vehFb.id || vehFb.vehicleId || vehFb.num);
     if (vid && typeof firebase !== 'undefined') {
       var thisMonth = new Date().toISOString().slice(0,7).replace('-','');
       firebase.database().ref('washLog/' + vid + '/' + thisMonth).once('value').then(function(snap) {
