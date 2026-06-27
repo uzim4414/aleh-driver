@@ -7716,21 +7716,15 @@ var __latestVerLabel = '';
 (function() {
   var el = document.getElementById('splash-ver-text');
   if (!el) return;
-  // Fallback: show SW version immediately while GitHub fetch runs
-  function _setSwFallback() {
-    var cur = el.textContent || '';
-    if (cur && cur !== 'טוען...') return; // already set by GitHub
-    _getAppVersion().then(function(v) {
-      var cur2 = el.textContent || '';
-      if ((!cur2 || cur2 === 'טוען...') && v) el.textContent = v;
-      else if (!v) el.textContent = '';
-    }).catch(function(){ el.textContent = ''; });
-  }
-  setTimeout(_setSwFallback, 1500); // fire if GitHub hasn't responded
+  var LS_KEY = '_aleh_ver_label';
+  // Show cached label immediately (instant, no flicker)
+  var cached = localStorage.getItem(LS_KEY);
+  if (cached) { el.textContent = cached; __latestVerLabel = 'commit ' + cached; }
+  // Fetch fresh from GitHub (updates cache for next load)
   fetch('https://api.github.com/repos/uzim4414/aleh-driver/commits/main', {
     headers: { 'Accept': 'application/vnd.github.v3+json' }
   }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data || !data.sha) { _setSwFallback(); return; }
+    if (!data || !data.sha) return;
     var sha = data.sha.slice(0, 7);
     var raw = (data.commit && data.commit.author && data.commit.author.date) || '';
     var dt = raw ? new Date(raw) : null;
@@ -7740,9 +7734,13 @@ var __latestVerLabel = '';
       ('0'+dt.getHours()).slice(-2) + ':' +
       ('0'+dt.getMinutes()).slice(-2)
     ) : '';
-    __latestVerLabel = 'commit ' + sha + (fmt ? ' · ' + fmt : '');
-    el.textContent = sha + (fmt ? ' · ' + fmt : '');
-  }).catch(function() { _setSwFallback(); });
+    var label = sha + (fmt ? ' · ' + fmt : '');
+    __latestVerLabel = 'commit ' + label;
+    el.textContent = label;
+    try { localStorage.setItem(LS_KEY, label); } catch(e){}
+  }).catch(function(){
+    // If fetch fails and nothing cached, show nothing (badge stays with cached or empty)
+  });
 })();
 
 /* ── Update banner: stunning slide-up + animated progress, auto-reload ── */
