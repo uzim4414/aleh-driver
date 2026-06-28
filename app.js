@@ -8287,6 +8287,7 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     rating = container ? parseInt(container.getAttribute('data-selected')||'0', 10) : 0;
   }
   if (!rating) { showToast('בחר דירוג (1-5 כוכבים)'); return; }
+  if (!stationId) { showToast('שגיאה: מזהה תחנה חסר'); return; }
   var comment = (document.getElementById('ws-comment-'+idx)||{}).value || '';
   var veh = STATE.vehicle;
   var vid = veh && (veh.id || veh.vehicleId || veh.num);
@@ -8295,9 +8296,19 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     vehicleId: vid||'', stationId: stationId, rating: rating,
     comment: comment, driverName: driverName, stationName: stationName
   }).then(function(r) {
+    if (!r || r.ok === false) {
+      showToast('שגיאה בשמירת הדירוג: ' + ((r && r.error) || ''));
+      return;
+    }
     APP._wsMyRatings = APP._wsMyRatings || {};
     var _sKey = String(stationId).replace(/[^0-9A-Za-z_-]/g,'_');
     APP._wsMyRatings[_sKey] = {rating: rating, comment: comment};
+    // Optimistically update Aleh stats so badge appears immediately on station card
+    if (r.newAvg != null) {
+      APP._wsAlehStats = APP._wsAlehStats || {};
+      APP._wsAlehStats[_sKey] = {avg: r.newAvg, count: r.count || 1};
+      if (typeof APP._wsRefreshRatingRows === 'function') APP._wsRefreshRatingRows();
+    }
     if (APP._wsSelected) delete APP._wsSelected[idx];
     APP._wsRenderHistory(APP._wsHistoryWashes || []);
     showToast('תודה! הדירוג נשמר');
