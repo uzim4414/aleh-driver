@@ -8216,7 +8216,8 @@ APP._wsRenderHistory = function(washes) {
       })() : '';
       var stationName = w.stationName || 'תחנת פז';
       var ratedHtml = myRating
-        ? '<div class="ws-hi-rated"><span class="ws-hi-rated-stars">' + '★'.repeat(myRating.rating) + '☆'.repeat(5-myRating.rating) + '</span><span class="ws-hi-rated-text">הדירוג שלך</span></div>'
+        ? '<div class="ws-hi-rated"><span class="ws-hi-rated-stars">' + '★'.repeat(myRating.rating) + '☆'.repeat(5-myRating.rating) + '</span><span class="ws-hi-rated-text">הדירוג שלך</span></div>' +
+          (myRating.comment ? '<div class="ws-hi-rated-comment" style="font-size:12px;color:rgba(255,255,255,.55);margin-top:6px;padding:8px 10px;background:rgba(255,255,255,.05);border-radius:10px;direction:rtl;line-height:1.5;">' + (myRating.comment+'').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' : '')
         : '<div class="ws-rating-label">דרג את הרחיצה</div>' +
           '<div class="ws-stars" id="ws-stars-'+i+'">' +
           [5,4,3,2,1].map(function(s){ return '<span class="ws-star" data-v="'+s+'" data-idx="'+i+'" onclick="APP._wsStarClick(this,' + i + ')">★</span>'; }).join('') +
@@ -8254,7 +8255,7 @@ APP._wsRenderHistory = function(washes) {
           var sKey = String(w.stationId).replace(/[^0-9A-Za-z_-]/g,'_');
           var vKey = String(vid).replace(/[^0-9A-Za-z_-]/g,'_');
           if (all[sKey] && all[sKey][vKey]) {
-            APP._wsMyRatings[w.stationId] = all[sKey][vKey];
+            APP._wsMyRatings[sKey] = all[sKey][vKey]; // store under sanitized key (matches submit path)
           }
         });
       }
@@ -8295,7 +8296,8 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     comment: comment, driverName: driverName, stationName: stationName
   }).then(function(r) {
     APP._wsMyRatings = APP._wsMyRatings || {};
-    APP._wsMyRatings[stationId] = {rating: rating, comment: comment};
+    var _sKey = String(stationId).replace(/[^0-9A-Za-z_-]/g,'_');
+    APP._wsMyRatings[_sKey] = {rating: rating, comment: comment};
     if (APP._wsSelected) delete APP._wsSelected[idx];
     APP._wsRenderHistory(APP._wsHistoryWashes || []);
     showToast('תודה! הדירוג נשמר');
@@ -8361,25 +8363,45 @@ APP._initWashPanel = async function(userLat, userLng) {
   APP._wsSortMode = 'dist';
   APP._wsRenderCards(stations);
 
-  // Load Aleh driver ratings from Firebase and inject badge into cards
+  // Load ratings from Firebase: Aleh driver stats + Google Places ratings + recent comments
   if (typeof firebase !== 'undefined') {
-    firebase.database().ref('washStationStats').once('value').then(function(snap) {
+    var db = firebase.database();
+    // 1) Google Places ratings → re-render the Google row inside each card
+    db.ref('washGoogleRatings').once('value').then(function(snap) {
+      APP._wsGoogleRatings = snap.val() || {};
+      APP._wsRefreshRatingRows();
+    }).catch(function(){});
+
+    // 2) Aleh driver aggregate stats → animated teal badge row
+    db.ref('washStationStats').once('value').then(function(snap) {
       if (!snap.exists()) return;
       APP._wsAlehStats = snap.val() || {};
-      document.querySelectorAll('.ws-sc').forEach(function(card) {
-        var sid = card.getAttribute('data-station-id');
-        if (!sid || !APP._wsAlehStats[sid]) return;
-        var stats = APP._wsAlehStats[sid];
-        if (stats.avg == null) return;
-        var badge = card.querySelector('.ws-aleh-badge');
-        if (!badge) {
-          badge = document.createElement('div');
-          badge.className = 'ws-aleh-badge';
-          var anchor = card.querySelector('.ws-sc-right') || card.querySelector('.ws-sc-head');
-          if (anchor) anchor.appendChild(badge);
-        }
-        badge.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' + Number(stats.avg).toFixed(1) + ' (' + (stats.count||0) + ' נהגי עלה)';
+      APP._wsRefreshRatingRows();
+    }).catch(function(){});
+
+    // 3) Recent driver comments (last 3 across all vehicles) → expandable card body
+    db.ref('washRatings').once('value').then(function(snap) {
+      if (!snap.exists()) return;
+      var all = snap.val() || {};
+      APP._wsRecentComments = {};
+      Object.keys(all).forEach(function(sKey) {
+        var perVeh = all[sKey] || {};
+        var arr = [];
+        Object.keys(perVeh).forEach(function(vKey) {
+          var r = perVeh[vKey];
+          if (r && r.comment && String(r.comment).trim()) {
+            arr.push({
+              comment: String(r.comment).trim(),
+              rating: r.rating || 0,
+              driverName: r.driverName || '',
+              ts: r.ts || r.timestamp || r.date || 0
+            });
+          }
+        });
+        arr.sort(function(a, b){ return (b.ts || 0) - (a.ts || 0); });
+        if (arr.length) APP._wsRecentComments[sKey] = arr.slice(0, 3);
       });
+      APP._wsRefreshCommentSections();
     }).catch(function(){});
   }
 
@@ -8494,6 +8516,100 @@ function _wsParseHoursStr(hoursStr) {
   });
 }
 
+// Sanitize a station id the same way GAS does before using it as a Firebase key
+APP._wsSanKey = function(id) { return String(id).replace(/[^0-9A-Za-z_-]/g, '_'); };
+
+// Render 0–5 stars supporting halves: full ★, half ⯨ (rendered via ½ glyph), empty ☆
+APP._wsStarsHalf = function(r) {
+  r = Number(r) || 0;
+  var out = '';
+  for (var i = 1; i <= 5; i++) {
+    if (r >= i)            out += '★';
+    else if (r >= i - 0.5) out += '<span class="ws-half">★</span>';
+    else                   out += '☆';
+  }
+  return out;
+};
+
+// Look up Aleh + Google data for a station (handles both raw and sanitized keys)
+APP._wsAlehFor = function(id) {
+  var a = APP._wsAlehStats || {};
+  return a[id] || a[APP._wsSanKey(id)] || null;
+};
+APP._wsGoogleFor = function(id) {
+  var g = APP._wsGoogleRatings || {};
+  return g[id] || g[APP._wsSanKey(id)] || null;
+};
+APP._wsCommentsFor = function(id) {
+  var c = APP._wsRecentComments || {};
+  return c[id] || c[APP._wsSanKey(id)] || null;
+};
+
+// Build the two-row rating block (Google Places + Aleh drivers) for a card
+APP._wsRatingRowsHtml = function(s) {
+  var g = APP._wsGoogleFor(s.id);
+  var gRating = (g && g.rating != null) ? Number(g.rating) : (s.rating != null ? Number(s.rating) : null);
+  var gCount  = (g && g.count != null) ? g.count : s.ratingCount;
+  var html = '';
+  if (gRating != null) {
+    html += '<div class="ws-rate-google">' +
+              '<span class="ws-rate-stars">' + APP._wsStarsHalf(gRating) + '</span>' +
+              '<span class="ws-rate-val">' + gRating.toFixed(1) + '</span>' +
+              '<span class="ws-rate-cnt">(' + (gCount || 0) + ' ביקורות גוגל)</span>' +
+            '</div>';
+  }
+  var a = APP._wsAlehFor(s.id);
+  if (a && a.avg != null) {
+    html += '<div class="ws-aleh-badge ws-aleh-live" title="דירוג נהגי עלה">' +
+              '<span class="ws-aleh-emoji">🧑‍✈️</span>' +
+              '<span class="ws-rate-val">' + Number(a.avg).toFixed(1) + '</span>' +
+              '<span class="ws-aleh-cnt">(' + (a.count || 0) + ' נהגי עלה)</span>' +
+            '</div>';
+  }
+  return html;
+};
+
+// Build the "ביקורות נהגים" section (recent comments) for the expandable body
+APP._wsCommentsHtml = function(s) {
+  var arr = APP._wsCommentsFor(s.id);
+  if (!arr || !arr.length) return '';
+  var items = arr.map(function(c) {
+    var stars = '';
+    var rr = Math.round(Number(c.rating) || 0);
+    for (var i = 1; i <= 5; i++) stars += (i <= rr) ? '★' : '☆';
+    var who = c.driverName ? ('<span class="ws-cm-who">' + c.driverName + '</span>') : '';
+    return '<div class="ws-cm">' +
+             '<div class="ws-cm-top"><span class="ws-cm-stars">' + stars + '</span>' + who + '</div>' +
+             '<div class="ws-cm-text">' + String(c.comment).replace(/</g, '&lt;') + '</div>' +
+           '</div>';
+  }).join('');
+  return '<div class="ws-cm-label">ביקורות נהגים</div>' + items;
+};
+
+// Re-render the rating block of every visible card (called after Firebase loads)
+APP._wsRefreshRatingRows = function() {
+  var data = APP._wsStationsData || APP._WASH_STATIONS;
+  document.querySelectorAll('.ws-sc-ratings').forEach(function(el) {
+    var card = el.closest('.ws-sc');
+    if (!card) return;
+    var sid = card.getAttribute('data-station-id');
+    var s = data.find(function(x){ return String(x.id) === String(sid); });
+    if (s) el.innerHTML = APP._wsRatingRowsHtml(s);
+  });
+};
+
+// Re-render the comments section of every visible card (called after Firebase loads)
+APP._wsRefreshCommentSections = function() {
+  var data = APP._wsStationsData || APP._WASH_STATIONS;
+  document.querySelectorAll('.ws-sc-comments').forEach(function(el) {
+    var card = el.closest('.ws-sc');
+    if (!card) return;
+    var sid = card.getAttribute('data-station-id');
+    var s = data.find(function(x){ return String(x.id) === String(sid); });
+    if (s) el.innerHTML = APP._wsCommentsHtml(s);
+  });
+};
+
 // Mirror of _thRenderCards — Waze-only + confirm bar
 APP._wsRenderCards = function(stations) {
   var list = document.getElementById('ws-station-list');
@@ -8517,7 +8633,7 @@ APP._wsRenderCards = function(stations) {
           '<div><div class="ws-sc-name">'+s.name+'</div><div class="ws-sc-addr">'+s.addr+'</div></div>' +
           '<div class="ws-sc-right">' +
             '<div class="ws-sc-dist">'+distTxt+'</div>' +
-            '<div class="ws-sc-stars">'+_thStars(s.rating)+'<span>'+s.rating+' ('+s.ratingCount+')</span></div>' +
+            '<div class="ws-sc-ratings" id="ws-ratings-'+s.id+'">'+APP._wsRatingRowsHtml(s)+'</div>' +
           '</div>' +
         '</div>' +
         '<div class="ws-sc-row2">' +
@@ -8528,6 +8644,7 @@ APP._wsRenderCards = function(stations) {
       '</div>' +
       '<div class="ws-sc-body">' +
         _thHoursTableHtml(parsedHours) +
+        '<div class="ws-sc-comments" id="ws-comments-'+s.id+'">'+APP._wsCommentsHtml(s)+'</div>' +
         '<div class="ws-sc-actions">' +
           '<button class="ws-sc-btn waze" onclick="APP._wsWaze(\''+s.id+'\')"><div class="ws-sc-btn-icon"><svg width="20" height="20" viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="27" rx="17" ry="14" fill="#0891b2"/><circle cx="18" cy="33" r="3" fill="#fff"/><circle cx="30" cy="33" r="3" fill="#fff"/><path d="M15 24 Q24 14 33 24" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg></div>נווט ב-Waze</button>' +
         '</div>' +
