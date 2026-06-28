@@ -8386,13 +8386,15 @@ APP._initWashPanel = async function(userLat, userLng) {
 
   stations.forEach(function(s, idx) {
     var marker = L.marker([s.lat, s.lng], { icon: _wsMakeMarkerIcon(idx+1, false) }).addTo(map);
-    marker.bindPopup('<div style="direction:rtl">'+s.name+'<br><small>'+s.addr+'</small></div>');
+    marker.bindPopup('<div style="direction:rtl">'+s.name+'<br><small>'+s.addr+'</small></div>', { autoPan: false });
     marker.on('click', function() {
       APP._wsToggleSC(s.id, true);
       marker.openPopup();
       var el = document.getElementById('ws-sc-'+s.id);
       if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
-      stations.forEach(function(ss, ii) {
+      // Renumber markers based on current _wsStationsData order (post-sort)
+      var cur = APP._wsStationsData || stations;
+      cur.forEach(function(ss, ii) {
         if (APP._wsMapMarkers[ss.id]) APP._wsMapMarkers[ss.id].setIcon(_wsMakeMarkerIcon(ii+1, ss.id===s.id));
       });
     });
@@ -8441,6 +8443,12 @@ APP._initWashPanel = async function(userLat, userLng) {
       }
       APP._wsStationsData = visible;
       APP._wsRenderCards(visible);
+      // Renumber map markers to match new sort order
+      visible.forEach(function(s, ii) {
+        if (APP._wsMapMarkers && APP._wsMapMarkers[s.id]) {
+          APP._wsMapMarkers[s.id].setIcon(_wsMakeMarkerIcon(ii+1, false));
+        }
+      });
     }, 600);
   });
 
@@ -8477,6 +8485,9 @@ function _wsParseHoursStr(hoursStr) {
 APP._wsRenderCards = function(stations) {
   var list = document.getElementById('ws-station-list');
   if (!list) return;
+  // Capture which station card is open before wiping DOM
+  var _prevOpen = list.querySelector('.ws-sc.open');
+  var _openId = _prevOpen ? _prevOpen.getAttribute('data-station-id') : null;
   list.innerHTML = '';
   stations.forEach(function(s, idx) {
     var open = _thIsOpen(s);
@@ -8484,7 +8495,7 @@ APP._wsRenderCards = function(stations) {
     var todayHours = _thTodayHours(parsedHours);
     var distTxt = s.dist !== null && s.dist !== undefined ? (s.dist < 1 ? Math.round(s.dist*1000) + 'מ׳' : s.dist.toFixed(1) + ' ק"מ') : '—';
     var card = document.createElement('div');
-    card.className = 'ws-sc' + (idx === 0 ? ' open' : '');
+    card.className = 'ws-sc' + ((String(s.id) === String(_openId) || (!_openId && idx === 0)) ? ' open' : '');
     card.id = 'ws-sc-' + s.id;
     card.setAttribute('data-station-id', s.id);
     card.innerHTML =
