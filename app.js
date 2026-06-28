@@ -8510,8 +8510,36 @@ APP._wsConfirmWash = function(stationId) {
   APP._wsUpdateQuota(used);
   showToast('רחיצה נרשמה!');
   APP._showWashSuccess();
+  console.log('[save_wash] vehicleId=' + vehicleId + ' stationId=' + s.id + ' stationName=' + s.name);
   return gasPostForm('save_wash', params).then(function(r) {
     if (r && r.quotaFull) showToast('מכסה חודשית מלאה (4/4)');
+    // Write to Firebase directly from PWA (authenticated session)
+    // This ensures data appears even if GAS _fbWrite fails (auth/rules issue)
+    try {
+      if (typeof firebase !== 'undefined') {
+        var vehFb2 = STATE.vehicle;
+        var vid2 = vehFb2 && (vehFb2.id || vehFb2.vehicleId || vehFb2.num);
+        if (vid2) {
+          var now2 = new Date();
+          var mo2 = now2.getFullYear() + '' + ('0'+(now2.getMonth()+1)).slice(-2);
+          var dateStr2 = now2.toISOString().slice(0,10);
+          var timeStr2 = now2.toTimeString().slice(0,8);
+          var fbRef = 'washLog/' + vid2 + '/' + mo2 + '/' + now2.getTime();
+          firebase.database().ref(fbRef).set({
+            vehicleId: String(vid2),
+            stationId: String(s.id),
+            stationName: s.name || '',
+            stationCity: s.city || '',
+            date: dateStr2,
+            time: timeStr2,
+            washType: 'regular',
+            source: 'pwa'
+          }).catch(function(fbErr) {
+            console.warn('[save_wash Firebase direct]', fbErr);
+          });
+        }
+      }
+    } catch(fbEx) { console.warn('[save_wash Firebase]', fbEx); }
     return r;
   }).catch(function(err) {
     // Rollback optimistic update
@@ -8520,7 +8548,7 @@ APP._wsConfirmWash = function(stationId) {
     var usedAfter = APP._washMonthCount();
     APP._wsUpdateQuota(usedAfter);
     showToast('שגיאה בשמירת הרחיצה: ' + (err.message || 'שגיאת שרת'));
-    console.error('[save_wash]', err);
+    console.error('[save_wash ERROR]', err.message, err);
   });
 };
 
