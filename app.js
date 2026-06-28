@@ -8190,7 +8190,7 @@ APP._wsRenderHistory = function(washes) {
   APP._wsMyRatings = APP._wsMyRatings || {};
   var renderAll = function() {
     listEl.innerHTML = washes.map(function(w, i) {
-      var myRating = APP._wsMyRatings[w.stationId] || null;
+      var myRating = APP._wsMyRatings[w.stationId] || APP._wsMyRatings[String(w.stationId).replace(/[^0-9A-Za-z_-]/g,'_')] || null;
       var dateStr = w.date || '';
       var timeStr = w.time ? w.time.slice(0,5) : '';
       var dateHeb = dateStr ? (function(){
@@ -8212,14 +8212,32 @@ APP._wsRenderHistory = function(washes) {
         '<div class="ws-hi-divider"></div><div class="ws-hi-rating">'+ratedHtml+'</div></div>';
     }).join('');
     APP._wsHistoryWashes = washes;
+    // Re-apply any in-progress star selections that survived the re-render
+    if (APP._wsSelected) {
+      setTimeout(function() {
+        Object.keys(APP._wsSelected).forEach(function(i) {
+          var sel = APP._wsSelected[i];
+          if (!sel) return;
+          var cont = document.getElementById('ws-stars-' + i);
+          if (!cont) return;
+          cont.setAttribute('data-selected', sel);
+          cont.querySelectorAll('.ws-star').forEach(function(s) {
+            s.classList.toggle('on', parseInt(s.getAttribute('data-v'), 10) <= sel);
+          });
+        });
+      }, 0);
+    }
   };
   if (vid && typeof firebase !== 'undefined') {
     firebase.database().ref('washRatings').once('value').then(function(snap) {
       if (snap.exists()) {
         var all = snap.val();
-        Object.keys(all).forEach(function(stationId) {
-          if (all[stationId] && all[stationId][vid]) {
-            APP._wsMyRatings[stationId] = all[stationId][vid];
+        // GAS sanitizes keys — match raw stationId from washes to sanitized Firebase key
+        washes.forEach(function(w) {
+          var sKey = String(w.stationId).replace(/[^0-9A-Za-z_-]/g,'_');
+          var vKey = String(vid).replace(/[^0-9A-Za-z_-]/g,'_');
+          if (all[sKey] && all[sKey][vKey]) {
+            APP._wsMyRatings[w.stationId] = all[sKey][vKey];
           }
         });
       }
@@ -8227,9 +8245,12 @@ APP._wsRenderHistory = function(washes) {
   } else { renderAll(); }
 };
 
-// Star tap → set selection
+// Star tap → set selection (stored outside DOM to survive re-renders)
+APP._wsSelected = APP._wsSelected || {};
 APP._wsStarClick = function(el, idx) {
   var val = parseInt(el.getAttribute('data-v'), 10);
+  APP._wsSelected = APP._wsSelected || {};
+  APP._wsSelected[idx] = val;
   var container = document.getElementById('ws-stars-' + idx);
   if (!container) return;
   container.querySelectorAll('.ws-star').forEach(function(s) {
@@ -8241,8 +8262,12 @@ APP._wsStarClick = function(el, idx) {
 
 // Submit rating → GAS
 APP._wsSubmitRating = function(stationId, stationName, idx) {
-  var container = document.getElementById('ws-stars-' + idx);
-  var rating = container ? parseInt(container.getAttribute('data-selected')||'0', 10) : 0;
+  // Read from persistent store first (survives Firebase re-renders), fallback to DOM
+  var rating = (APP._wsSelected && APP._wsSelected[idx]) || 0;
+  if (!rating) {
+    var container = document.getElementById('ws-stars-' + idx);
+    rating = container ? parseInt(container.getAttribute('data-selected')||'0', 10) : 0;
+  }
   if (!rating) { showToast('בחר דירוג (1-5 כוכבים)'); return; }
   var comment = (document.getElementById('ws-comment-'+idx)||{}).value || '';
   var veh = STATE.vehicle;
@@ -8254,6 +8279,7 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
   }).then(function(r) {
     APP._wsMyRatings = APP._wsMyRatings || {};
     APP._wsMyRatings[stationId] = {rating: rating, comment: comment};
+    if (APP._wsSelected) delete APP._wsSelected[idx];
     APP._wsRenderHistory(APP._wsHistoryWashes || []);
     showToast('תודה! הדירוג נשמר');
   }).catch(function(err) {
