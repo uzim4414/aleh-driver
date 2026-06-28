@@ -8124,7 +8124,7 @@ APP._wsLoadHistory = function() {
           if (w && w.date) allWashes.push(w);
         });
       }
-    }).catch(function(){}).finally(function() {
+    }).catch(function(e){ console.warn('[washLog read ' + m + ']', e); }).finally(function() {
       done++;
       if (done === months.length) {
         allWashes.sort(function(a,b){ return (b.date+' '+(b.time||'')).localeCompare(a.date+' '+(a.time||'')); });
@@ -8537,6 +8537,24 @@ APP._wsConfirmWash = function(stationId) {
           }).catch(function(fbErr) {
             console.warn('[save_wash Firebase direct]', fbErr);
           });
+          // Also push to in-memory history so tab shows it immediately
+          var histEntry = {
+            vehicleId: String(vid2 || vehicleId),
+            stationId: String(s.id),
+            stationName: s.name || '',
+            stationCity: s.city || '',
+            date: dateStr2,
+            time: timeStr2,
+            washType: 'regular',
+            source: 'pwa'
+          };
+          if (!APP._wsHistoryWashes) APP._wsHistoryWashes = [];
+          APP._wsHistoryWashes.unshift(histEntry);  // prepend — newest first
+          // If history panel is visible, re-render immediately
+          var hp = document.getElementById('ws-panel-history');
+          if (hp && hp.style.display !== 'none') {
+            APP._wsRenderHistory(APP._wsHistoryWashes);
+          }
         }
       }
     } catch(fbEx) { console.warn('[save_wash Firebase]', fbEx); }
