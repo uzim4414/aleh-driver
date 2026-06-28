@@ -1790,6 +1790,10 @@ async function loadFullData() {
     STATE.insurance = result.insurance || [];
     STATE.history   = result.history   || [];
     STATE.alerts    = buildAlerts(STATE.vehicle);
+    // Eagerly load wash log from Firebase — must await so badge is populated before renderAll
+    if (typeof APP !== 'undefined' && typeof APP._loadWashLog === 'function') {
+      await APP._loadWashLog();
+    }
   } catch(e) {
     console.warn('loadFullData error:', e.message);
     if (e && (e.error === 'vehicle_inactive' || (e.message && e.message.indexOf('vehicle_inactive') >= 0))) {
@@ -8062,37 +8066,46 @@ APP._washMonthCount = function() {
   return (STATE.washLog || []).filter(function(w){ return w.date && w.date.slice(0,7) === thisMonth; }).length;
 };
 
+/* Eagerly load this month's wash log from Firebase so the home-screen badge
+   is correct on every app open — without requiring the user to open the wash
+   screen. Idempotent via STATE._washLogLoaded. Returns a Promise. */
+APP._loadWashLog = function() {
+  if (STATE._washLogLoaded) return Promise.resolve();
+  STATE._washLogLoaded = true;
+  var vehFb = STATE.vehicle;
+  var vid = vehFb && (vehFb.id || vehFb.vehicleId || vehFb.num);
+  if (!vid || typeof firebase === 'undefined') return Promise.resolve();
+  var thisMonth = new Date().toISOString().slice(0,7).replace('-','');
+  return firebase.database().ref('washLog/' + vid + '/' + thisMonth).once('value').then(function(snap) {
+    if (snap.exists()) {
+      var data = snap.val();
+      if (!STATE.washLog) STATE.washLog = [];
+      Object.values(data).forEach(function(entry) {
+        if (entry && entry.date) {
+          var exists = STATE.washLog.some(function(w){ return w.date === entry.date && w.stationName === entry.stationName; });
+          if (!exists) STATE.washLog.push({ date: entry.date, stationName: entry.stationName || '' });
+        }
+      });
+    }
+    APP._updateWashBadge();
+  }).catch(function(e){ console.warn('[washLog fetch]', e); });
+};
+
 APP.openWash = function() {
   if (!STATE.vehicle) return;
-  // Ensure washLog is loaded from Firebase (survives reload)
+  // Ensure washLog is loaded from Firebase (survives reload).
+  // _loadWashLog is idempotent (no-op if already loaded at startup).
   if (!STATE._washLogLoaded) {
-    STATE._washLogLoaded = true;
-    var vehFb = STATE.vehicle;
-    var vid = vehFb && (vehFb.id || vehFb.vehicleId || vehFb.num);
-    if (vid && typeof firebase !== 'undefined') {
-      var thisMonth = new Date().toISOString().slice(0,7).replace('-','');
-      firebase.database().ref('washLog/' + vid + '/' + thisMonth).once('value').then(function(snap) {
-        if (snap.exists()) {
-          var data = snap.val();
-          if (!STATE.washLog) STATE.washLog = [];
-          Object.values(data).forEach(function(entry) {
-            if (entry && entry.date) {
-              var exists = STATE.washLog.some(function(w){ return w.date === entry.date && w.stationName === entry.stationName; });
-              if (!exists) STATE.washLog.push({ date: entry.date, stationName: entry.stationName || '' });
-            }
-          });
-          APP._updateWashBadge();
-          var used2 = APP._washMonthCount();
-          APP._wsUpdateQuota(used2);
-          // Re-check quota now that Firebase data is loaded
-          if (used2 >= 4 && STATE.currentScreen === 'wash') {
-            var scr = document.getElementById('screen-wash');
-            if (scr) { scr.classList.remove('active'); scr.style.display = 'none'; }
-            document.getElementById('wash-quota-popup').style.display = 'flex';
-          }
-        }
-      }).catch(function(e){ console.warn('[washLog fetch]', e); });
-    }
+    APP._loadWashLog().then(function() {
+      var used2 = APP._washMonthCount();
+      APP._wsUpdateQuota(used2);
+      // Re-check quota now that Firebase data is loaded
+      if (used2 >= 4 && STATE.currentScreen === 'wash') {
+        var scr = document.getElementById('screen-wash');
+        if (scr) { scr.classList.remove('active'); scr.style.display = 'none'; }
+        document.getElementById('wash-quota-popup').style.display = 'flex';
+      }
+    });
   }
   var used = APP._washMonthCount();
   if (used >= 4) {
