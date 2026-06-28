@@ -8374,7 +8374,6 @@ APP._initWashPanel = async function(userLat, userLng) {
 
     // 2) Aleh driver aggregate stats → animated teal badge row
     db.ref('washStationStats').once('value').then(function(snap) {
-      if (!snap.exists()) return;
       APP._wsAlehStats = snap.val() || {};
       APP._wsRefreshRatingRows();
     }).catch(function(){});
@@ -8651,6 +8650,9 @@ APP._wsRenderCards = function(stations) {
       '</div>';
     list.appendChild(card);
   });
+  // Re-apply async-loaded rating data after every card rebuild
+  if (APP._wsAlehStats || APP._wsGoogleRatings) APP._wsRefreshRatingRows();
+  if (APP._wsRecentComments) APP._wsRefreshCommentSections();
 };
 
 // Tap Waze → show confirm popup FIRST (wash is saved only after confirmation)
