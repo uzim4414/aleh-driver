@@ -8465,11 +8465,20 @@ APP._wsWazeConfirmGo = function() {
   if (el) el.style.display = 'none';
   var s = APP._wsPendingWazeStation;
   if (!s) return;
-  // Save wash immediately
-  APP._wsConfirmWash(s.id);
-  // Open Waze
   var url = s.wazeUrl || s.waze || ('waze://ul?ll=' + s.lat + ',' + s.lng + '&navigate=yes');
-  window.open(url, '_blank');
+  // Save wash FIRST, then navigate to Waze. Opening Waze immediately navigates the
+  // browser away and aborts the in-flight save fetch (root cause of lost washes).
+  // Wait for the save to settle (or a 2.5s safety timeout) before leaving the page.
+  var navigated = false;
+  var go = function() { if (navigated) return; navigated = true; window.open(url, '_blank'); };
+  var savePromise;
+  try { savePromise = APP._wsConfirmWash(s.id); } catch(e) { savePromise = null; }
+  if (savePromise && typeof savePromise.then === 'function') {
+    setTimeout(go, 2500); // safety: never block navigation more than 2.5s
+    savePromise.then(go, go);
+  } else {
+    go();
+  }
 };
 
 APP._wsWazeConfirmCancel = function() {
@@ -8482,9 +8491,9 @@ APP._wsWazeConfirmCancel = function() {
 APP._wsConfirmWash = function(stationId) {
   var s = (APP._wsStationsData || APP._WASH_STATIONS).find(function(x){ return String(x.id) === String(stationId); });
   var veh = STATE.vehicle;
-  if (!s || !veh) { showToast('שגיאה: אין נתוני רכב'); return; }
+  if (!s || !veh) { showToast('שגיאה: אין נתוני רכב'); return Promise.reject(new Error('no vehicle')); }
   var vehicleId = veh.id || veh.vehicleId || veh.num || '';
-  if (!vehicleId) { showToast('שגיאה: מזהה רכב חסר'); return; }
+  if (!vehicleId) { showToast('שגיאה: מזהה רכב חסר'); return Promise.reject(new Error('no vehicleId')); }
   var params = {
     vehicleId: vehicleId,
     plate: veh.num || '',
@@ -8501,8 +8510,9 @@ APP._wsConfirmWash = function(stationId) {
   APP._wsUpdateQuota(used);
   showToast('רחיצה נרשמה!');
   APP._showWashSuccess();
-  gasPostForm('save_wash', params).then(function(r) {
+  return gasPostForm('save_wash', params).then(function(r) {
     if (r && r.quotaFull) showToast('מכסה חודשית מלאה (4/4)');
+    return r;
   }).catch(function(err) {
     // Rollback optimistic update
     if (STATE.washLog && STATE.washLog.length > 0) STATE.washLog.pop();
