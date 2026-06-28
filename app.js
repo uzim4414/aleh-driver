@@ -1782,7 +1782,7 @@ async function loadFullData() {
   try {
     const result = await gasPost('driver_vehicle');
     STATE.vehicle   = result.vehicle;
-    STATE._washLogLoaded = false; STATE.washLog = [];
+    // Do NOT reset washLog here — only reset at login/vehicle-switch so badge survives refresh
     STATE.fuelData  = result.fuelData  || null;
     STATE.documents = (result.documents && result.documents.length)
       ? result.documents
@@ -1887,7 +1887,7 @@ async function _syncActiveAppointmentFromGAS() {
 /* Periodic poll — covers cases where Firebase listener missed the update
    (e.g. admin set appointment while driver app was open, but garageSync had
    stale `consumed:true` from a previous event on this device). */
-var _APPT_POLL_INTERVAL = 30 * 1000; // 30s
+var _APPT_POLL_INTERVAL = 120 * 1000; // 2min — reduced from 30s to stop jarring repaints
 var _apptPollTimer = null;
 function _startActiveAppointmentPoll() {
   if (_apptPollTimer) return;
@@ -7945,13 +7945,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 var _lastRefresh = 0;
 var _REFRESH_MIN = 5 * 60 * 1000; // 5 דקות מינימום בין רענונים
 
+var _lastApptSync = 0;
+var _APPT_SYNC_MIN = 60 * 1000; // throttle appointment sync to at most once/min on refocus
 document.addEventListener('visibilitychange', async function() {
   if (document.visibilityState !== 'visible') return;
   if (!STATE.idToken || !STATE.vehicle) return;
   if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
-  // Always sync active appointment on refocus — admin may have set it while app was hidden.
-  // Cheap GAS call, no full reload.
-  try { _syncActiveAppointmentFromGAS(); } catch(_) {}
+  // Throttled appointment sync — not on every screen-on
+  if (Date.now() - _lastApptSync >= _APPT_SYNC_MIN) {
+    try { _syncActiveAppointmentFromGAS(); } catch(_) {}
+    _lastApptSync = Date.now();
+  }
   if (Date.now() - _lastRefresh < _REFRESH_MIN) return;
   try {
     await loadFullData();
