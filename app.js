@@ -1637,6 +1637,20 @@ function loadSession() {
 }
 
 /* ══ Auth ══ */
+function _loginFallbackRedirect() {
+  var redirectUri = encodeURIComponent(window.location.href.split('?')[0]);
+  var clientId = encodeURIComponent(GOOGLE_CLIENT_ID);
+  var scope = encodeURIComponent('openid email profile');
+  var url = 'https://accounts.google.com/o/oauth2/v2/auth'
+    + '?client_id=' + clientId
+    + '&redirect_uri=' + redirectUri
+    + '&response_type=token id_token'
+    + '&scope=' + scope
+    + '&nonce=' + Math.random().toString(36).slice(2)
+    + '&prompt=select_account';
+  window.location.href = url;
+}
+
 function initGoogleAuth() {
   if (!GOOGLE_CLIENT_ID) {
     // Demo mode — skip Google auth
@@ -7815,6 +7829,19 @@ function _getAppVersion() {
 
 document.addEventListener('DOMContentLoaded', async function() {
 
+  // Handle OAuth implicit-flow redirect callback (fallback for browsers where GSI One Tap fails)
+  if (location.hash && location.hash.indexOf('id_token') !== -1) {
+    try {
+      var _hp = new URLSearchParams(location.hash.substring(1));
+      var _it = _hp.get('id_token');
+      if (_it) {
+        history.replaceState({}, '', location.pathname);
+        handleGoogleCredential({ credential: _it });
+        return;
+      }
+    } catch(_) {}
+  }
+
   if ('serviceWorker' in navigator) {
     /* updateViaCache:'none' — never serve sw.js from the HTTP cache; always hit network.
        This is the fix for Desktop Chrome not picking up new SW versions. */
@@ -7895,8 +7922,21 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.onload = function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
-      google.accounts.id.prompt();
+      try {
+        google.accounts.id.prompt(function(notification) {
+          // If One Tap is suppressed/not displayed — fall back to redirect OAuth
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            _loginFallbackRedirect();
+          }
+        });
+      } catch(e) {
+        _loginFallbackRedirect();
+      }
     });
+  };
+  script.onerror = function() {
+    // GIS script failed to load — attach direct redirect handler
+    document.getElementById('login-btn').addEventListener('click', _loginFallbackRedirect);
   };
   document.head.appendChild(script);
 });
