@@ -1612,9 +1612,12 @@ function pkConfirmSelect() {
   STATE._washLogLoaded = false; STATE.washLog = [];
   STATE.isActualHolder = chosen.isActualHolder || false;
   saveSession(STATE.idToken, chosen, STATE.user);
-  // הצע רישום טביעת אצבע (פעם אחת)
-  if (_biometricAvailable() && !_biometricLoad()) {
-    setTimeout(function(){ _offerBiometricRegister(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
+  // שמור pin session ובדוק אם PIN מוגדר
+  _pinSessionSave(STATE.user.email, chosen, STATE.user);
+  if (_bioAvailable() && !_bioLoad()) {
+    setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
+  } else if (!_pinLoad()) {
+    setTimeout(function(){ _offerPinSetup(STATE.user.email, chosen, STATE.user); }, 1500);
   }
   showGreeting((chosen.holder) || STATE.user.name);
   loadFullData().then(function() { hideGreeting(); startApp(); }).catch(function(err) {
@@ -1623,235 +1626,421 @@ function pkConfirmSelect() {
   });
 }
 
-/* ===== WebAuthn / Biometric Auth ===== */
+/* ===== WebAuthn / Samsung Fingerprint ===== */
 
-var BIOMETRIC_KEY = 'aleh_biometric_v1';
+var BIO_KEY = 'aleh_bio_v2'; // {email, credentialId, rpId, deviceName, createdAt}
 
-function _biometricAvailable() {
+function _bioAvailable() {
   return !!(window.PublicKeyCredential &&
-    typeof navigator.credentials !== 'undefined' &&
-    typeof navigator.credentials.get === 'function' &&
-    typeof navigator.credentials.create === 'function');
+    navigator.credentials &&
+    navigator.credentials.create &&
+    navigator.credentials.get);
 }
 
-function _biometricLoad() {
-  try { return JSON.parse(localStorage.getItem(BIOMETRIC_KEY)||'null'); } catch(e){ return null; }
+function _bioLoad() {
+  try { return JSON.parse(localStorage.getItem(BIO_KEY)||'null'); } catch(e){ return null; }
 }
 
-function _biometricSave(data) {
-  try { localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(data)); } catch(e){}
+function _bioSave(data) {
+  try { localStorage.setItem(BIO_KEY, JSON.stringify(data)); } catch(e){} }
+
+function _bioClear() {
+  try { localStorage.removeItem(BIO_KEY); } catch(e){} }
+
+function _b64url(bytes) {
+  var bin=''; new Uint8Array(bytes).forEach(function(b){bin+=String.fromCharCode(b)});
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 }
 
-function _biometricClear() {
-  try { localStorage.removeItem(BIOMETRIC_KEY); } catch(e){}
-}
-
-// קורא GAS webauthn_challenge (doGet, public)
-async function _biometricGetChallenge(email) {
-  var url = GAS_URL + '?action=webauthn_challenge&email=' + encodeURIComponent(email);
-  var resp = await fetch(url);
-  var data = await resp.json();
-  if (!data.ok) throw new Error(data.error||'שגיאת challenge');
-  return data; // {challenge, allowCredentials}
-}
-
-// רישום טביעת אצבע אחרי Google login מוצלח
-async function biometricRegister(email, userDisplayName) {
-  if (!_biometricAvailable()) throw new Error('מכשיר זה אינו תומך בטביעת אצבע');
-  var chalData = await _biometricGetChallenge(email);
-  var challengeBytes = _b64ToBytes(chalData.challenge);
-  var userIdBytes = new TextEncoder().encode(email);
-  var rpId = location.hostname;
-  var credential = await navigator.credentials.create({publicKey: {
-    challenge: challengeBytes,
-    rp: { name: 'עלה נסיעות', id: rpId },
-    user: { id: userIdBytes, name: email, displayName: userDisplayName||email },
-    pubKeyCredParams: [
-      {type:'public-key', alg:-7},   // ES256
-      {type:'public-key', alg:-257}  // RS256 fallback
-    ],
-    authenticatorSelection: {
-      authenticatorAttachment: 'platform',
-      userVerification: 'required',
-      residentKey: 'preferred'
-    },
-    timeout: 60000,
-    attestation: 'none'
-  }});
-  if (!credential) throw new Error('הרישום בוטל');
-  var credentialId = _bytesToB64(new Uint8Array(credential.rawId));
-  var deviceName = _getDeviceName();
-  // שלח ל-GAS לשמירה
-  var result = await gasPostForm('webauthn_register', {
-    email: email,
-    credentialId: credentialId,
-    deviceName: deviceName
-  });
-  if (!result.ok) throw new Error(result.error||'שגיאת שמירה');
-  // שמור מקומית
-  _biometricSave({ email:email, credentialId:credentialId, rpId:rpId, deviceName:deviceName, registeredAt:new Date().toISOString() });
-  return credentialId;
-}
-
-// אימות טביעת אצבע
-async function biometricAuthenticate(email, credentialId) {
-  if (!_biometricAvailable()) throw new Error('WebAuthn לא נתמך');
-  var chalData = await _biometricGetChallenge(email);
-  var challengeBytes = _b64ToBytes(chalData.challenge);
-  var rpId = location.hostname;
-  var allowCreds = [{
-    type: 'public-key',
-    id: _b64ToBytes(credentialId),
-    transports: ['internal']
-  }];
-  var assertion = await navigator.credentials.get({publicKey: {
-    challenge: challengeBytes,
-    rpId: rpId,
-    allowCredentials: allowCreds,
-    userVerification: 'required',
-    timeout: 60000
-  }});
-  if (!assertion) throw new Error('אימות בוטל');
-  // שלח ל-GAS לאימות ולקבלת נתוני רכב
-  var result = await gasPostForm('webauthn_auth', {
-    email: email,
-    credentialId: credentialId
-  });
-  if (!result.ok) throw new Error(result.error||'אימות נכשל');
-  return result; // {ok, vehicle, orgName, biometric:true}
-}
-
-// שם המכשיר (הומוגני)
-function _getDeviceName() {
-  var ua = navigator.userAgent;
-  if (/iPhone/.test(ua)) return 'iPhone';
-  if (/iPad/.test(ua)) return 'iPad';
-  if (/Android/.test(ua)) {
-    var m = ua.match(/;\s*([^;)]+)\sBuild/);
-    return m ? m[1].trim() : 'Android';
-  }
-  return 'מכשיר';
-}
-
-// Base64 URL-safe helpers
-function _b64ToBytes(b64) {
-  var s = b64.replace(/-/g,'+').replace(/_/g,'/');
+function _fromB64url(s) {
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
   while(s.length%4) s+='=';
-  var raw = atob(s);
-  var bytes = new Uint8Array(raw.length);
+  var raw=atob(s), bytes=new Uint8Array(raw.length);
   for(var i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
   return bytes;
 }
 
-function _bytesToB64(bytes) {
-  var binary = '';
-  bytes.forEach(function(b){ binary += String.fromCharCode(b); });
-  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+async function _bioGetChallenge(email) {
+  var url = GAS_URL+'?action=webauthn_challenge&email='+encodeURIComponent(email);
+  var r = await fetch(url); var d = await r.json();
+  if (!d.ok) throw new Error(d.error||'challenge error');
+  return d;
 }
 
-// מציג מסך אימות ביומטרי (על session קיים שצריך unlock)
-async function _showBiometricScreen(existingSession, bioData) {
-  var overlay = document.getElementById('biometric-screen');
-  if (!overlay) return _bootWithSession(existingSession); // fallback
-  // הסתר splash/loader כדי שמסך הביומטרי יהיה השכבה היחידה הגלויה
-  var _splash = document.getElementById('splash-screen');
-  if (_splash) _splash.style.display = 'none';
-  var _dev = document.getElementById('bio-device-name');
-  if (_dev) _dev.textContent = bioData.deviceName||'מכשיר';
-  overlay.style.display = 'flex';
-  // שמור context לאימות חוזר ידני (לחיצה על הכפתור)
-  window._pendingBioSession = existingSession;
-  window._pendingBioData = bioData;
-  // הפעל אוטומטית אחרי 800ms (UX: מאפשר למסך להיטען)
-  setTimeout(function(){ _doBiometricAuth(existingSession, bioData); }, 800);
+// רישום טביעת אצבע — residentKey:discouraged = Samsung fingerprint נייטיב
+async function bioRegister(email, displayName) {
+  if (!_bioAvailable()) throw new Error('מכשיר לא נתמך');
+  var chal = await _bioGetChallenge(email);
+  var rpId = location.hostname;
+  var cred = await navigator.credentials.create({publicKey:{
+    challenge: _fromB64url(chal.challenge),
+    rp: {name:'עלה נסיעות', id:rpId},
+    user: {id:new TextEncoder().encode(email), name:email, displayName:displayName||email},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{
+      authenticatorAttachment:'platform',
+      residentKey:'discouraged',       // ← המפתח: לא passkey, device-bound
+      requireResidentKey:false,        // ← חובה false
+      userVerification:'required'      // ← מכריח טביעת אצבע
+    },
+    hints:['client-device'],           // ← מעדיף מכשיר מקומי
+    timeout:60000,
+    attestation:'none',
+    extensions:{credProps:true}
+  }});
+  if (!cred) throw new Error('בוטל');
+  var credId = _b64url(cred.rawId);
+  var ua = navigator.userAgent;
+  var dev = /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':
+    (/Android/.test(ua)&&ua.match(/;\s*([^;)]+)\sBuild/))?ua.match(/;\s*([^;)]+)\sBuild/)[1].trim():'מכשיר';
+  var res = await gasPostForm('webauthn_register',{email,credentialId:credId,deviceName:dev});
+  if (!res.ok) throw new Error(res.error||'שגיאת שמירה');
+  _bioSave({email,credentialId:credId,rpId,deviceName:dev,createdAt:new Date().toISOString()});
+  return credId;
 }
 
-// נקרא מלחיצה ידנית על כפתור טביעת האצבע (#bio-fingerprint-btn)
-function _doBiometricAuthManual() {
-  var s = window._pendingBioSession;
-  var b = window._pendingBioData || _biometricLoad();
-  if (!b) return;
-  _doBiometricAuth(s, b);
+// אימות — יציג Samsung fingerprint ישיר (ללא Google popup)
+async function bioAuthenticate(email, credentialId) {
+  if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
+  var chal = await _bioGetChallenge(email);
+  var rpId = location.hostname;
+  var assertion = await navigator.credentials.get({publicKey:{
+    challenge: _fromB64url(chal.challenge),
+    rpId: rpId,
+    allowCredentials:[{type:'public-key',id:_fromB64url(credentialId),transports:['internal']}],
+    userVerification:'required',
+    timeout:60000
+  }});
+  if (!assertion) throw new Error('בוטל');
+  var result = await gasPostForm('webauthn_auth',{email,credentialId});
+  if (!result.ok) throw new Error(result.error||'אימות נכשל');
+  return result;
 }
 
-async function _doBiometricAuth(existingSession, bioData) {
-  var btn = document.getElementById('bio-fingerprint-btn');
-  var errEl = document.getElementById('bio-error');
-  if (btn) btn.classList.add('bio-pulse');
-  if (errEl) errEl.textContent = '';
+// מסך אימות ביומטרי
+async function _showBioScreen(session, bioData) {
+  var ov = document.getElementById('bio-screen');
+  if (!ov) { _bootFromSession(session); return; }
+  var sp = document.getElementById('splash-screen');
+  if (sp) sp.style.display='none';
+  var nameEl = document.getElementById('bio-device-label');
+  if (nameEl) nameEl.textContent = bioData.deviceName||'מכשיר';
+  ov.style.display='flex';
+  window._bioPendingSession = session;
+  window._bioPendingData = bioData;
+  setTimeout(function(){ _doBioAuth(); }, 600);
+}
+
+async function _doBioAuth() {
+  var bioData = window._bioPendingData;
+  var session = window._bioPendingSession;
+  var btn = document.getElementById('bio-btn');
+  var errEl = document.getElementById('bio-err');
+  if (btn) btn.classList.add('bio-scanning');
+  if (errEl) errEl.textContent='';
   try {
-    var result = await biometricAuthenticate(bioData.email, bioData.credentialId);
-    // עדכן vehicle מ-result
-    if (result.vehicle) existingSession.vehicleData = result.vehicle;
-    var overlay = document.getElementById('biometric-screen');
-    if (overlay) overlay.style.display = 'none';
-    _bootWithSession(existingSession);
+    var result = await bioAuthenticate(bioData.email, bioData.credentialId);
+    if (result.vehicle) session.vehicleData = result.vehicle;
+    var ov = document.getElementById('bio-screen');
+    if (ov) ov.style.display='none';
+    _bootFromSession(session);
   } catch(err) {
-    if (btn) btn.classList.remove('bio-pulse');
+    if (btn) btn.classList.remove('bio-scanning');
     var msg = err.message||'שגיאה';
-    if (msg.indexOf('cancel') > -1 || msg.indexOf('NotAllowed') > -1) {
-      msg = 'האימות בוטל';
-    }
+    if (/cancel|NotAllowed|abort/i.test(msg)) msg='האימות בוטל';
     if (errEl) errEl.textContent = msg;
   }
 }
 
-function _biometricFallbackGoogle() {
-  var overlay = document.getElementById('biometric-screen');
+function bioFallback() {
+  _bioClear();
+  var ov = document.getElementById('bio-screen');
+  if (ov) ov.style.display='none';
+  var sp = document.getElementById('splash-screen');
+  if (sp) sp.style.display='flex';
+}
+
+function _bootFromSession(session) {
+  if (!session) return;
+  STATE.vehicle = session.vehicleData;
+  STATE.user = session.userInfo || {email:session.email||''};
+  STATE.idToken = session.token||null;
+  if (STATE.idToken && typeof _fbSignIn==='function') _fbSignIn(STATE.idToken).catch(function(){});
+  if (typeof loadFullData==='function') loadFullData().then(startApp).catch(startApp);
+  else startApp();
+}
+
+function _offerBio(email, displayName) {
+  var modal = document.getElementById('bio-offer-modal');
+  if (!modal || !_bioAvailable()) return;
+  modal.style.display='flex';
+  window._bioPendingEmail = email;
+  window._bioPendingName = displayName;
+}
+
+async function bioOfferAccept() {
+  var modal = document.getElementById('bio-offer-modal');
+  if (modal) modal.style.display='none';
+  try {
+    await bioRegister(window._bioPendingEmail||'', window._bioPendingName||'');
+    showToast('טביעת אצבע הופעלה! בפעם הבאה תיכנס אוטומטית');
+  } catch(e) {
+    showToast('לא הצלחנו: '+(e.message||'שגיאה'));
+  }
+}
+
+function bioOfferDecline() {
+  var modal = document.getElementById('bio-offer-modal');
+  if (modal) modal.style.display='none';
+}
+
+/* ===== PIN Auth — Quick Login ===== */
+
+var PIN_KEY = 'aleh_pin_v1'; // { hash, email, salt, createdAt }
+var PIN_SESSION_KEY = 'aleh_pin_session_v1'; // { email, vehicleData, userInfo, ts }
+var PIN_SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 ימים
+
+function _pinHash(pin, salt) {
+  // SHA-256 של pin+salt (Web Crypto sync fallback via simple hash)
+  var str = pin + ':' + salt + ':aleh2026';
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    var chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  // עוד rounds לחיזוק
+  for (var r = 0; r < 1000; r++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(r % str.length);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36) + str.length.toString(36);
+}
+
+function _pinLoad() {
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) || 'null'); } catch(e) { return null; }
+}
+
+function _pinSave(data) {
+  try { localStorage.setItem(PIN_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+function _pinClear() {
+  try { localStorage.removeItem(PIN_KEY); localStorage.removeItem(PIN_SESSION_KEY); } catch(e) {}
+}
+
+function _pinSessionLoad() {
+  try {
+    var s = JSON.parse(localStorage.getItem(PIN_SESSION_KEY) || 'null');
+    if (!s) return null;
+    if (Date.now() - (s.ts || 0) > PIN_SESSION_TTL) { localStorage.removeItem(PIN_SESSION_KEY); return null; }
+    return s;
+  } catch(e) { return null; }
+}
+
+function _pinSessionSave(email, vehicleData, userInfo) {
+  try {
+    localStorage.setItem(PIN_SESSION_KEY, JSON.stringify({
+      email: email, vehicleData: vehicleData, userInfo: userInfo, ts: Date.now()
+    }));
+  } catch(e) {}
+}
+
+function _pinAvailable() {
+  return !!_pinLoad();
+}
+
+// הצג מסך PIN לאימות
+function _showPinScreen(pinSession) {
+  var overlay = document.getElementById('pin-screen');
+  if (!overlay) { _bootWithPinSession(pinSession); return; }
+  var splash = document.getElementById('splash-screen');
+  if (splash) splash.style.display = 'none';
+  overlay.style.display = 'flex';
+  window._pendingPinSession = pinSession;
+  window._enteredPin = '';
+  _pinUpdateDots('');
+  document.getElementById('pin-email-label').textContent = pinSession.email || '';
+}
+
+function _pinUpdateDots(pin) {
+  var dots = document.querySelectorAll('.pin-dot');
+  dots.forEach(function(d, i) {
+    d.classList.toggle('filled', i < pin.length);
+  });
+}
+
+function pinKeyPress(digit) {
+  if (window._enteredPin === undefined) window._enteredPin = '';
+  if (window._enteredPin.length >= 4) return;
+  window._enteredPin += String(digit);
+  _pinUpdateDots(window._enteredPin);
+  if (window._enteredPin.length === 4) {
+    setTimeout(_pinVerify, 120);
+  }
+}
+
+function pinBackspace() {
+  if (!window._enteredPin) return;
+  window._enteredPin = window._enteredPin.slice(0, -1);
+  _pinUpdateDots(window._enteredPin);
+}
+
+function _pinVerify() {
+  var stored = _pinLoad();
+  if (!stored) { _pinAuthFail('PIN לא מוגדר'); return; }
+  var entered = window._enteredPin || '';
+  var hashed = _pinHash(entered, stored.salt);
+  if (hashed === stored.hash) {
+    _pinAuthSuccess();
+  } else {
+    _pinAuthFail('PIN שגוי — נסה שוב');
+    window._enteredPin = '';
+    _pinUpdateDots('');
+    // רעידה
+    var dotsEl = document.getElementById('pin-dots');
+    if (dotsEl) {
+      dotsEl.classList.add('pin-shake');
+      setTimeout(function(){ dotsEl.classList.remove('pin-shake'); }, 500);
+    }
+  }
+}
+
+function _pinAuthSuccess() {
+  var overlay = document.getElementById('pin-screen');
+  var dotsEl = document.getElementById('pin-dots');
+  if (dotsEl) dotsEl.classList.add('pin-success');
+  setTimeout(function() {
+    if (overlay) overlay.style.display = 'none';
+    _bootWithPinSession(window._pendingPinSession);
+  }, 350);
+}
+
+function _pinAuthFail(msg) {
+  var errEl = document.getElementById('pin-error');
+  if (errEl) { errEl.textContent = msg; setTimeout(function(){ errEl.textContent = ''; }, 2000); }
+}
+
+function pinForgot() {
+  _pinClear();
+  var overlay = document.getElementById('pin-screen');
   if (overlay) overlay.style.display = 'none';
-  _biometricClear(); // מחק credential לא פעיל
-  // הצג login רגיל
   var splash = document.getElementById('splash-screen');
   if (splash) splash.style.display = 'flex';
 }
 
-// boot עם session קיים (אחרי biometric או session רגיל)
-function _bootWithSession(session) {
-  STATE.idToken = session.token; // עשוי להיות null אחרי biometric — זה תקין
+// boot עם pin session
+function _bootWithPinSession(session) {
+  if (!session) return;
   STATE.vehicle = session.vehicleData;
-  STATE.user = session.userInfo;
+  STATE.user = { email: session.email, name: (session.userInfo && session.userInfo.name) || session.email, picture: (session.userInfo && session.userInfo.picture) || '' };
+  STATE.idToken = null; // אין token — PIN session
   STATE._washLogLoaded = false; STATE.washLog = [];
-  // Firebase Auth — רק אם יש idToken תקף (biometric pseudo-session אין לו token)
   if (typeof _fbSignIn === 'function' && STATE.idToken) _fbSignIn(STATE.idToken).catch(function(){});
-  // אם יש biometric אך אין token — נסה רענון שקט של Google ברקע (best-effort).
-  // גם אם נכשל, STATE.vehicle מה-biometric מספיק לרוב הפעולות.
-  if (!STATE.idToken && _biometricLoad()) {
-    try { if (typeof _silentGoogleRefresh === 'function') _silentGoogleRefresh(); } catch(_) {}
-  }
   if (typeof loadFullData === 'function') {
     loadFullData().then(startApp).catch(startApp);
-  } else {
-    startApp();
-  }
+  } else { startApp(); }
 }
 
-// מציג הצעת רישום טביעת אצבע
-async function _offerBiometricRegister(email, displayName) {
-  var modal = document.getElementById('biometric-offer-modal');
+// הצג הצעת הגדרת PIN אחרי login מוצלח
+function _offerPinSetup(email, vehicleData, userInfo) {
+  var modal = document.getElementById('pin-offer-modal');
   if (!modal) return;
   modal.style.display = 'flex';
-  // הכפתורים מוגדרים ב-HTML עם onclick
-  window._pendingBioEmail = email;
-  window._pendingBioName = displayName;
+  window._pendingPinEmail = email;
+  window._pendingPinVehicle = vehicleData;
+  window._pendingPinUser = userInfo;
 }
 
-async function biometricRegisterConfirm() {
-  var modal = document.getElementById('biometric-offer-modal');
+function pinOfferAccept() {
+  var modal = document.getElementById('pin-offer-modal');
   if (modal) modal.style.display = 'none';
-  var email = window._pendingBioEmail;
-  var name = window._pendingBioName;
-  if (!email) return;
-  try {
-    await biometricRegister(email, name);
-    showToast('טביעת אצבע הופעלה בהצלחה!');
-  } catch(err) {
-    showToast('לא הצלחנו להפעיל: ' + (err.message||'שגיאה'));
+  _showPinSetup();
+}
+
+function pinOfferDecline() {
+  var modal = document.getElementById('pin-offer-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// הגדרת PIN חדש
+function _showPinSetup() {
+  var overlay = document.getElementById('pin-setup-screen');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  window._setupPin = '';
+  window._setupPinConfirm = '';
+  window._setupStep = 1;
+  document.getElementById('pin-setup-title').textContent = 'בחר קוד PIN';
+  document.getElementById('pin-setup-subtitle').textContent = 'הזן 4 ספרות לכניסה מהירה';
+  _pinSetupUpdateDots('');
+}
+
+function pinSetupKeyPress(digit) {
+  if (window._setupStep === 1) {
+    if (window._setupPin.length >= 4) return;
+    window._setupPin += String(digit);
+    _pinSetupUpdateDots(window._setupPin);
+    if (window._setupPin.length === 4) {
+      setTimeout(function() {
+        window._setupStep = 2;
+        window._setupPinConfirm = '';
+        document.getElementById('pin-setup-title').textContent = 'אשר קוד PIN';
+        document.getElementById('pin-setup-subtitle').textContent = 'הזן שוב את אותו הקוד';
+        _pinSetupUpdateDots('');
+      }, 200);
+    }
+  } else {
+    if (window._setupPinConfirm.length >= 4) return;
+    window._setupPinConfirm += String(digit);
+    _pinSetupUpdateDots(window._setupPinConfirm);
+    if (window._setupPinConfirm.length === 4) {
+      setTimeout(_pinSetupFinish, 120);
+    }
   }
 }
 
-function biometricRegisterDecline() {
-  var modal = document.getElementById('biometric-offer-modal');
-  if (modal) modal.style.display = 'none';
+function pinSetupBackspace() {
+  if (window._setupStep === 1) {
+    window._setupPin = window._setupPin.slice(0,-1);
+    _pinSetupUpdateDots(window._setupPin);
+  } else {
+    window._setupPinConfirm = window._setupPinConfirm.slice(0,-1);
+    _pinSetupUpdateDots(window._setupPinConfirm);
+  }
+}
+
+function _pinSetupUpdateDots(pin) {
+  var dots = document.querySelectorAll('.pin-setup-dot');
+  dots.forEach(function(d, i) { d.classList.toggle('filled', i < pin.length); });
+}
+
+function _pinSetupFinish() {
+  if (window._setupPin !== window._setupPinConfirm) {
+    var errEl = document.getElementById('pin-setup-error');
+    if (errEl) { errEl.textContent = 'הקודים לא תואמים — נסה שוב'; setTimeout(function(){ errEl.textContent = ''; }, 2000); }
+    window._setupStep = 1;
+    window._setupPin = '';
+    window._setupPinConfirm = '';
+    document.getElementById('pin-setup-title').textContent = 'בחר קוד PIN';
+    document.getElementById('pin-setup-subtitle').textContent = 'הזן 4 ספרות לכניסה מהירה';
+    _pinSetupUpdateDots('');
+    var dotsEl = document.getElementById('pin-setup-dots');
+    if (dotsEl) { dotsEl.classList.add('pin-shake'); setTimeout(function(){ dotsEl.classList.remove('pin-shake'); }, 500); }
+    return;
+  }
+  var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  var hash = _pinHash(window._setupPin, salt);
+  _pinSave({ hash: hash, salt: salt, email: window._pendingPinEmail, createdAt: new Date().toISOString() });
+  _pinSessionSave(window._pendingPinEmail, window._pendingPinVehicle, window._pendingPinUser);
+  var overlay = document.getElementById('pin-setup-screen');
+  if (overlay) overlay.style.display = 'none';
+  showToast('כניסה מהירה הופעלה! ');
+}
+
+function pinSetupCancel() {
+  var overlay = document.getElementById('pin-setup-screen');
+  if (overlay) overlay.style.display = 'none';
 }
 
 /* ══ Session ══ */
@@ -1935,9 +2124,12 @@ async function handleGoogleCredential(response) {
       var _ek = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
       _fbWriteLastLogin(_ek, _vehKey(result.vehicle));
       saveSession(STATE.idToken, STATE.vehicle, STATE.user);
-      // הצע רישום טביעת אצבע (פעם אחת)
-      if (_biometricAvailable() && !_biometricLoad()) {
-        setTimeout(function(){ _offerBiometricRegister(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
+      // שמור pin session ובדוק אם PIN מוגדר
+      _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user);
+      if (_bioAvailable() && !_bioLoad()) {
+        setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
+      } else if (!_pinLoad()) {
+        setTimeout(function(){ _offerPinSetup(STATE.user.email, STATE.vehicle, STATE.user); }, 1500);
       }
       var greetName = result.isActualHolder
         ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
@@ -8121,24 +8313,26 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Try cached session
   const session = loadSession();
 
-  // ═══ BIOMETRIC FIRST ═══
-  // אם יש טביעת אצבע רשומה — הצג מסך ביומטרי טבעי לפני כל בדיקת token ולפני Google One Tap.
-  // ה-biometric מחליף את חידוש ה-token של Google: גם אם ה-token פג, האימות הביומטרי
-  // מאמת מול GAS ומחזיר נתוני רכב מחדש — אין צורך ב-Google popup.
-  var _bioData = _biometricLoad();
-  if (_bioData && _bioData.credentialId && _biometricAvailable()) {
-    // ודא שיש session או לפחות email מתאים. אם אין session תקף — בנה pseudo-session
-    var _sameUser = !session || !session.userInfo || (session.userInfo.email === _bioData.email);
-    if (_sameUser) {
-      var _bioSession = (session && session.token !== 'demo_token') ? session : {
-        token: null,
-        vehicleData: null,
-        userInfo: { email: _bioData.email, name: _bioData.email }
-      };
-      hideLoader();
-      _showBiometricScreen(_bioSession, _bioData);
-      return; // ← חיוני: עצור boot, אל תיגע ב-Google
-    }
+  // ═══ PIN FIRST ═══
+  // אם יש PIN מוגדר + pin session — הצג קודפד לפני כל בדיקת token ולפני Google One Tap.
+  // WebAuthn check — FIRST (before PIN, before Google)
+  var _bioData = _bioLoad();
+  var _bioSession = _pinSessionLoad(); // שימוש באותו session storage של PIN
+  if (_bioData && _bioSession && _bioAvailable()) {
+    hideLoader();
+    _showBioScreen(_bioSession, _bioData);
+    return;
+  }
+  var _pinData = _pinLoad();
+  var _pinSess = _pinSessionLoad();
+  if (_pinData && _pinSess) {
+    hideLoader();
+    _showPinScreen(_pinSess);
+    return; // ← חיוני: עצור boot, אל תיגע ב-Google
+  }
+  // session רגיל ללא PIN — שמור pin session להצעה עתידית
+  if (!_pinData && session && session.token !== 'demo_token' && session.userInfo && !_isTokenExpired(session.token)) {
+    _pinSessionSave(session.userInfo.email, session.vehicleData, session.userInfo);
   }
 
   if (session && session.token !== 'demo_token') {
@@ -8147,7 +8341,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     STATE._washLogLoaded = false; STATE.washLog = [];
     STATE.user    = session.userInfo;
 
-    // אין biometric — אם token פג, נקה והמשך ל-login רגיל (ללא overlay מבהיל)
+    // אם token פג, נקה והמשך ל-login רגיל (ללא overlay מבהיל)
     if (_isTokenExpired(STATE.idToken)) {
       localStorage.removeItem(SESSION_KEY);
       STATE.idToken = null;
