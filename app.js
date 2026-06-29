@@ -1740,14 +1740,19 @@ async function _doBioAuth() {
   if (errEl) errEl.textContent='';
   try {
     var result = await bioAuthenticate(bioData.email, bioData.credentialId);
-    if (result.vehicle) session.vehicleData = result.vehicle;
+    // GAS החזיר נתוני רכב — שמור session חדש (גם כשהתחלנו מ-pseudo-session ללא vehicleData)
+    if (result.vehicle) {
+      session.vehicleData = result.vehicle;
+      session.userInfo = session.userInfo || { email: bioData.email };
+      _pinSessionSave(bioData.email, result.vehicle, session.userInfo); // session חדש (30 יום)
+    }
     var ov = document.getElementById('bio-screen');
     if (ov) ov.style.display='none';
     _bootFromSession(session);
   } catch(err) {
     if (btn) btn.classList.remove('bio-scanning');
     var msg = err.message||'שגיאה';
-    if (/cancel|NotAllowed|abort/i.test(msg)) msg='האימות בוטל';
+    if (/cancel|NotAllowed|abort/i.test(msg)) msg='האימות בוטל — נסה שוב';
     if (errEl) errEl.textContent = msg;
   }
 }
@@ -1774,13 +1779,21 @@ function _offerBio(email, displayName) {
   var modal = document.getElementById('bio-offer-modal');
   if (!modal || !_bioAvailable()) return;
   modal.style.display='flex';
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      modal.classList.add('bio-modal-open');
+    });
+  });
   window._bioPendingEmail = email;
   window._bioPendingName = displayName;
 }
 
 async function bioOfferAccept() {
   var modal = document.getElementById('bio-offer-modal');
-  if (modal) modal.style.display='none';
+  if (modal) {
+    modal.classList.remove('bio-modal-open');
+    setTimeout(function(){ modal.style.display='none'; }, 450);
+  }
   try {
     await bioRegister(window._bioPendingEmail||'', window._bioPendingName||'');
     showToast('טביעת אצבע הופעלה! בפעם הבאה תיכנס אוטומטית');
@@ -1791,7 +1804,10 @@ async function bioOfferAccept() {
 
 function bioOfferDecline() {
   var modal = document.getElementById('bio-offer-modal');
-  if (modal) modal.style.display='none';
+  if (modal) {
+    modal.classList.remove('bio-modal-open');
+    setTimeout(function(){ modal.style.display='none'; }, 450);
+  }
 }
 
 /* ===== PIN Auth — Quick Login ===== */
@@ -2944,6 +2960,8 @@ function logout() {
     confirmText: 'התנתק',
     onConfirm: () => {
       localStorage.removeItem(SESSION_KEY);
+      _pinClear(); // מוחק PIN + pin session — אך לא את ה-bio credential
+      // ה-credential נשמר בכוונה (_bioClear לא נקרא) כדי שמסך טביעת האצבע יופיע אחרי boot
       location.reload();
     }
   });
@@ -8317,10 +8335,17 @@ document.addEventListener('DOMContentLoaded', async function() {
   // אם יש PIN מוגדר + pin session — הצג קודפד לפני כל בדיקת token ולפני Google One Tap.
   // WebAuthn check — FIRST (before PIN, before Google)
   var _bioData = _bioLoad();
-  var _bioSession = _pinSessionLoad(); // שימוש באותו session storage של PIN
-  if (_bioData && _bioSession && _bioAvailable()) {
+  if (_bioData && _bioAvailable()) {
+    // יש credential רשום — הצג מסך טביעת אצבע תמיד (גם בלי session קיים)
     hideLoader();
-    _showBioScreen(_bioSession, _bioData);
+    var _existSession = _pinSessionLoad();
+    var _pseudoSession = _existSession || {
+      email: _bioData.email,
+      vehicleData: null,
+      userInfo: { email: _bioData.email, name: _bioData.email },
+      ts: Date.now()
+    };
+    _showBioScreen(_pseudoSession, _bioData);
     return;
   }
   var _pinData = _pinLoad();
