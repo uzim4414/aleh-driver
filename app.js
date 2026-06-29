@@ -1751,32 +1751,43 @@ async function _doBioAuth() {
   if (btn) btn.classList.add('bio-scanning');
   if (errEl) errEl.textContent = '';
   try {
-    var result = await bioAuthenticate(bioData.email, bioData.credentialId);
+    // שלב 1: אמת טביעת אצבע מקומית
+    var bioResult = await bioAuthenticate(bioData.email, bioData.credentialId);
+    // שלב 2: קבל נתוני רכב אמיתיים מ-GAS (email+credentialId, ללא token)
+    var gasResult = null;
+    try {
+      gasResult = await gasPostForm('bio_vehicle', {
+        email: bioData.email,
+        credentialId: bioData.credentialId
+      });
+    } catch(gasErr) {
+      // GAS נכשל — נסה session שמור
+      var cachedSession = _pinSessionLoad();
+      if (cachedSession && cachedSession.vehicleData) {
+        gasResult = { ok: true, vehicle: cachedSession.vehicleData,
+                      userInfo: cachedSession.userInfo, orgName: '' };
+      }
+    }
     if (btn) btn.classList.remove('bio-scanning');
-    if (!result.vehicle) {
-      // session פג (30+ יום) — טביעת אצבע תקינה אבל אין נתוני רכב שמורים
-      // צריך login חדש עם Google פעם אחת
+    if (!gasResult || !gasResult.ok || !gasResult.vehicle) {
+      // אין נתוני רכב — login מחדש עם Google
       var ov = document.getElementById('bio-screen');
       if (ov) ov.style.display = 'none';
-      if (errEl) errEl.textContent = '';
       var sp = document.getElementById('splash-screen');
       if (sp) sp.style.display = 'flex';
-      setTimeout(function() {
-        showToast('הסשן פג תוקף — כנס פעם אחת עם Google לחידושו');
-      }, 300);
+      setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 300);
       return;
     }
-    // הצלחה — רענן session ל-30 יום נוספים
-    _pinSessionSave(bioData.email, result.vehicle, result.userInfo);
+    // שמור session מעודכן (30 יום)
+    var userInfo = gasResult.userInfo || { email: bioData.email, name: bioData.email };
+    _pinSessionSave(bioData.email, gasResult.vehicle, userInfo);
+    // boot
+    STATE.vehicle = gasResult.vehicle;
+    STATE.user = userInfo;
+    STATE.idToken = null;
     var ov2 = document.getElementById('bio-screen');
     if (ov2) ov2.style.display = 'none';
-    _bootFromSession({
-      email: bioData.email,
-      vehicleData: result.vehicle,
-      userInfo: result.userInfo,
-      token: null,
-      ts: Date.now()
-    });
+    startApp();
   } catch(err) {
     if (btn) btn.classList.remove('bio-scanning');
     var msg = err.message || 'שגיאה';
