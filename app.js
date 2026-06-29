@@ -1660,61 +1660,74 @@ function _fromB64url(s) {
   return bytes;
 }
 
-async function _bioGetChallenge(email) {
-  var url = GAS_URL+'?action=webauthn_challenge&email='+encodeURIComponent(email);
-  var r = await fetch(url); var d = await r.json();
-  if (!d.ok) throw new Error(d.error||'challenge error');
-  return d;
-}
-
-// רישום טביעת אצבע — residentKey:discouraged = Samsung fingerprint נייטיב
+// רישום טביעת אצבע — WebAuthn מקומי לחלוטין, ללא GAS
 async function bioRegister(email, displayName) {
-  if (!_bioAvailable()) throw new Error('מכשיר לא נתמך');
-  var chal = await _bioGetChallenge(email);
+  if (!_bioAvailable()) throw new Error('מכשיר זה אינו תומך בטביעת אצבע');
   var rpId = location.hostname;
-  var cred = await navigator.credentials.create({publicKey:{
-    challenge: _fromB64url(chal.challenge),
-    rp: {name:'עלה נסיעות', id:rpId},
-    user: {id:new TextEncoder().encode(email), name:email, displayName:displayName||email},
-    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
-    authenticatorSelection:{
-      authenticatorAttachment:'platform',
-      residentKey:'discouraged',       // ← המפתח: לא passkey, device-bound
-      requireResidentKey:false,        // ← חובה false
-      userVerification:'required'      // ← מכריח טביעת אצבע
+  // challenge מקומי — אין צורך ב-GAS
+  var localChallenge = new Uint8Array(32);
+  window.crypto.getRandomValues(localChallenge);
+  var cred = await navigator.credentials.create({ publicKey: {
+    challenge: localChallenge,
+    rp: { name: 'עלה נסיעות', id: rpId },
+    user: {
+      id: new TextEncoder().encode(email),
+      name: email,
+      displayName: displayName || email
     },
-    hints:['client-device'],           // ← מעדיף מכשיר מקומי
-    timeout:60000,
-    attestation:'none',
-    extensions:{credProps:true}
+    pubKeyCredParams: [
+      { type: 'public-key', alg: -7 },
+      { type: 'public-key', alg: -257 }
+    ],
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+      residentKey: 'discouraged',
+      requireResidentKey: false,
+      userVerification: 'required'
+    },
+    hints: ['client-device'],
+    timeout: 60000,
+    attestation: 'none'
   }});
-  if (!cred) throw new Error('בוטל');
+  if (!cred) throw new Error('הרישום בוטל');
   var credId = _b64url(cred.rawId);
   var ua = navigator.userAgent;
-  var dev = /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':
-    (/Android/.test(ua)&&ua.match(/;\s*([^;)]+)\sBuild/))?ua.match(/;\s*([^;)]+)\sBuild/)[1].trim():'מכשיר';
-  var res = await gasPostForm('webauthn_register',{email,credentialId:credId,deviceName:dev});
-  if (!res.ok) throw new Error(res.error||'שגיאת שמירה');
-  _bioSave({email,credentialId:credId,rpId,deviceName:dev,createdAt:new Date().toISOString()});
+  var dev = /iPhone/.test(ua) ? 'iPhone' :
+            /iPad/.test(ua) ? 'iPad' :
+            (/Android/.test(ua) && ua.match(/;\s*([^;)]+)\sBuild/)) ?
+              ua.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'מכשיר';
+  // שמור מקומית — זה הכל שצריך
+  _bioSave({ email: email, credentialId: credId, rpId: rpId, deviceName: dev, createdAt: new Date().toISOString() });
   return credId;
 }
 
-// אימות — יציג Samsung fingerprint ישיר (ללא Google popup)
+// אימות — WebAuthn מקומי לחלוטין, ללא GAS
 async function bioAuthenticate(email, credentialId) {
   if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
-  var chal = await _bioGetChallenge(email);
   var rpId = location.hostname;
-  var assertion = await navigator.credentials.get({publicKey:{
-    challenge: _fromB64url(chal.challenge),
+  // challenge מקומי — אין GAS
+  var localChallenge = new Uint8Array(32);
+  window.crypto.getRandomValues(localChallenge);
+  var assertion = await navigator.credentials.get({ publicKey: {
+    challenge: localChallenge,
     rpId: rpId,
-    allowCredentials:[{type:'public-key',id:_fromB64url(credentialId),transports:['internal']}],
-    userVerification:'required',
-    timeout:60000
+    allowCredentials: [{
+      type: 'public-key',
+      id: _fromB64url(credentialId),
+      transports: ['internal']
+    }],
+    userVerification: 'required',
+    timeout: 60000
   }});
-  if (!assertion) throw new Error('בוטל');
-  var result = await gasPostForm('webauthn_auth',{email,credentialId});
-  if (!result.ok) throw new Error(result.error||'אימות נכשל');
-  return result;
+  if (!assertion) throw new Error('האימות בוטל');
+  // טביעת אצבע הצליחה — טען session מקומי
+  var session = _pinSessionLoad();
+  return {
+    ok: true,
+    biometric: true,
+    vehicle: session ? session.vehicleData : null,
+    userInfo: session ? session.userInfo : { email: email, name: email }
+  };
 }
 
 // מסך אימות ביומטרי
@@ -1733,26 +1746,41 @@ async function _showBioScreen(session, bioData) {
 
 async function _doBioAuth() {
   var bioData = window._bioPendingData;
-  var session = window._bioPendingSession;
   var btn = document.getElementById('bio-btn');
   var errEl = document.getElementById('bio-err');
   if (btn) btn.classList.add('bio-scanning');
-  if (errEl) errEl.textContent='';
+  if (errEl) errEl.textContent = '';
   try {
     var result = await bioAuthenticate(bioData.email, bioData.credentialId);
-    // GAS החזיר נתוני רכב — שמור session חדש (גם כשהתחלנו מ-pseudo-session ללא vehicleData)
-    if (result.vehicle) {
-      session.vehicleData = result.vehicle;
-      session.userInfo = session.userInfo || { email: bioData.email };
-      _pinSessionSave(bioData.email, result.vehicle, session.userInfo); // session חדש (30 יום)
+    if (btn) btn.classList.remove('bio-scanning');
+    if (!result.vehicle) {
+      // session פג (30+ יום) — טביעת אצבע תקינה אבל אין נתוני רכב שמורים
+      // צריך login חדש עם Google פעם אחת
+      var ov = document.getElementById('bio-screen');
+      if (ov) ov.style.display = 'none';
+      if (errEl) errEl.textContent = '';
+      var sp = document.getElementById('splash-screen');
+      if (sp) sp.style.display = 'flex';
+      setTimeout(function() {
+        showToast('הסשן פג תוקף — כנס פעם אחת עם Google לחידושו');
+      }, 300);
+      return;
     }
-    var ov = document.getElementById('bio-screen');
-    if (ov) ov.style.display='none';
-    _bootFromSession(session);
+    // הצלחה — רענן session ל-30 יום נוספים
+    _pinSessionSave(bioData.email, result.vehicle, result.userInfo);
+    var ov2 = document.getElementById('bio-screen');
+    if (ov2) ov2.style.display = 'none';
+    _bootFromSession({
+      email: bioData.email,
+      vehicleData: result.vehicle,
+      userInfo: result.userInfo,
+      token: null,
+      ts: Date.now()
+    });
   } catch(err) {
     if (btn) btn.classList.remove('bio-scanning');
-    var msg = err.message||'שגיאה';
-    if (/cancel|NotAllowed|abort/i.test(msg)) msg='האימות בוטל — נסה שוב';
+    var msg = err.message || 'שגיאה';
+    if (/cancel|NotAllowed|abort|dismiss/i.test(msg)) msg = 'האימות בוטל — לחץ לנסות שוב';
     if (errEl) errEl.textContent = msg;
   }
 }
