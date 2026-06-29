@@ -1754,7 +1754,7 @@ async function _doBioAuth() {
     await bioAuthenticate(bioData.email, bioData.credentialId);
     if (btn) btn.classList.remove('bio-scanning');
     var session = _pinSessionLoad();
-    if (!session || !session.vehicleData) {
+    if (!session || !session.vehicleData || !session.idToken) {
       var ov = document.getElementById('bio-screen');
       if (ov) ov.style.display = 'none';
       var sp = document.getElementById('splash-screen');
@@ -2072,7 +2072,7 @@ function _pinSetupFinish() {
   var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
   var hash = _pinHash(window._setupPin, salt);
   _pinSave({ hash: hash, salt: salt, email: window._pendingPinEmail, createdAt: new Date().toISOString() });
-  _pinSessionSave(window._pendingPinEmail, window._pendingPinVehicle, window._pendingPinUser);
+  _pinSessionSave(window._pendingPinEmail, window._pendingPinVehicle, window._pendingPinUser, STATE.idToken);
   var overlay = document.getElementById('pin-setup-screen');
   if (overlay) overlay.style.display = 'none';
   showToast('כניסה מהירה הופעלה! ');
@@ -8382,7 +8382,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   // session רגיל ללא PIN — שמור pin session להצעה עתידית
   if (!_pinData && session && session.token !== 'demo_token' && session.userInfo && !_isTokenExpired(session.token)) {
-    _pinSessionSave(session.userInfo.email, session.vehicleData, session.userInfo);
+    _pinSessionSave(session.userInfo.email, session.vehicleData, session.userInfo, session.token);
   }
 
   if (session && session.token !== 'demo_token') {
