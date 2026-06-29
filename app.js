@@ -8409,7 +8409,16 @@ APP._initWashPanel = async function(userLat, userLng) {
 
     // 2) Aleh driver aggregate stats → animated teal badge row
     db.ref('washStationStats').once('value').then(function(snap) {
-      APP._wsAlehStats = Object.assign(APP._wsAlehStats || {}, snap.val() || {});
+      var _fbStats = snap.val() || {};
+      APP._wsAlehStats = APP._wsAlehStats || {};
+      Object.keys(_fbStats).forEach(function(k) {
+        var fb = _fbStats[k];
+        var local = APP._wsAlehStats[k];
+        // Only overwrite local data if Firebase has a real avg (>0), or no local data exists
+        if (!local || !local.avg || (fb && fb.avg > 0)) {
+          APP._wsAlehStats[k] = fb;
+        }
+      });
       try { localStorage.setItem('ws_aleh_stats', JSON.stringify(APP._wsAlehStats)); } catch(e){}
       APP._wsRefreshRatingRows();
     }).catch(function(){});
@@ -8418,6 +8427,7 @@ APP._initWashPanel = async function(userLat, userLng) {
     db.ref('washRatings').once('value').then(function(snap) {
       if (!snap.exists()) return;
       var all = snap.val() || {};
+      var _prevLocal = APP._wsRecentComments || {};
       APP._wsRecentComments = {};
       Object.keys(all).forEach(function(sKey) {
         var perVeh = all[sKey] || {};
@@ -8434,7 +8444,18 @@ APP._initWashPanel = async function(userLat, userLng) {
           }
         });
         arr.sort(function(a, b){ return (b.ts || 0) - (a.ts || 0); });
-        if (arr.length) APP._wsRecentComments[sKey] = arr.slice(0, 3);
+        // Merge Firebase comments with local optimistic data — keep newest by ts
+        var _fbArr = arr.slice(0, 10);
+        var _localArr = _prevLocal[sKey] || [];
+        var _merged = _fbArr.slice();
+        _localArr.forEach(function(lc) {
+          var isDup = _merged.some(function(fc) {
+            return fc.driverName === lc.driverName && Math.abs((fc.ts||0)-(lc.ts||0)) < 60000;
+          });
+          if (!isDup) _merged.unshift(lc);
+        });
+        _merged.sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+        if (_merged.length) APP._wsRecentComments[sKey] = _merged.slice(0, 10);
       });
       try { localStorage.setItem('ws_recent_comments', JSON.stringify(APP._wsRecentComments)); } catch(e){}
       APP._wsRefreshCommentSections();
