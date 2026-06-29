@@ -1766,12 +1766,19 @@ async function _doBioAuth() {
     STATE.vehicle = session.vehicleData;
     STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
     STATE.idToken = session.idToken || null;
-    var ov2 = document.getElementById('bio-screen');
-    if (ov2) ov2.style.display = 'none';
     if (STATE.idToken && typeof _fbSignIn === 'function') {
       _fbSignIn(STATE.idToken).catch(function(){});
     }
-    loadFullData().then(startApp).catch(startApp);
+    loadFullData().then(function() {
+      var ov2 = document.getElementById('bio-screen');
+      if (ov2) ov2.style.display = 'none';
+      startApp();
+    }).catch(function() {
+      STATE.vehicle = STATE.vehicle || session.vehicleData;
+      var ov2 = document.getElementById('bio-screen');
+      if (ov2) ov2.style.display = 'none';
+      startApp();
+    });
   } catch(err) {
     if (btn) btn.classList.remove('bio-scanning');
     var msg = err.message || 'שגיאה';
