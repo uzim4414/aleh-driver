@@ -8311,9 +8311,11 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     APP._wsAlehStats = APP._wsAlehStats || {};
     if (r.newAvg != null && Number(r.newAvg) > 0) {
       APP._wsAlehStats[_sKey] = {avg: r.newAvg, count: r.count || 1};
+      try { localStorage.setItem('ws_aleh_stats', JSON.stringify(APP._wsAlehStats)); } catch(e){}
     } else {
       var _prevStat = APP._wsAlehStats[_sKey];
       APP._wsAlehStats[_sKey] = {avg: rating, count: (_prevStat && _prevStat.count) ? _prevStat.count + 1 : 1};
+      try { localStorage.setItem('ws_aleh_stats', JSON.stringify(APP._wsAlehStats)); } catch(e){}
     }
     if (typeof APP._wsRefreshRatingRows === 'function') APP._wsRefreshRatingRows();
     // Optimistic update of recent comments so modal shows immediately
@@ -8322,6 +8324,7 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     var _cList = APP._wsRecentComments[_sKey] ? APP._wsRecentComments[_sKey].slice() : [];
     _cList.unshift(_newComment);
     APP._wsRecentComments[_sKey] = _cList.slice(0, 10);
+    try { localStorage.setItem('ws_recent_comments', JSON.stringify(APP._wsRecentComments)); } catch(e){}
     if (APP._wsSelected) delete APP._wsSelected[idx];
     APP._wsRenderHistory(APP._wsHistoryWashes || []);
     showToast('תודה! הדירוג נשמר');
@@ -8370,6 +8373,14 @@ APP._initWashPanel = async function(userLat, userLng) {
   var list = document.getElementById('ws-station-list');
   if (!list) return;
 
+  // Load persisted badge data immediately (before Firebase responds)
+  if (!APP._wsAlehStats || Object.keys(APP._wsAlehStats).length === 0) {
+    try { APP._wsAlehStats = JSON.parse(localStorage.getItem('ws_aleh_stats')) || {}; } catch(e) { APP._wsAlehStats = {}; }
+  }
+  if (!APP._wsRecentComments || Object.keys(APP._wsRecentComments).length === 0) {
+    try { APP._wsRecentComments = JSON.parse(localStorage.getItem('ws_recent_comments')) || {}; } catch(e) { APP._wsRecentComments = {}; }
+  }
+
   var stations = APP._WASH_STATIONS.map(function(s) {
     var dist = (userLat && userLng) ? _thHaversine(userLat, userLng, s.lat, s.lng) : null;
     return Object.assign({}, s, {dist: dist});
@@ -8399,6 +8410,7 @@ APP._initWashPanel = async function(userLat, userLng) {
     // 2) Aleh driver aggregate stats → animated teal badge row
     db.ref('washStationStats').once('value').then(function(snap) {
       APP._wsAlehStats = Object.assign(APP._wsAlehStats || {}, snap.val() || {});
+      try { localStorage.setItem('ws_aleh_stats', JSON.stringify(APP._wsAlehStats)); } catch(e){}
       APP._wsRefreshRatingRows();
     }).catch(function(){});
 
@@ -8424,6 +8436,7 @@ APP._initWashPanel = async function(userLat, userLng) {
         arr.sort(function(a, b){ return (b.ts || 0) - (a.ts || 0); });
         if (arr.length) APP._wsRecentComments[sKey] = arr.slice(0, 3);
       });
+      try { localStorage.setItem('ws_recent_comments', JSON.stringify(APP._wsRecentComments)); } catch(e){}
       APP._wsRefreshCommentSections();
     }).catch(function(){});
   }
