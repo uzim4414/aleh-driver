@@ -8062,6 +8062,7 @@ APP._washCurrentStation = null;
 APP._washWazeLaunched = false;
 
 APP._washMonthCount = function() {
+  if (typeof STATE._realWashCount === 'number') return STATE._realWashCount;
   var thisMonth = new Date().toISOString().slice(0,7);
   return (STATE.washLog || []).filter(function(w){ return w.date && w.date.slice(0,7) === thisMonth; }).length;
 };
@@ -8088,6 +8089,18 @@ APP._loadWashLog = function() {
       });
     }
     APP._updateWashBadge();
+    // Sync real wash count from GAS (includes Pazomot imports)
+    var _syncVid = STATE.vehicle && (STATE.vehicle.id || STATE.vehicle.vehicleId || STATE.vehicle.num);
+    var _syncMon = new Date().toISOString().slice(0,7);
+    if (_syncVid) {
+      gasPostForm('get_wash_status', {vehicleId: _syncVid, monthKey: _syncMon}).then(function(r) {
+        if (r && typeof r.thisMonth === 'number') {
+          STATE._realWashCount = r.thisMonth;
+          if (typeof APP._wsUpdateQuota === 'function') APP._wsUpdateQuota();
+          if (typeof APP._updateWashBadge === 'function') APP._updateWashBadge();
+        }
+      }).catch(function(e){ console.warn('[get_wash_status]', e); });
+    }
   }).catch(function(e){ console.warn('[washLog fetch]', e); });
 };
 
@@ -8864,7 +8877,17 @@ APP._wsConfirmWash = function(stationId) {
   APP._showWashSuccess();
   console.log('[save_wash] vehicleId=' + vehicleId + ' stationId=' + s.id + ' stationName=' + s.name);
   return gasPostForm('save_wash', params).then(function(r) {
-    if (r && r.quotaFull) showToast('מכסה חודשית מלאה (4/4)');
+    if (r && r.quotaFull) {
+      // Rollback optimistic wash entry (the last pushed entry)
+      if (STATE.washLog && STATE.washLog.length > 0) STATE.washLog.pop();
+      APP._updateWashBadge();
+      var usedQF = APP._washMonthCount();
+      APP._wsUpdateQuota(usedQF);
+      // Show beautiful quota popup instead of toast
+      var qp = document.getElementById('wash-quota-popup');
+      if (qp) { qp.style.display = 'flex'; } else { showToast('הגעת למכסת הרחיצות החודשית (4/4)'); }
+      return r;
+    }
     // Write to Firebase directly from PWA (authenticated session)
     // This ensures data appears even if GAS _fbWrite fails (auth/rules issue)
     try {
