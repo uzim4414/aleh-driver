@@ -8940,8 +8940,14 @@ APP._wsConfirmWash = function(stationId) {
     APP._updateWashBadge();
     var usedAfter = APP._washMonthCount();
     APP._wsUpdateQuota(usedAfter);
-    showToast('שגיאה בשמירת הרחיצה: ' + (err.message || 'שגיאת שרת'));
-    console.error('[save_wash ERROR]', err.message, err);
+    // Quota full → show beautiful popup instead of error toast
+    var errMsg = err.message || '';
+    if (errMsg.indexOf('מכסה') > -1 || errMsg.indexOf('quota') > -1 || errMsg.indexOf('4/4') > -1) {
+      var qp = document.getElementById('wash-quota-popup');
+      if (qp) { qp.style.display = 'flex'; return; }
+    }
+    showToast('שגיאה בשמירת הרחיצה: ' + errMsg);
+    console.error('[save_wash ERROR]', errMsg, err);
   });
 };
 
