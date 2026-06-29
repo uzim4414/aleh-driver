@@ -1753,10 +1753,25 @@ function _bytesToB64(bytes) {
 async function _showBiometricScreen(existingSession, bioData) {
   var overlay = document.getElementById('biometric-screen');
   if (!overlay) return _bootWithSession(existingSession); // fallback
-  document.getElementById('bio-device-name').textContent = bioData.deviceName||'מכשיר';
+  // הסתר splash/loader כדי שמסך הביומטרי יהיה השכבה היחידה הגלויה
+  var _splash = document.getElementById('splash-screen');
+  if (_splash) _splash.style.display = 'none';
+  var _dev = document.getElementById('bio-device-name');
+  if (_dev) _dev.textContent = bioData.deviceName||'מכשיר';
   overlay.style.display = 'flex';
+  // שמור context לאימות חוזר ידני (לחיצה על הכפתור)
+  window._pendingBioSession = existingSession;
+  window._pendingBioData = bioData;
   // הפעל אוטומטית אחרי 800ms (UX: מאפשר למסך להיטען)
   setTimeout(function(){ _doBiometricAuth(existingSession, bioData); }, 800);
+}
+
+// נקרא מלחיצה ידנית על כפתור טביעת האצבע (#bio-fingerprint-btn)
+function _doBiometricAuthManual() {
+  var s = window._pendingBioSession;
+  var b = window._pendingBioData || _biometricLoad();
+  if (!b) return;
+  _doBiometricAuth(s, b);
 }
 
 async function _doBiometricAuth(existingSession, bioData) {
@@ -1790,12 +1805,19 @@ function _biometricFallbackGoogle() {
   if (splash) splash.style.display = 'flex';
 }
 
-// boot עם session קיים (ללא biometric)
+// boot עם session קיים (אחרי biometric או session רגיל)
 function _bootWithSession(session) {
-  STATE.idToken = session.token;
+  STATE.idToken = session.token; // עשוי להיות null אחרי biometric — זה תקין
   STATE.vehicle = session.vehicleData;
   STATE.user = session.userInfo;
-  if (typeof _fbSignIn === 'function') _fbSignIn(STATE.idToken).catch(function(){});
+  STATE._washLogLoaded = false; STATE.washLog = [];
+  // Firebase Auth — רק אם יש idToken תקף (biometric pseudo-session אין לו token)
+  if (typeof _fbSignIn === 'function' && STATE.idToken) _fbSignIn(STATE.idToken).catch(function(){});
+  // אם יש biometric אך אין token — נסה רענון שקט של Google ברקע (best-effort).
+  // גם אם נכשל, STATE.vehicle מה-biometric מספיק לרוב הפעולות.
+  if (!STATE.idToken && _biometricLoad()) {
+    try { if (typeof _silentGoogleRefresh === 'function') _silentGoogleRefresh(); } catch(_) {}
+  }
   if (typeof loadFullData === 'function') {
     loadFullData().then(startApp).catch(startApp);
   } else {
@@ -8098,13 +8120,34 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Try cached session
   const session = loadSession();
+
+  // ═══ BIOMETRIC FIRST ═══
+  // אם יש טביעת אצבע רשומה — הצג מסך ביומטרי טבעי לפני כל בדיקת token ולפני Google One Tap.
+  // ה-biometric מחליף את חידוש ה-token של Google: גם אם ה-token פג, האימות הביומטרי
+  // מאמת מול GAS ומחזיר נתוני רכב מחדש — אין צורך ב-Google popup.
+  var _bioData = _biometricLoad();
+  if (_bioData && _bioData.credentialId && _biometricAvailable()) {
+    // ודא שיש session או לפחות email מתאים. אם אין session תקף — בנה pseudo-session
+    var _sameUser = !session || !session.userInfo || (session.userInfo.email === _bioData.email);
+    if (_sameUser) {
+      var _bioSession = (session && session.token !== 'demo_token') ? session : {
+        token: null,
+        vehicleData: null,
+        userInfo: { email: _bioData.email, name: _bioData.email }
+      };
+      hideLoader();
+      _showBiometricScreen(_bioSession, _bioData);
+      return; // ← חיוני: עצור boot, אל תיגע ב-Google
+    }
+  }
+
   if (session && session.token !== 'demo_token') {
     STATE.idToken = session.token;
     STATE.vehicle = session.vehicleData;
     STATE._washLogLoaded = false; STATE.washLog = [];
     STATE.user    = session.userInfo;
 
-    // If token already expired — clear silently and fall through to login (no scary overlay)
+    // אין biometric — אם token פג, נקה והמשך ל-login רגיל (ללא overlay מבהיל)
     if (_isTokenExpired(STATE.idToken)) {
       localStorage.removeItem(SESSION_KEY);
       STATE.idToken = null;
@@ -8112,13 +8155,6 @@ document.addEventListener('DOMContentLoaded', async function() {
       STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.user    = null;
     } else {
-      // יש טביעת אצבע מוגדרת לאותו משתמש? — הצג מסך ביומטרי במקום login אוטומטי
-      var _bioData = _biometricLoad();
-      if (_bioData && session.userInfo && _bioData.email === session.userInfo.email && _biometricAvailable()) {
-        hideLoader();
-        _showBiometricScreen(session, _bioData);
-        return;
-      }
       try {
         _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
         hideLoader();
