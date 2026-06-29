@@ -3810,6 +3810,112 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 @keyframes agP4 { to { transform:translate(34px,10px); opacity:0; } }
 @keyframes agP5 { to { transform:translate(-12px,-50px); opacity:0; } }
 @keyframes agP6 { to { transform:translate(16px,-46px); opacity:0; } }
+
+/* ===== Biometric / WebAuthn ===== */
+#biometric-screen {
+  display:none;
+  position:fixed;inset:0;z-index:9000;
+  background:#000;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:28px;padding:40px 24px;
+  animation:bioFadeIn 0.4s ease;
+}
+@keyframes bioFadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+.bio-logo {
+  width:80px;height:80px;border-radius:28px;
+  background:linear-gradient(135deg,var(--red) 0%,#0d5c28 100%);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 40px var(--red-glow);
+}
+.bio-logo svg { width:44px;height:44px; }
+
+.bio-title {
+  font-size:22px;font-weight:700;color:var(--t1);
+  font-family:'Noto Sans Hebrew',sans-serif;text-align:center;
+}
+.bio-subtitle {
+  font-size:14px;color:var(--t2);text-align:center;line-height:1.5;
+  font-family:'Noto Sans Hebrew',sans-serif;
+}
+
+#bio-fingerprint-btn {
+  width:96px;height:96px;border-radius:50%;border:none;cursor:pointer;
+  background:radial-gradient(circle at 40% 40%,rgba(31,138,61,0.25) 0%,rgba(31,138,61,0.08) 100%);
+  border:2px solid rgba(31,138,61,0.4);
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.3s ease;position:relative;overflow:visible;
+}
+#bio-fingerprint-btn:hover { border-color:var(--red); box-shadow:0 0 30px var(--red-glow); }
+#bio-fingerprint-btn svg { width:52px;height:52px;color:var(--red); }
+
+.bio-pulse { animation:bioPulse 1.2s ease-in-out infinite; }
+@keyframes bioPulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(31,138,61,0.5)}
+  50%{box-shadow:0 0 0 20px rgba(31,138,61,0)}
+}
+.bio-ripple {
+  position:absolute;inset:-8px;border-radius:50%;
+  border:2px solid rgba(31,138,61,0.3);
+  animation:bioRipple 2s ease-out infinite;
+}
+@keyframes bioRipple {
+  0%{transform:scale(1);opacity:0.6}
+  100%{transform:scale(1.6);opacity:0}
+}
+
+#bio-error {
+  font-size:13px;color:var(--warn);text-align:center;min-height:18px;
+  font-family:'Noto Sans Hebrew',sans-serif;
+}
+
+.bio-fallback-btn {
+  font-size:13px;color:var(--t2);background:none;border:none;cursor:pointer;
+  font-family:'Noto Sans Hebrew',sans-serif;text-decoration:underline;
+  padding:8px 16px;
+}
+.bio-fallback-btn:hover { color:var(--t1); }
+
+/* Modal הצעת רישום */
+#biometric-offer-modal {
+  display:none;
+  position:fixed;inset:0;z-index:9100;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+  align-items:flex-end;justify-content:center;
+  padding:0 0 24px;
+  animation:bioFadeIn 0.3s ease;
+}
+.bio-offer-card {
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:20px 20px 16px 16px;width:100%;max-width:400px;
+  padding:28px 24px 20px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  font-family:'Noto Sans Hebrew',sans-serif;
+}
+.bio-offer-icon {
+  width:60px;height:60px;border-radius:20px;
+  background:linear-gradient(135deg,rgba(31,138,61,0.2),rgba(31,138,61,0.05));
+  border:1px solid rgba(31,138,61,0.3);
+  display:flex;align-items:center;justify-content:center;
+}
+.bio-offer-icon svg { width:32px;height:32px;color:var(--red); }
+.bio-offer-title { font-size:18px;font-weight:700;color:var(--t1);text-align:center; }
+.bio-offer-desc { font-size:13px;color:var(--t2);text-align:center;line-height:1.6; }
+.bio-offer-btns { display:flex;flex-direction:column;gap:10px;width:100%; }
+.bio-offer-accept {
+  background:var(--red);color:#fff;border:none;border-radius:12px;
+  padding:14px;font-size:15px;font-weight:600;cursor:pointer;
+  font-family:'Noto Sans Hebrew',sans-serif;
+  box-shadow:0 4px 16px var(--red-glow);
+  transition:opacity 0.2s;
+}
+.bio-offer-accept:active { opacity:0.85; }
+.bio-offer-decline {
+  background:transparent;color:var(--t2);border:1px solid var(--border);
+  border-radius:12px;padding:12px;font-size:14px;cursor:pointer;
+  font-family:'Noto Sans Hebrew',sans-serif;transition:color 0.2s;
+}
+.bio-offer-decline:hover { color:var(--t1); }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3910,6 +4016,63 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   <div class="pk-dots" id="pk-dots"></div>
   <div class="pk-cta-wrap" id="pk-cta-wrap">
     <button class="pk-cta-btn" id="pk-cta-btn" onclick="pkConfirmSelect()"></button>
+  </div>
+</div>
+
+<!-- Biometric unlock screen -->
+<div id="biometric-screen" style="display:none">
+  <div class="bio-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1C5.925 1 1 5.925 1 12s4.925 11 11 11 11-4.925 11-11S18.075 1 12 1z"/>
+      <path d="M12 5c-1.933 0-3.5 1.567-3.5 3.5v1c0 .828.448 1.5 1 1.5"/>
+      <path d="M9 12c0 1.657 1.343 3 3 3s3-1.343 3-3v-1"/>
+      <path d="M7 9.5C7 6.462 9.239 4 12 4s5 2.462 5 5.5v1c0 .828-.672 1.5-1.5 1.5"/>
+      <path d="M6 11c0 3.314 2.686 6 6 6s6-2.686 6-6"/>
+    </svg>
+  </div>
+  <div class="bio-title">כניסה מהירה</div>
+  <div class="bio-subtitle">השתמש בטביעת האצבע<br>להיכנס לאפליקציה</div>
+  <button id="bio-fingerprint-btn" onclick="_doBiometricAuthManual()" title="אמת עם טביעת אצבע">
+    <div class="bio-ripple"></div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a6.5 6.5 0 0 1 6.5 6.5"/>
+      <path d="M5.5 7.5A6.5 6.5 0 0 1 12 1"/>
+      <path d="M12 4a3.5 3.5 0 0 1 3.5 3.5v5a3.5 3.5 0 0 1-7 0v-5A3.5 3.5 0 0 1 12 4z"/>
+      <path d="M9 17.5A7 7 0 0 0 19 12"/>
+      <path d="M5 12a7 7 0 0 0 2.5 5.3"/>
+    </svg>
+  </button>
+  <div class="bio-subtitle" style="font-size:12px">לגע בלחצן לאימות</div>
+  <div id="bio-error"></div>
+  <div class="bio-subtitle" style="font-size:12px;margin-top:4px">
+    מכשיר: <span id="bio-device-name">—</span>
+  </div>
+  <button class="bio-fallback-btn" onclick="_biometricFallbackGoogle()">
+    כניסה עם Google במקום
+  </button>
+</div>
+
+<!-- Modal: הצעת רישום טביעת אצבע -->
+<div id="biometric-offer-modal" style="display:none">
+  <div class="bio-offer-card">
+    <div class="bio-offer-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4a3.5 3.5 0 0 1 3.5 3.5v5a3.5 3.5 0 0 1-7 0v-5A3.5 3.5 0 0 1 12 4z"/>
+        <path d="M5.5 7.5A6.5 6.5 0 0 1 18.5 7.5"/>
+        <path d="M9 17.5A7 7 0 0 0 19 12"/>
+        <path d="M5 12a7 7 0 0 0 2.5 5.3"/>
+      </svg>
+    </div>
+    <div class="bio-offer-title">כניסה מהירה עם טביעת אצבע</div>
+    <div class="bio-offer-desc">בפעם הבאה תיכנס לאפליקציה בשנייה אחת — ללא צורך ב-Google</div>
+    <div class="bio-offer-btns">
+      <button class="bio-offer-accept" onclick="biometricRegisterConfirm()">
+        הפעל טביעת אצבע
+      </button>
+      <button class="bio-offer-decline" onclick="biometricRegisterDecline()">
+        לא תודה
+      </button>
+    </div>
   </div>
 </div>
 
@@ -5008,5 +5171,12 @@ window.fcmDebug = async function() {
     <div class="ws-rv-body" id="wsRvBody"></div>
   </div>
 </div>
+<script>
+function _doBiometricAuthManual() {
+  var bioData = _biometricLoad();
+  var session = loadSession();
+  if (bioData && session) _doBiometricAuth(session, bioData);
+}
+</script>
 </body>
 </html>
