@@ -8294,7 +8294,7 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
   var comment = (document.getElementById('ws-comment-'+idx)||{}).value || '';
   var veh = STATE.vehicle;
   var vid = veh && (veh.id || veh.vehicleId || veh.num);
-  var driverName = (STATE.user && (STATE.user.name || STATE.user.displayName)) || '';
+  var driverName = (STATE.vehicle && STATE.vehicle.holder) || (STATE.user && (STATE.user.name || STATE.user.displayName)) || '';
   gasPostForm('save_wash_rating', {
     vehicleId: vid||'', stationId: stationId, rating: rating,
     comment: comment, driverName: driverName, stationName: stationName
@@ -8305,7 +8305,7 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     }
     APP._wsMyRatings = APP._wsMyRatings || {};
     var _sKey = String(stationId).replace(/[^0-9A-Za-z_-]/g,'_');
-    APP._wsMyRatings[_sKey] = {rating: rating, comment: comment};
+    APP._wsMyRatings[_sKey] = {rating: rating, comment: comment, stationName: stationName, stationId: stationId};
     try { localStorage.setItem('ws_my_ratings', JSON.stringify(APP._wsMyRatings)); } catch(e){}
     // Optimistically update Aleh stats so badge appears immediately on station card
     APP._wsAlehStats = APP._wsAlehStats || {};
@@ -8316,6 +8316,12 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
       APP._wsAlehStats[_sKey] = {avg: rating, count: (_prevStat && _prevStat.count) ? _prevStat.count + 1 : 1};
     }
     if (typeof APP._wsRefreshRatingRows === 'function') APP._wsRefreshRatingRows();
+    // Optimistic update of recent comments so modal shows immediately
+    APP._wsRecentComments = APP._wsRecentComments || {};
+    var _newComment = {comment: comment || '', rating: rating, driverName: driverName, ts: Date.now()};
+    var _cList = APP._wsRecentComments[_sKey] ? APP._wsRecentComments[_sKey].slice() : [];
+    _cList.unshift(_newComment);
+    APP._wsRecentComments[_sKey] = _cList.slice(0, 10);
     if (APP._wsSelected) delete APP._wsSelected[idx];
     APP._wsRenderHistory(APP._wsHistoryWashes || []);
     showToast('תודה! הדירוג נשמר');
@@ -8392,7 +8398,7 @@ APP._initWashPanel = async function(userLat, userLng) {
 
     // 2) Aleh driver aggregate stats → animated teal badge row
     db.ref('washStationStats').once('value').then(function(snap) {
-      APP._wsAlehStats = snap.val() || {};
+      APP._wsAlehStats = Object.assign(APP._wsAlehStats || {}, snap.val() || {});
       APP._wsRefreshRatingRows();
     }).catch(function(){});
 
