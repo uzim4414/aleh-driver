@@ -8204,7 +8204,9 @@ APP._wsRenderHistory = function(washes) {
   if (emptyEl) emptyEl.style.display = 'none';
   var veh = STATE.vehicle;
   var vid = veh && (veh.id || veh.vehicleId || veh.num);
-  APP._wsMyRatings = APP._wsMyRatings || {};
+  if (!APP._wsMyRatings) {
+    try { APP._wsMyRatings = JSON.parse(localStorage.getItem('ws_my_ratings')) || {}; } catch(e) { APP._wsMyRatings = {}; }
+  }
   var renderAll = function() {
     listEl.innerHTML = washes.map(function(w, i) {
       var myRating = APP._wsMyRatings[w.stationId] || APP._wsMyRatings[String(w.stationId).replace(/[^0-9A-Za-z_-]/g,'_')] || null;
@@ -8255,7 +8257,8 @@ APP._wsRenderHistory = function(washes) {
           var sKey = String(w.stationId).replace(/[^0-9A-Za-z_-]/g,'_');
           var vKey = String(vid).replace(/[^0-9A-Za-z_-]/g,'_');
           if (all[sKey] && all[sKey][vKey]) {
-            APP._wsMyRatings[sKey] = all[sKey][vKey]; // store under sanitized key (matches submit path)
+            APP._wsMyRatings[sKey] = all[sKey][vKey];
+            try { localStorage.setItem('ws_my_ratings', JSON.stringify(APP._wsMyRatings)); } catch(e){}
           }
         });
       }
@@ -8303,12 +8306,16 @@ APP._wsSubmitRating = function(stationId, stationName, idx) {
     APP._wsMyRatings = APP._wsMyRatings || {};
     var _sKey = String(stationId).replace(/[^0-9A-Za-z_-]/g,'_');
     APP._wsMyRatings[_sKey] = {rating: rating, comment: comment};
+    try { localStorage.setItem('ws_my_ratings', JSON.stringify(APP._wsMyRatings)); } catch(e){}
     // Optimistically update Aleh stats so badge appears immediately on station card
-    if (r.newAvg != null) {
-      APP._wsAlehStats = APP._wsAlehStats || {};
+    APP._wsAlehStats = APP._wsAlehStats || {};
+    if (r.newAvg != null && Number(r.newAvg) > 0) {
       APP._wsAlehStats[_sKey] = {avg: r.newAvg, count: r.count || 1};
-      if (typeof APP._wsRefreshRatingRows === 'function') APP._wsRefreshRatingRows();
+    } else {
+      var _prevStat = APP._wsAlehStats[_sKey];
+      APP._wsAlehStats[_sKey] = {avg: rating, count: (_prevStat && _prevStat.count) ? _prevStat.count + 1 : 1};
     }
+    if (typeof APP._wsRefreshRatingRows === 'function') APP._wsRefreshRatingRows();
     if (APP._wsSelected) delete APP._wsSelected[idx];
     APP._wsRenderHistory(APP._wsHistoryWashes || []);
     showToast('תודה! הדירוג נשמר');
@@ -8570,8 +8577,8 @@ APP._wsRatingRowsHtml = function(s) {
   }
   var a = APP._wsAlehFor(s.id);
   if (a && a.avg != null) {
-    html += '<div class="ws-aleh-badge ws-aleh-live" title="דירוג נהגי עלה">' +
-              '<span class="ws-aleh-emoji">🧑‍✈️</span>' +
+    html += '<div class="ws-aleh-badge ws-aleh-live" title="דירוג נהגי עלה — לחץ לביקורות" onclick="event.stopPropagation();APP._wsShowReviews(\'' + s.id + '\')" style="cursor:pointer">' +
+              '<svg class="ws-aleh-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="12" y1="3" x2="12" y2="10"/><line x1="4.2" y1="16.5" x2="10.3" y2="13"/><line x1="19.8" y1="16.5" x2="13.7" y2="13"/></svg>' +
               '<span class="ws-rate-val">' + Number(a.avg).toFixed(1) + '</span>' +
               '<span class="ws-aleh-cnt">(' + (a.count || 0) + ' נהגי עלה)</span>' +
             '</div>';
@@ -8594,6 +8601,87 @@ APP._wsCommentsHtml = function(s) {
            '</div>';
   }).join('');
   return '<div class="ws-cm-label">ביקורות נהגים</div>' + items;
+};
+
+// ===== Aleh Reviews Modal =====
+// Build the gold star string (full ★ / empty ☆) for an integer-rounded rating
+APP._wsStarsStr = function(r) {
+  var rr = Math.round(Number(r) || 0), out = '';
+  for (var i = 1; i <= 5; i++) out += (i <= rr) ? '★' : '☆';
+  return out;
+};
+
+// Show the reviews modal for a given station id
+APP._wsShowReviews = function(stationId) {
+  var s = (APP._wsStationsData || APP._WASH_STATIONS).find(function(x){ return String(x.id) === String(stationId); });
+  if (!s) return;
+  var a = APP._wsAlehFor(stationId) || {};
+  var arr = APP._wsCommentsFor(stationId) || [];
+
+  var titleEl = document.getElementById('wsRvTitle');
+  if (titleEl) titleEl.textContent = s.name || 'תחנה';
+
+  // Average row
+  var avgRow = document.getElementById('wsRvAvgRow');
+  if (avgRow) {
+    if (a.avg != null) {
+      avgRow.innerHTML =
+        '<div class="ws-rv-avgnum">' + Number(a.avg).toFixed(1) + '</div>' +
+        '<div>' +
+          '<div class="ws-rv-avgstars">' + APP._wsStarsStr(a.avg) + '</div>' +
+          '<div class="ws-rv-avgcnt">(' + (a.count || 0) + ' נהגי עלה)</div>' +
+        '</div>';
+    } else {
+      avgRow.innerHTML = '';
+    }
+  }
+
+  // Body
+  var body = document.getElementById('wsRvBody');
+  if (body) {
+    if (!arr.length) {
+      body.innerHTML = '<div class="ws-rv-empty">אין ביקורות עדיין</div>';
+    } else {
+      var note = '';
+      if (a.count != null && a.count > arr.length) {
+        note = '<div class="ws-rv-note">מציג ' + arr.length + ' ביקורות אחרונות</div>';
+      }
+      var cards = arr.map(function(c) {
+        var nm = (c.driverName || '').trim();
+        var initial = nm ? nm.charAt(0) : '?';
+        var dateStr = '';
+        if (c.ts) {
+          var d = new Date(Number(c.ts));
+          if (!isNaN(d.getTime())) {
+            var dd = ('0'+d.getDate()).slice(-2), mm = ('0'+(d.getMonth()+1)).slice(-2);
+            dateStr = dd + '/' + mm + '/' + d.getFullYear();
+          }
+        }
+        return '<div class="ws-rv-card">' +
+                 '<div class="ws-rv-avatar">' + String(initial).replace(/</g,'&lt;') + '</div>' +
+                 '<div class="ws-rv-cmain">' +
+                   '<div class="ws-rv-crow">' +
+                     '<span class="ws-rv-cname">' + (nm ? String(nm).replace(/</g,'&lt;') : 'נהג עלה') + '</span>' +
+                     '<span class="ws-rv-cstars">' + APP._wsStarsStr(c.rating) + '</span>' +
+                     (dateStr ? '<span class="ws-rv-cdate">' + dateStr + '</span>' : '') +
+                   '</div>' +
+                   '<div class="ws-rv-ctext">' + String(c.comment || '').replace(/</g,'&lt;') + '</div>' +
+                 '</div>' +
+               '</div>';
+      }).join('');
+      body.innerHTML = note + cards;
+      body.scrollTop = 0;
+    }
+  }
+
+  var ov = document.getElementById('wsReviewsOverlay');
+  if (ov) ov.style.display = 'flex';
+};
+
+// Close the reviews modal
+APP._wsCloseReviews = function() {
+  var ov = document.getElementById('wsReviewsOverlay');
+  if (ov) ov.style.display = 'none';
 };
 
 // Re-render the rating block of every visible card (called after Firebase loads)

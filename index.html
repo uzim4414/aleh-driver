@@ -224,6 +224,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 /* ── ALEH BADGE on station cards ──────────── */
 .ws-aleh-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(8,145,178,.15); border:1px solid rgba(8,145,178,.3); border-radius:20px; padding:3px 8px; font-size:11px; font-weight:700; color:#0891b2; margin-top:4px; }
 .ws-aleh-badge svg { width:10px; height:10px; }
+.ws-aleh-badge .ws-aleh-ic { width:14px; height:14px; vertical-align:middle; opacity:.9; }
 /* Two-source rating block on station cards */
 .ws-sc-ratings { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
 .ws-rate-google { display:flex; align-items:center; gap:4px; font-size:13px; color:#FFB800; line-height:1; }
@@ -247,6 +248,31 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .ws-cm-stars { font-size:12px; color:#FFB800; letter-spacing:1px; }
 .ws-cm-who { font-size:11px; font-weight:700; color:var(--t2); }
 .ws-cm-text { font-size:12px; color:var(--t1); line-height:1.5; }
+/* ===== Aleh Reviews Modal ===== */
+@keyframes wsRvFadeIn { from{opacity:0} to{opacity:1} }
+@keyframes wsRvSlideUp { from{opacity:0;transform:translateY(40px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+#wsReviewsOverlay { animation:wsRvFadeIn .2s ease; }
+.ws-rv-panel { width:100%; max-width:440px; max-height:86vh; display:flex; flex-direction:column; background:var(--card); border:1px solid rgba(8,145,178,.35); border-radius:24px; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.7); animation:wsRvSlideUp .28s cubic-bezier(.2,.9,.3,1.1); margin:0 14px; }
+.ws-rv-head { position:relative; padding:18px 18px 16px; background:linear-gradient(135deg,rgba(8,145,178,.18) 0%,transparent 65%); border-bottom:1px solid var(--border); }
+.ws-rv-close { position:absolute; top:14px; left:14px; width:32px; height:32px; border:none; border-radius:50%; background:rgba(255,255,255,.07); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.ws-rv-close:active { background:rgba(255,255,255,.15); }
+.ws-rv-eyebrow { font-size:11px; font-weight:800; color:#22d3ee; letter-spacing:.05em; margin-bottom:2px; }
+.ws-rv-title { font-size:17px; font-weight:800; color:var(--t1); line-height:1.3; padding-left:36px; }
+.ws-rv-avgrow { display:flex; align-items:center; gap:12px; margin-top:14px; }
+.ws-rv-avgnum { font-size:38px; font-weight:900; color:#22d3ee; line-height:1; font-family:'Outfit',sans-serif; }
+.ws-rv-avgstars { font-size:20px; color:#FFB800; letter-spacing:2px; line-height:1; }
+.ws-rv-avgcnt { font-size:12px; color:var(--t2); font-weight:600; margin-top:3px; }
+.ws-rv-body { padding:14px 16px 18px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; }
+.ws-rv-note { font-size:11px; color:var(--t2); text-align:center; font-weight:600; padding-bottom:2px; }
+.ws-rv-card { display:flex; gap:11px; background:rgba(8,145,178,.06); border:1px solid rgba(8,145,178,.15); border-radius:14px; padding:11px 12px; }
+.ws-rv-avatar { flex:0 0 auto; width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#0891b2,#22d3ee); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:#fff; }
+.ws-rv-cmain { flex:1; min-width:0; }
+.ws-rv-crow { display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap; }
+.ws-rv-cname { font-size:13px; font-weight:700; color:var(--t1); }
+.ws-rv-cstars { font-size:12px; color:#FFB800; letter-spacing:1px; }
+.ws-rv-cdate { font-size:11px; color:var(--t2); margin-right:auto; }
+.ws-rv-ctext { font-size:13px; color:var(--t1); line-height:1.55; word-break:break-word; }
+.ws-rv-empty { text-align:center; color:var(--t2); font-size:14px; font-weight:600; padding:40px 10px; }
 .ws-sc { background:var(--card); border-radius:20px; border:1px solid var(--border); border-right:3px solid #0891b2; overflow:hidden; transition:border-right-color .2s; }
 .ws-sc.highlight { border-right-color:#0891b2; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
 .ws-sc-head { padding:14px 16px 12px; cursor:pointer; display:flex; flex-direction:column; gap:8px; background:linear-gradient(135deg,rgba(8,145,178,.08) 0%,transparent 60%); }
@@ -4965,6 +4991,21 @@ window.fcmDebug = async function() {
     <div class="wash-confirm-title" style="color:#FF9F0A">ניצלת את מכסת הרחיצות</div>
     <div class="wash-confirm-station">4/4 רחיצות לחודש זה מוצו</div>
     <div style="color:var(--t2);font-size:13px;text-align:center;margin-top:4px">המכסה תתחדש ב-1 לחודש הבא</div>
+  </div>
+</div>
+
+<!-- ALEH DRIVERS REVIEWS MODAL -->
+<div id="wsReviewsOverlay" style="display:none" class="overlay-backdrop" onclick="if(event.target===this)APP._wsCloseReviews()">
+  <div class="ws-rv-panel">
+    <div class="ws-rv-head">
+      <button class="ws-rv-close" onclick="APP._wsCloseReviews()" aria-label="סגירה">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+      </button>
+      <div class="ws-rv-eyebrow">ביקורות נהגי עלה</div>
+      <div class="ws-rv-title" id="wsRvTitle">—</div>
+      <div class="ws-rv-avgrow" id="wsRvAvgRow"></div>
+    </div>
+    <div class="ws-rv-body" id="wsRvBody"></div>
   </div>
 </div>
 </body>
