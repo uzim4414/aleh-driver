@@ -1613,7 +1613,7 @@ function pkConfirmSelect() {
   STATE.isActualHolder = chosen.isActualHolder || false;
   saveSession(STATE.idToken, chosen, STATE.user);
   // שמור pin session ובדוק אם PIN מוגדר
-  _pinSessionSave(STATE.user.email, chosen, STATE.user);
+  _pinSessionSave(STATE.user.email, chosen, STATE.user, STATE.idToken);
   if (_bioAvailable() && !_bioLoad()) {
     setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
   } else if (!_pinLoad()) {
@@ -1762,13 +1762,16 @@ async function _doBioAuth() {
       setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 300);
       return;
     }
-    _pinSessionSave(bioData.email, session.vehicleData, session.userInfo);
+    _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
     STATE.vehicle = session.vehicleData;
     STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
-    STATE.idToken = null;
+    STATE.idToken = session.idToken || null;
     var ov2 = document.getElementById('bio-screen');
     if (ov2) ov2.style.display = 'none';
-    startApp();
+    if (STATE.idToken && typeof _fbSignIn === 'function') {
+      _fbSignIn(STATE.idToken).catch(function(){});
+    }
+    loadFullData().then(startApp).catch(startApp);
   } catch(err) {
     if (btn) btn.classList.remove('bio-scanning');
     var msg = err.message || 'שגיאה';
@@ -1874,10 +1877,11 @@ function _pinSessionLoad() {
   } catch(e) { return null; }
 }
 
-function _pinSessionSave(email, vehicleData, userInfo) {
+function _pinSessionSave(email, vehicleData, userInfo, idToken) {
   try {
     localStorage.setItem(PIN_SESSION_KEY, JSON.stringify({
-      email: email, vehicleData: vehicleData, userInfo: userInfo, ts: Date.now()
+      email: email, vehicleData: vehicleData, userInfo: userInfo,
+      idToken: idToken || null, ts: Date.now()
     }));
   } catch(e) {}
 }
@@ -2161,7 +2165,7 @@ async function handleGoogleCredential(response) {
       _fbWriteLastLogin(_ek, _vehKey(result.vehicle));
       saveSession(STATE.idToken, STATE.vehicle, STATE.user);
       // שמור pin session ובדוק אם PIN מוגדר
-      _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user);
+      _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
       if (_bioAvailable() && !_bioLoad()) {
         setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
       } else if (!_pinLoad()) {
@@ -2172,7 +2176,7 @@ async function handleGoogleCredential(response) {
         : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
       showGreeting(greetName);
       await loadFullData();
-      _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user);
+      _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user, STATE.idToken);
       hideGreeting();
       startApp();
     }
