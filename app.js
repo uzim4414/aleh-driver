@@ -1751,26 +1751,10 @@ async function _doBioAuth() {
   if (btn) btn.classList.add('bio-scanning');
   if (errEl) errEl.textContent = '';
   try {
-    // שלב 1: אמת טביעת אצבע מקומית
-    var bioResult = await bioAuthenticate(bioData.email, bioData.credentialId);
-    // שלב 2: קבל נתוני רכב אמיתיים מ-GAS (email+credentialId, ללא token)
-    var gasResult = null;
-    try {
-      gasResult = await gasPostForm('bio_vehicle', {
-        email: bioData.email,
-        credentialId: bioData.credentialId
-      });
-    } catch(gasErr) {
-      // GAS נכשל — נסה session שמור
-      var cachedSession = _pinSessionLoad();
-      if (cachedSession && cachedSession.vehicleData) {
-        gasResult = { ok: true, vehicle: cachedSession.vehicleData,
-                      userInfo: cachedSession.userInfo, orgName: '' };
-      }
-    }
+    await bioAuthenticate(bioData.email, bioData.credentialId);
     if (btn) btn.classList.remove('bio-scanning');
-    if (!gasResult || !gasResult.ok || !gasResult.vehicle) {
-      // אין נתוני רכב — login מחדש עם Google
+    var session = _pinSessionLoad();
+    if (!session || !session.vehicleData) {
       var ov = document.getElementById('bio-screen');
       if (ov) ov.style.display = 'none';
       var sp = document.getElementById('splash-screen');
@@ -1778,12 +1762,9 @@ async function _doBioAuth() {
       setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 300);
       return;
     }
-    // שמור session מעודכן (30 יום)
-    var userInfo = gasResult.userInfo || { email: bioData.email, name: bioData.email };
-    _pinSessionSave(bioData.email, gasResult.vehicle, userInfo);
-    // boot
-    STATE.vehicle = gasResult.vehicle;
-    STATE.user = userInfo;
+    _pinSessionSave(bioData.email, session.vehicleData, session.userInfo);
+    STATE.vehicle = session.vehicleData;
+    STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
     STATE.idToken = null;
     var ov2 = document.getElementById('bio-screen');
     if (ov2) ov2.style.display = 'none';
@@ -2191,6 +2172,7 @@ async function handleGoogleCredential(response) {
         : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
       showGreeting(greetName);
       await loadFullData();
+      _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user);
       hideGreeting();
       startApp();
     }
@@ -2999,7 +2981,7 @@ function logout() {
     confirmText: 'התנתק',
     onConfirm: () => {
       localStorage.removeItem(SESSION_KEY);
-      _pinClear(); // מוחק PIN + pin session — אך לא את ה-bio credential
+      try { localStorage.removeItem(PIN_KEY); } catch(_e) {} // מוחק PIN בלבד — שומר pin session ל-bio cache
       // ה-credential נשמר בכוונה (_bioClear לא נקרא) כדי שמסך טביעת האצבע יופיע אחרי boot
       location.reload();
     }
