@@ -1615,9 +1615,6 @@ function pkConfirmSelect() {
   var idx      = STATE._pickerCurrent;
   if (!vehicles || !vehicles[idx]) return;
   var chosen = vehicles[idx];
-  // Write lastLogin to Firebase
-  var emailKey = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
-  _fbWriteLastLogin(emailKey, _vehKey(chosen));
   // Hide picker, proceed
   var el = document.getElementById('screen-picker');
   if (el) el.classList.add('hidden');
@@ -1634,8 +1631,13 @@ function pkConfirmSelect() {
     setTimeout(function(){ _offerPinSetup(STATE.user.email, chosen, STATE.user); }, 1500);
   }
   var _grEk = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
-  showGreeting((chosen.holder) || STATE.user.name, _grEk, _vehKey(chosen));
-  loadFullData().then(function() { hideGreeting(); startApp(); }).catch(function(err) {
+  var _grVk = _vehKey(chosen);
+  showGreeting((chosen.holder) || STATE.user.name, _grEk, _grVk);
+  loadFullData().then(function() {
+    hideGreeting();
+    _fbWriteLastLogin(_grEk, _grVk);  // כתוב רק אחרי שסיימנו להציג את הכניסה הקודמת
+    startApp();
+  }).catch(function(err) {
     hideGreeting();
     showLoginError(err && err.message ? err.message : 'שגיאת טעינה');
   });
@@ -1826,12 +1828,12 @@ async function _bioLoginFromSplash() {
     var _bioEk = bioData.email ? bioData.email.replace(/[.#$[\]]/g,'_') : '';
     var _bioVk = _vehKey(session.vehicleData);
     showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name), _bioEk, _bioVk);
-    _fbWriteLastLogin(_bioEk, _bioVk);
     loadFullData().then(function() {
       window._bioLoginBusy = false;
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
       _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
       hideGreeting();
+      _fbWriteLastLogin(_bioEk, _bioVk);
       if (sp) sp.classList.add('hidden');
       startApp();
     }).catch(function(loadErr) {
@@ -2249,9 +2251,6 @@ async function handleGoogleCredential(response) {
       STATE.vehicle      = result.vehicle;
       STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.isActualHolder = result.isActualHolder || false;
-      // Write lastLogin
-      var _ek = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
-      _fbWriteLastLogin(_ek, _vehKey(result.vehicle));
       saveSession(STATE.idToken, STATE.vehicle, STATE.user);
       // שמור pin session ובדוק אם PIN מוגדר
       _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
@@ -2264,10 +2263,12 @@ async function handleGoogleCredential(response) {
         ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
         : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
       var _gEk = STATE.user && STATE.user.email ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
-      showGreeting(greetName, _gEk, _vehKey(STATE.vehicle));
+      var _gVk = _vehKey(STATE.vehicle);
+      showGreeting(greetName, _gEk, _gVk);
       await loadFullData();
       _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user, STATE.idToken);
       hideGreeting();
+      _fbWriteLastLogin(_gEk, _gVk);
       startApp();
     }
   } catch(err) {
@@ -8592,9 +8593,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         var _sEk = STATE.user && STATE.user.email ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
         var _sVk = _vehKey(STATE.vehicle);
         showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _sVk);
-        _fbWriteLastLogin(_sEk, _sVk);
         await loadFullData();
         hideGreeting();
+        _fbWriteLastLogin(_sEk, _sVk);
         startApp();
         return;
       } catch(e) {
