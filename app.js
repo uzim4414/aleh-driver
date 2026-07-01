@@ -1834,6 +1834,11 @@ async function _bioLoginFromSplash() {
       setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
       return;
     }
+    // token פג — אסור לטעון נתונים עם token לא תקף (לולאה אינסופית)
+    if (_isTokenExpired(session.idToken)) {
+      setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+      return;
+    }
     _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
     STATE.vehicle = session.vehicleData;
     STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
@@ -1845,10 +1850,12 @@ async function _bioLoginFromSplash() {
     loadFullData().then(function() {
       if (sp) sp.classList.add('hidden');
       startApp();
-    }).catch(function() {
-      STATE.vehicle = STATE.vehicle || session.vehicleData;
-      if (sp) sp.classList.add('hidden');
-      startApp();
+    }).catch(function(loadErr) {
+      // loadFullData נכשל (token פג / רשת) — אסור להפעיל את האפליקציה עם נתוני קאש ישנים
+      STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
+      setTimeout(function() {
+        showToast('שגיאת כניסה — יש להיכנס מחדש עם Google');
+      }, 200);
     });
   } catch(err) {
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
