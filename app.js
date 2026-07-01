@@ -2156,7 +2156,11 @@ function loadSession() {
 
 /* ══ Auth ══ */
 function _loginFallbackRedirect() {
-  var redirectUri = encodeURIComponent(window.location.href.split('?')[0]);
+  // redirect_uri חייב להיות זהה בדיוק למה שרשום ב-Google Cloud Console.
+  // מנרמל: מסיר query/hash/index.html — נותן תמיד את שורש ה-scope
+  var _base = window.location.origin + window.location.pathname.replace(/index\.html$/i, '');
+  if (!_base.endsWith('/')) _base += '/';
+  var redirectUri = encodeURIComponent(_base);
   var clientId = encodeURIComponent(GOOGLE_CLIENT_ID);
   var scope = encodeURIComponent('openid email profile');
   var url = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -3067,11 +3071,9 @@ function logout() {
         if (_ps) { _ps.idToken = null; localStorage.setItem(PIN_SESSION_KEY, JSON.stringify(_ps)); }
       } catch(_e) {}
 
-      // ══ שלב 3: בטל Google auto-select + Firebase sign-out
-      try { if (window.google && google.accounts && google.accounts.id) {
-        google.accounts.id.disableAutoSelect();
-        google.accounts.id.cancel();
-      }} catch(_e) {}
+      // ══ שלב 3: Firebase sign-out (non-blocking)
+      // לא קוראים disableAutoSelect() — זה מדכא את One Tap גם בכניסה הבאה.
+      // ה-gate _userInitiatedLogin + auto_select:false מספיקים למניעת auto-login.
       try { if (window._fbAuth && typeof window._fbAuth.signOut === 'function') window._fbAuth.signOut(); } catch(_e) {}
 
       // ══ שלב 4: הסתר #app והצג splash — לפני closeConfirmModal (מונע GPU flash)
