@@ -8417,13 +8417,11 @@ function _getAppVersion() {
 // ══════════════════════════════════════════════════════════════════
 window.addEventListener('pageshow', function(e) {
   if (!e.persisted) return;
-  // Guard: רק ?_bfc= — כדי למנוע לולאה אינסופית (bfcache של ?_bfc= עצמו).
-  // אסור לשים guard על ?_lo= !
-  // Samsung Internet שומרת את עמוד הרכב (Toyota) ב-bfcache עם ה-URL החדש ?_lo=
-  // כשלוחצים location.replace. אם נחזיר early על ?_lo= — עמוד הפייק נשאר!
-  if (location.search.indexOf('_bfc=') !== -1) return;
-  // כל bfcache restore אחר (כולל ?_lo= !) → reload חדש עם ?_bfc=
-  window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
+  // Samsung Internet bfcache: תמיד reload מלא ללא יוצא מהכלל.
+  // ללא guards — כל URL (כולל ?_lo=, ?_bfc=, נקי) מקבל reload.
+  // לולאה? אינה אפשרית: reload(true) מייצר ניווט חדש → pageshow(e.persisted=false) → return.
+  // Guards על ?_lo=/?_bfc= אסורים — גרמו ל-regression (v243/v244/v245).
+  window.location.reload(true);
 });
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -8588,6 +8586,13 @@ var _lastApptSync = 0;
 var _APPT_SYNC_MIN = 60 * 1000; // throttle appointment sync to at most once/min on refocus
 document.addEventListener('visibilitychange', async function() {
   if (document.visibilityState !== 'visible') return;
+  // Fake-screen guard: #app גלוי אבל אין session — מצב לא תקין (bfcache / Samsung restore).
+  // מופעל לפני כל guard אחר כדי לתפוס כל מנגנון שמציג את האפליקציה ללא אימות.
+  var _fsApp = document.getElementById('app');
+  if (_fsApp && !_fsApp.classList.contains('hidden') && _fsApp.style.display !== 'none' && !STATE.idToken) {
+    window.location.reload(true);
+    return;
+  }
   if (!STATE.idToken || !STATE.vehicle) return;
   if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
   // Throttled appointment sync — not on every screen-on
