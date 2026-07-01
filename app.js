@@ -8403,6 +8403,13 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Try cached session
   const session = loadSession();
 
+  // אם אין session תקף (logout / כניסה ראשונה) — מחק pin session ישן שעשוי להכיל
+  // נתוני רכב ו-idToken מפגישה קודמת. בלי זה, bio אחרי logout פותח את האפליקציה
+  // עם נתוני cache ישנים (Toyota bug).
+  if (!session) {
+    try { localStorage.removeItem(PIN_SESSION_KEY); } catch(_e) {}
+  }
+
   // ═══ PIN FIRST ═══
   // אם יש PIN מוגדר + pin session — הצג קודפד לפני כל בדיקת token ולפני Google One Tap.
   // WebAuthn check — FIRST (before PIN, before Google)
