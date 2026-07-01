@@ -1325,6 +1325,7 @@ window.addEventListener('online', function() { _syncPendingEvents(); });
 /* ══ Vehicle Picker Helpers ══ */
 
 function _vehKey(v) {
+  if (!v) return '';
   return String(v.id || v.num || '').replace(/[^0-9A-Za-z_-]/g, '_');
 }
 
@@ -1823,7 +1824,9 @@ async function _bioLoginFromSplash() {
     }
     var sp = document.getElementById('splash-screen');
     var _bioEk = bioData.email ? bioData.email.replace(/[.#$[\]]/g,'_') : '';
-    showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name), _bioEk, _vehKey(session.vehicleData));
+    var _bioVk = _vehKey(session.vehicleData);
+    showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name), _bioEk, _bioVk);
+    _fbWriteLastLogin(_bioEk, _bioVk);
     loadFullData().then(function() {
       window._bioLoginBusy = false;
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
@@ -8587,7 +8590,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
         hideLoader();
         var _sEk = STATE.user && STATE.user.email ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
-        showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _vehKey(STATE.vehicle));
+        var _sVk = _vehKey(STATE.vehicle);
+        showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _sVk);
+        _fbWriteLastLogin(_sEk, _sVk);
         await loadFullData();
         hideGreeting();
         startApp();
