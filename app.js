@@ -63,6 +63,8 @@ var _fbApp, _fbAuth, _fbDb, _fbSyncReady = false;
 function navigateForAlertType(alertType, meta) {
   meta = meta || {};
   if (typeof APP === 'undefined') return;
+  // אסור לנווט לתוך האפליקציה ללא session — מונע הצגת מסך פייק
+  if (!STATE.idToken || !STATE.vehicle) return;
   switch (alertType) {
     case 'km_update':
       APP.nav('vehicle');
@@ -8229,12 +8231,17 @@ if ('serviceWorker' in navigator) {
       showInAppNotification(msg.payload);
     } else if (msg.type === 'push-received' && msg.payload) {
       saveNotifToHistory(msg.payload);
-      navigateForAlertType(
-        (msg.payload.data && msg.payload.data.alertType) || 'plan',
-        msg.payload.data || {}
-      );
+      // guard: אסור לנווט אם אין session — הנוטיפיקציה יכולה להגיע אחרי logout
+      if (STATE.idToken && STATE.vehicle) {
+        navigateForAlertType(
+          (msg.payload.data && msg.payload.data.alertType) || 'plan',
+          msg.payload.data || {}
+        );
+      }
     } else if (msg.type === 'notification-click' && msg.data) {
-      navigateForAlertType(msg.data.alertType || 'plan', msg.data);
+      if (STATE.idToken && STATE.vehicle) {
+        navigateForAlertType(msg.data.alertType || 'plan', msg.data);
+      }
     } else if (msg.type === 'pending-notifs' && msg.notifs && msg.notifs.length) {
       msg.notifs.forEach(function(p) { saveNotifToHistory(p); });
       showInAppNotification(msg.notifs[0]);
