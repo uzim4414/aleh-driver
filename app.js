@@ -2171,6 +2171,8 @@ async function handleGoogleCredential(response) {
     return;
   }
   window._userInitiatedLogin = false; // consume — require new explicit gesture for next login
+  // כניסת Google מוצלחת — מנקה את דגל "force Google" שנוגדר בזמן logout
+  try { localStorage.removeItem('aleh_force_google'); } catch(_) {}
   /* Dismiss One Tap overlay immediately so it doesn't block the app */
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.cancel(); } catch(_) {}
   showLoader();
@@ -3025,16 +3027,17 @@ function logout() {
     sub: 'האם תרצה להתנתק?',
     confirmText: 'התנתק',
     onConfirm: () => {
+      // הסתר #app מיד — כשהמודל נסגר, #app נחשף לרגע לפני הניווט (flash של מסך הרכב)
+      var _appEl = document.getElementById('app');
+      var _splashEl = document.getElementById('splash-screen');
+      if (_appEl) _appEl.classList.add('hidden');
+      if (_splashEl) { _splashEl.classList.remove('hidden'); _splashEl.style.removeProperty('display'); }
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
-      // מוחקים את pin session — idToken בתוכו עדיין תקף שעה אחת אחרי logout
-      // ולכן Knox/bio יכול להשתמש בו להכנסה שקטה. ה-credential נשמר כדי שהכפתור יופיע,
-      // אך ללא pin session bio יקבל toast "יש להיכנס עם Google" ולא יפתח את האפליקציה.
       try { localStorage.removeItem(PIN_SESSION_KEY); } catch(_e) {}
-      // נמחק auto-select זיכרון גוגל כדי למנוע FedCM מלהחזיר credential אוטומטי
+      // דגל: מכניסה הבאה חייבת להיות דרך Google בלבד (לא bio/Knox אוטומטי)
+      try { localStorage.setItem('aleh_force_google', '1'); } catch(_e) {}
       try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch(_e) {}
-      // location.replace עם query string חדש מונע bfcache לחלוטין —
-      // Samsung Internet מחזיר location.reload() מ-cache ומדלג על DOMContentLoaded
       window.location.replace(window.location.pathname + '?_lo=' + Date.now());
     }
   });
@@ -8362,11 +8365,12 @@ function _getAppVersion() {
 // ══════════════════════════════════════════════════════════════════
 window.addEventListener('pageshow', function(e) {
   if (!e.persisted) return; // reload רגיל — DOMContentLoaded ירוץ כרגיל
-  // הדף שוחזר מ-bfcache — בדוק אם יש session תקף
+  // הדף שוחזר מ-bfcache — DOMContentLoaded לא רץ, boot לא רץ.
+  // אם logout בוצע (אין session, או דגל force_google קיים) → force reload אמיתי.
   var _bfSession = null;
   try { _bfSession = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(_) {}
-  if (!_bfSession || !_bfSession.token) {
-    // אין session (logout בוצע) — force reload אמיתי
+  var _bfForceGoogle = localStorage.getItem('aleh_force_google') === '1';
+  if (!_bfSession || !_bfSession.token || _bfForceGoogle) {
     window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
   }
 });
@@ -8430,18 +8434,22 @@ document.addEventListener('DOMContentLoaded', async function() {
     try { localStorage.removeItem(PIN_SESSION_KEY); } catch(_e) {}
   }
 
+  // דגל "התנתקות מפורשת" — מונע כל כניסה אוטומטית (bio/Knox/FedCM) אחרי logout.
+  // נמחק רק אחרי כניסה מוצלחת עם Google. מגן גם על bfcache, pageshow, ו-SW caching.
+  var _forceGoogle = localStorage.getItem('aleh_force_google') === '1';
+
   // ═══ PIN FIRST ═══
   // אם יש PIN מוגדר + pin session — הצג קודפד לפני כל בדיקת token ולפני Google One Tap.
   // WebAuthn check — FIRST (before PIN, before Google)
   var _bioData = _bioLoad();
-  if (_bioData && _bioAvailable()) {
+  if (_bioData && _bioAvailable() && !_forceGoogle) {
     // יש credential רשום — הצג את כפתור הכניסה הביומטרית על מסך ה-splash.
     // WebAuthn/Knox לא מופעל אוטומטית — רק בלחיצת המשתמש על הכפתור.
     hideLoader();
     _showBioLoginButton(_bioData);
     // ממשיכים לטעינת Google (הכפתור השני) — לא עוצרים את ה-boot.
   }
-  var _bioShown = !!(_bioData && _bioAvailable());
+  var _bioShown = !!(_bioData && _bioAvailable() && !_forceGoogle);
   _wireLoginRipple();
   if (!_bioShown) {
     // אין ביומטרי רשום — פאנל במצב "Google בלבד"
