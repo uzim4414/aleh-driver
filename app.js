@@ -1801,7 +1801,6 @@ async function _bioLoginFromSplash() {
       setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
       return;
     }
-    _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
     STATE.vehicle = session.vehicleData;
     STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
     STATE.idToken = session.idToken || null;
@@ -1811,6 +1810,8 @@ async function _bioLoginFromSplash() {
     var sp = document.getElementById('splash-screen');
     loadFullData().then(function() {
       window._bioLoginBusy = false;
+      // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
+      _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
       if (sp) sp.classList.add('hidden');
       startApp();
     }).catch(function(loadErr) {
@@ -1947,7 +1948,12 @@ function _pinAvailable() {
 // הצג מסך PIN לאימות
 function _showPinScreen(pinSession) {
   var overlay = document.getElementById('pin-screen');
-  if (!overlay) { _bootWithPinSession(pinSession); return; }
+  if (!overlay) {
+    // DOM חסר — אל תאתחל אפליקציה ללא אימות, הצג splash
+    var splash = document.getElementById('splash-screen');
+    if (splash) { splash.classList.remove('hidden'); splash.style.removeProperty('display'); }
+    return;
+  }
   var splash = document.getElementById('splash-screen');
   if (splash) splash.style.display = 'none';
   overlay.style.display = 'flex';
@@ -2245,6 +2251,8 @@ async function handleGoogleCredential(response) {
     }
   } catch(err) {
     console.error('[auth] error:', err.message);
+    // Reset STATE — avoid stale idToken/vehicle/user leaking into next login attempt
+    STATE.idToken = null; STATE.vehicle = null; STATE.user = null;
     if (err && (err.error === 'vehicle_inactive' || (err.message && err.message.indexOf('vehicle_inactive') >= 0))) {
       showLoginError('הרכב שלך אינו פעיל במערכת. פנה למנהל הצי.');
     } else {
@@ -8409,8 +8417,9 @@ function _getAppVersion() {
 // ══════════════════════════════════════════════════════════════════
 window.addEventListener('pageshow', function(e) {
   if (!e.persisted) return;
+  // Guard: אם כבר ריצה מ-bfcache או מ-logout — אל תיצור לולאה אינסופית
+  if (location.search.indexOf('_bfc=') !== -1 || location.search.indexOf('_lo=') !== -1) return;
   // bfcache שחזר את הדף — תמיד force reload אמיתי, ללא יוצא מהכלל.
-  // אסור לסמוך על SESSION_KEY כי logout יכול להיות ב-race עם bfcache (Samsung Internet bug).
   window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
 });
 
@@ -8548,8 +8557,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       window._userInitiatedLogin = true;
       try {
         google.accounts.id.prompt(function(notification) {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // One Tap מדוכא — לא מעבירים לדף חדש, מציגים הנחיה
+          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+            // One Tap מדוכא / נסגר — לא מעבירים לדף חדש, מציגים הנחיה
             window._userInitiatedLogin = false;
             showToast('לא ניתן לפתוח את חלון הכניסה. נסה לרענן את הדף.');
           }
