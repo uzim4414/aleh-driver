@@ -8557,8 +8557,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       window._userInitiatedLogin = true;
       try {
         google.accounts.id.prompt(function(notification) {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
-            // One Tap מדוכא / נסגר — לא מעבירים לדף חדש, מציגים הנחיה
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            // One Tap מדוכא — לא מעבירים לדף חדש, מציגים הנחיה
+            // isDismissedMoment אסור כאן — מופעל גם אחרי כניסה מוצלחת (One Tap נסגר)
             window._userInitiatedLogin = false;
             showToast('לא ניתן לפתוח את חלון הכניסה. נסה לרענן את הדף.');
           }
