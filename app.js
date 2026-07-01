@@ -2183,10 +2183,16 @@ function initGoogleAuth() {
     cancel_on_tap_outside: false,
     use_fedcm_for_prompt: false
   });
-  // renderButton = popup mode — no redirect_uri registration required
+  // renderButton uses popup — no redirect_uri registration required.
+  // The overlay (#g-signin-target) covers #login-btn so the user physically clicks Google's iframe.
   var gsTarget = document.getElementById('g-signin-target');
-  if (gsTarget) {
-    google.accounts.id.renderButton(gsTarget, { type: 'icon', size: 'small', theme: 'outline' });
+  var loginBtn = document.getElementById('login-btn');
+  if (gsTarget && loginBtn) {
+    var bw = loginBtn.getBoundingClientRect().width || loginBtn.offsetWidth || 320;
+    google.accounts.id.renderButton(gsTarget, { type: 'standard', size: 'large', theme: 'filled_blue', width: Math.round(bw) });
+    // mousedown/touchstart bubble from the iframe element to this div — set flag before callback fires
+    gsTarget.addEventListener('mousedown', function() { window._userInitiatedLogin = true; });
+    gsTarget.addEventListener('touchstart', function() { window._userInitiatedLogin = true; }, { passive: true });
   }
 }
 
@@ -8548,24 +8554,19 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.src = 'https://accounts.google.com/gsi/client';
   script.onload = function() {
     initGoogleAuth();
+    // #login-btn click fires only if #g-signin-target overlay is missing (renderButton failed to load)
     document.getElementById('login-btn').addEventListener('click', function() {
-      window._userInitiatedLogin = true; // user pressed the button — allow credential callback
-      // Use renderButton popup (no redirect_uri needed) — find the hidden Google button and click it
       var gsTarget = document.getElementById('g-signin-target');
-      var gsBtn = gsTarget && (gsTarget.querySelector('[role="button"]') || gsTarget.querySelector('button') || gsTarget.querySelector('div[tabindex]'));
-      if (gsBtn) {
-        gsBtn.click();
-      } else {
-        // Fallback: prompt (may fail if suppressed)
-        try {
-          google.accounts.id.prompt(function(notification) {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              _loginFallbackRedirect();
-            }
-          });
-        } catch(e) {
-          _loginFallbackRedirect();
-        }
+      if (gsTarget && gsTarget.children.length > 0) return; // overlay present — Google iframe handles it
+      window._userInitiatedLogin = true;
+      try {
+        google.accounts.id.prompt(function(notification) {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            _loginFallbackRedirect();
+          }
+        });
+      } catch(e) {
+        _loginFallbackRedirect();
       }
     });
   };
