@@ -1356,6 +1356,16 @@ function _fbWriteLastLogin(emailKey, vehicleKey) {
   } catch(_e) {}
 }
 
+function _fbReadLastLoginOnce(emailKey, vehicleKey, cb) {
+  if (!_fbDb || !emailKey || !vehicleKey) { cb(null); return; }
+  try {
+    _fbDb.ref('driverLogins/' + emailKey + '/' + vehicleKey + '/lastLogin')
+      .once('value')
+      .then(function(snap) { cb(snap.val()); })
+      .catch(function() { cb(null); });
+  } catch(_e) { cb(null); }
+}
+
 function _fbReadLastLogins(emailKey, vehicleKeys, cb) {
   if (!_fbDb || !emailKey || !vehicleKeys.length) { cb({}); return; }
   try {
@@ -1622,7 +1632,8 @@ function pkConfirmSelect() {
     // אל תציע PIN אם bio רשום — המשתמש כבר יש לו כניסה מהירה
     setTimeout(function(){ _offerPinSetup(STATE.user.email, chosen, STATE.user); }, 1500);
   }
-  showGreeting((chosen.holder) || STATE.user.name);
+  var _grEk = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+  showGreeting((chosen.holder) || STATE.user.name, _grEk, _vehKey(chosen));
   loadFullData().then(function() { hideGreeting(); startApp(); }).catch(function(err) {
     hideGreeting();
     showLoginError(err && err.message ? err.message : 'שגיאת טעינה');
@@ -1811,7 +1822,8 @@ async function _bioLoginFromSplash() {
       _fbSignIn(STATE.idToken).catch(function(){});
     }
     var sp = document.getElementById('splash-screen');
-    showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name));
+    var _bioEk = bioData.email ? bioData.email.replace(/[.#$[\]]/g,'_') : '';
+    showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name), _bioEk, _vehKey(session.vehicleData));
     loadFullData().then(function() {
       window._bioLoginBusy = false;
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
@@ -2248,7 +2260,8 @@ async function handleGoogleCredential(response) {
       var greetName = result.isActualHolder
         ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
         : ((result.vehicle && result.vehicle.holder) || STATE.user.name);
-      showGreeting(greetName);
+      var _gEk = STATE.user && STATE.user.email ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+      showGreeting(greetName, _gEk, _vehKey(STATE.vehicle));
       await loadFullData();
       _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user, STATE.idToken);
       hideGreeting();
@@ -8308,31 +8321,28 @@ function _grAnimatePct() {
   }, 30);
 }
 
-function showGreeting(holderName) {
+function showGreeting(holderName, emailKey, vehicleKey) {
   hideLoader();
 
   document.getElementById('gr-time').textContent = getGreeting();
   document.getElementById('gr-name').textContent = holderName || '';
 
-  // last-login block
+  // last-login: read previous value from Firebase, show when arrives
   var llWrap = document.getElementById('gr-lastlogin');
-  var llRaw = localStorage.getItem('_last_login_ts');
-  if (llWrap && llRaw) {
-    var llTs = parseInt(llRaw, 10);
-    if (llTs) {
-      var llD = new Date(llTs);
-      var dd = String(llD.getDate()).padStart(2,'0');
-      var mm = String(llD.getMonth()+1).padStart(2,'0');
-      var yyyy = llD.getFullYear();
-      var hh = String(llD.getHours()).padStart(2,'0');
-      var min = String(llD.getMinutes()).padStart(2,'0');
-      document.getElementById('gr-ll-date').textContent = dd+'/'+mm+'/'+yyyy;
-      document.getElementById('gr-ll-time').textContent = hh+':'+min;
-      llWrap.style.display = '';
-    }
-  }
-  // save current login time for next session
-  localStorage.setItem('_last_login_ts', Date.now().toString());
+  if (llWrap) llWrap.style.display = 'none';
+  _fbReadLastLoginOnce(emailKey, vehicleKey, function(iso) {
+    if (!iso || !llWrap) return;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return;
+    var dd   = String(d.getDate()).padStart(2,'0');
+    var mo   = String(d.getMonth()+1).padStart(2,'0');
+    var yyyy = d.getFullYear();
+    var hh   = String(d.getHours()).padStart(2,'0');
+    var min  = String(d.getMinutes()).padStart(2,'0');
+    document.getElementById('gr-ll-date').textContent = dd+'/'+mo+'/'+yyyy;
+    document.getElementById('gr-ll-time').textContent = hh+':'+min;
+    llWrap.style.display = '';
+  });
 
   _grAnimatePct();
   const el = document.getElementById('greeting');
@@ -8576,7 +8586,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       try {
         _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
         hideLoader();
-        showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name));
+        var _sEk = STATE.user && STATE.user.email ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+        showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _vehKey(STATE.vehicle));
         await loadFullData();
         hideGreeting();
         startApp();
