@@ -1359,12 +1359,23 @@ function _fbWriteLastLogin(emailKey, vehicleKey) {
 
 function _fbReadLastLoginOnce(emailKey, vehicleKey, cb) {
   if (!_fbDb || !emailKey || !vehicleKey) { cb(null); return; }
-  try {
+  function doRead() {
     _fbDb.ref('driverLogins/' + emailKey + '/' + vehicleKey + '/lastLogin')
       .once('value')
       .then(function(snap) { cb(snap.val()); })
       .catch(function() { cb(null); });
-  } catch(_e) { cb(null); }
+  }
+  // wait for Firebase auth before reading (Security Rules require auth != null)
+  if (_fbAuth && _fbAuth.currentUser) { doRead(); return; }
+  var done = false;
+  var unsub = _fbAuth ? _fbAuth.onAuthStateChanged(function(u) {
+    if (done) return;
+    if (u) { done = true; if (unsub) unsub(); doRead(); }
+  }) : null;
+  // safety: attempt read after 3s even if auth hasn't fired
+  setTimeout(function() {
+    if (done) return; done = true; if (unsub) unsub(); doRead();
+  }, 3000);
 }
 
 function _fbReadLastLogins(emailKey, vehicleKeys, cb) {
@@ -1634,9 +1645,11 @@ function pkConfirmSelect() {
   var _grVk = _vehKey(chosen);
   showGreeting((chosen.holder) || STATE.user.name, _grEk, _grVk);
   loadFullData().then(function() {
-    hideGreeting();
-    _fbWriteLastLogin(_grEk, _grVk);  // כתוב רק אחרי שסיימנו להציג את הכניסה הקודמת
-    startApp();
+    _grComplete(function() {
+      hideGreeting();
+      _fbWriteLastLogin(_grEk, _grVk);
+      startApp();
+    });
   }).catch(function(err) {
     hideGreeting();
     showLoginError(err && err.message ? err.message : 'שגיאת טעינה');
@@ -1832,10 +1845,12 @@ async function _bioLoginFromSplash() {
       window._bioLoginBusy = false;
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
       _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
-      hideGreeting();
-      _fbWriteLastLogin(_bioEk, _bioVk);
-      if (sp) sp.classList.add('hidden');
-      startApp();
+      _grComplete(function() {
+        hideGreeting();
+        _fbWriteLastLogin(_bioEk, _bioVk);
+        if (sp) sp.classList.add('hidden');
+        startApp();
+      });
     }).catch(function(loadErr) {
       // loadFullData נכשל (token פג / רשת) — אסור להפעיל את האפליקציה עם נתוני קאש ישנים
       window._bioLoginBusy = false;
@@ -2267,9 +2282,11 @@ async function handleGoogleCredential(response) {
       showGreeting(greetName, _gEk, _gVk);
       await loadFullData();
       _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user, STATE.idToken);
-      hideGreeting();
-      _fbWriteLastLogin(_gEk, _gVk);
-      startApp();
+      _grComplete(function() {
+        hideGreeting();
+        _fbWriteLastLogin(_gEk, _gVk);
+        startApp();
+      });
     }
   } catch(err) {
     console.error('[auth] error:', err.message);
@@ -8309,20 +8326,59 @@ function getInitials(name) {
 }
 
 var _grPctTimer = null;
+var _grDone = false;
+var _GR_CIRC = 408;
+
+function _grSetRing(pct) {
+  var ring = document.querySelector('#greeting .gr-ring-prog');
+  if (ring) ring.style.strokeDashoffset = String(_GR_CIRC * (1 - pct / 100));
+}
+
 function _grAnimatePct() {
   clearInterval(_grPctTimer);
-  var el = document.getElementById('gr-pct');
+  _grDone = false;
+  var el  = document.getElementById('gr-pct');
+  var lbl = document.querySelector('#greeting .gr-ring-lbl');
+  var gr  = document.getElementById('greeting');
   if (!el) return;
   el.textContent = '0%';
   var start = performance.now(), delay = 700, dur = 2100;
+  var CAP = 90, CRAWL_MAX = 97;
+  var crawling = false;
   _grPctTimer = setInterval(function() {
+    if (_grDone) return;
     var t = performance.now() - start - delay;
     if (t < 0) return;
     var p = Math.min(1, t / dur);
     var eased = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
-    el.textContent = Math.round(eased * 100) + '%';
-    if (p >= 1) { el.textContent = '100%'; clearInterval(_grPctTimer); }
+    var pct;
+    if (p < 1) {
+      pct = eased * CAP;
+    } else {
+      if (!crawling) {
+        crawling = true;
+        if (gr)  gr.classList.add('greeting-waiting');
+        if (lbl) lbl.textContent = 'מתחבר…';
+      }
+      var over = (performance.now() - (start + delay + dur)) / 1000;
+      pct = CAP + (CRAWL_MAX - CAP) * (1 - Math.exp(-over / 2.2));
+    }
+    el.textContent = Math.round(pct) + '%';
+    _grSetRing(pct);
   }, 30);
+}
+
+function _grComplete(cb) {
+  _grDone = true;
+  clearInterval(_grPctTimer);
+  var el  = document.getElementById('gr-pct');
+  var lbl = document.querySelector('#greeting .gr-ring-lbl');
+  var gr  = document.getElementById('greeting');
+  if (gr)  { gr.classList.remove('greeting-waiting'); gr.classList.add('greeting-complete'); }
+  if (el)  el.textContent = '100%';
+  if (lbl) lbl.textContent = 'מוכן';
+  _grSetRing(100);
+  setTimeout(function() { if (cb) cb(); }, 350);
 }
 
 function showGreeting(holderName, emailKey, vehicleKey) {
@@ -8358,12 +8414,15 @@ function showGreeting(holderName, emailKey, vehicleKey) {
 
 function hideGreeting() {
   clearInterval(_grPctTimer);
+  _grDone = true;
   const el = document.getElementById('greeting');
   el.style.transition = 'opacity .4s ease';
   el.style.opacity = '0';
   setTimeout(function() {
     el.classList.add('hidden');
-    el.classList.remove('gr-show');
+    el.classList.remove('gr-show', 'greeting-waiting', 'greeting-complete');
+    var lbl  = el.querySelector('.gr-ring-lbl');  if (lbl)  lbl.textContent = 'טוען';
+    var ring = el.querySelector('.gr-ring-prog'); if (ring) ring.style.strokeDashoffset = '';
     el.style.opacity = '';
     el.style.transition = '';
   }, 420);
@@ -8594,9 +8653,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         var _sVk = _vehKey(STATE.vehicle);
         showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _sVk);
         await loadFullData();
-        hideGreeting();
-        _fbWriteLastLogin(_sEk, _sVk);
-        startApp();
+        _grComplete(function() {
+          hideGreeting();
+          _fbWriteLastLogin(_sEk, _sVk);
+          startApp();
+        });
         return;
       } catch(e) {
         hideGreeting();
