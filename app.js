@@ -1795,6 +1795,89 @@ function bioFallback() {
   if (sp) sp.style.display='flex';
 }
 
+/* ── מסך כניסה חדש: כפתור ביומטרי על ה-splash ──
+   מציג את כפתור "כניסה ביומטרית" + מפריד "או" ומסמן את הפאנל כמצב bio.
+   ה-WebAuthn מופעל אך ורק בלחיצה על הכפתור (ללא auto-trigger). */
+function _showBioLoginButton(bioData) {
+  var panel = document.getElementById('login-buttons-panel');
+  var bioBtn = document.getElementById('bio-login-btn');
+  var divider = document.getElementById('login-or-divider');
+  if (!panel || !bioBtn) return;
+  panel.classList.remove('nobio');
+  bioBtn.style.display = 'flex';
+  if (divider) divider.style.display = 'flex';
+  // שמור את נתוני ה-bio עבור _doBioAuth (ללא הפעלה אוטומטית)
+  window._bioPendingData = bioData;
+  if (!bioBtn._bioWired) {
+    bioBtn._bioWired = true;
+    bioBtn.addEventListener('click', function() {
+      _bioLoginFromSplash();
+    });
+  }
+}
+
+/* מופעל רק בלחיצת המשתמש על כפתור הכניסה הביומטרית */
+async function _bioLoginFromSplash() {
+  var bioData = window._bioPendingData || _bioLoad();
+  if (!bioData) return;
+  window._bioPendingData = bioData;
+  var errEl = document.getElementById('login-err');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+  var bioBtn = document.getElementById('bio-login-btn');
+  if (bioBtn) bioBtn.classList.add('bio-scanning');
+  try {
+    await bioAuthenticate(bioData.email, bioData.credentialId);
+    if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    var session = _pinSessionLoad();
+    if (!session || !session.vehicleData || !session.idToken) {
+      // אין session מלא — צריך כניסת Google חד-פעמית לחידוש
+      setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
+      return;
+    }
+    _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
+    STATE.vehicle = session.vehicleData;
+    STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
+    STATE.idToken = session.idToken || null;
+    if (STATE.idToken && typeof _fbSignIn === 'function') {
+      _fbSignIn(STATE.idToken).catch(function(){});
+    }
+    var sp = document.getElementById('splash-screen');
+    loadFullData().then(function() {
+      if (sp) sp.classList.add('hidden');
+      startApp();
+    }).catch(function() {
+      STATE.vehicle = STATE.vehicle || session.vehicleData;
+      if (sp) sp.classList.add('hidden');
+      startApp();
+    });
+  } catch(err) {
+    if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    var msg = (err && err.message) || 'שגיאה';
+    if (/cancel|NotAllowed|abort|dismiss/i.test(msg)) msg = 'האימות בוטל — לחץ לנסות שוב';
+    if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+  }
+}
+
+/* אפקט ripple בלחיצה על כפתורי הכניסה */
+function _wireLoginRipple() {
+  var btns = document.querySelectorAll('#login-buttons-panel .bio-btn, #login-buttons-panel .signin-btn');
+  btns.forEach(function(btn) {
+    if (btn._rippleWired) return;
+    btn._rippleWired = true;
+    btn.addEventListener('pointerdown', function(e) {
+      var r = document.createElement('span');
+      r.className = 'ripple';
+      var rect = btn.getBoundingClientRect();
+      var size = Math.max(rect.width, rect.height);
+      r.style.width = r.style.height = size + 'px';
+      r.style.left = (e.clientX - rect.left - size/2) + 'px';
+      r.style.top  = (e.clientY - rect.top  - size/2) + 'px';
+      btn.appendChild(r);
+      setTimeout(function(){ r.remove(); }, 600);
+    });
+  });
+}
+
 function _bootFromSession(session) {
   if (!session) return;
   STATE.vehicle = session.vehicleData;
@@ -8368,21 +8451,23 @@ document.addEventListener('DOMContentLoaded', async function() {
   // WebAuthn check — FIRST (before PIN, before Google)
   var _bioData = _bioLoad();
   if (_bioData && _bioAvailable()) {
-    // יש credential רשום — הצג מסך טביעת אצבע תמיד (גם בלי session קיים)
+    // יש credential רשום — הצג את כפתור הכניסה הביומטרית על מסך ה-splash.
+    // WebAuthn/Knox לא מופעל אוטומטית — רק בלחיצת המשתמש על הכפתור.
     hideLoader();
-    var _existSession = _pinSessionLoad();
-    var _pseudoSession = _existSession || {
-      email: _bioData.email,
-      vehicleData: null,
-      userInfo: { email: _bioData.email, name: _bioData.email },
-      ts: Date.now()
-    };
-    _showBioScreen(_pseudoSession, _bioData);
-    return;
+    _showBioLoginButton(_bioData);
+    // ממשיכים לטעינת Google (הכפתור השני) — לא עוצרים את ה-boot.
+  }
+  var _bioShown = !!(_bioData && _bioAvailable());
+  _wireLoginRipple();
+  if (!_bioShown) {
+    // אין ביומטרי רשום — פאנל במצב "Google בלבד"
+    var _lbp = document.getElementById('login-buttons-panel');
+    if (_lbp) _lbp.classList.add('nobio');
   }
   var _pinData = _pinLoad();
   var _pinSess = _pinSessionLoad();
-  if (_pinData && _pinSess) {
+  // אם כניסה ביומטרית זמינה על ה-splash — היא קודמת ל-PIN. אל תציג קודפד.
+  if (!_bioShown && _pinData && _pinSess) {
     hideLoader();
     _showPinScreen(_pinSess);
     return; // ← חיוני: עצור boot, אל תיגע ב-Google
