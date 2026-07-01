@@ -1811,10 +1811,12 @@ async function _bioLoginFromSplash() {
       _fbSignIn(STATE.idToken).catch(function(){});
     }
     var sp = document.getElementById('splash-screen');
+    showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name));
     loadFullData().then(function() {
       window._bioLoginBusy = false;
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
       _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
+      hideGreeting();
       if (sp) sp.classList.add('hidden');
       startApp();
     }).catch(function(loadErr) {
