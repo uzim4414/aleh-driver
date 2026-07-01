@@ -8417,9 +8417,12 @@ function _getAppVersion() {
 // ══════════════════════════════════════════════════════════════════
 window.addEventListener('pageshow', function(e) {
   if (!e.persisted) return;
-  // Guard: אם כבר ריצה מ-bfcache או מ-logout — אל תיצור לולאה אינסופית
-  if (location.search.indexOf('_bfc=') !== -1 || location.search.indexOf('_lo=') !== -1) return;
-  // bfcache שחזר את הדף — תמיד force reload אמיתי, ללא יוצא מהכלל.
+  // Guard: רק ?_bfc= — כדי למנוע לולאה אינסופית (bfcache של ?_bfc= עצמו).
+  // אסור לשים guard על ?_lo= !
+  // Samsung Internet שומרת את עמוד הרכב (Toyota) ב-bfcache עם ה-URL החדש ?_lo=
+  // כשלוחצים location.replace. אם נחזיר early על ?_lo= — עמוד הפייק נשאר!
+  if (location.search.indexOf('_bfc=') !== -1) return;
+  // כל bfcache restore אחר (כולל ?_lo= !) → reload חדש עם ?_bfc=
   window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
 });
 
