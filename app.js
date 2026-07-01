@@ -3033,7 +3033,9 @@ function logout() {
       try { localStorage.removeItem(PIN_SESSION_KEY); } catch(_e) {}
       // נמחק auto-select זיכרון גוגל כדי למנוע FedCM מלהחזיר credential אוטומטי
       try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch(_e) {}
-      location.reload();
+      // location.replace עם query string חדש מונע bfcache לחלוטין —
+      // Samsung Internet מחזיר location.reload() מ-cache ומדלג על DOMContentLoaded
+      window.location.replace(window.location.pathname + '?_lo=' + Date.now());
     }
   });
 }
@@ -8350,6 +8352,24 @@ function _getAppVersion() {
     }).catch(function() { resolve(''); });
   });
 }
+
+// ══════════════════════════════════════════════════════════════════
+// bfcache guard — Samsung Internet / Chrome משחזרים את הדף מה-cache
+// בזיכרון אחרי location.reload(). DOMContentLoaded לא רץ כלל, ה-DOM
+// מוצג כמו לפני logout (main app עם נתוני רכב). pageshow עם e.persisted
+// הוא האירוע היחיד שמופעל במקרה זה.
+// אם אין session תקף → reload אמיתי שמריץ מחדש את ה-boot.
+// ══════════════════════════════════════════════════════════════════
+window.addEventListener('pageshow', function(e) {
+  if (!e.persisted) return; // reload רגיל — DOMContentLoaded ירוץ כרגיל
+  // הדף שוחזר מ-bfcache — בדוק אם יש session תקף
+  var _bfSession = null;
+  try { _bfSession = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(_) {}
+  if (!_bfSession || !_bfSession.token) {
+    // אין session (logout בוצע) — force reload אמיתי
+    window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
+  }
+});
 
 document.addEventListener('DOMContentLoaded', async function() {
 
