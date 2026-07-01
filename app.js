@@ -8296,6 +8296,27 @@ function showGreeting(holderName) {
 
   document.getElementById('gr-time').textContent = getGreeting();
   document.getElementById('gr-name').textContent = holderName || '';
+
+  // last-login block
+  var llWrap = document.getElementById('gr-lastlogin');
+  var llRaw = localStorage.getItem('_last_login_ts');
+  if (llWrap && llRaw) {
+    var llTs = parseInt(llRaw, 10);
+    if (llTs) {
+      var llD = new Date(llTs);
+      var dd = String(llD.getDate()).padStart(2,'0');
+      var mm = String(llD.getMonth()+1).padStart(2,'0');
+      var yyyy = llD.getFullYear();
+      var hh = String(llD.getHours()).padStart(2,'0');
+      var min = String(llD.getMinutes()).padStart(2,'0');
+      document.getElementById('gr-ll-date').textContent = dd+'/'+mm+'/'+yyyy;
+      document.getElementById('gr-ll-time').textContent = hh+':'+min;
+      llWrap.style.display = '';
+    }
+  }
+  // save current login time for next session
+  localStorage.setItem('_last_login_ts', Date.now().toString());
+
   const el = document.getElementById('greeting');
   el.classList.remove('hidden');
   requestAnimationFrame(function() {

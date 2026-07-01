@@ -885,6 +885,15 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gr-show .gr-name { opacity:1; transform:translateY(0); }
 .gr-show .gr-bar-label { opacity:1; }
 .gr-show .gr-bar-fill { width:100%; }
+/* last-login block */
+.gr-lastlogin { display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:10px; opacity:0; transform:translateY(12px); transition:opacity .6s ease .5s, transform .6s ease .5s; }
+.gr-lastlogin .ll-title { display:flex; align-items:center; gap:6px; font-family:'Outfit',sans-serif; font-size:9px; font-weight:300; color:var(--t2); letter-spacing:0.32em; text-transform:uppercase; opacity:0.55; }
+.gr-lastlogin .ll-dot { width:4px; height:4px; border-radius:50%; background:var(--red); box-shadow:0 0 6px var(--red); flex:none; animation:llPulse 2.4s ease-in-out infinite; }
+.gr-lastlogin .ll-date { font-family:'Outfit',sans-serif; font-size:13px; font-weight:300; color:rgba(255,255,255,0.72); letter-spacing:0.18em; direction:ltr; line-height:1.35; font-variant-numeric:tabular-nums; }
+.gr-lastlogin .ll-time { font-family:'Outfit',sans-serif; font-size:15px; font-weight:400; color:rgba(255,255,255,0.9); letter-spacing:0.16em; direction:ltr; line-height:1.3; font-variant-numeric:tabular-nums; position:relative; padding-inline-start:14px; }
+.gr-lastlogin .ll-time::before { content:''; position:absolute; inset-inline-start:0; top:50%; width:4px; height:4px; margin-top:-2px; border-radius:50%; background:var(--red); box-shadow:0 0 6px 1px var(--red); animation:llPulse 2.4s ease-in-out infinite; }
+@keyframes llPulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+.gr-show .gr-lastlogin { opacity:1; transform:translateY(0); }
 .login-err { color:var(--red); font-size:13px; margin-top:16px; text-align:center; max-width:280px; line-height:1.5; }
 .login-err.hidden { display:none; }
 
@@ -4533,6 +4542,11 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 <div id="greeting" class="hidden">
   <div class="gr-time" id="gr-time">בוקר טוב</div>
   <div class="gr-name" id="gr-name"></div>
+  <div class="gr-lastlogin" id="gr-lastlogin" style="display:none">
+    <div class="ll-title"><span class="ll-dot"></span><span>כניסה אחרונה</span></div>
+    <div class="ll-date" id="gr-ll-date"></div>
+    <div class="ll-time" id="gr-ll-time"></div>
+  </div>
   <div class="gr-bar-wrap">
     <div class="gr-bar-label">טוען נתונים...</div>
     <div class="gr-bar-bg"><div class="gr-bar-fill" id="gr-bar-fill"></div></div>

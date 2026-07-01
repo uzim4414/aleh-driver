@@ -1,4 +1,4 @@
-// SW build: 2026-07-01T19:35:24Z // v256
+// SW build: 2026-07-01T20:27:27Z // v257
 /* ════════════════════════════════════════════════════════════════════
    Main service worker for the עלה driver PWA.
    Firebase SDK removed — uses direct W3C Web Push API.
@@ -10,7 +10,7 @@
    Cache / offline
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'aleh-driver-v256';
+const CACHE_NAME = 'aleh-driver-v257';
 
 // Pending notifications buffer — survives until client collects them (max 60s)
 let _pendingNotifs = [];
