@@ -8291,6 +8291,23 @@ function getInitials(name) {
   return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
 }
 
+var _grPctTimer = null;
+function _grAnimatePct() {
+  clearInterval(_grPctTimer);
+  var el = document.getElementById('gr-pct');
+  if (!el) return;
+  el.textContent = '0%';
+  var start = performance.now(), delay = 700, dur = 2100;
+  _grPctTimer = setInterval(function() {
+    var t = performance.now() - start - delay;
+    if (t < 0) return;
+    var p = Math.min(1, t / dur);
+    var eased = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+    el.textContent = Math.round(eased * 100) + '%';
+    if (p >= 1) { el.textContent = '100%'; clearInterval(_grPctTimer); }
+  }, 30);
+}
+
 function showGreeting(holderName) {
   hideLoader();
 
@@ -8317,6 +8334,7 @@ function showGreeting(holderName) {
   // save current login time for next session
   localStorage.setItem('_last_login_ts', Date.now().toString());
 
+  _grAnimatePct();
   const el = document.getElementById('greeting');
   el.classList.remove('hidden');
   requestAnimationFrame(function() {
@@ -8325,6 +8343,7 @@ function showGreeting(holderName) {
 }
 
 function hideGreeting() {
+  clearInterval(_grPctTimer);
   const el = document.getElementById('greeting');
   el.style.transition = 'opacity .4s ease';
   el.style.opacity = '0';

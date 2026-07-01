@@ -877,14 +877,24 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 #greeting.hidden { display:none; }
 .gr-time { font-size:22px; font-weight:300; color:var(--t2); opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s ease; }
 .gr-name { font-size:34px; font-weight:800; color:#fff; opacity:0; transform:translateY(16px); transition:opacity .6s ease .3s, transform .6s ease .3s; }
-.gr-bar-wrap { margin-top:40px; width:200px; }
-.gr-bar-label { font-size:12px; color:var(--t2); text-align:center; margin-bottom:8px; opacity:0; transition:opacity .4s ease .6s; }
-.gr-bar-bg { height:3px; background:rgba(255,255,255,.1); border-radius:2px; overflow:hidden; }
-.gr-bar-fill { height:100%; width:0; background:var(--red); border-radius:2px; transition:width 2s cubic-bezier(.4,0,.2,1) .7s; }
 .gr-show .gr-time { opacity:1; transform:translateY(0); }
 .gr-show .gr-name { opacity:1; transform:translateY(0); }
-.gr-show .gr-bar-label { opacity:1; }
-.gr-show .gr-bar-fill { width:100%; }
+/* radial gauge */
+.gr-ring-wrap { position:relative; width:150px; height:150px; margin-top:34px; opacity:0; transform:scale(0.85); transition:opacity .5s ease .55s, transform .6s cubic-bezier(.2,.7,.2,1) .55s; }
+.gr-ring-svg { width:100%; height:100%; transform:rotate(-90deg); }
+.gr-ring-track { fill:none; stroke:rgba(255,255,255,0.07); stroke-width:6; }
+.gr-ring-prog { fill:none; stroke:var(--red); stroke-width:6; stroke-linecap:round; stroke-dasharray:408; stroke-dashoffset:408; filter:drop-shadow(0 0 6px var(--red)); transition:stroke-dashoffset 2.1s cubic-bezier(.4,0,.2,1) .7s; }
+.gr-ring-sweep { position:absolute; inset:8px; border-radius:50%; background:conic-gradient(from 0deg, transparent 0deg, rgba(31,138,61,0.28) 40deg, transparent 80deg); mask:radial-gradient(farthest-side, transparent calc(100% - 22px), #000 calc(100% - 21px)); -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 22px), #000 calc(100% - 21px)); animation:sweepSpin 1.6s linear infinite; }
+@keyframes sweepSpin { to { transform:rotate(360deg); } }
+.gr-ring-wrap::before, .gr-ring-wrap::after { content:""; position:absolute; inset:0; border-radius:50%; border:1px solid var(--red); opacity:0; }
+.gr-ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
+.gr-ring-pct { font-family:'Bebas Neue','Outfit',sans-serif; font-size:38px; line-height:1; color:#fff; letter-spacing:1px; direction:ltr; text-shadow:0 0 14px var(--red); }
+.gr-ring-lbl { font-size:10px; color:var(--t2); letter-spacing:0.28em; text-transform:uppercase; }
+.gr-show .gr-ring-wrap { opacity:1; transform:scale(1); }
+.gr-show .gr-ring-prog { stroke-dashoffset:0; }
+.gr-show .gr-ring-wrap::before { animation:pulseRing 2.4s ease-out .9s infinite; }
+.gr-show .gr-ring-wrap::after  { animation:pulseRing 2.4s ease-out 1.7s infinite; }
+@keyframes pulseRing { 0%{opacity:.55;transform:scale(1)} 100%{opacity:0;transform:scale(1.4)} }
 /* last-login block */
 .gr-lastlogin { display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:10px; opacity:0; transform:translateY(12px); transition:opacity .6s ease .5s, transform .6s ease .5s; }
 .gr-lastlogin .ll-title { display:flex; align-items:center; gap:6px; font-family:'Outfit',sans-serif; font-size:9px; font-weight:300; color:var(--t2); letter-spacing:0.32em; text-transform:uppercase; opacity:0.55; }
@@ -4547,9 +4557,16 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     <div class="ll-date" id="gr-ll-date"></div>
     <div class="ll-time" id="gr-ll-time"></div>
   </div>
-  <div class="gr-bar-wrap">
-    <div class="gr-bar-label">טוען נתונים...</div>
-    <div class="gr-bar-bg"><div class="gr-bar-fill" id="gr-bar-fill"></div></div>
+  <div class="gr-ring-wrap">
+    <svg class="gr-ring-svg" viewBox="0 0 150 150">
+      <circle class="gr-ring-track" cx="75" cy="75" r="65"></circle>
+      <circle class="gr-ring-prog"  cx="75" cy="75" r="65"></circle>
+    </svg>
+    <div class="gr-ring-sweep"></div>
+    <div class="gr-ring-center">
+      <div class="gr-ring-pct" id="gr-pct">0%</div>
+      <div class="gr-ring-lbl">טוען</div>
+    </div>
   </div>
 </div>
 
