@@ -1755,7 +1755,20 @@ function _showBioLoginButton(bioData) {
   window._bioPendingData = bioData;
   if (!bioBtn._bioWired) {
     bioBtn._bioWired = true;
-    bioBtn.addEventListener('click', function() {
+    // הכפתור בלתי נגיש לקליקים עד שאנימציית ה-btnIn מסתיימת (opacity:0 4.35s)
+    // Knox / Samsung Pass יכולים לשגר touch על אלמנט שקוף — זה חוסם את זה.
+    bioBtn.style.pointerEvents = 'none';
+    bioBtn.addEventListener('animationend', function _armBio(ev) {
+      if (ev.animationName !== 'btnIn') return;
+      bioBtn.style.pointerEvents = 'auto';
+      bioBtn.removeEventListener('animationend', _armBio);
+    });
+    // fallback: אם animationend לא יורה (reduced-motion / interrupt)
+    setTimeout(function() { bioBtn.style.pointerEvents = 'auto'; }, 5200);
+
+    bioBtn.addEventListener('click', function(e) {
+      // רק gesture אמיתי של המשתמש — לא synthetic/replay
+      if (!e.isTrusted) return;
       _bioLoginFromSplash();
     });
   }
@@ -1763,8 +1776,10 @@ function _showBioLoginButton(bioData) {
 
 /* מופעל רק בלחיצת המשתמש על כפתור הכניסה הביומטרית */
 async function _bioLoginFromSplash() {
+  if (window._bioLoginBusy) return;
+  window._bioLoginBusy = true;
   var bioData = window._bioPendingData || _bioLoad();
-  if (!bioData) return;
+  if (!bioData) { window._bioLoginBusy = false; return; }
   window._bioPendingData = bioData;
   var errEl = document.getElementById('login-err');
   if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
@@ -1776,11 +1791,13 @@ async function _bioLoginFromSplash() {
     var session = _pinSessionLoad();
     if (!session || !session.vehicleData || !session.idToken) {
       // אין session מלא — צריך כניסת Google חד-פעמית לחידוש
+      window._bioLoginBusy = false;
       setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
       return;
     }
     // token פג — אסור לטעון נתונים עם token לא תקף (לולאה אינסופית)
     if (_isTokenExpired(session.idToken)) {
+      window._bioLoginBusy = false;
       setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
       return;
     }
@@ -1793,16 +1810,19 @@ async function _bioLoginFromSplash() {
     }
     var sp = document.getElementById('splash-screen');
     loadFullData().then(function() {
+      window._bioLoginBusy = false;
       if (sp) sp.classList.add('hidden');
       startApp();
     }).catch(function(loadErr) {
       // loadFullData נכשל (token פג / רשת) — אסור להפעיל את האפליקציה עם נתוני קאש ישנים
+      window._bioLoginBusy = false;
       STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
       setTimeout(function() {
         showToast('שגיאת כניסה — יש להיכנס מחדש עם Google');
       }, 200);
     });
   } catch(err) {
+    window._bioLoginBusy = false;
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     var msg = (err && err.message) || 'שגיאה';
     if (/cancel|NotAllowed|abort|dismiss/i.test(msg)) msg = 'האימות בוטל — לחץ לנסות שוב';
@@ -3032,7 +3052,12 @@ function logout() {
       if (_splashEl) { _splashEl.classList.remove('hidden'); _splashEl.style.removeProperty('display'); }
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
-      // PIN_SESSION_KEY נשמר בכוונה — bio זקוק לו לכניסה מהירה אחרי logout
+      // PIN_SESSION_KEY נשמר — bio יודע להציג כפתור. אבל idToken מאופס
+      // כדי שלחיצה מקרית על הכפתור לא תוכל לפתוח את האפליקציה ללא WebAuthn
+      try {
+        var _ps = JSON.parse(localStorage.getItem(PIN_SESSION_KEY) || 'null');
+        if (_ps) { _ps.idToken = null; localStorage.setItem(PIN_SESSION_KEY, JSON.stringify(_ps)); }
+      } catch(_e) {}
       try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch(_e) {}
       window.location.replace(window.location.pathname + '?_lo=' + Date.now());
     }
