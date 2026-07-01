@@ -8494,7 +8494,6 @@ document.addEventListener('DOMContentLoaded', async function() {
   // הכפתור מוצג, WebAuthn לא מופעל אוטומטית — רק בלחיצת המשתמש.
   var _bioData = _bioLoad();
   if (_bioData && _bioAvailable()) {
-    hideLoader();
     _showBioLoginButton(_bioData);
   }
   var _bioShown = !!(_bioData && _bioAvailable());
