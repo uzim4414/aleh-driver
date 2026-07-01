@@ -8565,10 +8565,26 @@ document.addEventListener('DOMContentLoaded', async function() {
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // One Tap מדוכא — לא מעבירים לדף חדש, מציגים הנחיה
-            // isDismissedMoment אסור כאן — מופעל גם אחרי כניסה מוצלחת (One Tap נסגר)
-            window._userInitiatedLogin = false;
-            showToast('לא ניתן לפתוח את חלון הכניסה. נסה לרענן את הדף.');
+            // One Tap מדוכא (g_state cookie) — נקה ונסה שוב פעם אחת
+            // isDismissedMoment אסור כאן — מופעל גם אחרי כניסה מוצלחת
+            if (!window._gRetried) {
+              window._gRetried = true;
+              try { document.cookie = 'g_state=; max-age=0; path=/'; } catch(_) {}
+              try { google.accounts.id.cancel(); } catch(_) {}
+              setTimeout(function() {
+                google.accounts.id.prompt(function(n2) {
+                  window._gRetried = false;
+                  if (n2.isNotDisplayed() || n2.isSkippedMoment()) {
+                    window._userInitiatedLogin = false;
+                    showToast('לא ניתן לפתוח את חלון הכניסה. נסה לרענן את הדף.');
+                  }
+                });
+              }, 300);
+            } else {
+              window._gRetried = false;
+              window._userInitiatedLogin = false;
+              showToast('לא ניתן לפתוח את חלון הכניסה. נסה לרענן את הדף.');
+            }
           }
         });
       } catch(e) {
