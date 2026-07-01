@@ -3076,7 +3076,10 @@ function logout() {
       if (_appEl) { _appEl.classList.add('hidden'); _appEl.style.display = 'none'; }
       if (_splashEl) { _splashEl.classList.remove('hidden'); _splashEl.style.removeProperty('display'); }
 
-      // ══ שלב 5: נווט — reload מלא להבטחת מצב JS נקי
+      // ══ שלב 5: נווט — beforeunload מבטל bfcache (Samsung Internet), ואז reload מלא
+      window.addEventListener('beforeunload', function _bfDisable() {
+        window.removeEventListener('beforeunload', _bfDisable);
+      }, { once: true });
       window.location.replace(window.location.pathname + '?_lo=' + Date.now());
     }
   });
@@ -8405,14 +8408,10 @@ function _getAppVersion() {
 // אם אין session תקף → reload אמיתי שמריץ מחדש את ה-boot.
 // ══════════════════════════════════════════════════════════════════
 window.addEventListener('pageshow', function(e) {
-  if (!e.persisted) return; // reload רגיל — DOMContentLoaded ירוץ כרגיל
-  // הדף שוחזר מ-bfcache — DOMContentLoaded לא רץ, boot לא רץ.
-  // אם logout בוצע (אין session, או דגל force_google קיים) → force reload אמיתי.
-  var _bfSession = null;
-  try { _bfSession = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch(_) {}
-  if (!_bfSession || !_bfSession.token) {
-    window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
-  }
+  if (!e.persisted) return;
+  // bfcache שחזר את הדף — תמיד force reload אמיתי, ללא יוצא מהכלל.
+  // אסור לסמוך על SESSION_KEY כי logout יכול להיות ב-race עם bfcache (Samsung Internet bug).
+  window.location.replace(window.location.pathname + '?_bfc=' + Date.now());
 });
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -8464,8 +8463,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }).catch(function(){});
 
+  // Guard: אם הגענו מ-logout (?_lo=) — כפה null session ונקה URL (מניעת גרסאות SW ישנות שיקראו startApp)
+  var _isPostLogout = location.search.indexOf('_lo=') !== -1;
+  if (_isPostLogout) {
+    try { localStorage.removeItem(SESSION_KEY); } catch(_) {}
+    try { history.replaceState({}, '', location.pathname); } catch(_) {}
+  }
   // Try cached session
-  const session = loadSession();
+  const session = _isPostLogout ? null : loadSession();
 
   // ═══ WebAuthn check — FIRST (before PIN, before Google) ═══
   // PIN_SESSION_KEY נשמר — bio זקוק לו לכניסה מהירה אחרי logout (idToken cached).
