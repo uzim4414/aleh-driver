@@ -2183,6 +2183,11 @@ function initGoogleAuth() {
     cancel_on_tap_outside: false,
     use_fedcm_for_prompt: false
   });
+  // renderButton = popup mode — no redirect_uri registration required
+  var gsTarget = document.getElementById('g-signin-target');
+  if (gsTarget) {
+    google.accounts.id.renderButton(gsTarget, { type: 'icon', size: 'small', theme: 'outline' });
+  }
 }
 
 async function handleGoogleCredential(response) {
@@ -8545,15 +8550,22 @@ document.addEventListener('DOMContentLoaded', async function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true; // user pressed the button — allow credential callback
-      try {
-        google.accounts.id.prompt(function(notification) {
-          // If One Tap is suppressed/not displayed — fall back to redirect OAuth
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            _loginFallbackRedirect();
-          }
-        });
-      } catch(e) {
-        _loginFallbackRedirect();
+      // Use renderButton popup (no redirect_uri needed) — find the hidden Google button and click it
+      var gsTarget = document.getElementById('g-signin-target');
+      var gsBtn = gsTarget && (gsTarget.querySelector('[role="button"]') || gsTarget.querySelector('button') || gsTarget.querySelector('div[tabindex]'));
+      if (gsBtn) {
+        gsBtn.click();
+      } else {
+        // Fallback: prompt (may fail if suppressed)
+        try {
+          google.accounts.id.prompt(function(notification) {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              _loginFallbackRedirect();
+            }
+          });
+        } catch(e) {
+          _loginFallbackRedirect();
+        }
       }
     });
   };
