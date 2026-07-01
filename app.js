@@ -3010,7 +3010,9 @@ function _initHelpFabDrag() {
 /* ══ Start App ══ */
 function startApp() {
   hideLoader();
-  document.getElementById('app').classList.remove('hidden');
+  var _appEl = document.getElementById('app');
+  _appEl.classList.remove('hidden');
+  _appEl.style.removeProperty('display'); // מסיר כל display:none שהוגדר inline (logout protection)
   var _hfab = document.getElementById('help-fab'); if (_hfab) _hfab.style.display = '';
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function(){}); } catch(_){}
   renderAll();
