@@ -3071,7 +3071,9 @@ function showConfirmModal({ icon='❓', title='', sub='', confirmText='אישו�
   document.getElementById('cm-sub').textContent = sub;
   const btn = document.getElementById('cm-confirm');
   btn.textContent = confirmText;
-  btn.onclick = () => { closeConfirmModal(); onConfirm(); };
+  // onConfirm קודם — מסתיר #app ומציג splash לפני שה-backdrop-filter מוסר.
+  // אחרת: הסרת GPU layer של ה-modal חושפת את #app לframe אחד (flash של מסך הרכב).
+  btn.onclick = () => { onConfirm(); closeConfirmModal(); };
   modal.style.display = 'flex';
 }
 
