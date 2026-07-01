@@ -8565,17 +8565,14 @@ document.addEventListener('DOMContentLoaded', async function() {
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // One Tap / FedCM מדוכא (Chrome Android FedCM, g_state, dismiss קודם).
-            // ניסיונות retry עם ניקוי g_state לא עזרו (v251) — One Tap נשאר מדוכא.
-            // הפתרון האמין: full-page OAuth redirect (אותו נתיב שכבר רשום ב-Cloud
-            // Console ומטופל בחזרה דרך location.hash). זה עובד גם כשאין One Tap.
-            // isDismissedMoment אסור כאן — מופעל גם אחרי כניסה מוצלחת.
-            _loginFallbackRedirect();
+            // One Tap מדוכא — isDismissedMoment אסור (מופעל גם בכניסה מוצלחת)
+            window._userInitiatedLogin = false;
+            showToast('חלון הכניסה חסום. נסה לרענן או השתמש בכניסה ביומטרית.');
           }
         });
       } catch(e) {
-        // GSI prompt נכשל לגמרי — עבור ישירות ל-OAuth redirect במקום toast מבוי סתום.
-        _loginFallbackRedirect();
+        window._userInitiatedLogin = false;
+        showToast('שגיאה בטעינת כניסת Google — נסה לרענן.');
       }
     });
   };
