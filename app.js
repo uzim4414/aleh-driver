@@ -2156,11 +2156,9 @@ function loadSession() {
 
 /* ══ Auth ══ */
 function _loginFallbackRedirect() {
-  // redirect_uri חייב להיות זהה בדיוק למה שרשום ב-Google Cloud Console.
-  // מנרמל: מסיר query/hash/index.html — נותן תמיד את שורש ה-scope
-  var _base = window.location.origin + window.location.pathname.replace(/index\.html$/i, '');
-  if (!_base.endsWith('/')) _base += '/';
-  var redirectUri = encodeURIComponent(_base);
+  // redirect_uri = הנתיב הנוכחי ללא query string — חייב להיות רשום ב-Google Cloud Console.
+  // עבור האפליקציה: https://uzim4414.github.io/aleh-driver/index.html
+  var redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
   var clientId = encodeURIComponent(GOOGLE_CLIENT_ID);
   var scope = encodeURIComponent('openid email profile');
   var url = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -2183,7 +2181,7 @@ function initGoogleAuth() {
     callback: handleGoogleCredential,
     auto_select: false,
     cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: true
+    use_fedcm_for_prompt: false
   });
 }
 
