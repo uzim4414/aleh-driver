@@ -3045,20 +3045,40 @@ function logout() {
     sub: 'האם תרצה להתנתק?',
     confirmText: 'התנתק',
     onConfirm: () => {
-      // הסתר #app מיד — כשהמודל נסגר, #app נחשף לרגע לפני הניווט (flash של מסך הרכב)
-      var _appEl = document.getElementById('app');
-      var _splashEl = document.getElementById('splash-screen');
-      if (_appEl) _appEl.classList.add('hidden');
-      if (_splashEl) { _splashEl.classList.remove('hidden'); _splashEl.style.removeProperty('display'); }
+      // ══ שלב 1: אפס STATE מיד — חוסם כל async handler (Firebase, visibilitychange,
+      //           push) שעלול לבדוק STATE.idToken ולהפעיל את האפליקציה מחדש
+      STATE.idToken = null;
+      STATE.vehicle = null;
+      STATE.user    = null;
+      STATE._washLogLoaded = false;
+      STATE.washLog = [];
+      window._userInitiatedLogin = false;
+      window._bioLoginBusy       = false;
+
+      // ══ שלב 2: נקה localStorage
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
-      // PIN_SESSION_KEY נשמר — bio יודע להציג כפתור. אבל idToken מאופס
-      // כדי שלחיצה מקרית על הכפתור לא תוכל לפתוח את האפליקציה ללא WebAuthn
+      // PIN_SESSION_KEY נשמר — bio יודע להציג כפתור. idToken מאופס
+      // כדי שלחיצה על כפתור bio לא תוכל לפתוח את האפליקציה ללא אימות
       try {
         var _ps = JSON.parse(localStorage.getItem(PIN_SESSION_KEY) || 'null');
         if (_ps) { _ps.idToken = null; localStorage.setItem(PIN_SESSION_KEY, JSON.stringify(_ps)); }
       } catch(_e) {}
-      try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch(_e) {}
+
+      // ══ שלב 3: בטל Google auto-select + Firebase sign-out
+      try { if (window.google && google.accounts && google.accounts.id) {
+        google.accounts.id.disableAutoSelect();
+        google.accounts.id.cancel();
+      }} catch(_e) {}
+      try { if (window._fbAuth && typeof window._fbAuth.signOut === 'function') window._fbAuth.signOut(); } catch(_e) {}
+
+      // ══ שלב 4: הסתר #app והצג splash — לפני closeConfirmModal (מונע GPU flash)
+      var _appEl = document.getElementById('app');
+      var _splashEl = document.getElementById('splash-screen');
+      if (_appEl) { _appEl.classList.add('hidden'); _appEl.style.display = 'none'; }
+      if (_splashEl) { _splashEl.classList.remove('hidden'); _splashEl.style.removeProperty('display'); }
+
+      // ══ שלב 5: נווט — reload מלא להבטחת מצב JS נקי
       window.location.replace(window.location.pathname + '?_lo=' + Date.now());
     }
   });
