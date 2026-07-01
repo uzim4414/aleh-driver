@@ -2183,17 +2183,6 @@ function initGoogleAuth() {
     cancel_on_tap_outside: false,
     use_fedcm_for_prompt: false
   });
-  // renderButton uses popup — no redirect_uri registration required.
-  // The overlay (#g-signin-target) covers #login-btn so the user physically clicks Google's iframe.
-  var gsTarget = document.getElementById('g-signin-target');
-  var loginBtn = document.getElementById('login-btn');
-  if (gsTarget && loginBtn) {
-    var bw = loginBtn.getBoundingClientRect().width || loginBtn.offsetWidth || 320;
-    google.accounts.id.renderButton(gsTarget, { type: 'standard', size: 'large', theme: 'filled_blue', width: Math.round(bw) });
-    // mousedown/touchstart bubble from the iframe element to this div — set flag before callback fires
-    gsTarget.addEventListener('mousedown', function() { window._userInitiatedLogin = true; });
-    gsTarget.addEventListener('touchstart', function() { window._userInitiatedLogin = true; }, { passive: true });
-  }
 }
 
 async function handleGoogleCredential(response) {
@@ -3073,12 +3062,8 @@ function logout() {
       // ══ שלב 2: נקה localStorage
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
-      // PIN_SESSION_KEY נשמר — bio יודע להציג כפתור. idToken מאופס
-      // כדי שלחיצה על כפתור bio לא תוכל לפתוח את האפליקציה ללא אימות
-      try {
-        var _ps = JSON.parse(localStorage.getItem(PIN_SESSION_KEY) || 'null');
-        if (_ps) { _ps.idToken = null; localStorage.setItem(PIN_SESSION_KEY, JSON.stringify(_ps)); }
-      } catch(_e) {}
+      // PIN_SESSION_KEY נשמר בכוונה — bio cache נשמר כך שטביעת האצבע תעבוד אחרי logout.
+      // הגנה מפני Knox: e.isTrusted + pointer-events:none מספיקים; אין צורך לאפס idToken.
 
       // ══ שלב 3: Firebase sign-out (non-blocking)
       // לא קוראים disableAutoSelect() — זה מדכא את One Tap גם בכניסה הבאה.
@@ -8554,19 +8539,19 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.src = 'https://accounts.google.com/gsi/client';
   script.onload = function() {
     initGoogleAuth();
-    // #login-btn click fires only if #g-signin-target overlay is missing (renderButton failed to load)
     document.getElementById('login-btn').addEventListener('click', function() {
-      var gsTarget = document.getElementById('g-signin-target');
-      if (gsTarget && gsTarget.children.length > 0) return; // overlay present — Google iframe handles it
       window._userInitiatedLogin = true;
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            _loginFallbackRedirect();
+            // One Tap מדוכא — לא מעבירים לדף חדש, מציגים הנחיה
+            window._userInitiatedLogin = false;
+            showToast('לא ניתן לפתוח את חלון הכניסה. נסה לרענן את הדף.');
           }
         });
       } catch(e) {
-        _loginFallbackRedirect();
+        window._userInitiatedLogin = false;
+        showToast('שגיאה בטעינת כניסת Google — נסה לרענן.');
       }
     });
   };
