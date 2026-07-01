@@ -8565,14 +8565,13 @@ document.addEventListener('DOMContentLoaded', async function() {
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // One Tap מדוכא — isDismissedMoment אסור (מופעל גם בכניסה מוצלחת)
-            window._userInitiatedLogin = false;
-            showToast('חלון הכניסה חסום. נסה לרענן או השתמש בכניסה ביומטרית.');
+            // One Tap מדוכא (FedCM / g_state) — redirect_uri רשום ב-Cloud Console
+            // isDismissedMoment אסור כאן — מופעל גם אחרי כניסה מוצלחת
+            _loginFallbackRedirect();
           }
         });
       } catch(e) {
-        window._userInitiatedLogin = false;
-        showToast('שגיאה בטעינת כניסת Google — נסה לרענן.');
+        _loginFallbackRedirect();
       }
     });
   };
