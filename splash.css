@@ -20,10 +20,11 @@ html, body {
 .stage {
   position: fixed; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  /* buttons panel occupies the lower ~38% of the screen; reserve that
-     space so the speedometer centers in the visible upper area instead
-     of the full viewport (was leaving dead black space up top). */
-  padding-bottom: min(38vh, 320px);
+  /* NOTE: do NOT add padding here. .login-chrome / .login-buttons-panel are
+     position:absolute descendants of .stage and resolve their inset/bottom
+     against .stage's padding box — padding-bottom shifted the panel out of
+     view in v250 and the login buttons vanished. Center the speedometer in
+     the visible upper area via a transform on .splash-logo instead (below). */
   background:
     radial-gradient(ellipse at 50% 42%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 55%),
     radial-gradient(ellipse at 50% 88%, rgba(255, 45, 45, 0.05) 0%, rgba(0,0,0,0) 50%),
@@ -78,8 +79,13 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   /* viewBox aspect 600:720 = 5:6 */
   width:  min(calc(500px * var(--logo-scale)), calc(100vw - 60px));
-  height: min(calc(600px * var(--logo-scale)), calc(62vh - 40px));
+  height: min(calc(600px * var(--logo-scale)), calc(100vh - 240px));
   filter: drop-shadow(0 0 30px rgba(255,255,255,0.04));
+  /* .stage centers the logo in the FULL viewport; the login buttons panel
+     occupies the lower ~38%. Nudge the logo upward so it sits centered in the
+     visible upper area, WITHOUT reserving space via .stage padding (which
+     would displace the absolutely-positioned buttons panel and hide it). */
+  transform: translateY(min(-19vh, -160px));
 }
 .splash-logo svg { width: 100%; height: 100%; display: block; }
 
