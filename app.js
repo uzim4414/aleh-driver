@@ -2227,6 +2227,13 @@ function initGoogleAuth() {
 }
 
 async function handleGoogleCredential(response) {
+  /* Block FedCM / One Tap auto-sign-in that fires without user gesture (e.g. immediately after logout).
+     Only proceed when the user explicitly pressed a login button or was redirected via OAuth. */
+  if (!window._userInitiatedLogin) {
+    try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.cancel(); } catch(_) {}
+    return;
+  }
+  window._userInitiatedLogin = false; // consume — require new explicit gesture for next login
   /* Dismiss One Tap overlay immediately so it doesn't block the app */
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.cancel(); } catch(_) {}
   showLoader();
@@ -8411,6 +8418,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       var _it = _hp.get('id_token');
       if (_it) {
         history.replaceState({}, '', location.pathname);
+        window._userInitiatedLogin = true; // OAuth redirect is always user-initiated
         handleGoogleCredential({ credential: _it });
         return;
       }
@@ -8529,6 +8537,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   script.onload = function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
+      window._userInitiatedLogin = true; // user pressed the button — allow credential callback
       try {
         google.accounts.id.prompt(function(notification) {
           // If One Tap is suppressed/not displayed — fall back to redirect OAuth
