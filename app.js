@@ -1730,62 +1730,7 @@ async function bioAuthenticate(email, credentialId) {
   };
 }
 
-// מסך אימות ביומטרי
-async function _showBioScreen(session, bioData) {
-  var ov = document.getElementById('bio-screen');
-  if (!ov) { _bootFromSession(session); return; }
-  var sp = document.getElementById('splash-screen');
-  if (sp) sp.style.display='none';
-  var nameEl = document.getElementById('bio-device-label');
-  if (nameEl) nameEl.textContent = bioData.deviceName||'מכשיר';
-  ov.style.display='flex';
-  window._bioPendingSession = session;
-  window._bioPendingData = bioData;
-  setTimeout(function(){ _doBioAuth(); }, 600);
-}
-
-async function _doBioAuth() {
-  var bioData = window._bioPendingData;
-  var btn = document.getElementById('bio-btn');
-  var errEl = document.getElementById('bio-err');
-  if (btn) btn.classList.add('bio-scanning');
-  if (errEl) errEl.textContent = '';
-  try {
-    await bioAuthenticate(bioData.email, bioData.credentialId);
-    if (btn) btn.classList.remove('bio-scanning');
-    var session = _pinSessionLoad();
-    if (!session || !session.vehicleData || !session.idToken) {
-      var ov = document.getElementById('bio-screen');
-      if (ov) ov.style.display = 'none';
-      var sp = document.getElementById('splash-screen');
-      if (sp) sp.style.display = 'flex';
-      setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 300);
-      return;
-    }
-    _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
-    STATE.vehicle = session.vehicleData;
-    STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
-    STATE.idToken = session.idToken || null;
-    if (STATE.idToken && typeof _fbSignIn === 'function') {
-      _fbSignIn(STATE.idToken).catch(function(){});
-    }
-    loadFullData().then(function() {
-      var ov2 = document.getElementById('bio-screen');
-      if (ov2) ov2.style.display = 'none';
-      startApp();
-    }).catch(function() {
-      STATE.vehicle = STATE.vehicle || session.vehicleData;
-      var ov2 = document.getElementById('bio-screen');
-      if (ov2) ov2.style.display = 'none';
-      startApp();
-    });
-  } catch(err) {
-    if (btn) btn.classList.remove('bio-scanning');
-    var msg = err.message || 'שגיאה';
-    if (/cancel|NotAllowed|abort|dismiss/i.test(msg)) msg = 'האימות בוטל — לחץ לנסות שוב';
-    if (errEl) errEl.textContent = msg;
-  }
-}
+// _showBioScreen / _doBioAuth — נמחקו (קוד מת, auto-triggered WebAuthn — ראה FIX-2026-07-01-logout-fake-screen)
 
 function bioFallback() {
   _bioClear();
@@ -1885,15 +1830,7 @@ function _wireLoginRipple() {
   });
 }
 
-function _bootFromSession(session) {
-  if (!session) return;
-  STATE.vehicle = session.vehicleData;
-  STATE.user = session.userInfo || {email:session.email||''};
-  STATE.idToken = session.token||null;
-  if (STATE.idToken && typeof _fbSignIn==='function') _fbSignIn(STATE.idToken).catch(function(){});
-  if (typeof loadFullData==='function') loadFullData().then(startApp).catch(startApp);
-  else startApp();
-}
+// _bootFromSession — נמחק (קוד מת, caller יחיד היה _showBioScreen שנמחק)
 
 function _offerBio(email, displayName) {
   var modal = document.getElementById('bio-offer-modal');
@@ -3089,8 +3026,13 @@ function logout() {
     confirmText: 'התנתק',
     onConfirm: () => {
       localStorage.removeItem(SESSION_KEY);
-      try { localStorage.removeItem(PIN_KEY); } catch(_e) {} // מוחק PIN בלבד — שומר pin session ל-bio cache
-      // ה-credential נשמר בכוונה (_bioClear לא נקרא) כדי שמסך טביעת האצבע יופיע אחרי boot
+      try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
+      // מוחקים את pin session — idToken בתוכו עדיין תקף שעה אחת אחרי logout
+      // ולכן Knox/bio יכול להשתמש בו להכנסה שקטה. ה-credential נשמר כדי שהכפתור יופיע,
+      // אך ללא pin session bio יקבל toast "יש להיכנס עם Google" ולא יפתח את האפליקציה.
+      try { localStorage.removeItem(PIN_SESSION_KEY); } catch(_e) {}
+      // נמחק auto-select זיכרון גוגל כדי למנוע FedCM מלהחזיר credential אוטומטי
+      try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch(_e) {}
       location.reload();
     }
   });
