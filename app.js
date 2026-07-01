@@ -1618,7 +1618,8 @@ function pkConfirmSelect() {
   _pinSessionSave(STATE.user.email, chosen, STATE.user, STATE.idToken);
   if (_bioAvailable() && !_bioLoad()) {
     setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
-  } else if (!_pinLoad()) {
+  } else if (!_pinLoad() && !_bioLoad()) {
+    // אל תציע PIN אם bio רשום — המשתמש כבר יש לו כניסה מהירה
     setTimeout(function(){ _offerPinSetup(STATE.user.email, chosen, STATE.user); }, 1500);
   }
   showGreeting((chosen.holder) || STATE.user.name);
@@ -2239,7 +2240,7 @@ async function handleGoogleCredential(response) {
       _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
       if (_bioAvailable() && !_bioLoad()) {
         setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
-      } else if (!_pinLoad()) {
+      } else if (!_pinLoad() && !_bioLoad()) {
         setTimeout(function(){ _offerPinSetup(STATE.user.email, STATE.vehicle, STATE.user); }, 1500);
       }
       var greetName = result.isActualHolder
