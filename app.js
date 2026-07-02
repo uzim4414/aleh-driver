@@ -1829,6 +1829,12 @@ function _showBioLoginButton(bioData) {
 async function _bioLoginFromSplash() {
   if (window._bioLoginBusy) return;
   window._bioLoginBusy = true;
+  // v267: clear leaked flags from any prior aborted timeout-reauth attempt
+  if (!window._bioSkipAuthenticate) {
+    window._bioPendingTokenRefresh = false;
+    window._bioTimeoutReauthPending = false;
+    try { clearTimeout(window._bioRefreshTimer); } catch(_) {}
+  }
   var bioData = window._bioPendingData || _bioLoad();
   if (!bioData) { window._bioLoginBusy = false; return; }
   window._bioPendingData = bioData;
