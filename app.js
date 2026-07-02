@@ -1348,31 +1348,49 @@ function _formatLastLogin(isoStr) {
   } catch(_e) { return null; }
 }
 
+function _llCacheKey(emailKey, vehicleKey) {
+  return '_ll_' + emailKey + '_' + vehicleKey;
+}
+
 function _fbWriteLastLogin(emailKey, vehicleKey) {
+  var iso = new Date().toISOString();
+  // write to localStorage cache immediately (cross-session, same device)
+  try { localStorage.setItem(_llCacheKey(emailKey, vehicleKey), iso); } catch(_e) {}
+  // write to Firebase (cross-device sync)
   if (!_fbDb || !emailKey || !vehicleKey) return;
   try {
     _fbDb.ref('driverLogins/' + emailKey + '/' + vehicleKey + '/lastLogin')
-      .set(new Date().toISOString())
+      .set(iso)
       .catch(function() {});
   } catch(_e) {}
 }
 
 function _fbReadLastLoginOnce(emailKey, vehicleKey, cb) {
-  if (!_fbDb || !emailKey || !vehicleKey) { cb(null); return; }
+  if (!emailKey || !vehicleKey) { cb(null); return; }
+  // 1. return localStorage cache immediately (instant, no auth needed)
+  try {
+    var cached = localStorage.getItem(_llCacheKey(emailKey, vehicleKey));
+    if (cached) { cb(cached); return; }
+  } catch(_e) {}
+  // 2. no cache → try Firebase (new device) — wait for auth
+  if (!_fbDb) { cb(null); return; }
   function doRead() {
     _fbDb.ref('driverLogins/' + emailKey + '/' + vehicleKey + '/lastLogin')
       .once('value')
-      .then(function(snap) { cb(snap.val()); })
+      .then(function(snap) {
+        var val = snap.val();
+        // populate cache for next time
+        if (val) { try { localStorage.setItem(_llCacheKey(emailKey, vehicleKey), val); } catch(_e) {} }
+        cb(val);
+      })
       .catch(function() { cb(null); });
   }
-  // wait for Firebase auth before reading (Security Rules require auth != null)
   if (_fbAuth && _fbAuth.currentUser) { doRead(); return; }
   var done = false;
   var unsub = _fbAuth ? _fbAuth.onAuthStateChanged(function(u) {
     if (done) return;
     if (u) { done = true; if (unsub) unsub(); doRead(); }
   }) : null;
-  // safety: attempt read after 3s even if auth hasn't fired
   setTimeout(function() {
     if (done) return; done = true; if (unsub) unsub(); doRead();
   }, 3000);
