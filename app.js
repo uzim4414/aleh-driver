@@ -3212,6 +3212,7 @@ function startApp() {
 }
 
 var _bioTimeoutInterval = null;
+var _bioVisHandler = null;
 function _armBioTimeout() {
   if (window._bioTimeoutArmed) return;
   window._bioTimeoutArmed = true;
@@ -3226,9 +3227,10 @@ function _armBioTimeout() {
     if (!appEl || appEl.classList.contains('hidden')) return;
     _showBioTimeoutModal();
   }
-  document.addEventListener('visibilitychange', function() {
+  _bioVisHandler = function() {
     if (document.visibilityState === 'visible') _checkBioTimeout();
-  });
+  };
+  document.addEventListener('visibilitychange', _bioVisHandler);
   _bioTimeoutInterval = setInterval(function() {
     if (document.visibilityState === 'visible') _checkBioTimeout();
   }, 60000);
@@ -3275,6 +3277,7 @@ async function _bioTimeoutReauth() {
     var session = _pinSessionLoad();
     if (!session) throw new Error('no_session');
     if (_isTokenExpired(session.idToken)) {
+      if (window._bioPendingTokenRefresh) return;
       // reuse silent refresh from _bioLoginFromSplash
       if (window._bioTokenRefreshTried) {
         window._bioTokenRefreshTried = false;
@@ -3343,6 +3346,7 @@ function logout() {
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
       _bioSessionClear();
       if (_bioTimeoutInterval) { clearInterval(_bioTimeoutInterval); _bioTimeoutInterval = null; }
+      if (_bioVisHandler) { document.removeEventListener('visibilitychange', _bioVisHandler); _bioVisHandler = null; }
       window._bioTimeoutArmed = false;
       // PIN_SESSION_KEY נשמר בכוונה — bio cache נשמר כך שטביעת האצבע תעבוד אחרי logout.
       // הגנה מפני Knox: e.isTrusted + pointer-events:none מספיקים; אין צורך לאפס idToken.
