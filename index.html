@@ -516,6 +516,9 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 }
 .km-modal-overlay.hidden { display:none; }
 
+/* ── Bio timeout modal ── */
+#bio-timeout-modal { z-index:350; }
+
 .km-modal-card {
   width:100%; max-width:520px;
   background:#111;
@@ -5545,6 +5548,30 @@ window.fcmDebug = async function() {
       <div class="km-success-title">ק"מ עודכן בהצלחה!</div>
       <div class="km-success-sub">הדיווח שלך מאפשר לנו לנהל את הצי בצורה מיטבית</div>
     </div>
+  </div>
+</div>
+
+<!-- Bio session timeout modal -->
+<div class="km-modal-overlay hidden" id="bio-timeout-modal" style="display:none">
+  <div class="km-modal-card" id="bio-timeout-card">
+    <div class="km-drag-handle"></div>
+    <div class="km-modal-header">
+      <div class="km-modal-icon-tile">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#30D158" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2C8.5 2 6 4.5 6 8v1H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V8c0-3.5-2.5-6-6-6z"/>
+          <circle cx="12" cy="16" r="1.5" fill="#30D158" stroke="none"/>
+        </svg>
+      </div>
+      <div class="km-modal-header-text">
+        <div class="km-modal-title">הפעלת המסך ננעלה</div>
+        <div class="km-modal-subtitle">עברו 30 דקות — אמת/י זהות כדי להמשיך</div>
+      </div>
+    </div>
+    <div class="km-modal-error hidden" id="bio-timeout-error"></div>
+    <button class="km-modal-submit" id="bio-timeout-btn" onclick="_bioTimeoutReauth()">
+      <span id="bio-timeout-btn-text">אימות בטביעת אצבע</span>
+      <div class="km-modal-spinner hidden" id="bio-timeout-spinner"></div>
+    </button>
   </div>
 </div>
 

@@ -12,6 +12,9 @@ const GOOGLE_CLIENT_ID = '11295167732-dov0o2p2858i4nhe0lm1r6aa5sucvukp.apps.goog
 const SESSION_KEY = 'aleh_driver_session';
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 
+var BIO_SESSION_KEY = 'aleh_bio_active_v1';
+var BIO_SESSION_TTL = 30 * 60 * 1000; // 30 minutes
+
 /* ══ Firebase Config + Init ══
    databaseURL נוסף ידנית — מופיע ב: Firebase Console → Realtime Database → URL בראש העמוד
    שאר הערכים מה-Console → Project Settings → aleh-driver-pwa
@@ -1915,6 +1918,7 @@ async function _bioLoginFromSplash() {
         hideGreeting();
         _fbWriteLastLogin(_bioEk, _bioVk);
         if (sp) sp.classList.add('hidden');
+        _bioSessionStart();
         startApp();
       });
     }).catch(function(loadErr) {
@@ -2024,6 +2028,23 @@ function _pinSave(data) {
 
 function _pinClear() {
   try { localStorage.removeItem(PIN_KEY); localStorage.removeItem(PIN_SESSION_KEY); } catch(e) {}
+}
+
+function _bioSessionStart() {
+  if (!_bioLoad()) return;
+  try { localStorage.setItem(BIO_SESSION_KEY, JSON.stringify({startTs: Date.now()})); } catch(e) {}
+}
+function _bioSessionClear() {
+  try { localStorage.removeItem(BIO_SESSION_KEY); } catch(e) {}
+}
+function _bioSessionExpired() {
+  if (!_bioLoad()) return false;
+  try {
+    var raw = localStorage.getItem(BIO_SESSION_KEY);
+    if (!raw) return false;
+    var s = JSON.parse(raw);
+    return Date.now() - (s.startTs || 0) > BIO_SESSION_TTL;
+  } catch(e) { return false; }
 }
 
 function _pinSessionLoad() {
@@ -2307,6 +2328,14 @@ async function handleGoogleCredential(response) {
         _pinSessionSave(_bSess.email, _bSess.vehicleData, _bSess.userInfo, response.credential);
       }
     } catch(_) {}
+    if (window._bioTimeoutReauthPending) {
+      window._bioTimeoutReauthPending = false;
+      window._bioSkipAuthenticate = false;
+      window._bioLoginBusy = false;
+      _bioSessionStart();
+      _hideBioTimeoutModal();
+      return;
+    }
     window._bioSkipAuthenticate = true;  // אל תבקש טביעת אצבע שנייה
     window._bioLoginBusy = false;        // שחרר נעילה לפני retry
     _bioLoginFromSplash();
@@ -2369,6 +2398,7 @@ async function handleGoogleCredential(response) {
       _grComplete(function() {
         hideGreeting();
         _fbWriteLastLogin(_gEk, _gVk);
+        _bioSessionStart();
         startApp();
       });
     }
@@ -3171,6 +3201,118 @@ function startApp() {
       });
     }
   } catch(e) {}
+
+  _armBioTimeout();
+}
+
+var _bioTimeoutInterval = null;
+function _armBioTimeout() {
+  if (window._bioTimeoutArmed) return;
+  window._bioTimeoutArmed = true;
+  function _checkBioTimeout() {
+    if (!_bioLoad()) return;
+    if (!_bioSessionExpired()) return;
+    // popup already open?
+    var modal = document.getElementById('bio-timeout-modal');
+    if (!modal || !modal.classList.contains('hidden')) return;
+    // app must be visible
+    var appEl = document.getElementById('app');
+    if (!appEl || appEl.classList.contains('hidden')) return;
+    _showBioTimeoutModal();
+  }
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') _checkBioTimeout();
+  });
+  _bioTimeoutInterval = setInterval(function() {
+    if (document.visibilityState === 'visible') _checkBioTimeout();
+  }, 60000);
+}
+
+function _showBioTimeoutModal() {
+  var modal = document.getElementById('bio-timeout-modal');
+  if (!modal) return;
+  var errEl = document.getElementById('bio-timeout-error');
+  var btn = document.getElementById('bio-timeout-btn');
+  var btnText = document.getElementById('bio-timeout-btn-text');
+  var spinner = document.getElementById('bio-timeout-spinner');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+  if (btnText) btnText.textContent = 'אימות בטביעת אצבע';
+  if (spinner) spinner.classList.add('hidden');
+  if (btn) btn.disabled = false;
+  modal.style.display = '';
+  modal.classList.remove('hidden', 'km-modal-closing');
+  requestAnimationFrame(function() { modal.classList.add('km-modal-open'); });
+}
+function _hideBioTimeoutModal() {
+  var modal = document.getElementById('bio-timeout-modal');
+  if (!modal) return;
+  modal.classList.remove('km-modal-open');
+  modal.classList.add('km-modal-closing');
+  setTimeout(function() {
+    modal.classList.remove('km-modal-closing');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }, 350);
+}
+async function _bioTimeoutReauth() {
+  var btn = document.getElementById('bio-timeout-btn');
+  var btnText = document.getElementById('bio-timeout-btn-text');
+  var spinner = document.getElementById('bio-timeout-spinner');
+  var errEl = document.getElementById('bio-timeout-error');
+  if (btn) btn.disabled = true;
+  if (btnText) btnText.textContent = '';
+  if (spinner) spinner.classList.remove('hidden');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+  try {
+    var bioData = _bioLoad();
+    if (!bioData) throw new Error('no_bio');
+    var session = _pinSessionLoad();
+    if (!session) throw new Error('no_session');
+    if (_isTokenExpired(session.idToken)) {
+      // reuse silent refresh from _bioLoginFromSplash
+      if (window._bioTokenRefreshTried) {
+        window._bioTokenRefreshTried = false;
+        window._bioPendingTokenRefresh = false;
+        _hideBioTimeoutModal();
+        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); logout(); }, 300);
+        return;
+      }
+      window._bioTokenRefreshTried = true;
+      window._bioPendingTokenRefresh = true;
+      window._bioTimeoutReauthPending = true;
+      var refreshTimer = setTimeout(function() {
+        window._bioPendingTokenRefresh = false;
+        window._bioTokenRefreshTried = false;
+        window._bioTimeoutReauthPending = false;
+        _hideBioTimeoutModal();
+        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); logout(); }, 300);
+      }, 5000);
+      window._bioRefreshTimer = refreshTimer;
+      google.accounts.id.prompt(function(notification) {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          clearTimeout(refreshTimer);
+          window._bioPendingTokenRefresh = false;
+          window._bioTokenRefreshTried = false;
+          window._bioTimeoutReauthPending = false;
+          _hideBioTimeoutModal();
+          setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); logout(); }, 300);
+        }
+      });
+      return;
+    }
+    await bioAuthenticate(bioData.email, bioData.credentialId);
+    _bioSessionStart();
+    _hideBioTimeoutModal();
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    if (spinner) spinner.classList.add('hidden');
+    if (btnText) btnText.textContent = 'אימות בטביעת אצבע';
+    if (errEl) {
+      var msg = (e && e.name === 'NotAllowedError') ? 'האימות בוטל — נסה/י שוב' : 'שגיאה באימות — נסה/י שוב';
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+  }
 }
 
 function logout() {
@@ -3193,6 +3335,9 @@ function logout() {
       // ══ שלב 2: נקה localStorage
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
+      _bioSessionClear();
+      if (_bioTimeoutInterval) { clearInterval(_bioTimeoutInterval); _bioTimeoutInterval = null; }
+      window._bioTimeoutArmed = false;
       // PIN_SESSION_KEY נשמר בכוונה — bio cache נשמר כך שטביעת האצבע תעבוד אחרי logout.
       // הגנה מפני Knox: e.isTrusted + pointer-events:none מספיקים; אין צורך לאפס idToken.
 
@@ -8748,6 +8893,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         _grComplete(function() {
           hideGreeting();
           _fbWriteLastLogin(_sEk, _sVk);
+          _bioSessionStart();
           startApp();
         });
         return;
