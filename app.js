@@ -1799,6 +1799,21 @@ function _showBioLoginButton(bioData) {
   var bioBtn = document.getElementById('bio-login-btn');
   var divider = document.getElementById('login-or-divider');
   if (!panel || !bioBtn) return;
+  // UX 4c: אם ה-session שמור אך ה-idToken פג (עברה שעה) — הסתר את כפתור הביומטרי
+  // והצג רק Google עם הודעת הסבר. אחרי כניסת Google חד-פעמית (bio חוזר אוטומטית
+  // דרך _bioSkipAuthenticate) — הכפתור יופיע רגיל בביקור הבא.
+  var _sess = (typeof _pinSessionLoad === 'function') ? _pinSessionLoad() : null;
+  var _tokenExpired = !!(_sess && _sess.idToken && _isTokenExpired(_sess.idToken));
+  var _expMsg = document.getElementById('bio-token-expired-msg');
+  if (_tokenExpired) {
+    panel.classList.add('nobio');
+    bioBtn.style.display = 'none';
+    if (divider) divider.style.display = 'none';
+    if (_expMsg) { _expMsg.classList.remove('hidden'); _expMsg.style.display = ''; }
+    window._bioPendingData = bioData;
+    return;
+  }
+  if (_expMsg) { _expMsg.classList.add('hidden'); _expMsg.style.display = 'none'; }
   panel.classList.remove('nobio');
   bioBtn.style.display = 'flex';
   if (divider) divider.style.display = 'flex';
@@ -1833,6 +1848,7 @@ async function _bioLoginFromSplash() {
   if (!window._bioSkipAuthenticate) {
     window._bioPendingTokenRefresh = false;
     window._bioTimeoutReauthPending = false;
+    window._bioTokenRefreshTried = false;
     try { clearTimeout(window._bioRefreshTimer); } catch(_) {}
   }
   var bioData = window._bioPendingData || _bioLoad();
@@ -1858,51 +1874,13 @@ async function _bioLoginFromSplash() {
       setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
       return;
     }
-    // token פג — רענון שקט דרך Google One Tap, retry bio ללא טביעת אצבע נוספת
+    // UX 4c: הכפתור הביומטרי מוסתר כאשר ה-token פג (ראה _showBioLoginButton),
+    // כך שסניף זה לא אמור להיות נגיש מהכפתור. שמור כ-guard בלבד.
     if (_isTokenExpired(session.idToken)) {
-      if (window._bioTokenRefreshTried) {
-        // כבר ניסינו פעם אחת — fallback לטוסט
-        window._bioTokenRefreshTried = false;
-        window._bioPendingTokenRefresh = false;
-        window._bioLoginBusy = false;
-        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
-        return;
-      }
-      window._bioTokenRefreshTried = true;
-      if (!(window.google && google.accounts && google.accounts.id && GOOGLE_CLIENT_ID)) {
-        window._bioTokenRefreshTried = false;
-        window._bioLoginBusy = false;
-        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
-        return;
-      }
-      window._bioPendingTokenRefresh = true;
-      var _bioRefreshTimer = setTimeout(function() {
-        if (!window._bioPendingTokenRefresh) return;
-        window._bioPendingTokenRefresh = false;
-        window._bioTokenRefreshTried = false;
-        window._bioLoginBusy = false;
-        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
-      }, 5000);
-      window._bioRefreshTimer = _bioRefreshTimer;
-      try {
-        google.accounts.id.prompt(function(notification) {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
-            clearTimeout(_bioRefreshTimer);
-            if (!window._bioPendingTokenRefresh) return;
-            window._bioPendingTokenRefresh = false;
-            window._bioTokenRefreshTried = false;
-            window._bioLoginBusy = false;
-            setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
-          }
-          // אם הוצג → handleGoogleCredential יורה → ישמור token חדש → retry bio
-        });
-      } catch(e) {
-        clearTimeout(_bioRefreshTimer);
-        window._bioPendingTokenRefresh = false;
-        window._bioTokenRefreshTried = false;
-        window._bioLoginBusy = false;
-        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
-      }
+      // should never happen if splash shows correctly, but guard anyway
+      window._bioLoginBusy = false;
+      if (bioBtn) bioBtn.classList.remove('bio-scanning');
+      showToast('פג תוקף הכניסה — יש להתחבר עם Google');
       return;
     }
     STATE.vehicle = session.vehicleData;
