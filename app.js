@@ -8399,28 +8399,36 @@ function _grComplete(cb) {
   setTimeout(function() { if (cb) cb(); }, 350);
 }
 
+function _grFillLastLogin(iso, llWrap) {
+  if (!iso || !llWrap) return false;
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  document.getElementById('gr-ll-date').textContent =
+    String(d.getDate()).padStart(2,'0') + '/' +
+    String(d.getMonth()+1).padStart(2,'0') + '/' +
+    d.getFullYear();
+  document.getElementById('gr-ll-time').textContent =
+    String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0');
+  llWrap.style.display = '';
+  return true;
+}
+
 function showGreeting(holderName, emailKey, vehicleKey) {
   hideLoader();
 
   document.getElementById('gr-time').textContent = getGreeting();
   document.getElementById('gr-name').textContent = holderName || '';
 
-  // last-login: read previous value from Firebase, show when arrives
+  // last-login: read localStorage synchronously — zero delay, shown together with greeting
   var llWrap = document.getElementById('gr-lastlogin');
   if (llWrap) llWrap.style.display = 'none';
-  _fbReadLastLoginOnce(emailKey, vehicleKey, function(iso) {
-    if (!iso || !llWrap) return;
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return;
-    var dd   = String(d.getDate()).padStart(2,'0');
-    var mo   = String(d.getMonth()+1).padStart(2,'0');
-    var yyyy = d.getFullYear();
-    var hh   = String(d.getHours()).padStart(2,'0');
-    var min  = String(d.getMinutes()).padStart(2,'0');
-    document.getElementById('gr-ll-date').textContent = dd+'/'+mo+'/'+yyyy;
-    document.getElementById('gr-ll-time').textContent = hh+':'+min;
-    llWrap.style.display = '';
-  });
+  var cachedIso = null;
+  try { cachedIso = (emailKey && vehicleKey) ? localStorage.getItem(_llCacheKey(emailKey, vehicleKey)) : null; } catch(_e) {}
+  if (!_grFillLastLogin(cachedIso, llWrap)) {
+    // no cache (new device) — try Firebase async after auth
+    _fbReadLastLoginOnce(emailKey, vehicleKey, function(iso) { _grFillLastLogin(iso, llWrap); });
+  }
 
   _grAnimatePct();
   const el = document.getElementById('greeting');
