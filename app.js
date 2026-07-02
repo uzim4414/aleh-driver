@@ -1834,7 +1834,13 @@ async function _bioLoginFromSplash() {
   var bioBtn = document.getElementById('bio-login-btn');
   if (bioBtn) bioBtn.classList.add('bio-scanning');
   try {
-    await bioAuthenticate(bioData.email, bioData.credentialId);
+    // _bioSkipAuthenticate מוגדר ב-retry אחרי silent token refresh — לא לבקש טביעת אצבע שנייה
+    if (window._bioSkipAuthenticate) {
+      window._bioSkipAuthenticate = false;
+      if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    } else {
+      await bioAuthenticate(bioData.email, bioData.credentialId);
+    }
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     var session = _pinSessionLoad();
     if (!session || !session.vehicleData || !session.idToken) {
@@ -1843,10 +1849,51 @@ async function _bioLoginFromSplash() {
       setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
       return;
     }
-    // token פג — אסור לטעון נתונים עם token לא תקף (לולאה אינסופית)
+    // token פג — רענון שקט דרך Google One Tap, retry bio ללא טביעת אצבע נוספת
     if (_isTokenExpired(session.idToken)) {
-      window._bioLoginBusy = false;
-      setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+      if (window._bioTokenRefreshTried) {
+        // כבר ניסינו פעם אחת — fallback לטוסט
+        window._bioTokenRefreshTried = false;
+        window._bioPendingTokenRefresh = false;
+        window._bioLoginBusy = false;
+        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+        return;
+      }
+      window._bioTokenRefreshTried = true;
+      if (!(window.google && google.accounts && google.accounts.id && GOOGLE_CLIENT_ID)) {
+        window._bioTokenRefreshTried = false;
+        window._bioLoginBusy = false;
+        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+        return;
+      }
+      window._bioPendingTokenRefresh = true;
+      var _bioRefreshTimer = setTimeout(function() {
+        if (!window._bioPendingTokenRefresh) return;
+        window._bioPendingTokenRefresh = false;
+        window._bioTokenRefreshTried = false;
+        window._bioLoginBusy = false;
+        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+      }, 5000);
+      window._bioRefreshTimer = _bioRefreshTimer;
+      try {
+        google.accounts.id.prompt(function(notification) {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+            clearTimeout(_bioRefreshTimer);
+            if (!window._bioPendingTokenRefresh) return;
+            window._bioPendingTokenRefresh = false;
+            window._bioTokenRefreshTried = false;
+            window._bioLoginBusy = false;
+            setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+          }
+          // אם הוצג → handleGoogleCredential יורה → ישמור token חדש → retry bio
+        });
+      } catch(e) {
+        clearTimeout(_bioRefreshTimer);
+        window._bioPendingTokenRefresh = false;
+        window._bioTokenRefreshTried = false;
+        window._bioLoginBusy = false;
+        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); }, 200);
+      }
       return;
     }
     STATE.vehicle = session.vehicleData;
@@ -1861,6 +1908,7 @@ async function _bioLoginFromSplash() {
     showGreeting((session.vehicleData && session.vehicleData.holder) || (session.userInfo && session.userInfo.name), _bioEk, _bioVk);
     loadFullData().then(function() {
       window._bioLoginBusy = false;
+      window._bioTokenRefreshTried = false; // אפס guard — כניסה הצליחה
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
       _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
       _grComplete(function() {
@@ -2247,6 +2295,24 @@ function initGoogleAuth() {
 }
 
 async function handleGoogleCredential(response) {
+  /* Bio token refresh: One Tap fired a fresh idToken for an expired bio session.
+     Bypass the _userInitiatedLogin guard — no full login flow, just save token + retry bio. */
+  if (window._bioPendingTokenRefresh) {
+    window._bioPendingTokenRefresh = false;
+    try { clearTimeout(window._bioRefreshTimer); } catch(_) {}
+    try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.cancel(); } catch(_) {}
+    try {
+      var _bSess = _pinSessionLoad();
+      if (_bSess && _bSess.vehicleData) {
+        _pinSessionSave(_bSess.email, _bSess.vehicleData, _bSess.userInfo, response.credential);
+      }
+    } catch(_) {}
+    window._bioSkipAuthenticate = true;  // אל תבקש טביעת אצבע שנייה
+    window._bioLoginBusy = false;        // שחרר נעילה לפני retry
+    _bioLoginFromSplash();
+    return;
+  }
+
   /* Block FedCM / One Tap auto-sign-in that fires without user gesture (e.g. immediately after logout).
      Only proceed when the user explicitly pressed a login button or was redirected via OAuth. */
   if (!window._userInitiatedLogin) {
