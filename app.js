@@ -1868,15 +1868,26 @@ async function _bioGasAuth(email, credentialId) {
     return false;
   }
   var data;
+  var _bioRespText;
   try {
     var params = { action: 'bio_auth', email: email, credentialId: credentialId };
     var url = GAS_URL + '?' + new URLSearchParams(params).toString();
     var resp = await fetch(url, { method: 'GET' });
-    data = JSON.parse(await resp.text());
+    _bioRespText = await resp.text();
   } catch(e) {
     window._bioLoginBusy = false;
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     setTimeout(function() { showToast('שגיאת חיבור — נסה שוב'); }, 200);
+    return false;
+  }
+  try {
+    data = JSON.parse(_bioRespText);
+  } catch(e) {
+    window._bioLoginBusy = false;
+    if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    var _snip = String(_bioRespText || '').substring(0, 120).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    try { console.warn('[bio_auth] non-JSON response:', _snip); } catch(_) {}
+    setTimeout(function() { showToast('שגיאת שרת — נסה שוב מאוחר יותר'); }, 200);
     return false;
   }
   if (!data || !data.ok || !data.vehicle) {
@@ -3344,6 +3355,8 @@ async function _bioTimeoutReauth() {
     // גישה A: אם idToken חסר/פג — השתמש ב-credentialId (ללא Google)
     var _tReauthBad = !session.idToken || _isTokenExpired(session.idToken);
     await bioAuthenticate(bioData.email, bioData.credentialId);
+    // עדכן session מיידית — לפני כל async, כדי ש-visibilitychange לא יקפיץ modal שנית
+    _bioSessionStart();
     if (_tReauthBad) {
       // fingerprint הצליח + token פג → credentialId path
       _hideBioTimeoutModal();
