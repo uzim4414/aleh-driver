@@ -1,21 +1,21 @@
-// SW build: 2026-07-03T07:56:42Z // v273
-/* ════════════════════════════════════════════════════════════════════
-   Main service worker for the עלה driver PWA.
-   Firebase SDK removed — uses direct W3C Web Push API.
+﻿// SW build: 2026-07-03T08:14:14Z // v274
+/* ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•
+   Main service worker for the ׳¢׳׳” driver PWA.
+   Firebase SDK removed ג€” uses direct W3C Web Push API.
    Push events: handles both payload-bearing and empty pushes
-   (empty → fetch latest pending notification from GAS).
-   ════════════════════════════════════════════════════════════════════ */
+   (empty ג†’ fetch latest pending notification from GAS).
+   ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• */
 
-/* ════════════════════════════════════════════════════════════════════
+/* ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•
    Cache / offline
-   ════════════════════════════════════════════════════════════════════ */
+   ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• */
 
-const CACHE_NAME = 'aleh-driver-v273';
+const CACHE_NAME = 'aleh-driver-v274';
 
-// Pending notifications buffer — survives until client collects them (max 60s)
+// Pending notifications buffer ג€” survives until client collects them (max 60s)
 let _pendingNotifs = [];
 
-/* קבצים שנשמרים לoffline — fonts בלבד (לא משתנים) */
+/* ׳§׳‘׳¦׳™׳ ׳©׳ ׳©׳׳¨׳™׳ ׳offline ג€” fonts ׳‘׳׳‘׳“ (׳׳ ׳׳©׳×׳ ׳™׳) */
 const PRECACHE = [
   'version.json',
   'https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&display=swap'
@@ -42,13 +42,13 @@ self.addEventListener('fetch', e => {
 
   const url = e.request.url;
 
-  /* cross-origin (GAS, Google APIs, gstatic firebase) — תמיד רשת, ללא התערבות */
+  /* cross-origin (GAS, Google APIs, gstatic firebase) ג€” ׳×׳׳™׳“ ׳¨׳©׳×, ׳׳׳ ׳”׳×׳¢׳¨׳‘׳•׳× */
   if (!url.startsWith(self.location.origin)) return;
 
-  /* FCM scope endpoint — חייב להיות תמיד רשת טרייה */
+  /* FCM scope endpoint ג€” ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳×׳׳™׳“ ׳¨׳©׳× ׳˜׳¨׳™׳™׳” */
   if (url.includes('firebase-cloud-messaging-push-scope')) return;
 
-  /* index.html + app.js — network-first: תמיד מנסה רשת, fallback לcache */
+  /* index.html + app.js ג€” network-first: ׳×׳׳™׳“ ׳׳ ׳¡׳” ׳¨׳©׳×, fallback ׳cache */
   const isAppFile = url.endsWith('/') || url.includes('index.html') || url.includes('app.js') || url.includes('manifest.json');
   if (isAppFile) {
     e.respondWith(
@@ -63,15 +63,15 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* שאר קבצים (icons וכו') — cache-first */
+  /* ׳©׳׳¨ ׳§׳‘׳¦׳™׳ (icons ׳•׳›׳•') ג€” cache-first */
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => {}))
   );
 });
 
-/* ════════════════════════════════════════════════════════════════════
-   Web Push (raw push event — when payload arrives without FCM SDK route)
-   ════════════════════════════════════════════════════════════════════ */
+/* ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•
+   Web Push (raw push event ג€” when payload arrives without FCM SDK route)
+   ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• */
 
 self.GAS_URL = self.GAS_URL || '';
 
@@ -95,7 +95,7 @@ self.addEventListener('message', e => {
     e.source.postMessage({ type: 'pending-notifs', notifs: _pendingNotifs });
     _pendingNotifs = [];
   }
-  // Client cleared notification history — drop buffer so it can't replay
+  // Client cleared notification history ג€” drop buffer so it can't replay
   if (e.data.type === 'clear-pending-notifs') {
     _pendingNotifs = [];
   }
@@ -124,21 +124,21 @@ const TYPE_CONFIG = {
 // type-specific primary action label.
 // approved=green, danger=red, reminder=blue, warning=orange, info=purple.
 const NOTIF_VISUAL = {
-  garage_approved:              { cat: 'approved', action: 'קבע תור'       },
-  garage_rejected:              { cat: 'danger',   action: 'שלח בקשה חדשה' },
-  garage_appointment_set:       { cat: 'reminder', action: 'הוסף ליומן'    },
-  garage_appointment_cancelled: { cat: 'danger',   action: 'קבע תור חדש'   },
-  plan:                         { cat: 'approved', action: 'תכנן טיפול'     },
-  overdue:                      { cat: 'danger',   action: 'תאם מוסך עכשיו' },
-  urgent:                       { cat: 'warning',  action: 'תאם מוסך'       },
-  km_update:                    { cat: 'reminder', action: 'עדכן ק"מ'       },
-  test_due:                     { cat: 'reminder', action: 'פרטי טסט'       },
-  test_urgent:                  { cat: 'danger',   action: 'תאם טסט דחוף'   },
-  fuel_high:                    { cat: 'warning',  action: 'צפה בדוח'       },
-  fuel_km_high:                 { cat: 'warning',  action: 'צפה בדוח'       }
+  garage_approved:              { cat: 'approved', action: '׳§׳‘׳¢ ׳×׳•׳¨'       },
+  garage_rejected:              { cat: 'danger',   action: '׳©׳׳— ׳‘׳§׳©׳” ׳—׳“׳©׳”' },
+  garage_appointment_set:       { cat: 'reminder', action: '׳”׳•׳¡׳£ ׳׳™׳•׳׳'    },
+  garage_appointment_cancelled: { cat: 'danger',   action: '׳§׳‘׳¢ ׳×׳•׳¨ ׳—׳“׳©'   },
+  plan:                         { cat: 'approved', action: '׳×׳›׳ ׳ ׳˜׳™׳₪׳•׳'     },
+  overdue:                      { cat: 'danger',   action: '׳×׳׳ ׳׳•׳¡׳ ׳¢׳›׳©׳™׳•' },
+  urgent:                       { cat: 'warning',  action: '׳×׳׳ ׳׳•׳¡׳'       },
+  km_update:                    { cat: 'reminder', action: '׳¢׳“׳›׳ ׳§"׳'       },
+  test_due:                     { cat: 'reminder', action: '׳₪׳¨׳˜׳™ ׳˜׳¡׳˜'       },
+  test_urgent:                  { cat: 'danger',   action: '׳×׳׳ ׳˜׳¡׳˜ ׳“׳—׳•׳£'   },
+  fuel_high:                    { cat: 'warning',  action: '׳¦׳₪׳” ׳‘׳“׳•׳—'       },
+  fuel_km_high:                 { cat: 'warning',  action: '׳¦׳₪׳” ׳‘׳“׳•׳—'       }
 };
 function notifVisual(alertType) {
-  const v = NOTIF_VISUAL[alertType] || { cat: 'info', action: 'פתח עכשיו' };
+  const v = NOTIF_VISUAL[alertType] || { cat: 'info', action: '׳₪׳×׳— ׳¢׳›׳©׳™׳•' };
   return {
     icon:   './icons/notif-' + v.cat + '.png',
     image:  './icons/notif-banner-' + v.cat + '.png',
@@ -146,93 +146,93 @@ function notifVisual(alertType) {
   };
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   OS notification content builder — per-type title + body with real data
-   ════════════════════════════════════════════════════════════════════ */
+/* ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•
+   OS notification content builder ג€” per-type title + body with real data
+   ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• */
 
 function _buildOsNotifContent(type, m, fallback) {
-  var id  = m.vehicleId ? 'רכב ' + m.vehicleId : '';
-  var dash = id ? ' — ' + id : '';
+  var id  = m.vehicleId ? '׳¨׳›׳‘ ' + m.vehicleId : '';
+  var dash = id ? ' ג€” ' + id : '';
 
   var builders = {
     overdue: function() {
       return {
-        title: 'טיפול דחוף' + dash,
-        body:  'חריגה של ' + (m.kmLeft || '?') + ' ק"מ מהמועד. יש לתאם מוסך מיידית.'
+        title: '׳˜׳™׳₪׳•׳ ׳“׳—׳•׳£' + dash,
+        body:  '׳—׳¨׳™׳’׳” ׳©׳ ' + (m.kmLeft || '?') + ' ׳§"׳ ׳׳”׳׳•׳¢׳“. ׳™׳© ׳׳×׳׳ ׳׳•׳¡׳ ׳׳™׳™׳“׳™׳×.'
       };
     },
     urgent: function() {
       return {
-        title: 'טיפול בקרוב' + dash,
-        body:  'נותרו ' + (m.kmLeft || '?') + ' ק"מ עד הטיפול הבא.'
+        title: '׳˜׳™׳₪׳•׳ ׳‘׳§׳¨׳•׳‘' + dash,
+        body:  '׳ ׳•׳×׳¨׳• ' + (m.kmLeft || '?') + ' ׳§"׳ ׳¢׳“ ׳”׳˜׳™׳₪׳•׳ ׳”׳‘׳.'
       };
     },
     plan: function() {
       return {
-        title: 'תכנן טיפול' + dash,
-        body:  'נותרו ' + (m.kmLeft || '?') + ' ק"מ. כדאי להתחיל לתכנן.'
+        title: '׳×׳›׳ ׳ ׳˜׳™׳₪׳•׳' + dash,
+        body:  '׳ ׳•׳×׳¨׳• ' + (m.kmLeft || '?') + ' ׳§"׳. ׳›׳“׳׳™ ׳׳”׳×׳—׳™׳ ׳׳×׳›׳ ׳.'
       };
     },
     km_update: function() {
       return {
-        title: 'עדכון קילומטרז׳ נדרש' + dash,
-        body:  'לא עודכן ' + (m.daysSinceUpdate || '?') + ' ימים. ק"מ אחרון: ' + (m.lastKm || '?') + '.'
+        title: '׳¢׳“׳›׳•׳ ׳§׳™׳׳•׳׳˜׳¨׳–׳³ ׳ ׳“׳¨׳©' + dash,
+        body:  '׳׳ ׳¢׳•׳“׳›׳ ' + (m.daysSinceUpdate || '?') + ' ׳™׳׳™׳. ׳§"׳ ׳׳—׳¨׳•׳: ' + (m.lastKm || '?') + '.'
       };
     },
     test_due: function() {
       return {
-        title: 'טסט רכב בקרוב' + dash,
-        body:  'הטסט לפני ' + (m.testDate || '?') + '. נותרו ' + (m.daysLeft || '?') + ' ימים.'
+        title: '׳˜׳¡׳˜ ׳¨׳›׳‘ ׳‘׳§׳¨׳•׳‘' + dash,
+        body:  '׳”׳˜׳¡׳˜ ׳׳₪׳ ׳™ ' + (m.testDate || '?') + '. ׳ ׳•׳×׳¨׳• ' + (m.daysLeft || '?') + ' ׳™׳׳™׳.'
       };
     },
     test_urgent: function() {
       return {
-        title: 'טסט רכב — דחוף!' + dash,
-        body:  'הטסט חייב להתבצע לפני ' + (m.testDate || '?') + '. נותרו ' + (m.daysLeft || '?') + ' ימים בלבד.'
+        title: '׳˜׳¡׳˜ ׳¨׳›׳‘ ג€” ׳“׳—׳•׳£!' + dash,
+        body:  '׳”׳˜׳¡׳˜ ׳—׳™׳™׳‘ ׳׳”׳×׳‘׳¦׳¢ ׳׳₪׳ ׳™ ' + (m.testDate || '?') + '. ׳ ׳•׳×׳¨׳• ' + (m.daysLeft || '?') + ' ׳™׳׳™׳ ׳‘׳׳‘׳“.'
       };
     },
     garage_approved: function() {
-      var garage = m.garageInfo ? ' ב' + m.garageInfo : '';
+      var garage = m.garageInfo ? ' ׳‘' + m.garageInfo : '';
       return {
-        title: 'בקשת מוסך אושרה',
-        body:  (id || 'הבקשה') + ' אושרה. ניתן לקבוע תור' + garage + '.'
+        title: '׳‘׳§׳©׳× ׳׳•׳¡׳ ׳׳•׳©׳¨׳”',
+        body:  (id || '׳”׳‘׳§׳©׳”') + ' ׳׳•׳©׳¨׳”. ׳ ׳™׳×׳ ׳׳§׳‘׳•׳¢ ׳×׳•׳¨' + garage + '.'
       };
     },
     garage_rejected: function() {
       return {
-        title: 'בקשת מוסך נדחתה',
-        body:  (id ? id + ' — ' : '') + 'ניתן לשלוח בקשה חדשה.'
+        title: '׳‘׳§׳©׳× ׳׳•׳¡׳ ׳ ׳“׳—׳×׳”',
+        body:  (id ? id + ' ג€” ' : '') + '׳ ׳™׳×׳ ׳׳©׳׳•׳— ׳‘׳§׳©׳” ׳—׳“׳©׳”.'
       };
     },
     garage_appointment_set: function() {
       var when = m.appointmentDate || '';
-      var time = m.appointmentTime ? ' · ' + m.appointmentTime : '';
-      var garage = m.garageInfo ? ' · ' + m.garageInfo : '';
+      var time = m.appointmentTime ? ' ֲ· ' + m.appointmentTime : '';
+      var garage = m.garageInfo ? ' ֲ· ' + m.garageInfo : '';
       return {
-        title: 'תור מוסך נקבע' + (when ? ' — ' + when : ''),
+        title: '׳×׳•׳¨ ׳׳•׳¡׳ ׳ ׳§׳‘׳¢' + (when ? ' ג€” ' + when : ''),
         body:  (id || '') + time + garage + '.'
       };
     },
     garage_appointment_cancelled: function() {
       var when = m.appointmentDate || '';
       return {
-        title: 'תור מוסך בוטל' + (when ? ' — ' + when : ''),
-        body:  (id ? id + ' — ' : '') + 'ניתן לקבוע מועד חדש.'
+        title: '׳×׳•׳¨ ׳׳•׳¡׳ ׳‘׳•׳˜׳' + (when ? ' ג€” ' + when : ''),
+        body:  (id ? id + ' ג€” ' : '') + '׳ ׳™׳×׳ ׳׳§׳‘׳•׳¢ ׳׳•׳¢׳“ ׳—׳“׳©.'
       };
     },
     fuel_high: function() {
       var pct = (m.fuelConsumption && m.fleetAverage)
-        ? ' (' + Math.round((m.fuelConsumption / m.fleetAverage - 1) * 100) + '% מעל הממוצע)'
+        ? ' (' + Math.round((m.fuelConsumption / m.fleetAverage - 1) * 100) + '% ׳׳¢׳ ׳”׳׳׳•׳¦׳¢)'
         : '';
       return {
-        title: 'צריכת דלק חריגה' + dash,
-        body:  (m.fuelConsumption || '?') + ' ל׳/100ק"מ' + pct + '.'
+        title: '׳¦׳¨׳™׳›׳× ׳“׳׳§ ׳—׳¨׳™׳’׳”' + dash,
+        body:  (m.fuelConsumption || '?') + ' ׳׳³/100׳§"׳' + pct + '.'
       };
     },
     fuel_km_high: function() {
       return {
-        title: 'עלות דלק חריגה' + dash,
-        body:  (m.costPerKm || '?') + ' ₪/ק"מ — ממוצע ציי: ' + (m.fleetAverage || '?') + ' ₪/ק"מ.'
+        title: '׳¢׳׳•׳× ׳“׳׳§ ׳—׳¨׳™׳’׳”' + dash,
+        body:  (m.costPerKm || '?') + ' ג‚×/׳§"׳ ג€” ׳׳׳•׳¦׳¢ ׳¦׳™׳™: ' + (m.fleetAverage || '?') + ' ג‚×/׳§"׳.'
       };
     }
   };
@@ -241,13 +241,13 @@ function _buildOsNotifContent(type, m, fallback) {
   if (builder) {
     var built = builder();
     return {
-      title: built.title || fallback.title || 'עלה — התראה',
-      body:  built.body  || fallback.body  || 'פתח את האפליקציה לפרטים'
+      title: built.title || fallback.title || '׳¢׳׳” ג€” ׳”׳×׳¨׳׳”',
+      body:  built.body  || fallback.body  || '׳₪׳×׳— ׳׳× ׳”׳׳₪׳׳™׳§׳¦׳™׳” ׳׳₪׳¨׳˜׳™׳'
     };
   }
   return {
-    title: fallback.title || 'עלה — התראה',
-    body:  fallback.body  || 'פתח את האפליקציה לפרטים'
+    title: fallback.title || '׳¢׳׳” ג€” ׳”׳×׳¨׳׳”',
+    body:  fallback.body  || '׳₪׳×׳— ׳׳× ׳”׳׳₪׳׳™׳§׳¦׳™׳” ׳׳₪׳¨׳˜׳™׳'
   };
 }
 
@@ -262,7 +262,7 @@ self.addEventListener('push', e => {
       meta  = payload.data || {};
     }
 
-    // No payload — silent no-op (empty pushes are FCM keep-alives, not real notifications)
+    // No payload ג€” silent no-op (empty pushes are FCM keep-alives, not real notifications)
     if (!notif) return;
 
     const alertType = meta.alertType || '';
@@ -270,7 +270,7 @@ self.addEventListener('push', e => {
 
     // Buffer the notification so app can collect it on next open
     const relayPayload = {
-      notification: { title: notif.title || 'עלה', body: notif.body || '' },
+      notification: { title: notif.title || '׳¢׳׳”', body: notif.body || '' },
       data: meta,
       ts: Date.now()
     };
@@ -285,7 +285,7 @@ self.addEventListener('push', e => {
       c.postMessage({ type: 'push-foreground', payload: relayPayload });
     }
 
-    // App is in foreground (focused) — in-app card handles it, skip OS notification
+    // App is in foreground (focused) ג€” in-app card handles it, skip OS notification
     // When app is in BACKGROUND (open but not focused), show OS notification too so
     // the pull-down panel notifies the user properly.
     const focusedClients = openClients.filter(c => c.focused);
@@ -311,7 +311,7 @@ self.addEventListener('push', e => {
       data: Object.assign({}, meta, { _pushTs: relayPayload.ts }),
       actions: [
         { action: 'open',    title: visual.action },
-        { action: 'dismiss', title: 'סגור' }
+        { action: 'dismiss', title: '׳¡׳’׳•׳¨' }
       ]
     });
   })());
@@ -324,24 +324,24 @@ self.addEventListener('notificationclick', e => {
   // Preserve original push timestamp so clearedAt guard in saveNotifToHistory works correctly.
   // _pushTs was embedded in the notification data at showNotification time.
   const fullPayload = {
-    notification: { title: e.notification.title || 'עלה', body: e.notification.body || '' },
+    notification: { title: e.notification.title || '׳¢׳׳”', body: e.notification.body || '' },
     data: meta,
     ts: meta._pushTs || Date.now()
   };
-  // Encode notification in URL so app always receives it — reliable even after SW restart
+  // Encode notification in URL so app always receives it ג€” reliable even after SW restart
   const notifParam = encodeURIComponent(JSON.stringify(fullPayload));
   const url = './index.html?_notif=' + notifParam;
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
         if (c.url.includes('/driver/') && 'focus' in c) {
-          // App already open — postMessage directly
+          // App already open ג€” postMessage directly
           c.postMessage({ type: 'push-received', payload: fullPayload });
           c.postMessage({ type: 'notification-click', data: meta });
           return c.focus();
         }
       }
-      // App closed — open with notif data in URL
+      // App closed ג€” open with notif data in URL
       return clients.openWindow(url);
     })
   );
@@ -357,3 +357,4 @@ self.addEventListener('notificationclose', e => {
     });
   }
 });
+
