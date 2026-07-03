@@ -1876,7 +1876,7 @@ async function _bioGasAuth(email, credentialId) {
   var _bioFetchOk = false;
   while (_bioRetries >= 0) {
     try {
-      var resp = await fetch(url, { method: 'GET' });
+      var resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(12000) });
       _bioRespText = await resp.text();
       _bioFetchOk = true;
       break;
