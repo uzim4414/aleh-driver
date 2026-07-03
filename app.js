@@ -1013,12 +1013,21 @@ async function gasPost(action, extra, opts) {
   opts  = opts  || {};
   if (!GAS_URL) return mockResponse(action, extra);
 
-  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken)) {
+  // גישה A: אם יש bio credential — נשתמש בו כ-fallback ולא נחסום על idToken שפג
+  var _bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+  var _hasBio = !!(_bioCred && _bioCred.credentialId && _bioCred.email);
+  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken) && !_hasBio) {
     if (!opts.silent) { _sessionExpired(); throw new Error('session_expired'); }
     return { ok: false, error: 'session_expired' };
   }
 
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
+  // גישה A: כשאין idToken תקין אך קיים bio credential — צרף credentialId+email ל-GAS
+  var _tokBad = !STATE.idToken || (STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken));
+  if (_tokBad && _hasBio) {
+    params.credentialId = _bioCred.credentialId;
+    params.email = _bioCred.email;
+  }
   const url = GAS_URL + '?' + new URLSearchParams(params).toString();
   let resp;
   try {
@@ -1058,12 +1067,20 @@ async function gasPost(action, extra, opts) {
 
 async function gasPostForm(action, params) {
   // שולח POST עם FormData — לפעולות עם payload גדול (תמונה base64)
-  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken)) {
+  // גישה A: bio credential כ-fallback ל-idToken שפג
+  var _bioCred2 = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+  var _hasBio2 = !!(_bioCred2 && _bioCred2.credentialId && _bioCred2.email);
+  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken) && !_hasBio2) {
     _sessionExpired(); throw new Error('session_expired');
   }
   var fd = new FormData();
   fd.append('action', action);
   if (STATE.idToken) fd.append('idToken', STATE.idToken);
+  var _tokBad2 = !STATE.idToken || (STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken));
+  if (_tokBad2 && _hasBio2) {
+    fd.append('credentialId', _bioCred2.credentialId);
+    fd.append('email', _bioCred2.email);
+  }
   Object.keys(params).forEach(function(k) { fd.append(k, params[k]); });
   var resp;
   try {
@@ -1749,6 +1766,15 @@ async function bioRegister(email, displayName) {
               ua.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'מכשיר';
   // שמור מקומית — זה הכל שצריך
   _bioSave({ email: email, credentialId: credId, rpId: rpId, deviceName: dev, createdAt: new Date().toISOString() });
+  // כתוב credentialId ל-Firebase — מאפשר auth ללא idToken (גישה A)
+  try {
+    if (_fbDb && email) {
+      var _ek = email.replace(/[.#$\[\]]/g, '_');
+      _fbDb.ref('driverCreds/' + _ek + '/' + credId)
+        .set({ email: email, createdAt: new Date().toISOString() })
+        .catch(function(){});
+    }
+  } catch(_e) {}
   return credId;
 }
 
@@ -1799,20 +1825,10 @@ function _showBioLoginButton(bioData) {
   var bioBtn = document.getElementById('bio-login-btn');
   var divider = document.getElementById('login-or-divider');
   if (!panel || !bioBtn) return;
-  // UX 4c: אם ה-session שמור אך ה-idToken פג (עברה שעה) — הסתר את כפתור הביומטרי
-  // והצג רק Google עם הודעת הסבר. אחרי כניסת Google חד-פעמית (bio חוזר אוטומטית
-  // דרך _bioSkipAuthenticate) — הכפתור יופיע רגיל בביקור הבא.
-  var _sess = (typeof _pinSessionLoad === 'function') ? _pinSessionLoad() : null;
-  var _tokenExpired = !!(_sess && _sess.idToken && _isTokenExpired(_sess.idToken));
+  // גישה A: הכפתור הביומטרי מוצג תמיד כשקיים bioData — גם אם idToken פג.
+  // האימות משתמש ב-credentialId מול GAS (driverCreds) במקום ב-JWT שפג.
+  // (הוסרה חסימת v269 שהסתירה את הכפתור כשה-token פג.)
   var _expMsg = document.getElementById('bio-token-expired-msg');
-  if (_tokenExpired) {
-    panel.classList.add('nobio');
-    bioBtn.style.display = 'none';
-    if (divider) divider.style.display = 'none';
-    if (_expMsg) { _expMsg.classList.remove('hidden'); _expMsg.style.display = ''; }
-    window._bioPendingData = bioData;
-    return;
-  }
   if (_expMsg) { _expMsg.classList.add('hidden'); _expMsg.style.display = 'none'; }
   panel.classList.remove('nobio');
   bioBtn.style.display = 'flex';
@@ -1838,6 +1854,69 @@ function _showBioLoginButton(bioData) {
       _bioLoginFromSplash();
     });
   }
+}
+
+/* גישה A: אימות מול GAS דרך credentialId (ללא idToken) אחרי שטביעת האצבע הצליחה.
+   קורא ל-action='bio_auth', מקבל נתוני רכב, מפעיל את האפליקציה.
+   מחזיר true בהצלחה, false בכישלון. מטפל בעצמו ב-toast, ב-startApp וב-_bioLoginBusy. */
+async function _bioGasAuth(email, credentialId) {
+  var bioBtn = document.getElementById('bio-login-btn');
+  var errEl = document.getElementById('login-err');
+  if (!email || !credentialId) {
+    window._bioLoginBusy = false;
+    setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
+    return false;
+  }
+  var data;
+  try {
+    var params = { action: 'bio_auth', email: email, credentialId: credentialId };
+    var url = GAS_URL + '?' + new URLSearchParams(params).toString();
+    var resp = await fetch(url, { method: 'GET' });
+    data = JSON.parse(await resp.text());
+  } catch(e) {
+    window._bioLoginBusy = false;
+    if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    setTimeout(function() { showToast('שגיאת חיבור — נסה שוב'); }, 200);
+    return false;
+  }
+  if (!data || !data.ok || !data.vehicle) {
+    window._bioLoginBusy = false;
+    if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    // credential לא תואם ב-Firebase — צריך כניסת Google חד-פעמית
+    setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
+    return false;
+  }
+  // הצלחה — הפעל את האפליקציה ללא idToken (STATE.idToken נשאר null)
+  STATE.vehicle = data.vehicle;
+  STATE.user = { email: email, name: (data.vehicle && data.vehicle.holder) || email };
+  STATE.idToken = null;
+  var sp = document.getElementById('splash-screen');
+  var _bioEk = email.replace(/[.#$[\]]/g, '_');
+  var _bioVk = _vehKey(data.vehicle);
+  showGreeting((data.vehicle && data.vehicle.holder) || email, _bioEk, _bioVk);
+  try {
+    loadFullData().then(function() {
+      window._bioLoginBusy = false;
+      window._bioTokenRefreshTried = false;
+      // שמור PIN_SESSION בלי idToken — הפינגר יעבוד שוב מ-credentialId בביקור הבא
+      _pinSessionSave(email, data.vehicle, STATE.user, null);
+      _grComplete(function() {
+        hideGreeting();
+        _fbWriteLastLogin(_bioEk, _bioVk);
+        if (sp) sp.classList.add('hidden');
+        _bioSessionStart();
+        startApp();
+      });
+    }).catch(function() {
+      window._bioLoginBusy = false;
+      STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
+      setTimeout(function() { showToast('שגיאת כניסה — נסה שוב'); }, 200);
+    });
+  } catch(e2) {
+    window._bioLoginBusy = false;
+    return false;
+  }
+  return true;
 }
 
 /* מופעל רק בלחיצת המשתמש על כפתור הכניסה הביומטרית */
@@ -1868,19 +1947,12 @@ async function _bioLoginFromSplash() {
     }
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     var session = _pinSessionLoad();
-    if (!session || !session.vehicleData || !session.idToken) {
-      // אין session מלא — צריך כניסת Google חד-פעמית לחידוש
-      window._bioLoginBusy = false;
-      setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
-      return;
-    }
-    // UX 4c: הכפתור הביומטרי מוסתר כאשר ה-token פג (ראה _showBioLoginButton),
-    // כך שסניף זה לא אמור להיות נגיש מהכפתור. שמור כ-guard בלבד.
-    if (_isTokenExpired(session.idToken)) {
-      // should never happen if splash shows correctly, but guard anyway
-      window._bioLoginBusy = false;
-      if (bioBtn) bioBtn.classList.remove('bio-scanning');
-      showToast('פג תוקף הכניסה — יש להתחבר עם Google');
+    // גישה A: אחרי שטביעת האצבע הצליחה — אם אין idToken תקין, נסה credentialId מול GAS.
+    // כך פינגר עובד לצמיתות (TTL 30 יום) בלי צורך ב-Google מחדש.
+    var _tokenBad = !session || !session.idToken || _isTokenExpired(session.idToken);
+    if (_tokenBad) {
+      var _okBio = await _bioGasAuth(bioData.email, bioData.credentialId);
+      // _bioGasAuth טיפל בכל: הפעלת האפליקציה, toast שגיאה, ו-_bioLoginBusy
       return;
     }
     STATE.vehicle = session.vehicleData;
