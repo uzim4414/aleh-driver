@@ -1869,12 +1869,25 @@ async function _bioGasAuth(email, credentialId) {
   }
   var data;
   var _bioRespText;
-  try {
-    var params = { action: 'bio_auth', email: email, credentialId: credentialId };
-    var url = GAS_URL + '?' + new URLSearchParams(params).toString();
-    var resp = await fetch(url, { method: 'GET' });
-    _bioRespText = await resp.text();
-  } catch(e) {
+  var params = { action: 'bio_auth', email: email, credentialId: credentialId };
+  var url = GAS_URL + '?' + new URLSearchParams(params).toString();
+  // retry — GAS cold start can exceed a mobile browser's fetch timeout and throw
+  var _bioRetries = 2;
+  var _bioFetchOk = false;
+  while (_bioRetries >= 0) {
+    try {
+      var resp = await fetch(url, { method: 'GET' });
+      _bioRespText = await resp.text();
+      _bioFetchOk = true;
+      break;
+    } catch(e) {
+      try { console.error('[bio_auth] fetch error (retries left ' + _bioRetries + '):', e && e.message, e); } catch(_) {}
+      if (_bioRetries <= 0) break;
+      _bioRetries--;
+      await new Promise(function(r){ setTimeout(r, 1500); });
+    }
+  }
+  if (!_bioFetchOk) {
     window._bioLoginBusy = false;
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     setTimeout(function() { showToast('שגיאת חיבור — נסה שוב'); }, 200);
@@ -1893,6 +1906,7 @@ async function _bioGasAuth(email, credentialId) {
   if (!data || !data.ok || !data.vehicle) {
     window._bioLoginBusy = false;
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    try { console.error('[bio_auth] server rejected:', (data && data.error) || 'no data', '| raw:', String(_bioRespText || '').substring(0, 200)); } catch(_) {}
     // credential לא תואם ב-Firebase — צריך כניסת Google חד-פעמית
     setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
     return false;
