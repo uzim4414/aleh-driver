@@ -1031,7 +1031,7 @@ async function gasPost(action, extra, opts) {
   const url = GAS_URL + '?' + new URLSearchParams(params).toString();
   let resp;
   try {
-    resp = await fetch(url, { method: 'GET' });
+    resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(20000) });
   } catch(netErr) {
     if (opts.silent) return { ok: false, error: 'network_error' };
     throw new Error('שגיאת חיבור: ' + (netErr && netErr.message ? netErr.message : netErr));
@@ -1084,7 +1084,7 @@ async function gasPostForm(action, params) {
   Object.keys(params).forEach(function(k) { fd.append(k, params[k]); });
   var resp;
   try {
-    resp = await fetch(GAS_URL, { method: 'POST', body: fd });
+    resp = await fetch(GAS_URL, { method: 'POST', body: fd, signal: AbortSignal.timeout(20000) });
   } catch(netErr) {
     throw new Error('שגיאת חיבור: ' + (netErr.message || netErr));
   }
