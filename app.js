@@ -2438,6 +2438,21 @@ async function handleGoogleCredential(response) {
       saveSession(STATE.idToken, STATE.vehicle, STATE.user);
       // שמור pin session ובדוק אם PIN מוגדר
       _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
+      // גישה A: אם bio רשום אך credentialId עוד לא ב-Firebase — כתוב כעת (migration)
+      try {
+        var _existBio = _bioLoad();
+        if (_existBio && _existBio.credentialId && _fbDb && STATE.user && STATE.user.email) {
+          var _mEk = STATE.user.email.replace(/[.#$\[\]]/g, '_');
+          _fbDb.ref('driverCreds/' + _mEk + '/' + _existBio.credentialId)
+            .once('value').then(function(snap) {
+              if (!snap.val()) {
+                _fbDb.ref('driverCreds/' + _mEk + '/' + _existBio.credentialId)
+                  .set({ email: STATE.user.email, createdAt: new Date().toISOString(), migrated: true })
+                  .catch(function(){});
+              }
+            }).catch(function(){});
+        }
+      } catch(_me) {}
       if (_bioAvailable() && !_bioLoad()) {
         setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
       } else if (!_pinLoad() && !_bioLoad()) {
@@ -3326,40 +3341,19 @@ async function _bioTimeoutReauth() {
     if (!bioData) throw new Error('no_bio');
     var session = _pinSessionLoad();
     if (!session) throw new Error('no_session');
-    if (_isTokenExpired(session.idToken)) {
-      if (window._bioPendingTokenRefresh) return;
-      // reuse silent refresh from _bioLoginFromSplash
-      if (window._bioTokenRefreshTried) {
-        window._bioTokenRefreshTried = false;
-        window._bioPendingTokenRefresh = false;
-        _hideBioTimeoutModal();
-        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); logout(); }, 300);
-        return;
+    // גישה A: אם idToken חסר/פג — השתמש ב-credentialId (ללא Google)
+    var _tReauthBad = !session.idToken || _isTokenExpired(session.idToken);
+    await bioAuthenticate(bioData.email, bioData.credentialId);
+    if (_tReauthBad) {
+      // fingerprint הצליח + token פג → credentialId path
+      _hideBioTimeoutModal();
+      var _gasOk = await _bioGasAuth(bioData.email, bioData.credentialId);
+      if (!_gasOk) {
+        // _bioGasAuth הציג toast — הצג שוב את ה-modal כדי לא להשאיר משתמש תקוע
+        _showBioTimeoutModal();
       }
-      window._bioTokenRefreshTried = true;
-      window._bioPendingTokenRefresh = true;
-      window._bioTimeoutReauthPending = true;
-      var refreshTimer = setTimeout(function() {
-        window._bioPendingTokenRefresh = false;
-        window._bioTokenRefreshTried = false;
-        window._bioTimeoutReauthPending = false;
-        _hideBioTimeoutModal();
-        setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); logout(); }, 300);
-      }, 5000);
-      window._bioRefreshTimer = refreshTimer;
-      google.accounts.id.prompt(function(notification) {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          clearTimeout(refreshTimer);
-          window._bioPendingTokenRefresh = false;
-          window._bioTokenRefreshTried = false;
-          window._bioTimeoutReauthPending = false;
-          _hideBioTimeoutModal();
-          setTimeout(function() { showToast('פג תוקף הכניסה — יש להיכנס מחדש עם Google'); logout(); }, 300);
-        }
-      });
       return;
     }
-    await bioAuthenticate(bioData.email, bioData.credentialId);
     _bioSessionStart();
     _hideBioTimeoutModal();
   } catch(e) {
