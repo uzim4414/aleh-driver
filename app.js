@@ -322,6 +322,7 @@ function _initFbSync() {
   _initFbGarageSync();
   _initFbReminderSync();
   _initFbGateSync();
+  _initFbVehicleSync();
   // Re-attach garageSync status listener with auth context (vehicle must already be loaded)
   if (STATE.vehicle) _initFbGarageStatusSync();
 }
@@ -333,14 +334,14 @@ function _initFbGateSync() {
   ref.on('value', function(snap) {
     try {
       var gateAccess = snap.val();
-      if (gateAccess && gateAccess.enabled) {
+      if (gateAccess && gateAccess.enabled && String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE') {
         APP._gateConfig = gateAccess;
         _gateInit();
       } else {
         // Self-provision: fetch config from GAS if vehicle has gate enabled
         var vehId = STATE.vehicle && STATE.vehicle.id;
         if (vehId && String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE') {
-          gasGet({ action: 'get_gate_config', vehicleId: vehId }).then(function(r) {
+          gasPost('get_gate_config', { vehicleId: vehId }, { silent: true }).then(function(r) {
             if (r && r.ok && r.config) {
               APP._gateConfig = r.config;
               // Write to Firebase so future loads are instant
@@ -361,6 +362,25 @@ function _initFbGateSync() {
       }
     } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
   }, function(err) { console.warn('[fbSync] gate listener:', err.message); });
+}
+
+/* ── Listener: Vehicle Assignment ── */
+function _initFbVehicleSync() {
+  var email = STATE.user && STATE.user.email;
+  if (!email || !_fbDb) return;
+  var emailKey = email.replace(/[.#$[\]]/g, '_').toLowerCase();
+  _fbDb.ref('vehicleAssignment/' + emailKey).on('value', function(snap) {
+    try {
+      var va = snap.val();
+      if (!va || !va.vehicleId) return;
+      // If vehicle changed or isActive changed, refresh state
+      var curId = STATE.vehicle && STATE.vehicle.id;
+      if (va.vehicleId !== curId || (STATE.vehicle && String(STATE.vehicle.isActive||'').toLowerCase() !== String(va.isActive||'').toLowerCase())) {
+        // Re-fetch full data from GAS
+        if (typeof loadFullData === 'function') loadFullData();
+      }
+    } catch(e) { console.warn('[fbSync] vehicleAssignment:', e.message); }
+  }, function(err) { console.warn('[fbSync] vehicleAssignment listener:', err.message); });
 }
 
 /* ── Listener: Notifications ── */
@@ -10435,7 +10455,10 @@ function _gateInit() {
   if (!card) return;
   var cfg = APP._gateConfig || {};
   if (!cfg.enabled) { card.style.display = 'none'; return; }
+  // Guard: vehicle must be active
+  var vehActive = !STATE.vehicle || String(STATE.vehicle.isActive || 'true').toLowerCase() === 'true';
   card.style.display = 'flex';
+  if (!vehActive) { _gateSetState('disabled'); return; }
   _gateSetState('idle');
   _gateStartWatch();
 }
@@ -10532,7 +10555,7 @@ function _gateSetState(state) {
   if (distBadge) distBadge.style.display = state === 'approaching' ? 'block' : 'none';
   if (statusDot) { statusDot.style.display = state === 'gps-off' ? 'block' : 'none'; statusDot.style.background = '#FF9F0A'; }
   if (lbl) {
-    var labels = { 'idle':'חניון\nאוטומטי', 'gps-off':'GPS\nלא זמין', 'approaching':'חניון\nאוטומטי', 'opening':'פותח\nשער...', 'success':'נפתח\n✓', 'error':'שגיאה\nנסה שוב' };
+    var labels = { 'idle':'חניון\nאוטומטי', 'gps-off':'GPS\nלא זמין', 'approaching':'חניון\nאוטומטי', 'opening':'פותח\nשער...', 'success':'נפתח\n✓', 'error':'שגיאה\nנסה שוב', 'disabled':'שער מושבת\nרכב לא פעיל' };
     lbl.innerHTML = (labels[state]||'חניון<br>אוטומטי').replace('\n','<br>');
   }
   if (iconBox) {

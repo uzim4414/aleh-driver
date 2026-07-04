@@ -4409,6 +4409,10 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 #qa-gate-card[data-state="opening"] .qa-lbl { color: rgba(255,255,255,0.85); }
 #qa-gate-card[data-state="error"] { border: 2px solid #FF453A !important; }
 #qa-gate-card[data-state="error"] #gate-icon-svg { stroke: #FF453A; }
+#qa-gate-card[data-state="disabled"] { background: #f1f5f9; border-color: #cbd5e1; }
+#qa-gate-card[data-state="disabled"] #gate-icon-box { background: #e2e8f0 !important; }
+#qa-gate-card[data-state="disabled"] #gate-icon-svg { stroke: #94a3b8; }
+#qa-gate-card[data-state="disabled"] #gate-lbl { color: #94a3b8; }
 @keyframes gatePulse { 0%,100%{box-shadow:0 0 0 0 rgba(31,138,61,0.4)} 50%{box-shadow:0 0 0 14px rgba(31,138,61,0)} }
 @keyframes rippleRing { 0%{transform:scale(0.6);opacity:0.7} 100%{transform:scale(2.8);opacity:0} }
 .gate-ripple { position:absolute;inset:0;border-radius:18px;border:2px solid rgba(31,138,61,0.6);pointer-events:none;display:none; }
