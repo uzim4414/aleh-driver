@@ -10563,8 +10563,8 @@ function _gateSetState(state) {
   if (distBadge) distBadge.style.display = state === 'approaching' ? 'block' : 'none';
   if (statusDot) { statusDot.style.display = state === 'gps-off' ? 'block' : 'none'; statusDot.style.background = '#FF9F0A'; }
   if (lbl) {
-    var labels = { 'idle':'חניון\nאוטומטי', 'gps-off':'GPS\nלא זמין', 'approaching':'חניון\nאוטומטי', 'opening':'פותח\nשער...', 'success':'נפתח\n✓', 'error':'שגיאה\nנסה שוב', 'disabled':'שער מושבת\nרכב לא פעיל' };
-    lbl.innerHTML = (labels[state]||'חניון<br>אוטומטי').replace('\n','<br>');
+    var labels = { 'idle':'שערי חניון\nוחניה', 'gps-off':'GPS\nלא זמין', 'approaching':'שערי חניון\nוחניה', 'opening':'פותח\nשער...', 'success':'נפתח\n✓', 'error':'שגיאה\nנסה שוב', 'disabled':'שער מושבת\nרכב לא פעיל' };
+    lbl.innerHTML = (labels[state]||'שערי חניון<br>וחניה').replace('\n','<br>');
   }
   if (iconBox) {
     if (state === 'opening') { iconBox.style.background = 'rgba(255,255,255,0.2)'; }
