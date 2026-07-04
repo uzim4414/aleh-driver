@@ -10493,6 +10493,8 @@ function _gateSetDisabled(reason) {
   card.style.display = 'flex';            // always visible (card is a flex .qa-card)
   card.classList.add('gate-access-disabled');
   card.setAttribute('data-state', 'disabled');
+  card.setAttribute('aria-disabled', 'true');
+  card.setAttribute('aria-label', 'גישה לחניון מושבתת');
   // Stop any running GPS watch — no point tracking while access is revoked.
   if (typeof _gateWatchId !== 'undefined' && _gateWatchId !== null && navigator.geolocation) {
     try { navigator.geolocation.clearWatch(_gateWatchId); _gateWatchId = null; } catch(_gsdW) {}
@@ -10503,12 +10505,28 @@ function _gateSetDisabled(reason) {
 }
 
 /* Re-enable the gate card (remove disabled styling). Actual init/state is
-   handled by _gateInit which is called right after by the caller. */
+   handled by _gateInit which is called right after by the caller.
+   NOTE: must ALSO clear the disabled data-state left behind by _gateSetDisabled /
+   _gateSetState('disabled') — otherwise the [data-state="disabled"] CSS keeps the
+   card grayed even after the .gate-access-disabled class is removed, so the card
+   stays visually "stuck disabled" until the next full refresh. */
 function _gateSetEnabled() {
   var card = document.getElementById('qa-gate-card');
   if (!card) return;
   card.style.display = 'flex';
   card.classList.remove('gate-access-disabled');
+  card.removeAttribute('aria-disabled');
+  // Reset any disabled/revoked visual state to a neutral idle look immediately,
+  // so the card reads as live even before _gateInit finishes its GAS round-trip.
+  if (card.getAttribute('data-state') === 'disabled') {
+    card.setAttribute('data-state', 'idle');
+    var _lbl = document.getElementById('gate-lbl');
+    if (_lbl) _lbl.innerHTML = 'שערי חניון<br>וחניה';
+    var _ib = document.getElementById('gate-icon-box');
+    if (_ib) _ib.style.background = 'var(--red-dim)';
+    var _svg = document.getElementById('gate-icon-svg');
+    if (_svg) _svg.setAttribute('stroke', '#1F8A3D');
+  }
 }
 
 function _gateInit() {

@@ -4413,9 +4413,50 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 #qa-gate-card[data-state="disabled"] #gate-icon-box { background: #e2e8f0 !important; }
 #qa-gate-card[data-state="disabled"] #gate-icon-svg { stroke: #94a3b8; }
 #qa-gate-card[data-state="disabled"] #gate-lbl { color: #94a3b8; }
-/* Gate access revoked / pending — card stays VISIBLE but grayed & non-interactive */
-#qa-gate-card.gate-access-disabled { opacity: 0.55; filter: grayscale(60%); cursor: default; pointer-events: none; }
-#qa-gate-card.gate-access-disabled #gate-lbl { color: #94a3b8; font-weight: 600; }
+/* Gate access revoked / pending — card stays VISIBLE but locked & non-interactive.
+   Reads as a real, intentional "locked" card (not broken): desaturated, muted slate
+   palette, a small lock badge over the gate icon, and a slow breathing pulse to show
+   it's "watching but locked". */
+#qa-gate-card.gate-access-disabled {
+  cursor: default;
+  pointer-events: none;
+  filter: saturate(0);
+  opacity: 0.7;
+  background: linear-gradient(160deg, #f8fafc 0%, #eef2f7 100%);
+  border-color: #cbd5e1;
+  box-shadow: inset 0 0 0 1px rgba(148,163,184,0.12);
+  animation: gateLockedBreathe 3.2s ease-in-out infinite;
+}
+/* Neutralize any active-state visuals that might linger under the class */
+#qa-gate-card.gate-access-disabled[data-state] { border-color: #cbd5e1 !important; }
+#qa-gate-card.gate-access-disabled .gate-ripple,
+#qa-gate-card.gate-access-disabled .gate-dist-badge { display: none !important; }
+/* Icon box — muted slate, and host the lock badge */
+#qa-gate-card.gate-access-disabled #gate-icon-box {
+  background: #e2e8f0 !important;
+  position: relative;
+}
+#qa-gate-card.gate-access-disabled #gate-icon-svg { stroke: #94a3b8 !important; }
+/* Small lock badge overlaid on the gate icon */
+#qa-gate-card.gate-access-disabled #gate-icon-box::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  inset-inline-end: -3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='11' width='16' height='10' rx='2'/><path d='M8 11V8a4 4 0 0 1 8 0v3'/></svg>") center/9px 9px no-repeat,
+    linear-gradient(160deg, #94a3b8 0%, #64748b 100%);
+  box-shadow: 0 1px 3px rgba(15,23,42,0.35), 0 0 0 2px #f8fafc;
+}
+/* Label — muted slate */
+#qa-gate-card.gate-access-disabled #gate-lbl { color: #64748b; font-weight: 600; }
+@keyframes gateLockedBreathe {
+  0%, 100% { opacity: 0.62; }
+  50%      { opacity: 0.78; }
+}
 @keyframes gatePulse { 0%,100%{box-shadow:0 0 0 0 rgba(31,138,61,0.4)} 50%{box-shadow:0 0 0 14px rgba(31,138,61,0)} }
 @keyframes rippleRing { 0%{transform:scale(0.6);opacity:0.7} 100%{transform:scale(2.8);opacity:0} }
 .gate-ripple { position:absolute;inset:0;border-radius:18px;border:2px solid rgba(31,138,61,0.6);pointer-events:none;display:none; }
