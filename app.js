@@ -356,24 +356,20 @@ function _initFbGateSync() {
               if (ref) ref.set(r.config);
               _gateInit();
             } else {
-              var gc = document.getElementById('qa-gate-card');
-              if (gc) gc.style.display = 'none';
+              // Vehicle IS gate-enabled but no config available yet — show disabled, don't hide.
+              _gateSetDisabled('ממתין\nלהרשאה');
             }
           }).catch(function() {
-            var gc = document.getElementById('qa-gate-card');
-            if (gc) gc.style.display = 'none';
+            _gateSetDisabled('ממתין\nלהרשאה');
           });
         } else {
-          var gc = document.getElementById('qa-gate-card');
-          if (gc) gc.style.display = 'none';
-          // Vehicle is NOT gate-enabled but a stale gateAccess node still exists in Firebase
-          // (left over from a previous self-provision). Delete it so the card can't reappear
-          // and other listeners don't act on stale config.
+          // Vehicle is assigned but gate access is NOT enabled (revoked / never granted).
+          // Show the card DISABLED (grayed, not tappable) — it must NEVER disappear.
+          _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון');
+          // Remove the stale gateAccess node so an active config can't be acted on,
+          // but keep the card visible in its disabled state.
           if (gateAccess && ref) { try { ref.remove(); } catch(_gaRmE) {} }
-          // Also stop any running GPS watch from a previous gate session.
-          if (typeof _gateWatchId !== 'undefined' && _gateWatchId !== null && navigator.geolocation) {
-            try { navigator.geolocation.clearWatch(_gateWatchId); _gateWatchId = null; } catch(_gwE) {}
-          }
+          // GPS watch is already cleared inside _gateSetDisabled().
         }
       }
     } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
@@ -393,6 +389,11 @@ function _initFbVehicleSync() {
       var curId = STATE.vehicle && STATE.vehicle.id;
       var curGate = String((STATE.vehicle||{}).gateAccessEnabled||'').toUpperCase();
       var newGate = String(va.gateAccessEnabled||'').toUpperCase();
+      // Instant visual feedback for gate access flips — don't wait for loadFullData.
+      if (curGate !== newGate) {
+        if (newGate === 'TRUE') { _gateSetEnabled(); }
+        else { _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון'); }
+      }
       if (va.vehicleId !== curId ||
           (STATE.vehicle && String(STATE.vehicle.isActive||'').toLowerCase() !== String(va.isActive||'').toLowerCase()) ||
           curGate !== newGate) {
@@ -2682,6 +2683,11 @@ async function loadFullData() {
   fetchGovData();
   if ('serviceWorker' in navigator && GAS_URL) registerPush();
   loadNotifHistoryFromGAS();
+  // Re-evaluate gate card now that STATE.vehicle is populated. On a plain refresh the
+  // gate listener already fired while STATE.vehicle was null (bailed at the guard), and
+  // _initFbVehicleSync only re-triggers on a *changed* value — so a vehicle that was
+  // already gateAccessEnabled=FALSE never gets its card hidden / stale node removed.
+  if (typeof _initFbGateSync === 'function') { try { _initFbGateSync(); } catch(_gsE) {} }
   _initFbGarageStatusSync();
   // Safety net: clear stale local widget if it no longer matches an active server request
   _reconcileGarageStatus();
@@ -10478,9 +10484,37 @@ var _gateCooldownUntil = 0;
 var _gateWatchId = null;
 var _gateOpening = false;
 
+/* Show the gate card in a DISABLED state — visible but grayed out & not tappable.
+   Used when gate access was revoked / not yet granted, but the vehicle is assigned.
+   The card must NEVER disappear once a vehicle is assigned. */
+function _gateSetDisabled(reason) {
+  var card = document.getElementById('qa-gate-card');
+  if (!card) return;
+  card.style.display = 'flex';            // always visible (card is a flex .qa-card)
+  card.classList.add('gate-access-disabled');
+  card.setAttribute('data-state', 'disabled');
+  // Stop any running GPS watch — no point tracking while access is revoked.
+  if (typeof _gateWatchId !== 'undefined' && _gateWatchId !== null && navigator.geolocation) {
+    try { navigator.geolocation.clearWatch(_gateWatchId); _gateWatchId = null; } catch(_gsdW) {}
+  }
+  GATE_STATE = 'access-disabled';
+  var lbl = document.getElementById('gate-lbl');
+  if (lbl) lbl.innerHTML = (reason || 'גישה לחניון\nמושהית').replace(/\n/g, '<br>');
+}
+
+/* Re-enable the gate card (remove disabled styling). Actual init/state is
+   handled by _gateInit which is called right after by the caller. */
+function _gateSetEnabled() {
+  var card = document.getElementById('qa-gate-card');
+  if (!card) return;
+  card.style.display = 'flex';
+  card.classList.remove('gate-access-disabled');
+}
+
 function _gateInit() {
   var card = document.getElementById('qa-gate-card');
   if (!card) return;
+  _gateSetEnabled(); // clear any prior disabled styling
   var cfg = APP._gateConfig || {};
   if (!cfg.enabled) { card.style.display = 'none'; return; }
   // Guard: vehicle must be active
