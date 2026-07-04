@@ -68,15 +68,16 @@ jobs:
           # under the YAML block scalar (a column-0 heredoc terminator
           # would break YAML parsing).
           TEXT=$(printf '%s\n' \
-            "🚀 *Fleet Driver PWA — גרסה חדשה עלתה לאוויר*" \
+            "Fleet Driver PWA - New version deployed!" \
             "" \
-            "📦 גרסה: \`${SW}\`" \
-            "🔗 SHA: \`${SHA}\`" \
-            "📅 תאריך: ${NICE}" \
-            "👤 דחף: ${PUSHER}" \
-            "📝 ${MSG_FIRST}" \
+            "Version: ${SW}" \
+            "SHA: ${SHA}" \
+            "Date: ${NICE}" \
+            "Pusher: ${PUSHER}" \
+            "Commit: ${MSG_FIRST}" \
             "" \
-            "[📱 פתח PWA](${PWA_URL})  •  [🐙 GitHub](${COMMIT_URL})")
+            "PWA: ${PWA_URL}" \
+            "GitHub: ${COMMIT_URL}")
 
           # Telegram sendMessage with MarkdownV2-safe classic Markdown.
           HTTP=$(curl -s -o /tmp/tg_resp.json -w '%{http_code}' \
