@@ -6,10 +6,11 @@ name: Notify Deploy (Telegram)
 on:
   deployment_status:
 
-# Avoid duplicate notifications if GitHub retries a deployment.
+# One notification per git SHA — GitHub Pages retries the same commit
+# multiple times; keying on the deployed SHA prevents duplicate messages.
 concurrency:
-  group: notify-deploy
-  cancel-in-progress: false
+  group: notify-deploy-${{ github.event.deployment.sha }}
+  cancel-in-progress: true
 
 jobs:
   telegram:
