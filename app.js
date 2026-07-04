@@ -358,6 +358,14 @@ function _initFbGateSync() {
         } else {
           var gc = document.getElementById('qa-gate-card');
           if (gc) gc.style.display = 'none';
+          // Vehicle is NOT gate-enabled but a stale gateAccess node still exists in Firebase
+          // (left over from a previous self-provision). Delete it so the card can't reappear
+          // and other listeners don't act on stale config.
+          if (gateAccess && ref) { try { ref.remove(); } catch(_gaRmE) {} }
+          // Also stop any running GPS watch from a previous gate session.
+          if (typeof _gateWatchId !== 'undefined' && _gateWatchId !== null && navigator.geolocation) {
+            try { navigator.geolocation.clearWatch(_gateWatchId); _gateWatchId = null; } catch(_gwE) {}
+          }
         }
       }
     } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
