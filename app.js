@@ -377,11 +377,18 @@ function _initFbGateSync() {
 }
 
 /* ── Listener: Vehicle Assignment ── */
+var _vehAssignRef = null; // module-level — allows detaching a stale listener before re-attaching
 function _initFbVehicleSync() {
   var email = STATE.user && STATE.user.email;
+  // Detach any previous listener first — this function is re-called after login
+  // (see startApp) once STATE.user.email is finally populated. Without the detach
+  // we'd stack duplicate listeners; without the re-call the listener never attaches
+  // at all, because onAuthStateChanged fires _initFbSync before STATE.user is set.
+  if (_vehAssignRef) { try { _vehAssignRef.off('value'); } catch(_vaE) {} _vehAssignRef = null; }
   if (!email || !_fbDb) return;
   var emailKey = email.replace(/[.#$[\]]/g, '_').toLowerCase();
-  _fbDb.ref('vehicleAssignment/' + emailKey).on('value', function(snap) {
+  _vehAssignRef = _fbDb.ref('vehicleAssignment/' + emailKey);
+  _vehAssignRef.on('value', function(snap) {
     try {
       var va = snap.val();
       if (!va || !va.vehicleId) return;
@@ -2688,6 +2695,11 @@ async function loadFullData() {
   // _initFbVehicleSync only re-triggers on a *changed* value — so a vehicle that was
   // already gateAccessEnabled=FALSE never gets its card hidden / stale node removed.
   if (typeof _initFbGateSync === 'function') { try { _initFbGateSync(); } catch(_gsE) {} }
+  // Attach (or re-attach) the vehicleAssignment listener now that STATE.user.email
+  // is populated. On cold start onAuthStateChanged calls _initFbSync → _initFbVehicleSync
+  // while STATE.user is still null, so that first attach bails out. This re-call is what
+  // actually wires up live gate-access flips (admin toggling gateAccessEnabled in Fleet).
+  if (typeof _initFbVehicleSync === 'function') { try { _initFbVehicleSync(); } catch(_vsE) {} }
   _initFbGarageStatusSync();
   // Safety net: clear stale local widget if it no longer matches an active server request
   _reconcileGarageStatus();
