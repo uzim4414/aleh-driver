@@ -332,14 +332,32 @@ function _initFbGateSync() {
   if (!ref) return;
   ref.on('value', function(snap) {
     try {
-      // Gate access config
-      var gateAccess = snap.val() || {};
-      APP._gateConfig = gateAccess;
-      if (gateAccess.enabled) {
+      var gateAccess = snap.val();
+      if (gateAccess && gateAccess.enabled) {
+        APP._gateConfig = gateAccess;
         _gateInit();
       } else {
-        var gc = document.getElementById('qa-gate-card');
-        if (gc) gc.style.display = 'none';
+        // Self-provision: fetch config from GAS if vehicle has gate enabled
+        var vehId = STATE.vehicle && STATE.vehicle.id;
+        if (vehId && String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE') {
+          gasGet({ action: 'get_gate_config', vehicleId: vehId }).then(function(r) {
+            if (r && r.ok && r.config) {
+              APP._gateConfig = r.config;
+              // Write to Firebase so future loads are instant
+              if (ref) ref.set(r.config);
+              _gateInit();
+            } else {
+              var gc = document.getElementById('qa-gate-card');
+              if (gc) gc.style.display = 'none';
+            }
+          }).catch(function() {
+            var gc = document.getElementById('qa-gate-card');
+            if (gc) gc.style.display = 'none';
+          });
+        } else {
+          var gc = document.getElementById('qa-gate-card');
+          if (gc) gc.style.display = 'none';
+        }
       }
     } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
   }, function(err) { console.warn('[fbSync] gate listener:', err.message); });
