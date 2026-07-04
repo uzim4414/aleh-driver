@@ -1,25 +1,28 @@
 name: Notify Deploy (Telegram)
 
-# Fires a rich Telegram push to the admin every time a new PWA version
-# lands on main. The pre-push hook bumps sw.js + version.json into the
-# pushed commit, so version.json here is already the new version.
+# Fires ONLY after GitHub Pages actually finishes deploying — not on push.
+# GitHub emits a deployment_status event with state=success when the CDN
+# is live and the new files are truly reachable by users.
 on:
-  push:
-    branches:
-      - main
+  deployment_status:
 
-# Avoid overlapping notifications if two pushes land close together.
+# Avoid duplicate notifications if GitHub retries a deployment.
 concurrency:
   group: notify-deploy
   cancel-in-progress: false
 
 jobs:
   telegram:
+    # Run only when Pages deployment succeeds (not on pending/in_progress/failure).
+    if: >
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'github-pages'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout deployed commit
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.deployment.sha }}
           fetch-depth: 1
 
       - name: Parse version.json
@@ -32,7 +35,7 @@ jobs:
           fi
           SW=$(jq -r '.swVersion // "unknown"' version.json)
           SHA=$(jq -r '.sha // "unknown"' version.json)
-          # Human date from version.json; fallback to commit time.
+          # Human date from version.json; fallback to now.
           RAWDATE=$(jq -r '.date // ""' version.json)
           if [ -n "$RAWDATE" ]; then
             NICE=$(date -d "$RAWDATE" +'%d/%m/%Y %H:%M' 2>/dev/null || echo "$RAWDATE")
@@ -54,36 +57,25 @@ jobs:
           SW: ${{ steps.ver.outputs.sw }}
           SHA: ${{ steps.ver.outputs.sha }}
           NICE: ${{ steps.ver.outputs.nice }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          PUSHER: ${{ github.event.pusher.name }}
+          DEPLOY_URL: ${{ github.event.deployment_status.target_url }}
         run: |
-          FULL_SHA="${{ github.sha }}"
+          FULL_SHA="${{ github.event.deployment.sha }}"
           COMMIT_URL="https://github.com/${{ github.repository }}/commit/${FULL_SHA}"
           PWA_URL="https://uzim4414.github.io/aleh-driver/"
 
-          # First line of the commit message only.
-          MSG_FIRST=$(printf '%s' "$COMMIT_MSG" | head -1)
-
-          # Build the message with printf so everything stays indented
-          # under the YAML block scalar (a column-0 heredoc terminator
-          # would break YAML parsing).
           TEXT=$(printf '%s\n' \
-            "🚀 *Fleet Driver PWA — New Deploy*" \
+            "🟢 *Fleet Driver PWA — Live on Pages*" \
             "━━━━━━━━━━━━━━━━━━━━" \
             "" \
             "📦 Version:  \`${SW}\`" \
             "🔗 SHA:  \`${SHA}\`" \
             "🕐 Date:  ${NICE}" \
-            "👤 By:  ${PUSHER}" \
-            "" \
-            "📝 _${MSG_FIRST}_" \
             "" \
             "━━━━━━━━━━━━━━━━━━━━" \
-            "✅ *Deployed successfully*" \
+            "✅ *הקבצים חיים — האפליקציה מוכנה לעדכון*" \
             "" \
-            "[📱 Open PWA](${PWA_URL})   ·   [🐙 View commit](${COMMIT_URL})")
+            "[📱 פתח PWA](${PWA_URL})   ·   [🐙 Commit](${COMMIT_URL})")
 
-          # Telegram sendMessage with MarkdownV2-safe classic Markdown.
           HTTP=$(curl -s -o /tmp/tg_resp.json -w '%{http_code}' \
             -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \
@@ -97,4 +89,4 @@ jobs:
             echo "::error::Telegram notification failed (HTTP $HTTP)"
             exit 1
           fi
-          echo "✅ Telegram notification sent for ${SW}."
+          echo "✅ Telegram sent — PWA ${SW} is live."
