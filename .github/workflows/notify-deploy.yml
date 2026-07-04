@@ -1,0 +1,95 @@
+name: Notify Deploy (Telegram)
+
+# Fires a rich Telegram push to the admin every time a new PWA version
+# lands on main. The pre-push hook bumps sw.js + version.json into the
+# pushed commit, so version.json here is already the new version.
+on:
+  push:
+    branches:
+      - main
+
+# Avoid overlapping notifications if two pushes land close together.
+concurrency:
+  group: notify-deploy
+  cancel-in-progress: false
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Parse version.json
+        id: ver
+        run: |
+          if [ ! -f version.json ]; then
+            echo "version.json missing — skipping notification."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          SW=$(jq -r '.swVersion // "unknown"' version.json)
+          SHA=$(jq -r '.sha // "unknown"' version.json)
+          # Human date from version.json; fallback to commit time.
+          RAWDATE=$(jq -r '.date // ""' version.json)
+          if [ -n "$RAWDATE" ]; then
+            NICE=$(date -d "$RAWDATE" +'%d/%m/%Y %H:%M' 2>/dev/null || echo "$RAWDATE")
+          else
+            NICE=$(date +'%d/%m/%Y %H:%M')
+          fi
+          {
+            echo "sw=$SW"
+            echo "sha=$SHA"
+            echo "nice=$NICE"
+            echo "skip=false"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send Telegram notification
+        if: steps.ver.outputs.skip == 'false'
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SW: ${{ steps.ver.outputs.sw }}
+          SHA: ${{ steps.ver.outputs.sha }}
+          NICE: ${{ steps.ver.outputs.nice }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          PUSHER: ${{ github.event.pusher.name }}
+        run: |
+          FULL_SHA="${{ github.sha }}"
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${FULL_SHA}"
+          PWA_URL="https://uzim4414.github.io/aleh-driver/"
+
+          # First line of the commit message only.
+          MSG_FIRST=$(printf '%s' "$COMMIT_MSG" | head -1)
+
+          # Build the message with printf so everything stays indented
+          # under the YAML block scalar (a column-0 heredoc terminator
+          # would break YAML parsing).
+          TEXT=$(printf '%s\n' \
+            "🚀 *Fleet Driver PWA — גרסה חדשה עלתה לאוויר*" \
+            "" \
+            "📦 גרסה: \`${SW}\`" \
+            "🔗 SHA: \`${SHA}\`" \
+            "📅 תאריך: ${NICE}" \
+            "👤 דחף: ${PUSHER}" \
+            "📝 ${MSG_FIRST}" \
+            "" \
+            "[📱 פתח PWA](${PWA_URL})  •  [🐙 GitHub](${COMMIT_URL})")
+
+          # Telegram sendMessage with MarkdownV2-safe classic Markdown.
+          HTTP=$(curl -s -o /tmp/tg_resp.json -w '%{http_code}' \
+            -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            --data-urlencode "parse_mode=Markdown" \
+            --data-urlencode "disable_web_page_preview=true")
+
+          echo "Telegram HTTP status: $HTTP"
+          cat /tmp/tg_resp.json || true
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Telegram notification failed (HTTP $HTTP)"
+            exit 1
+          fi
+          echo "✅ Telegram notification sent for ${SW}."
