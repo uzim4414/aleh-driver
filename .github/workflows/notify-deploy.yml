@@ -65,7 +65,7 @@ jobs:
           PWA_URL="https://uzim4414.github.io/aleh-driver/"
 
           TEXT=$(printf '%s\n' \
-            "🟢 *Fleet Driver PWA — Live on Pages*" \
+            "🟢 *Fleet Driver — PWA + Android מעודכנים*" \
             "━━━━━━━━━━━━━━━━━━━━" \
             "" \
             "📦 Version:  \`${SW}\`" \
@@ -73,7 +73,7 @@ jobs:
             "🕐 Date:  ${NICE}" \
             "" \
             "━━━━━━━━━━━━━━━━━━━━" \
-            "✅ *הקבצים חיים — האפליקציה מוכנה לעדכון*" \
+            "✅ *הקבצים חיים — PWA + APK מתעדכנים אוטומטית*" \
             "" \
             "[📱 פתח PWA](${PWA_URL})   ·   [🐙 Commit](${COMMIT_URL})")
 

@@ -8149,6 +8149,21 @@ APP._garageAppointmentNo = function() {
 
 /* ══ Web Push (direct PushManager.subscribe — no Firebase SDK) ══ */
 async function registerPush() {
+  // Native Capacitor: use FCM token instead of Web Push subscription
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+    if (window.CapacitorFirebaseMessaging) {
+      window.CapacitorFirebaseMessaging.requestPermissions().then(function() {
+        return window.CapacitorFirebaseMessaging.getToken();
+      }).then(function(result) {
+        var token = result && (result.token || result);
+        if (!token) { console.warn('[Push] FCM token empty'); return; }
+        gasPost('driver_register_push', { fcmToken: token, vehicleId: STATE.vehicle && STATE.vehicle.id }, { silent: true })
+          .then(function(r) { console.log('[Push] FCM registered:', r && r.ok); })
+          .catch(function(e) { console.warn('[Push] FCM register failed:', e); });
+      }).catch(function(e) { console.warn('[Push] FCM permission/token error:', e); });
+    }
+    return; // skip Web Push PushManager path
+  }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.warn('[Push] not supported');
     return;
@@ -10511,6 +10526,10 @@ function _gateSetDisabled(reason) {
   if (typeof _gateWatchId !== 'undefined' && _gateWatchId !== null && navigator.geolocation) {
     try { navigator.geolocation.clearWatch(_gateWatchId); _gateWatchId = null; } catch(_gsdW) {}
   }
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.__nativeGeoWatchId) {
+    try { BackgroundGeolocation.removeWatcher({ id: window.__nativeGeoWatchId }); } catch(_ngE) {}
+    window.__nativeGeoWatchId = null;
+  }
   GATE_STATE = 'access-disabled';
   var lbl = document.getElementById('gate-lbl');
   if (lbl) lbl.innerHTML = (reason || 'גישה לחניון\nמושהית').replace(/\n/g, '<br>');
@@ -10556,6 +10575,23 @@ function _gateInit() {
 }
 
 function _gateStartWatch() {
+  // Native Capacitor background GPS — replaces watchPosition when running as APK
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+    if (window.__nativeGeoWatchId) {
+      try { BackgroundGeolocation.removeWatcher({ id: window.__nativeGeoWatchId }); } catch(_e) {}
+      window.__nativeGeoWatchId = null;
+    }
+    BackgroundGeolocation.addWatcher(
+      { backgroundMessage: 'עלה עוקב אחר מיקום לפתיחת שערי חניון', backgroundTitle: 'עלה נהגים — GPS פעיל', requestPermissions: true, stale: false, distanceFilter: 10 },
+      function(location, error) {
+        if (error) { console.warn('[GateNative] GPS error:', error.code); return; }
+        if (!location) return;
+        var fakePos = { coords: { latitude: location.latitude, longitude: location.longitude, speed: location.speed || 0, accuracy: location.accuracy } };
+        if (typeof _gateOnPosition === 'function') _gateOnPosition(fakePos);
+      }
+    ).then(function(watchId) { window.__nativeGeoWatchId = watchId; });
+    return; // skip navigator.geolocation.watchPosition
+  }
   if (_gateWatchId !== null) { navigator.geolocation.clearWatch(_gateWatchId); }
   if (!navigator.geolocation) { _gateSetState('gps-off'); return; }
   _gateWatchId = navigator.geolocation.watchPosition(
