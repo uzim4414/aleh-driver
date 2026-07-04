@@ -321,8 +321,28 @@ function _initFbSync() {
   _initFbNotifSync();
   _initFbGarageSync();
   _initFbReminderSync();
+  _initFbGateSync();
   // Re-attach garageSync status listener with auth context (vehicle must already be loaded)
   if (STATE.vehicle) _initFbGarageStatusSync();
+}
+
+/* ── Listener: Gate access config ── */
+function _initFbGateSync() {
+  var ref = _fbRef('gateAccess');
+  if (!ref) return;
+  ref.on('value', function(snap) {
+    try {
+      // Gate access config
+      var gateAccess = snap.val() || {};
+      APP._gateConfig = gateAccess;
+      if (gateAccess.enabled) {
+        _gateInit();
+      } else {
+        var gc = document.getElementById('qa-gate-card');
+        if (gc) gc.style.display = 'none';
+      }
+    } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
+  }, function(err) { console.warn('[fbSync] gate listener:', err.message); });
 }
 
 /* ── Listener: Notifications ── */
@@ -10382,6 +10402,179 @@ function _thHaversine(lat1, lng1, lat2, lng2) {
   var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
+
+// ============================================================
+// GATE MODULE — חניון ושערים אוטומטיים
+// ============================================================
+
+var GATE_STATE = 'idle';
+var _gateCooldownUntil = 0;
+var _gateWatchId = null;
+var _gateOpening = false;
+
+function _gateInit() {
+  var card = document.getElementById('qa-gate-card');
+  if (!card) return;
+  var cfg = APP._gateConfig || {};
+  if (!cfg.enabled) { card.style.display = 'none'; return; }
+  card.style.display = 'flex';
+  _gateSetState('idle');
+  _gateStartWatch();
+}
+
+function _gateStartWatch() {
+  if (_gateWatchId !== null) { navigator.geolocation.clearWatch(_gateWatchId); }
+  if (!navigator.geolocation) { _gateSetState('gps-off'); return; }
+  _gateWatchId = navigator.geolocation.watchPosition(
+    function(pos) { _gateOnPosition(pos); },
+    function(err) { console.warn('Gate GPS error:', err.code); _gateSetState('gps-off'); },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+  );
+}
+
+function _gateOnPosition(pos) {
+  var cfg = APP._gateConfig || {};
+  if (!cfg.enabled || !cfg.lat || !cfg.lng) return;
+  var lat = pos.coords.latitude;
+  var lng = pos.coords.longitude;
+  var speedMs = pos.coords.speed || 0;
+  var distKm = _thHaversine(lat, lng, parseFloat(cfg.lat), parseFloat(cfg.lng));
+  var distM = distKm * 1000;
+  var radius = parseFloat(cfg.radius) || 200;
+  if (distM < radius) {
+    if (_gateOpening) return;
+    if (!_gateCheckConditions(speedMs, cfg)) return;
+    _gateSetState('opening');
+    _gateOpen(cfg.lotId, distM, speedMs, lat, lng);
+  } else if (distM < 400) {
+    _gateSetState('approaching');
+    var badge = document.getElementById('gate-dist-badge');
+    if (badge) badge.textContent = Math.round(distM) + ' מ\'';
+  } else {
+    _gateSetState('idle');
+  }
+}
+
+function _gateCheckConditions(speedMs, cfg) {
+  if (Date.now() < _gateCooldownUntil) return false;
+  var speedKmh = speedMs * 3.6;
+  var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
+  if (maxSpeed > 0 && speedKmh > maxSpeed) return false;
+  if (cfg.hoursStart && cfg.hoursEnd) {
+    var now = new Date();
+    var hhmm = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+    if (hhmm < cfg.hoursStart || hhmm > cfg.hoursEnd) return false;
+  }
+  if (cfg.allowedDays) {
+    var days = String(cfg.allowedDays).split(',').map(function(d){return parseInt(d.trim(),10);});
+    if (days.indexOf(new Date().getDay()) === -1) return false;
+  }
+  return true;
+}
+
+function _gateOpen(lotId, distM, speedMs, lat, lng) {
+  _gateOpening = true;
+  var uid = STATE.firebaseUid || (STATE.user && STATE.user.uid) || '';
+  var vehId = (STATE.vehicle && STATE.vehicle.id) || '';
+  gasPost('open_gate', {
+    lotId: lotId,
+    vehicleId: vehId,
+    uid: uid,
+    dist: Math.round(distM),
+    speed: Math.round(speedMs * 3.6 * 10) / 10,
+    lat: lat,
+    lng: lng
+  }, { silent: true }).then(function(r) {
+    _gateOpening = false;
+    if (r && r.ok) {
+      var cooldownSec = parseFloat((APP._gateConfig||{}).cooldownSec) || 300;
+      _gateCooldownUntil = Date.now() + cooldownSec * 1000;
+      _gateShowSuccess(r.lotName || (APP._gateConfig||{}).lotName || 'חניון', distM);
+    } else {
+      _gateSetState('error');
+      setTimeout(function(){ _gateSetState('idle'); }, 5000);
+    }
+  }).catch(function() {
+    _gateOpening = false;
+    _gateSetState('error');
+    setTimeout(function(){ _gateSetState('idle'); }, 5000);
+  });
+}
+
+function _gateSetState(state) {
+  GATE_STATE = state;
+  var card = document.getElementById('qa-gate-card');
+  if (!card) return;
+  card.setAttribute('data-state', state);
+  var lbl = document.getElementById('gate-lbl');
+  var iconBox = document.getElementById('gate-icon-box');
+  var distBadge = document.getElementById('gate-dist-badge');
+  var statusDot = document.getElementById('gate-status-dot');
+  var svg = document.getElementById('gate-icon-svg');
+  if (distBadge) distBadge.style.display = state === 'approaching' ? 'block' : 'none';
+  if (statusDot) { statusDot.style.display = state === 'gps-off' ? 'block' : 'none'; statusDot.style.background = '#FF9F0A'; }
+  if (lbl) {
+    var labels = { 'idle':'חניון\nאוטומטי', 'gps-off':'GPS\nלא זמין', 'approaching':'חניון\nאוטומטי', 'opening':'פותח\nשער...', 'success':'נפתח\n✓', 'error':'שגיאה\nנסה שוב' };
+    lbl.innerHTML = (labels[state]||'חניון<br>אוטומטי').replace('\n','<br>');
+  }
+  if (iconBox) {
+    if (state === 'opening') { iconBox.style.background = 'rgba(255,255,255,0.2)'; }
+    else if (state === 'gps-off') { iconBox.style.background = 'rgba(138,138,142,0.15)'; }
+    else { iconBox.style.background = 'var(--red-dim)'; }
+  }
+  if (svg) {
+    if (state === 'gps-off') { svg.setAttribute('stroke','#8A8A8E'); }
+    else if (state === 'error') { svg.setAttribute('stroke','#FF453A'); }
+    else if (state === 'opening') { svg.setAttribute('stroke','#fff'); }
+    else { svg.setAttribute('stroke','#1F8A3D'); }
+  }
+}
+
+function _gateShowSuccess(lotName, distM) {
+  _gateSetState('success');
+  var overlay = document.getElementById('gate-success-overlay');
+  if (!overlay) return;
+  var title = document.getElementById('gs-title');
+  var lot = document.getElementById('gs-lot');
+  var meta = document.getElementById('gs-meta');
+  var bar = document.getElementById('gs-bar');
+  if (title) title.textContent = 'השער נפתח!';
+  if (lot) lot.textContent = lotName;
+  var now = new Date();
+  var timeStr = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+  if (meta) meta.textContent = 'מרחק: ' + Math.round(distM) + ' מ\' · ' + timeStr;
+  overlay.style.display = 'flex';
+  if (bar) { bar.style.width = '0'; setTimeout(function(){ bar.style.width = '100%'; }, 50); }
+  // Show OS notification
+  if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+    navigator.serviceWorker.ready.then(function(reg) {
+      reg.showNotification('🅿️ שער החניון נפתח', {
+        body: lotName + ' · נפתח אוטומטית עבורך',
+        icon: './icons/icon-192.png',
+        badge: './icons/badge-blue.png',
+        tag: 'gate-open',
+        renotify: true,
+        requireInteraction: true,
+        actions: [{ action:'view', title:'פרטים' }, { action:'dismiss', title:'סגור' }],
+        dir: 'rtl', lang: 'he'
+      });
+    }).catch(function(){});
+  }
+  setTimeout(function() {
+    overlay.style.display = 'none';
+    _gateSetState('idle');
+  }, 4500);
+}
+
+// Expose tap handler
+if (typeof APP !== 'undefined') {
+  APP.gateCardTap = function() {
+    if (GATE_STATE === 'error') { _gateSetState('idle'); _gateStartWatch(); }
+  };
+}
+// ============================================================
+// END GATE MODULE
+// ============================================================
 
 function _thIsOpen(s) {
   var now = new Date(), day = now.getDay(), h = now.getHours() + now.getMinutes()/60;

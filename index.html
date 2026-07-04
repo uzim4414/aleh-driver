@@ -4402,6 +4402,27 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   font-family:'Noto Sans Hebrew',sans-serif;transition:color .2s;
 }
 .bio-decline:hover{color:var(--t1);}
+/* ── Gate card ── */
+#qa-gate-card[data-state="approaching"] { border-color: #1F8A3D; animation: gatePulse 2s ease-in-out infinite; }
+#qa-gate-card[data-state="opening"] { background: #1F8A3D; border-color: #1F8A3D; }
+#qa-gate-card[data-state="opening"] #gate-icon-svg { stroke: #fff; }
+#qa-gate-card[data-state="opening"] .qa-lbl { color: rgba(255,255,255,0.85); }
+#qa-gate-card[data-state="error"] { border: 2px solid #FF453A !important; }
+#qa-gate-card[data-state="error"] #gate-icon-svg { stroke: #FF453A; }
+@keyframes gatePulse { 0%,100%{box-shadow:0 0 0 0 rgba(31,138,61,0.4)} 50%{box-shadow:0 0 0 14px rgba(31,138,61,0)} }
+@keyframes rippleRing { 0%{transform:scale(0.6);opacity:0.7} 100%{transform:scale(2.8);opacity:0} }
+.gate-ripple { position:absolute;inset:0;border-radius:18px;border:2px solid rgba(31,138,61,0.6);pointer-events:none;display:none; }
+#qa-gate-card[data-state="opening"] .gate-ripple { display:block;animation:rippleRing 1.2s ease-out infinite; }
+.gate-dist-badge { position:absolute;top:6px;left:6px;background:#1F8A3D;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;animation:badgeBeat 1.5s ease-in-out infinite; }
+.gate-status-dot { position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#FF9F0A; }
+/* Gate success overlay */
+#gate-success-overlay { position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#0a1f0f 0%,#0d3018 100%);padding:32px;animation:notif-landing-in .5s cubic-bezier(.22,1,.36,1) both; }
+.gs-icon { font-size:80px;margin-bottom:20px; }
+.gs-title { font-size:28px;font-weight:800;color:#30D158;text-align:center; }
+.gs-lot { font-size:16px;color:rgba(255,255,255,.7);margin-top:8px;text-align:center; }
+.gs-meta { font-size:13px;color:rgba(255,255,255,.4);margin-top:4px;text-align:center; }
+.gs-bar-wrap { margin-top:36px;width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden; }
+.gs-bar { height:100%;background:#30D158;border-radius:2px;width:0;transition:width 4s linear; }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -4409,6 +4430,14 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 <body>
 
 <div id="notif-landing" style="display:none"></div>
+
+<div id="gate-success-overlay" style="display:none">
+  <div class="gs-icon" id="gs-icon">🅿️</div>
+  <div class="gs-title" id="gs-title">השער נפתח!</div>
+  <div class="gs-lot" id="gs-lot"></div>
+  <div class="gs-meta" id="gs-meta"></div>
+  <div class="gs-bar-wrap"><div class="gs-bar" id="gs-bar"></div></div>
+</div>
 
 <svg style="display:none">
 <defs>
@@ -4808,6 +4837,20 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <div class="qa-lbl">רחיצה<br>רכב</div>
           <div class="wash-count-badge" id="wash-count-badge" style="display:none"></div>
         </div>
+
+  <!-- כרטיס 4: חניון ושערים אוטומטיים -->
+  <div class="qa-card" id="qa-gate-card" data-state="idle" style="display:none;position:relative;overflow:hidden" onclick="APP.gateCardTap && APP.gateCardTap()">
+    <div class="gate-ripple" id="gate-ripple"></div>
+    <div class="qa-icon-box" id="gate-icon-box" style="background:var(--red-dim);transition:background .3s">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="gate-icon-svg">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <path d="M12 4v16M2 12h20"/>
+      </svg>
+    </div>
+    <div class="qa-lbl" id="gate-lbl">חניון<br>אוטומטי</div>
+    <div class="gate-dist-badge" id="gate-dist-badge" style="display:none"></div>
+    <div class="gate-status-dot" id="gate-status-dot" style="display:none"></div>
+  </div>
       </div>
       <div style="height:120px"></div>
     </div>
