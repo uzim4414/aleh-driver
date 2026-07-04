@@ -316,6 +316,8 @@ function _fbDeleteReminder(id) {
 
 /* ── Master Sync Init ── */
 
+var _gateRef = null; // module-level — מאפשר ניתוק listener ישן לפני חיבור חדש
+
 /** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
 function _initFbSync() {
   _initFbNotifSync();
@@ -329,10 +331,16 @@ function _initFbSync() {
 
 /* ── Listener: Gate access config ── */
 function _initFbGateSync() {
+  // ניתוק listener קודם — מניעת כפילות כשהפונקציה נקראת שוב אחרי loadFullData
+  if (_gateRef) { try { _gateRef.off('value'); } catch(_grE) {} _gateRef = null; }
   var ref = _fbRef('gateAccess');
   if (!ref) return;
+  _gateRef = ref;
   ref.on('value', function(snap) {
     try {
+      // STATE.vehicle טרם נטען (onAuthStateChanged מוקדם מדי) — לא מוחקים ולא מסתירים.
+      // _initFbVehicleSync יפעיל אותנו שוב לאחר שloadFullData יסיים.
+      if (!STATE.vehicle || !STATE.vehicle.id) return;
       var gateAccess = snap.val();
       if (gateAccess && gateAccess.enabled && String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE') {
         APP._gateConfig = gateAccess;
