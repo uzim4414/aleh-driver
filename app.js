@@ -381,11 +381,23 @@ function _initFbVehicleSync() {
     try {
       var va = snap.val();
       if (!va || !va.vehicleId) return;
-      // If vehicle changed or isActive changed, refresh state
+      // If vehicle changed, isActive changed, or gateAccessEnabled changed, refresh state
       var curId = STATE.vehicle && STATE.vehicle.id;
-      if (va.vehicleId !== curId || (STATE.vehicle && String(STATE.vehicle.isActive||'').toLowerCase() !== String(va.isActive||'').toLowerCase())) {
-        // Re-fetch full data from GAS
-        if (typeof loadFullData === 'function') loadFullData();
+      var curGate = String((STATE.vehicle||{}).gateAccessEnabled||'').toUpperCase();
+      var newGate = String(va.gateAccessEnabled||'').toUpperCase();
+      if (va.vehicleId !== curId ||
+          (STATE.vehicle && String(STATE.vehicle.isActive||'').toLowerCase() !== String(va.isActive||'').toLowerCase()) ||
+          curGate !== newGate) {
+        // Re-fetch full data from GAS, then re-evaluate gate card visibility
+        // (loadFullData refreshes STATE.vehicle but does NOT re-run gate init).
+        if (typeof loadFullData === 'function') {
+          var _lfd = loadFullData();
+          if (_lfd && typeof _lfd.then === 'function') {
+            _lfd.then(function() { if (typeof _initFbGateSync === 'function') _initFbGateSync(); });
+          } else if (typeof _initFbGateSync === 'function') {
+            _initFbGateSync();
+          }
+        }
       }
     } catch(e) { console.warn('[fbSync] vehicleAssignment:', e.message); }
   }, function(err) { console.warn('[fbSync] vehicleAssignment listener:', err.message); });
