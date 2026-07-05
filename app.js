@@ -2538,33 +2538,21 @@ function _getNativePlugin(name) {
 }
 
 function _loginFallbackRedirect() {
-  if (_isNativeApp()) {
-    var GoogleAuth = _getNativePlugin('GoogleAuth');
-    if (GoogleAuth) {
-      // initialize() must be called before signIn() on Android
-      var _initP;
-      try { _initP = GoogleAuth.initialize ? GoogleAuth.initialize({ clientId: GOOGLE_CLIENT_ID, scopes: ['profile','email'] }) : Promise.resolve(); } catch(_e) { _initP = Promise.resolve(); }
-      Promise.resolve(_initP).then(function() {
-        return GoogleAuth.signIn();
-      }).then(function(user) {
-        var token = user && ((user.authentication && user.authentication.idToken) || user.idToken);
-        if (token) {
-          window._userInitiatedLogin = true;
-          handleGoogleCredential({ credential: token });
-        } else {
-          showToast('NativeAuth: no idToken — keys: ' + JSON.stringify(Object.keys(user||{})));
-          _loginWebRedirect();
-        }
-      }).catch(function(err) {
-        showToast('NativeAuth ERR: ' + (err && (err.message || err.code || JSON.stringify(err))));
-        _loginWebRedirect();
-      });
-      return;
-    }
-    showToast('NativeAuth: plugin NULL. Plugins: ' + JSON.stringify(Object.keys((window.Capacitor&&window.Capacitor.Plugins)||{})));
-    _loginWebRedirect();
-    return;
-  }
+  // NOTE: We deliberately do NOT use the @codetrix-studio/capacitor-google-auth
+  // native plugin here. On Android it crashed the whole app:
+  //   1. app.js passes scopes as a JS array (['profile','email']), but the
+  //      native initialize() reads "scopes" as a String
+  //      (call.getData().getString("scopes")). An array yields null →
+  //      null.replaceAll(...) throws NPE INSIDE initialize() → the plugin's
+  //      private googleSignInClient field is never assigned.
+  //   2. signIn() then does googleSignInClient.getSignInIntent() on a null
+  //      client → uncaught native NullPointerException that kills the Activity
+  //      BEFORE any Promise rejection is marshalled back to JS, so the .catch()
+  //      below could never intercept it.
+  // The WebView OAuth redirect path is self-contained and already fully wired:
+  // MainActivity strips "; wv" from the UA so Google permits OAuth in the
+  // WebView, and the boot handler + _handleNativeOAuthUrl() parse the returned
+  // "#id_token=". So on native we go straight to the redirect flow.
   _loginWebRedirect();
 }
 
