@@ -2480,20 +2480,19 @@ function _loginFallbackRedirect() {
   // response_type=token id_token is therefore an invalid request.
   //
   // FIX: use the WEB client (implicit flow IS allowed for Web clients in a real
-  // browser) and redirect back to the GitHub Pages URL. This works with ZERO
-  // extra plugins because capacitor.config.json sets
-  //   server.url = https://uzim4414.github.io/aleh-driver/
-  // → the Capacitor WebView's origin IS https://uzim4414.github.io. The external
-  // Chrome tab lands on that same page, its boot handler parses "#id_token=…"
-  // and persists the session to localStorage. Since Chrome and the Capacitor
-  // WebView share the SAME origin they share the SAME localStorage store, so on
-  // App 'resume' the WebView re-reads the session the browser just wrote.
+  // browser) and redirect back to the GitHub Pages URL. The external Chrome tab
+  // lands on that page, its boot handler parses "#id_token=…" and — since it is
+  // NOT running inside Capacitor — forwards the token via deep link:
+  //   org.aleh.driverapp://auth-complete#id_token=…
+  // Android's intent-filter brings MainActivity to the foreground, 'appUrlOpen'
+  // fires with that URL, and _handleNativeOAuthUrl() completes the login.
+  // NOTE: Chrome and the Capacitor WebView do NOT share localStorage even for
+  // the same origin — a localStorage bridge can never work here.
   // redirect_uri must be registered as an Authorized redirect URI on the WEB
   // client in Google Cloud Console (it is already a JavaScript origin).
   if (_isNativeApp()) {
     var nativeRedirect = 'https://uzim4414.github.io/aleh-driver/';
     var nNonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    try { localStorage.setItem('aleh_oauth_pending', String(Date.now())); } catch (_) {}
     var nUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
       + '?client_id=' + clientId               // WEB client (GOOGLE_CLIENT_ID)
       + '&redirect_uri=' + encodeURIComponent(nativeRedirect)
@@ -2536,53 +2535,15 @@ function _handleNativeOAuthUrl(urlStr) {
   } catch (_) {}
 }
 
-/* localStorage bridge (native APK). The external Chrome tab and the Capacitor
-   WebView share the SAME origin (https://uzim4414.github.io — see server.url in
-   capacitor.config.json), hence the SAME localStorage. After OAuth, the browser
-   tab's boot handler writes the fresh id_token to 'aleh_oauth_token'. When the
-   app returns to the foreground we consume it here and continue the login. */
-var OAUTH_TOKEN_KEY = 'aleh_oauth_token';
-function _consumeBridgedOAuthToken() {
-  try {
-    var raw = localStorage.getItem(OAUTH_TOKEN_KEY);
-    if (!raw) return false;
-    // Format: "<ts>|<id_token>" — ignore anything older than 5 min (stale).
-    var sep = raw.indexOf('|');
-    var ts = sep > 0 ? parseInt(raw.slice(0, sep), 10) : 0;
-    var it = sep > 0 ? raw.slice(sep + 1) : raw;
-    localStorage.removeItem(OAUTH_TOKEN_KEY);
-    localStorage.removeItem('aleh_oauth_pending');
-    if (!it || (ts && Date.now() - ts > 5 * 60 * 1000)) return false;
-    if (STATE && STATE.idToken) return false; // already logged in this session
-    window._userInitiatedLogin = true;
-    handleGoogleCredential({ credential: it });
-    return true;
-  } catch (_) { return false; }
-}
-
+/* Deep-link listener (native APK). After external-browser OAuth, the GitHub
+   Pages boot handler (running in Chrome) forwards the token in the deep-link
+   URL itself: org.aleh.driverapp://auth-complete#id_token=… — no localStorage
+   bridge (Chrome and the Capacitor WebView have SEPARATE storage even for the
+   same origin). _handleNativeOAuthUrl() extracts the token from the URL. */
 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
   try {
     window.Capacitor.Plugins.App.addListener('appUrlOpen', function(data) {
-      var _u = data && data.url;
-      // Custom-scheme return from external OAuth browser:
-      // org.aleh.driverapp://auth-complete carries no token in the URL — the token
-      // was persisted to shared localStorage by the browser tab. Consume it here.
-      if (_u && _u.indexOf('auth-complete') !== -1) {
-        _consumeBridgedOAuthToken();
-        return;
-      }
-      _handleNativeOAuthUrl(_u);
-    });
-  } catch (_) {}
-  // Resume bridge: pick up a token the external browser wrote while we were backgrounded.
-  try {
-    window.Capacitor.Plugins.App.addListener('appStateChange', function(st) {
-      if (st && st.isActive) _consumeBridgedOAuthToken();
-    });
-  } catch (_) {}
-  try {
-    window.Capacitor.Plugins.App.addListener('resume', function() {
-      _consumeBridgedOAuthToken();
+      _handleNativeOAuthUrl(data && data.url);
     });
   } catch (_) {}
 }
@@ -9089,32 +9050,19 @@ document.addEventListener('DOMContentLoaded', async function() {
       var _it = _hp.get('id_token');
       if (_it) {
         history.replaceState({}, '', location.pathname);
-        // Native-APK bridge: this page may be running in the EXTERNAL browser tab
-        // (opened via window.open(_system)) rather than the Capacitor WebView.
-        // Both share this origin's localStorage, so stash the token for the APK
-        // to consume on resume. Harmless in a plain browser (consumed only by the
-        // native App-resume listener, which never fires there).
-        var _wasNativePending = false;
-        try {
-          if (localStorage.getItem('aleh_oauth_pending')) {
-            _wasNativePending = true;
-            localStorage.setItem('aleh_oauth_token', Date.now() + '|' + _it);
-          }
-        } catch(_) {}
-        // Native-APK return-to-app: this boot handler is running in the EXTERNAL
-        // Chrome tab (opened via window.open(_system)). The token is now persisted
-        // to the shared localStorage. Navigate to the custom scheme so Android's
-        // intent-filter (org.aleh.driverapp://auth-complete) brings MainActivity
-        // back to the foreground; the Capacitor WebView's 'appUrlOpen'/'resume'
-        // listeners then fire and _consumeBridgedOAuthToken() picks up the token.
-        // We deliberately do NOT call handleGoogleCredential() here in that case —
-        // this page is the throw-away browser tab, not the app WebView.
-        if (_wasNativePending) {
-          try { history.replaceState({}, '', location.pathname); } catch(_) {}
+        // Native-APK return (URL-based token handoff — NO localStorage bridge:
+        // Chrome and the Capacitor WebView have SEPARATE storage even for the
+        // same origin). If this page is running OUTSIDE Capacitor it may be the
+        // external Chrome tab opened by the APK via window.open(_system) —
+        // forward the token in the deep-link URL itself. Android's intent-filter
+        // (org.aleh.driverapp://auth-complete) brings MainActivity to the
+        // foreground; 'appUrlOpen' fires and _handleNativeOAuthUrl() extracts
+        // the token. In a plain desktop/PWA browser the unknown scheme is a
+        // no-op and login simply continues below as usual.
+        if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
           try {
-            window.location.href = 'org.aleh.driverapp://auth-complete';
+            window.location.replace('org.aleh.driverapp://auth-complete#id_token=' + encodeURIComponent(_it));
           } catch(_) {}
-          return;
         }
         window._userInitiatedLogin = true; // OAuth redirect is always user-initiated
         handleGoogleCredential({ credential: _it });
