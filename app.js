@@ -2698,23 +2698,56 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
   } catch (_) {}
 }
 
+/* One Tap suppressed (g_state backoff / no Google session / FedCM off) — render
+   the standard GSI button in place of the custom login button. Clicking it opens
+   Google's own account-chooser popup (same-origin, no full-page external redirect).
+   PWA only — native APK never reaches here. */
+var _gsiButtonRendered = false;
+function _renderGsiButton() {
+  if (_gsiButtonRendered) return;
+  try {
+    if (!(window.google && google.accounts && google.accounts.id)) return;
+    var loginBtn = document.getElementById('login-btn');
+    if (!loginBtn) return;
+    var host = document.getElementById('gsi-btn-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'gsi-btn-host';
+      host.style.display = 'flex';
+      host.style.justifyContent = 'center';
+      loginBtn.parentNode.insertBefore(host, loginBtn.nextSibling);
+    }
+    loginBtn.style.display = 'none';
+    google.accounts.id.renderButton(host, {
+      type: 'standard',
+      theme: 'filled_blue',
+      size: 'large',
+      text: 'signin_with',
+      shape: 'pill',
+      logo_alignment: 'left',
+      locale: 'he'
+    });
+    _gsiButtonRendered = true;
+  } catch (e) {
+    console.warn('[auth] renderButton failed:', e && e.message);
+  }
+}
+
 function initGoogleAuth() {
   if (!GOOGLE_CLIENT_ID) {
     // Demo mode — skip Google auth
     return;
   }
-  // use_fedcm_for_prompt:true — One Tap ב-PWA/דפדפן.
-  // Chrome ביטל את זרם One Tap הישן (מבוסס third-party cookies); בלי FedCM,
-  // prompt() מוחזר isNotDisplayed() ומיד נופל ל-_loginWebRedirect() → redirect עם
-  // prompt=select_account = "רשימת חשבונות ארוכה" במקום כרטיס ה-One Tap הקומפקטי.
-  // הפעלת FedCM מחזירה את כרטיס ה-One Tap דרך הדפדפן. native (APK) לא מגיע לכאן —
+  // use_fedcm_for_prompt:false — FedCM גרם ל-One Tap לא להיות מוצג ב-PWA
+  // (isNotDisplayed) ומיד ליפול ל-redirect/popup חיצוני. עם FedCM כבוי כרטיס
+  // ה-One Tap הקלאסי חוזר להיות מוצג דרך הדפדפן. native (APK) לא מגיע לכאן —
   // login-btn מדלג ל-_loginFallbackRedirect לפני קריאת prompt().
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
     auto_select: false,
     cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: true
+    use_fedcm_for_prompt: false
   });
 }
 
@@ -9402,10 +9435,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       // Native APK: google.accounts.id.prompt() opens Chrome (external browser)
       // even with the UA fix — skip it entirely and go straight to WebView OAuth.
       if (_isNativeApp()) { _loginFallbackRedirect(); return; }
+      // PWA: One Tap ישירות — ללא redirect/popup חיצוני.
       try {
         google.accounts.id.prompt(function(notification) {
-          // FedCM: isNotDisplayed()/isSkippedMoment() deprecated — may throw.
-          // עטוף כדי שזריקה לא תבטל את ה-fallback כשה-One Tap לא הוצג.
           var _notShown = false;
           try { _notShown = notification.isNotDisplayed() || notification.isSkippedMoment(); }
           catch(_ne) { _notShown = true; }
@@ -9413,12 +9445,12 @@ document.addEventListener('DOMContentLoaded', async function() {
           // backoff after repeated dismissals; opt_out_or_no_session = no Google session).
           try { console.log('[auth] One Tap notDisplayedReason:', notification.getNotDisplayedReason()); } catch(_r1) {}
           try { console.log('[auth] One Tap skippedReason:', notification.getSkippedReason()); } catch(_r2) {}
-          // PWA: One Tap suppressed/blocked → OAuth popup (no full-page redirect).
-          if (_notShown) _loginPopupOAuth();
+          // One Tap נחסם/דוכא → הצג כפתור GSI רגיל במקום redirect חיצוני.
+          if (_notShown) _renderGsiButton();
         });
       } catch(e) {
         console.warn('[auth] prompt() threw:', e && e.message);
-        _loginPopupOAuth();
+        _renderGsiButton();
       }
     });
   };
