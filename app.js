@@ -1803,6 +1803,9 @@ function pkConfirmSelect() {
 var BIO_KEY = 'aleh_bio_v2'; // {email, credentialId, rpId, deviceName, createdAt}
 
 function _bioAvailable() {
+  if (_isNativeApp()) {
+    return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuthNative);
+  }
   return !!(window.PublicKeyCredential &&
     navigator.credentials &&
     navigator.credentials.create &&
@@ -1832,12 +1835,36 @@ function _fromB64url(s) {
   return bytes;
 }
 
-// רישום טביעת אצבע — WebAuthn מקומי לחלוטין, ללא GAS
+// רישום טביעת אצבע
 async function bioRegister(email, displayName) {
   if (!_bioAvailable()) throw new Error('מכשיר זה אינו תומך בטביעת אצבע');
 
+  // Native APK: use BiometricAuthNative plugin (fingerprint-only, no PIN fallback)
+  if (_isNativeApp()) {
+    var plugin = window.Capacitor.Plugins.BiometricAuthNative;
+    await plugin.authenticate({
+      reason: 'רישום טביעת אצבע לכניסה מהירה',
+      cancelTitle: 'ביטול',
+      allowDeviceCredential: false
+    });
+    var ua = navigator.userAgent;
+    var dev = (/Samsung|Galaxy/.test(ua)) ? 'Samsung' :
+              (/Android/.test(ua) && ua.match(/;\s*([^;)]+)\sBuild/)) ?
+                ua.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'Android';
+    _bioSave({ email: email, deviceName: dev, createdAt: new Date().toISOString(), nativePlugin: true });
+    try {
+      if (_fbDb && email) {
+        var _ek = email.replace(/[.#$\[\]]/g, '_');
+        _fbDb.ref('driverCreds/' + _ek + '/native')
+          .set({ email: email, createdAt: new Date().toISOString() })
+          .catch(function(){});
+      }
+    } catch(_e) {}
+    return 'native';
+  }
+
+  // WebAuthn path (browser / PWA)
   var rpId = location.hostname;
-  // challenge מקומי — אין צורך ב-GAS
   var localChallenge = new Uint8Array(32);
   window.crypto.getRandomValues(localChallenge);
   var cred = await navigator.credentials.create({ publicKey: {
@@ -1864,18 +1891,16 @@ async function bioRegister(email, displayName) {
   }});
   if (!cred) throw new Error('הרישום בוטל');
   var credId = _b64url(cred.rawId);
-  var ua = navigator.userAgent;
-  var dev = /iPhone/.test(ua) ? 'iPhone' :
-            /iPad/.test(ua) ? 'iPad' :
-            (/Android/.test(ua) && ua.match(/;\s*([^;)]+)\sBuild/)) ?
-              ua.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'מכשיר';
-  // שמור מקומית — זה הכל שצריך
-  _bioSave({ email: email, credentialId: credId, rpId: rpId, deviceName: dev, createdAt: new Date().toISOString() });
-  // כתוב credentialId ל-Firebase — מאפשר auth ללא idToken (גישה A)
+  var ua2 = navigator.userAgent;
+  var dev2 = /iPhone/.test(ua2) ? 'iPhone' :
+             /iPad/.test(ua2) ? 'iPad' :
+             (/Android/.test(ua2) && ua2.match(/;\s*([^;)]+)\sBuild/)) ?
+               ua2.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'מכשיר';
+  _bioSave({ email: email, credentialId: credId, rpId: rpId, deviceName: dev2, createdAt: new Date().toISOString() });
   try {
     if (_fbDb && email) {
-      var _ek = email.replace(/[.#$\[\]]/g, '_');
-      _fbDb.ref('driverCreds/' + _ek + '/' + credId)
+      var _ek2 = email.replace(/[.#$\[\]]/g, '_');
+      _fbDb.ref('driverCreds/' + _ek2 + '/' + credId)
         .set({ email: email, createdAt: new Date().toISOString() })
         .catch(function(){});
     }
@@ -1883,12 +1908,29 @@ async function bioRegister(email, displayName) {
   return credId;
 }
 
-// אימות — WebAuthn מקומי לחלוטין, ללא GAS
+// אימות ביומטרי
 async function bioAuthenticate(email, credentialId) {
   if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
 
+  // Native APK: use BiometricAuthNative plugin (fingerprint-only)
+  if (_isNativeApp()) {
+    var plugin = window.Capacitor.Plugins.BiometricAuthNative;
+    await plugin.authenticate({
+      reason: 'כניסה ביומטרית',
+      cancelTitle: 'ביטול',
+      allowDeviceCredential: false
+    });
+    var session = _pinSessionLoad();
+    return {
+      ok: true,
+      biometric: true,
+      vehicle: session ? session.vehicleData : null,
+      userInfo: session ? session.userInfo : { email: email, name: email }
+    };
+  }
+
+  // WebAuthn path (browser / PWA)
   var rpId = location.hostname;
-  // challenge מקומי — אין GAS
   var localChallenge = new Uint8Array(32);
   window.crypto.getRandomValues(localChallenge);
   var assertion = await navigator.credentials.get({ publicKey: {
@@ -1903,13 +1945,12 @@ async function bioAuthenticate(email, credentialId) {
     timeout: 60000
   }});
   if (!assertion) throw new Error('האימות בוטל');
-  // טביעת אצבע הצליחה — טען session מקומי
-  var session = _pinSessionLoad();
+  var session2 = _pinSessionLoad();
   return {
     ok: true,
     biometric: true,
-    vehicle: session ? session.vehicleData : null,
-    userInfo: session ? session.userInfo : { email: email, name: email }
+    vehicle: session2 ? session2.vehicleData : null,
+    userInfo: session2 ? session2.userInfo : { email: email, name: email }
   };
 }
 
@@ -2486,21 +2527,32 @@ function _getNativePlugin(name) {
 }
 
 function _loginFallbackRedirect() {
-  // NOTE: We deliberately do NOT use the @codetrix-studio/capacitor-google-auth
-  // native plugin here. On Android it crashed the whole app:
-  //   1. app.js passes scopes as a JS array (['profile','email']), but the
-  //      native initialize() reads "scopes" as a String
-  //      (call.getData().getString("scopes")). An array yields null →
-  //      null.replaceAll(...) throws NPE INSIDE initialize() → the plugin's
-  //      private googleSignInClient field is never assigned.
-  //   2. signIn() then does googleSignInClient.getSignInIntent() on a null
-  //      client → uncaught native NullPointerException that kills the Activity
-  //      BEFORE any Promise rejection is marshalled back to JS, so the .catch()
-  //      below could never intercept it.
-  // The WebView OAuth redirect path is self-contained and already fully wired:
-  // MainActivity strips "; wv" from the UA so Google permits OAuth in the
-  // WebView, and the boot handler + _handleNativeOAuthUrl() parse the returned
-  // "#id_token=". So on native we go straight to the redirect flow.
+  // Native APK: use @codetrix-studio/capacitor-google-auth plugin.
+  // Root cause of previous NPE crash was missing strings.xml server_client_id —
+  // now fixed. Plugin supports JS array scopes (regex-cleaned internally).
+  if (_isNativeApp()) {
+    var GoogleAuth = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.GoogleAuth;
+    if (GoogleAuth) {
+      GoogleAuth.initialize({
+        clientId: GOOGLE_CLIENT_ID,
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: false
+      }).then(function() {
+        return GoogleAuth.signIn();
+      }).then(function(result) {
+        var idToken = result && result.authentication && result.authentication.idToken;
+        if (!idToken) throw new Error('no id_token in result');
+        window._userInitiatedLogin = true;
+        handleGoogleCredential({ credential: idToken });
+      }).catch(function(err) {
+        console.error('GoogleAuth native signIn error:', err);
+        hideLoader();
+        // User cancelled or plugin error — stay on login screen
+      });
+      return;
+    }
+    // Plugin not registered — fall through to web redirect as last resort
+  }
   _loginWebRedirect();
 }
 
@@ -9246,7 +9298,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       window._userInitiatedLogin = true;
       // Native APK: google.accounts.id.prompt() opens Chrome (external browser)
       // even with the UA fix — skip it entirely and go straight to WebView OAuth.
-      if (_isNativeApp()) { _loginWebRedirect(); return; }
+      if (_isNativeApp()) { _loginFallbackRedirect(); return; }
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
