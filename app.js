@@ -2702,36 +2702,6 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
    the standard GSI button in place of the custom login button. Clicking it opens
    Google's own account-chooser popup (same-origin, no full-page external redirect).
    PWA only — native APK never reaches here. */
-var _gsiButtonRendered = false;
-function _renderGsiButton() {
-  if (_gsiButtonRendered) return;
-  try {
-    if (!(window.google && google.accounts && google.accounts.id)) return;
-    var loginBtn = document.getElementById('login-btn');
-    if (!loginBtn) return;
-    var host = document.getElementById('gsi-btn-host');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'gsi-btn-host';
-      host.style.display = 'flex';
-      host.style.justifyContent = 'center';
-      loginBtn.parentNode.insertBefore(host, loginBtn.nextSibling);
-    }
-    loginBtn.style.display = 'none';
-    google.accounts.id.renderButton(host, {
-      type: 'standard',
-      theme: 'filled_blue',
-      size: 'large',
-      text: 'signin_with',
-      shape: 'pill',
-      logo_alignment: 'left',
-      locale: 'he'
-    });
-    _gsiButtonRendered = true;
-  } catch (e) {
-    console.warn('[auth] renderButton failed:', e && e.message);
-  }
-}
 
 function initGoogleAuth() {
   if (!GOOGLE_CLIENT_ID) {
@@ -9432,25 +9402,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true;
-      // Native APK: google.accounts.id.prompt() opens Chrome (external browser)
-      // even with the UA fix — skip it entirely and go straight to WebView OAuth.
+      // Native APK: use SocialLogin plugin (Credential Manager bottom sheet).
       if (_isNativeApp()) { _loginFallbackRedirect(); return; }
-      // PWA: One Tap ישירות — ללא redirect/popup חיצוני.
+      // PWA: נסה One Tap. אם מדוכא (backoff) — popup OAuth ישירות.
+      // popup נפתח סינכרונית מ-click → לא נחסם על מובייל.
       try {
         google.accounts.id.prompt(function(notification) {
           var _notShown = false;
           try { _notShown = notification.isNotDisplayed() || notification.isSkippedMoment(); }
           catch(_ne) { _notShown = true; }
-          // Diagnostic: why One Tap wasn't displayed (suppressed_by_user = exponential
-          // backoff after repeated dismissals; opt_out_or_no_session = no Google session).
-          try { console.log('[auth] One Tap notDisplayedReason:', notification.getNotDisplayedReason()); } catch(_r1) {}
-          try { console.log('[auth] One Tap skippedReason:', notification.getSkippedReason()); } catch(_r2) {}
-          // One Tap נחסם/דוכא → הצג כפתור GSI רגיל במקום redirect חיצוני.
-          if (_notShown) _renderGsiButton();
+          if (_notShown) _loginPopupOAuth();
         });
       } catch(e) {
         console.warn('[auth] prompt() threw:', e && e.message);
-        _renderGsiButton();
+        _loginPopupOAuth();
       }
     });
   };
