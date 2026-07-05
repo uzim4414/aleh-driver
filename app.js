@@ -9404,8 +9404,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       window._userInitiatedLogin = true;
       // Native APK: use SocialLogin plugin (Credential Manager bottom sheet).
       if (_isNativeApp()) { _loginFallbackRedirect(); return; }
-      // PWA: נסה One Tap. אם לא מוצג (backoff/isNotDisplayed) — redirect מלא.
-      // אסור popup מ-callback async: הדפדפן חוסם ומפנה לדף חיצוני (v318 restore).
+      // PWA: מחק g_state cookie לפני prompt כדי לאפס One Tap backoff (suppressed_by_user).
+      // g_state נשמר על הדומיין שלנו (לא google.com) — אפשר לנקות אותו.
+      try { document.cookie = 'g_state=;max-age=0;path=/'; } catch(_) {}
       try {
         google.accounts.id.prompt(function(notification) {
           var _notShown = false;
