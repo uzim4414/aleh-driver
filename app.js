@@ -1803,13 +1803,6 @@ function pkConfirmSelect() {
 var BIO_KEY = 'aleh_bio_v2'; // {email, credentialId, rpId, deviceName, createdAt}
 
 function _bioAvailable() {
-  // Native APK: the @aparajita/capacitor-biometric-auth plugin uses the platform
-  // BiometricPrompt (fingerprint/face), avoiding the WebAuthn-in-WebView PIN
-  // fallback (problem 3). If the plugin is present, biometric is available.
-  if (_isNativeApp()) {
-    var BiometricAuth = _getNativePlugin('BiometricAuthNative') || _getNativePlugin('BiometricAuth');
-    if (BiometricAuth) return true;
-  }
   return !!(window.PublicKeyCredential &&
     navigator.credentials &&
     navigator.credentials.create &&
@@ -1842,28 +1835,6 @@ function _fromB64url(s) {
 // רישום טביעת אצבע — WebAuthn מקומי לחלוטין, ללא GAS
 async function bioRegister(email, displayName) {
   if (!_bioAvailable()) throw new Error('מכשיר זה אינו תומך בטביעת אצבע');
-
-  // Native APK: the BiometricAuth plugin verifies via BiometricPrompt but does not
-  // mint a WebAuthn credential. Register by confirming a biometric check, then store
-  // a local marker keyed by email (bioAuthenticate uses the plugin, not credentialId).
-  if (_isNativeApp()) {
-    var BiometricAuth = _getNativePlugin('BiometricAuthNative') || _getNativePlugin('BiometricAuth');
-    if (BiometricAuth) {
-      await BiometricAuth.authenticate({
-        reason: 'אמת זהות כדי להפעיל כניסה ביומטרית',
-        cancelTitle: 'ביטול',
-        allowDeviceCredential: false,
-        androidTitle: 'הפעלת כניסה ביומטרית',
-        androidSubtitle: 'עלה נהגים'
-      });
-      var _nCredId = 'native-bio';
-      var _nUa = navigator.userAgent;
-      var _nDev = (/Android/.test(_nUa) && _nUa.match(/;\s*([^;)]+)\sBuild/)) ?
-        _nUa.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'מכשיר';
-      _bioSave({ email: email, credentialId: _nCredId, rpId: location.hostname, deviceName: _nDev, native: true, createdAt: new Date().toISOString() });
-      return _nCredId;
-    }
-  }
 
   var rpId = location.hostname;
   // challenge מקומי — אין צורך ב-GAS
@@ -1915,29 +1886,6 @@ async function bioRegister(email, displayName) {
 // אימות — WebAuthn מקומי לחלוטין, ללא GAS
 async function bioAuthenticate(email, credentialId) {
   if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
-
-  // Native APK: use BiometricPrompt via plugin. allowDeviceCredential:false forces
-  // fingerprint/face only — no PIN fallback (problem 3).
-  if (_isNativeApp()) {
-    var BiometricAuth = _getNativePlugin('BiometricAuthNative') || _getNativePlugin('BiometricAuth');
-    if (BiometricAuth) {
-      await BiometricAuth.authenticate({
-        reason: 'אמת זהות כדי להיכנס',
-        cancelTitle: 'ביטול',
-        allowDeviceCredential: false,
-        androidTitle: 'כניסה ביומטרית',
-        androidSubtitle: 'עלה נהגים'
-      });
-      // Biometric passed — load local session (mirrors the WebAuthn success path).
-      var _nSession = _pinSessionLoad();
-      return {
-        ok: true,
-        biometric: true,
-        vehicle: _nSession ? _nSession.vehicleData : null,
-        userInfo: _nSession ? _nSession.userInfo : { email: email, name: email }
-      };
-    }
-  }
 
   var rpId = location.hostname;
   // challenge מקומי — אין GAS
@@ -9296,9 +9244,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true;
-      // Native APK: try FedCM/One Tap first (user-agent fix removed "; wv" so
-      // Google's servers may allow it). If One Tap is suppressed or unavailable,
-      // _loginFallbackRedirect() uses the native GoogleAuth plugin.
+      // Native APK: google.accounts.id.prompt() opens Chrome (external browser)
+      // even with the UA fix — skip it entirely and go straight to WebView OAuth.
+      if (_isNativeApp()) { _loginWebRedirect(); return; }
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
