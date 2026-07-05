@@ -2563,7 +2563,15 @@ function _consumeBridgedOAuthToken() {
 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
   try {
     window.Capacitor.Plugins.App.addListener('appUrlOpen', function(data) {
-      _handleNativeOAuthUrl(data && data.url);
+      var _u = data && data.url;
+      // Custom-scheme return from external OAuth browser:
+      // org.aleh.driverapp://auth-complete carries no token in the URL — the token
+      // was persisted to shared localStorage by the browser tab. Consume it here.
+      if (_u && _u.indexOf('auth-complete') !== -1) {
+        _consumeBridgedOAuthToken();
+        return;
+      }
+      _handleNativeOAuthUrl(_u);
     });
   } catch (_) {}
   // Resume bridge: pick up a token the external browser wrote while we were backgrounded.
@@ -9086,11 +9094,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Both share this origin's localStorage, so stash the token for the APK
         // to consume on resume. Harmless in a plain browser (consumed only by the
         // native App-resume listener, which never fires there).
+        var _wasNativePending = false;
         try {
           if (localStorage.getItem('aleh_oauth_pending')) {
+            _wasNativePending = true;
             localStorage.setItem('aleh_oauth_token', Date.now() + '|' + _it);
           }
         } catch(_) {}
+        // Native-APK return-to-app: this boot handler is running in the EXTERNAL
+        // Chrome tab (opened via window.open(_system)). The token is now persisted
+        // to the shared localStorage. Navigate to the custom scheme so Android's
+        // intent-filter (org.aleh.driverapp://auth-complete) brings MainActivity
+        // back to the foreground; the Capacitor WebView's 'appUrlOpen'/'resume'
+        // listeners then fire and _consumeBridgedOAuthToken() picks up the token.
+        // We deliberately do NOT call handleGoogleCredential() here in that case —
+        // this page is the throw-away browser tab, not the app WebView.
+        if (_wasNativePending) {
+          try { history.replaceState({}, '', location.pathname); } catch(_) {}
+          try {
+            window.location.href = 'org.aleh.driverapp://auth-complete';
+          } catch(_) {}
+          return;
+        }
         window._userInitiatedLogin = true; // OAuth redirect is always user-initiated
         handleGoogleCredential({ credential: _it });
         return;
