@@ -1095,8 +1095,13 @@ function _sessionExpired() {
     var _fallbackTimer = setTimeout(_showSessionExpiredOverlay, 4000);
     try {
       google.accounts.id.prompt(function(notification) {
-        // prompt was suppressed or dismissed — give up and show overlay
-        if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+        // prompt was suppressed or dismissed — give up and show overlay.
+        // FedCM: isNotDisplayed()/isSkippedMoment()/isDismissedMoment() deprecated — may throw;
+        // אם זרק, נשאיר את ה-4s timer לטפל בכך (אל תכפה overlay אם ה-One Tap אולי מוצג).
+        var _gaveUp = false;
+        try { _gaveUp = notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment(); }
+        catch(_ne) { _gaveUp = false; }
+        if (_gaveUp) {
           clearTimeout(_fallbackTimer);
           _showSessionExpiredOverlay();
         }
@@ -2646,12 +2651,18 @@ function initGoogleAuth() {
     // Demo mode — skip Google auth
     return;
   }
+  // use_fedcm_for_prompt:true — One Tap ב-PWA/דפדפן.
+  // Chrome ביטל את זרם One Tap הישן (מבוסס third-party cookies); בלי FedCM,
+  // prompt() מוחזר isNotDisplayed() ומיד נופל ל-_loginWebRedirect() → redirect עם
+  // prompt=select_account = "רשימת חשבונות ארוכה" במקום כרטיס ה-One Tap הקומפקטי.
+  // הפעלת FedCM מחזירה את כרטיס ה-One Tap דרך הדפדפן. native (APK) לא מגיע לכאן —
+  // login-btn מדלג ל-_loginFallbackRedirect לפני קריאת prompt().
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
     auto_select: false,
     cancel_on_tap_outside: false,
-    use_fedcm_for_prompt: false
+    use_fedcm_for_prompt: true
   });
 }
 
@@ -9308,9 +9319,12 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (_isNativeApp()) { _loginFallbackRedirect(); return; }
       try {
         google.accounts.id.prompt(function(notification) {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            _loginFallbackRedirect();
-          }
+          // FedCM: isNotDisplayed()/isSkippedMoment() deprecated — may throw.
+          // עטוף כדי שזריקה לא תבטל את ה-fallback כשה-One Tap לא הוצג.
+          var _notShown = false;
+          try { _notShown = notification.isNotDisplayed() || notification.isSkippedMoment(); }
+          catch(_ne) { _notShown = true; }
+          if (_notShown) _loginFallbackRedirect();
         });
       } catch(e) {
         _loginFallbackRedirect();
