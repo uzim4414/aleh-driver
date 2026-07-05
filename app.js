@@ -2527,28 +2527,27 @@ function _getNativePlugin(name) {
 }
 
 function _loginFallbackRedirect() {
-  // Native APK: use @codetrix-studio/capacitor-google-auth plugin.
-  // Root cause of previous NPE crash was missing strings.xml server_client_id —
-  // now fixed. Plugin supports JS array scopes (regex-cleaned internally).
+  // Native APK: use @capgo/capacitor-social-login with Credential Manager API.
+  // style:'bottom' = bottom sheet (same UX as PWA One Tap).
+  // No custom scopes passed → defaults (email, profile, openid) apply without MainActivity changes.
   if (_isNativeApp()) {
-    var GoogleAuth = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.GoogleAuth;
-    if (GoogleAuth) {
-      GoogleAuth.initialize({
-        clientId: GOOGLE_CLIENT_ID,
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: false
-      }).then(function() {
-        return GoogleAuth.signIn();
-      }).then(function(result) {
-        var idToken = result && result.authentication && result.authentication.idToken;
-        if (!idToken) throw new Error('no id_token in result');
-        window._userInitiatedLogin = true;
-        handleGoogleCredential({ credential: idToken });
-      }).catch(function(err) {
-        console.error('GoogleAuth native signIn error:', err);
-        hideLoader();
-        // User cancelled or plugin error — stay on login screen
-      });
+    var SocialLogin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
+    if (SocialLogin) {
+      SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } })
+        .then(function() {
+          return SocialLogin.login({ provider: 'google', options: { style: 'bottom' } });
+        })
+        .then(function(res) {
+          var idToken = res && res.result && res.result.idToken;
+          if (!idToken) throw new Error('no idToken in SocialLogin result');
+          window._userInitiatedLogin = true;
+          handleGoogleCredential({ credential: idToken });
+        })
+        .catch(function(err) {
+          console.error('SocialLogin native error:', err);
+          hideLoader();
+          // User cancelled or no credentials — stay on login screen
+        });
       return;
     }
     // Plugin not registered — fall through to web redirect as last resort
@@ -3696,6 +3695,14 @@ function logout() {
       // לא קוראים disableAutoSelect() — זה מדכא את One Tap גם בכניסה הבאה.
       // ה-gate _userInitiatedLogin + auto_select:false מספיקים למניעת auto-login.
       try { if (window._fbAuth && typeof window._fbAuth.signOut === 'function') window._fbAuth.signOut(); } catch(_e) {}
+
+      // ══ שלב 3.5: Native CredentialManager logout — מנקה החשבון השמור
+      // כדי שהכניסה הבאה תדרוש בחירת חשבון ולא auto-login שקט.
+      // בטוח ב-PWA — SocialLogin יהיה undefined בדפדפן.
+      try {
+        var _sl = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
+        if (_sl && typeof _sl.logout === 'function') { _sl.logout({ provider: 'google' }); }
+      } catch (_e) {}
 
       // ══ שלב 4: הסתר #app והצג splash — לפני closeConfirmModal (מונע GPU flash)
       var _appEl = document.getElementById('app');
