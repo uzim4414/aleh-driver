@@ -2465,6 +2465,39 @@ function _isNativeApp() {
 }
 
 function _loginFallbackRedirect() {
+  // ── Native (Capacitor APK): native Google Sign-In SDK ───────────────────
+  // Root fix (2026-07-05): @codetrix-studio/capacitor-google-auth shows the
+  // native account bottom sheet and returns idToken directly to JS —
+  // no Chrome, no redirect_uri, no deep links, no disallowed_useragent.
+  if (_isNativeApp()) {
+    var GoogleAuth = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.GoogleAuth;
+    if (GoogleAuth) {
+      try { GoogleAuth.initialize && GoogleAuth.initialize(); } catch (_) {}
+      GoogleAuth.signIn().then(function(user) {
+        var token = user && (user.authentication && user.authentication.idToken);
+        if (token) {
+          window._userInitiatedLogin = true;
+          handleGoogleCredential({ credential: token });
+        } else {
+          console.warn('[NativeAuth] GoogleAuth.signIn returned no idToken');
+        }
+      }).catch(function(err) {
+        console.warn('[NativeAuth] GoogleAuth.signIn failed:', err);
+        // fallback to external-browser web redirect
+        _loginWebRedirect();
+      });
+      return;
+    }
+    // Plugin not available — fallback to external-browser web redirect
+    _loginWebRedirect();
+    return;
+  }
+  _loginWebRedirect();
+}
+
+/* Web OAuth redirect — browser/PWA path, and native fallback when the
+   GoogleAuth plugin is unavailable or fails. */
+function _loginWebRedirect() {
   var clientId = encodeURIComponent(GOOGLE_CLIENT_ID);
   var scope = encodeURIComponent('openid email profile');
 
