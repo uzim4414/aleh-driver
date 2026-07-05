@@ -1805,7 +1805,7 @@ function _bioAvailable() {
   // BiometricPrompt (fingerprint/face), avoiding the WebAuthn-in-WebView PIN
   // fallback (problem 3). If the plugin is present, biometric is available.
   if (_isNativeApp()) {
-    var _caps = (window.Capacitor && window.Capacitor.Plugins) || {}; var BiometricAuth = _caps.BiometricAuthNative || _caps.BiometricAuth;
+    var BiometricAuth = _getNativePlugin('BiometricAuthNative') || _getNativePlugin('BiometricAuth');
     if (BiometricAuth) return true;
   }
   return !!(window.PublicKeyCredential &&
@@ -1845,7 +1845,7 @@ async function bioRegister(email, displayName) {
   // mint a WebAuthn credential. Register by confirming a biometric check, then store
   // a local marker keyed by email (bioAuthenticate uses the plugin, not credentialId).
   if (_isNativeApp()) {
-    var _caps = (window.Capacitor && window.Capacitor.Plugins) || {}; var BiometricAuth = _caps.BiometricAuthNative || _caps.BiometricAuth;
+    var BiometricAuth = _getNativePlugin('BiometricAuthNative') || _getNativePlugin('BiometricAuth');
     if (BiometricAuth) {
       await BiometricAuth.authenticate({
         reason: 'אמת זהות כדי להפעיל כניסה ביומטרית',
@@ -1917,7 +1917,7 @@ async function bioAuthenticate(email, credentialId) {
   // Native APK: use BiometricPrompt via plugin. allowDeviceCredential:false forces
   // fingerprint/face only — no PIN fallback (problem 3).
   if (_isNativeApp()) {
-    var _caps = (window.Capacitor && window.Capacitor.Plugins) || {}; var BiometricAuth = _caps.BiometricAuthNative || _caps.BiometricAuth;
+    var BiometricAuth = _getNativePlugin('BiometricAuthNative') || _getNativePlugin('BiometricAuth');
     if (BiometricAuth) {
       await BiometricAuth.authenticate({
         reason: 'אמת זהות כדי להיכנס',
@@ -2526,31 +2526,36 @@ function _isNativeApp() {
   return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 }
 
+function _getNativePlugin(name) {
+  // When loading from a remote server.url (GitHub Pages), plugin JS modules are
+  // not bundled — Capacitor.Plugins.X is undefined. registerPlugin() creates
+  // a native bridge proxy without requiring an import/bundle.
+  var _cap = window.Capacitor;
+  if (!_cap) return null;
+  return (_cap.Plugins && _cap.Plugins[name]) || (_cap.registerPlugin && _cap.registerPlugin(name)) || null;
+}
+
 function _loginFallbackRedirect() {
-  // ── Native (Capacitor APK): native Google Sign-In SDK ───────────────────
-  // Root fix (2026-07-05): @codetrix-studio/capacitor-google-auth shows the
-  // native account bottom sheet and returns idToken directly to JS —
-  // no Chrome, no redirect_uri, no deep links, no disallowed_useragent.
   if (_isNativeApp()) {
-    var GoogleAuth = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.GoogleAuth;
+    var GoogleAuth = _getNativePlugin('GoogleAuth');
     if (GoogleAuth) {
-      try { GoogleAuth.initialize && GoogleAuth.initialize(); } catch (_) {}
+      try { GoogleAuth.initialize && GoogleAuth.initialize({ clientId: GOOGLE_CLIENT_ID }); } catch (_) {}
       GoogleAuth.signIn().then(function(user) {
         var token = user && (user.authentication && user.authentication.idToken);
         if (token) {
           window._userInitiatedLogin = true;
           handleGoogleCredential({ credential: token });
         } else {
-          console.warn('[NativeAuth] GoogleAuth.signIn returned no idToken');
+          console.warn('[NativeAuth] GoogleAuth.signIn returned no idToken', user);
+          _loginWebRedirect();
         }
       }).catch(function(err) {
         console.warn('[NativeAuth] GoogleAuth.signIn failed:', err);
-        // fallback to external-browser web redirect
         _loginWebRedirect();
       });
       return;
     }
-    // Plugin not available — fallback to external-browser web redirect
+    console.warn('[NativeAuth] GoogleAuth plugin not found — falling back to web redirect');
     _loginWebRedirect();
     return;
   }
