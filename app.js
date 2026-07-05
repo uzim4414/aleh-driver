@@ -1079,9 +1079,11 @@ function _sessionExpired() {
   STATE.user = null;
   var _hfab2 = document.getElementById('help-fab'); if (_hfab2) _hfab2.style.display = 'none';
 
-  // Native APK: GSI One Tap renders the full account-picker page inside the WebView
-  // (problem 1). Skip it — just show the session-expired overlay; the login button
-  // then uses the native GoogleAuth bottom sheet via _loginFallbackRedirect.
+  // Prevent One Tap from auto-signing in the same user on next prompt.
+  // Without this, clicking "login" after explicit logout logs in silently.
+  try { window.google && google.accounts && google.accounts.id && google.accounts.id.disableAutoSelect(); } catch(_) {}
+
+  // Native APK: just show the overlay — login button uses _loginFallbackRedirect.
   if (_isNativeApp()) {
     _showSessionExpiredOverlay();
     return;
