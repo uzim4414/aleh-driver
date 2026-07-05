@@ -1079,6 +1079,14 @@ function _sessionExpired() {
   STATE.user = null;
   var _hfab2 = document.getElementById('help-fab'); if (_hfab2) _hfab2.style.display = 'none';
 
+  // Native APK: GSI One Tap renders the full account-picker page inside the WebView
+  // (problem 1). Skip it — just show the session-expired overlay; the login button
+  // then uses the native GoogleAuth bottom sheet via _loginFallbackRedirect.
+  if (_isNativeApp()) {
+    _showSessionExpiredOverlay();
+    return;
+  }
+
   // Try silent Google token refresh — if user's Google session is still active,
   // handleGoogleCredential will fire automatically and re-login without user interaction.
   if (window.google && google.accounts && google.accounts.id && GOOGLE_CLIENT_ID) {
@@ -1793,6 +1801,13 @@ function pkConfirmSelect() {
 var BIO_KEY = 'aleh_bio_v2'; // {email, credentialId, rpId, deviceName, createdAt}
 
 function _bioAvailable() {
+  // Native APK: the @aparajita/capacitor-biometric-auth plugin uses the platform
+  // BiometricPrompt (fingerprint/face), avoiding the WebAuthn-in-WebView PIN
+  // fallback (problem 3). If the plugin is present, biometric is available.
+  if (_isNativeApp()) {
+    var _caps = (window.Capacitor && window.Capacitor.Plugins) || {}; var BiometricAuth = _caps.BiometricAuthNative || _caps.BiometricAuth;
+    if (BiometricAuth) return true;
+  }
   return !!(window.PublicKeyCredential &&
     navigator.credentials &&
     navigator.credentials.create &&
@@ -1825,6 +1840,29 @@ function _fromB64url(s) {
 // רישום טביעת אצבע — WebAuthn מקומי לחלוטין, ללא GAS
 async function bioRegister(email, displayName) {
   if (!_bioAvailable()) throw new Error('מכשיר זה אינו תומך בטביעת אצבע');
+
+  // Native APK: the BiometricAuth plugin verifies via BiometricPrompt but does not
+  // mint a WebAuthn credential. Register by confirming a biometric check, then store
+  // a local marker keyed by email (bioAuthenticate uses the plugin, not credentialId).
+  if (_isNativeApp()) {
+    var _caps = (window.Capacitor && window.Capacitor.Plugins) || {}; var BiometricAuth = _caps.BiometricAuthNative || _caps.BiometricAuth;
+    if (BiometricAuth) {
+      await BiometricAuth.authenticate({
+        reason: 'אמת זהות כדי להפעיל כניסה ביומטרית',
+        cancelTitle: 'ביטול',
+        allowDeviceCredential: false,
+        androidTitle: 'הפעלת כניסה ביומטרית',
+        androidSubtitle: 'עלה נהגים'
+      });
+      var _nCredId = 'native-bio';
+      var _nUa = navigator.userAgent;
+      var _nDev = (/Android/.test(_nUa) && _nUa.match(/;\s*([^;)]+)\sBuild/)) ?
+        _nUa.match(/;\s*([^;)]+)\sBuild/)[1].trim() : 'מכשיר';
+      _bioSave({ email: email, credentialId: _nCredId, rpId: location.hostname, deviceName: _nDev, native: true, createdAt: new Date().toISOString() });
+      return _nCredId;
+    }
+  }
+
   var rpId = location.hostname;
   // challenge מקומי — אין צורך ב-GAS
   var localChallenge = new Uint8Array(32);
@@ -1875,6 +1913,30 @@ async function bioRegister(email, displayName) {
 // אימות — WebAuthn מקומי לחלוטין, ללא GAS
 async function bioAuthenticate(email, credentialId) {
   if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
+
+  // Native APK: use BiometricPrompt via plugin. allowDeviceCredential:false forces
+  // fingerprint/face only — no PIN fallback (problem 3).
+  if (_isNativeApp()) {
+    var _caps = (window.Capacitor && window.Capacitor.Plugins) || {}; var BiometricAuth = _caps.BiometricAuthNative || _caps.BiometricAuth;
+    if (BiometricAuth) {
+      await BiometricAuth.authenticate({
+        reason: 'אמת זהות כדי להיכנס',
+        cancelTitle: 'ביטול',
+        allowDeviceCredential: false,
+        androidTitle: 'כניסה ביומטרית',
+        androidSubtitle: 'עלה נהגים'
+      });
+      // Biometric passed — load local session (mirrors the WebAuthn success path).
+      var _nSession = _pinSessionLoad();
+      return {
+        ok: true,
+        biometric: true,
+        vehicle: _nSession ? _nSession.vehicleData : null,
+        userInfo: _nSession ? _nSession.userInfo : { email: email, name: email }
+      };
+    }
+  }
+
   var rpId = location.hostname;
   // challenge מקומי — אין GAS
   var localChallenge = new Uint8Array(32);
@@ -9081,6 +9143,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
       var _hp = new URLSearchParams(location.hash.substring(1));
       var _it = _hp.get('id_token');
+      var _isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      if (_it && _isNative) {
+        // Native APK: token came back in the WebView hash (web-redirect fallback
+        // path). Complete login in-place and clean the URL so the PWA does not
+        // re-render the login screen and force a second account selection (problem 2).
+        history.replaceState(null, '', location.pathname);
+        window._userInitiatedLogin = true;
+        handleGoogleCredential({ credential: _it });
+        return;
+      }
       if (_it) {
         history.replaceState({}, '', location.pathname);
         // Native-APK return (URL-based token handoff — NO localStorage bridge:
@@ -9225,6 +9297,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true;
+      // Native APK: skip GSI One Tap entirely — it renders the full account-picker
+      // HTML page inside the WebView (problem 1). Go straight to the native path
+      // (@codetrix-studio/capacitor-google-auth bottom sheet).
+      if (_isNativeApp()) {
+        _loginFallbackRedirect();
+        return;
+      }
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
