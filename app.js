@@ -2541,23 +2541,24 @@ function _loginFallbackRedirect() {
   if (_isNativeApp()) {
     var GoogleAuth = _getNativePlugin('GoogleAuth');
     if (GoogleAuth) {
-      try { GoogleAuth.initialize && GoogleAuth.initialize({ clientId: GOOGLE_CLIENT_ID }); } catch (_) {}
+      showToast('[DBG] GoogleAuth plugin found — calling signIn…');
       GoogleAuth.signIn().then(function(user) {
-        var token = user && (user.authentication && user.authentication.idToken);
+        showToast('[DBG] signIn result: ' + JSON.stringify(Object.keys(user||{})));
+        var token = user && ((user.authentication && user.authentication.idToken) || user.idToken);
         if (token) {
           window._userInitiatedLogin = true;
           handleGoogleCredential({ credential: token });
         } else {
-          console.warn('[NativeAuth] GoogleAuth.signIn returned no idToken', user);
+          showToast('[DBG] no idToken in result');
           _loginWebRedirect();
         }
       }).catch(function(err) {
-        console.warn('[NativeAuth] GoogleAuth.signIn failed:', err);
+        showToast('[DBG] signIn FAILED: ' + (err && (err.message || err.code || JSON.stringify(err))));
         _loginWebRedirect();
       });
       return;
     }
-    console.warn('[NativeAuth] GoogleAuth plugin not found — falling back to web redirect');
+    showToast('[DBG] GoogleAuth plugin NULL — Plugins: ' + JSON.stringify(Object.keys((window.Capacitor&&window.Capacitor.Plugins)||{})));
     _loginWebRedirect();
     return;
   }
