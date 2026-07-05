@@ -2535,7 +2535,7 @@ function _loginFallbackRedirect() {
     if (SocialLogin) {
       SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } })
         .then(function() {
-          return SocialLogin.login({ provider: 'google', options: { style: 'bottom' } });
+          return SocialLogin.login({ provider: 'google', options: { style: 'standard' } });
         })
         .then(function(res) {
           var idToken = res && res.result && res.result.idToken;
