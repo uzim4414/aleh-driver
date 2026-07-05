@@ -1101,6 +1101,8 @@ function _sessionExpired() {
         var _gaveUp = false;
         try { _gaveUp = notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment(); }
         catch(_ne) { _gaveUp = false; }
+        try { console.log('[auth] sessionExpired One Tap notDisplayedReason:', notification.getNotDisplayedReason()); } catch(_r1) {}
+        try { console.log('[auth] sessionExpired One Tap skippedReason:', notification.getSkippedReason()); } catch(_r2) {}
         if (_gaveUp) {
           clearTimeout(_fallbackTimer);
           _showSessionExpiredOverlay();
@@ -2558,6 +2560,56 @@ function _loginFallbackRedirect() {
     // Plugin not registered — fall through to web redirect as last resort
   }
   _loginWebRedirect();
+}
+
+/* ── PWA popup OAuth ─────────────────────────────────────────────────────
+   When One Tap is suppressed (exponential backoff / FedCM blocked / no Google
+   session) a full-page redirect is bad PWA UX. Instead open the OAuth URL in a
+   small popup window ('aleh_gauth'). The popup lands back on index.html with
+   #id_token; the boot handler detects window.name==='aleh_gauth', hands the
+   token back (postMessage + localStorage for browsers that drop opener) and
+   closes itself. Popup blocked → _loginWebRedirect() as last resort.
+   PWA only — native APK never calls this. */
+var _authPopupListening = false;
+function _authPopupListen() {
+  if (_authPopupListening) return;
+  _authPopupListening = true;
+  window.addEventListener('message', function(ev) {
+    if (ev.origin !== window.location.origin) return;
+    var d = ev.data;
+    if (!d || d.type !== 'aleh-oauth-token' || !d.idToken) return;
+    window._userInitiatedLogin = true;
+    handleGoogleCredential({ credential: d.idToken });
+  });
+  // Fallback channel: some browsers null window.opener in popups — the popup
+  // then writes the token to localStorage; 'storage' fires in this window.
+  window.addEventListener('storage', function(ev) {
+    if (ev.key !== 'aleh_oauth_token' || !ev.newValue) return;
+    try { localStorage.removeItem('aleh_oauth_token'); } catch(_) {}
+    window._userInitiatedLogin = true;
+    handleGoogleCredential({ credential: ev.newValue });
+  });
+}
+
+function _loginPopupOAuth() {
+  var clientId = encodeURIComponent(GOOGLE_CLIENT_ID);
+  var scope = encodeURIComponent('openid email profile');
+  var redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+  var url = 'https://accounts.google.com/o/oauth2/v2/auth'
+    + '?client_id=' + clientId
+    + '&redirect_uri=' + redirectUri
+    + '&response_type=token id_token'
+    + '&scope=' + scope
+    + '&nonce=' + Math.random().toString(36).slice(2)
+    + '&prompt=select_account';
+  _authPopupListen();
+  var w = null;
+  try { w = window.open(url, 'aleh_gauth', 'width=500,height=640,popup=1'); } catch(_) {}
+  if (!w) {
+    // Popup blocked — full redirect is the only remaining option.
+    console.warn('[auth] popup blocked — falling back to full redirect');
+    _loginWebRedirect();
+  }
 }
 
 /* Web OAuth redirect — browser/PWA path, and native fallback when the
@@ -9170,6 +9222,39 @@ document.addEventListener('DOMContentLoaded', async function() {
         handleGoogleCredential({ credential: _it });
         return;
       }
+      if (_it && window.name === 'aleh_gauth' && !_isNative) {
+        // OAuth popup opened by _loginPopupOAuth(): hand the token back to the
+        // main PWA window and close. postMessage when opener survived; localStorage
+        // 'storage' event as fallback when the browser nulled opener.
+        history.replaceState({}, '', location.pathname);
+        var _handed = false;
+        try {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'aleh-oauth-token', idToken: _it }, window.location.origin);
+            _handed = true;
+          }
+        } catch(_) {}
+        if (!_handed) {
+          try { localStorage.setItem('aleh_oauth_token', _it); } catch(_) {}
+        }
+        try { window.close(); } catch(_) {}
+        // If the token was NOT handed off and the browser refused to close —
+        // continue login here so the user is never stuck on a blank window.
+        // (When handed off, the main window logs in; don't double-login here.)
+        if (!_handed) {
+          setTimeout(function() {
+            // If the main window consumed the localStorage token (removed the key),
+            // it already logged in — don't double-login in the popup.
+            var _consumed = false;
+            try { _consumed = localStorage.getItem('aleh_oauth_token') === null; } catch(_) {}
+            if (_consumed) { try { window.close(); } catch(_) {} return; }
+            try { localStorage.removeItem('aleh_oauth_token'); } catch(_) {}
+            window._userInitiatedLogin = true;
+            handleGoogleCredential({ credential: _it });
+          }, 800);
+        }
+        return;
+      }
       if (_it) {
         history.replaceState({}, '', location.pathname);
         // Native-APK return (URL-based token handoff — NO localStorage bridge:
@@ -9324,16 +9409,25 @@ document.addEventListener('DOMContentLoaded', async function() {
           var _notShown = false;
           try { _notShown = notification.isNotDisplayed() || notification.isSkippedMoment(); }
           catch(_ne) { _notShown = true; }
-          if (_notShown) _loginFallbackRedirect();
+          // Diagnostic: why One Tap wasn't displayed (suppressed_by_user = exponential
+          // backoff after repeated dismissals; opt_out_or_no_session = no Google session).
+          try { console.log('[auth] One Tap notDisplayedReason:', notification.getNotDisplayedReason()); } catch(_r1) {}
+          try { console.log('[auth] One Tap skippedReason:', notification.getSkippedReason()); } catch(_r2) {}
+          // PWA: One Tap suppressed/blocked → OAuth popup (no full-page redirect).
+          if (_notShown) _loginPopupOAuth();
         });
       } catch(e) {
-        _loginFallbackRedirect();
+        console.warn('[auth] prompt() threw:', e && e.message);
+        _loginPopupOAuth();
       }
     });
   };
   script.onerror = function() {
-    // GIS script failed to load — attach direct redirect handler
-    document.getElementById('login-btn').addEventListener('click', _loginFallbackRedirect);
+    // GIS script failed to load — attach direct fallback handler
+    document.getElementById('login-btn').addEventListener('click', function() {
+      window._userInitiatedLogin = true;
+      if (_isNativeApp()) { _loginFallbackRedirect(); } else { _loginPopupOAuth(); }
+    });
   };
   document.head.appendChild(script);
 });
