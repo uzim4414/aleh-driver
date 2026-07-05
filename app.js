@@ -2541,24 +2541,27 @@ function _loginFallbackRedirect() {
   if (_isNativeApp()) {
     var GoogleAuth = _getNativePlugin('GoogleAuth');
     if (GoogleAuth) {
-      showToast('[DBG] GoogleAuth plugin found — calling signIn…');
-      GoogleAuth.signIn().then(function(user) {
-        showToast('[DBG] signIn result: ' + JSON.stringify(Object.keys(user||{})));
+      // initialize() must be called before signIn() on Android
+      var _initP;
+      try { _initP = GoogleAuth.initialize ? GoogleAuth.initialize({ clientId: GOOGLE_CLIENT_ID, scopes: ['profile','email'] }) : Promise.resolve(); } catch(_e) { _initP = Promise.resolve(); }
+      Promise.resolve(_initP).then(function() {
+        return GoogleAuth.signIn();
+      }).then(function(user) {
         var token = user && ((user.authentication && user.authentication.idToken) || user.idToken);
         if (token) {
           window._userInitiatedLogin = true;
           handleGoogleCredential({ credential: token });
         } else {
-          showToast('[DBG] no idToken in result');
+          showToast('NativeAuth: no idToken — keys: ' + JSON.stringify(Object.keys(user||{})));
           _loginWebRedirect();
         }
       }).catch(function(err) {
-        showToast('[DBG] signIn FAILED: ' + (err && (err.message || err.code || JSON.stringify(err))));
+        showToast('NativeAuth ERR: ' + (err && (err.message || err.code || JSON.stringify(err))));
         _loginWebRedirect();
       });
       return;
     }
-    showToast('[DBG] GoogleAuth plugin NULL — Plugins: ' + JSON.stringify(Object.keys((window.Capacitor&&window.Capacitor.Plugins)||{})));
+    showToast('NativeAuth: plugin NULL. Plugins: ' + JSON.stringify(Object.keys((window.Capacitor&&window.Capacitor.Plugins)||{})));
     _loginWebRedirect();
     return;
   }
