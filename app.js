@@ -9404,18 +9404,18 @@ document.addEventListener('DOMContentLoaded', async function() {
       window._userInitiatedLogin = true;
       // Native APK: use SocialLogin plugin (Credential Manager bottom sheet).
       if (_isNativeApp()) { _loginFallbackRedirect(); return; }
-      // PWA: נסה One Tap. אם מדוכא (backoff) — popup OAuth ישירות.
-      // popup נפתח סינכרונית מ-click → לא נחסם על מובייל.
+      // PWA: נסה One Tap. אם לא מוצג (backoff/isNotDisplayed) — redirect מלא.
+      // אסור popup מ-callback async: הדפדפן חוסם ומפנה לדף חיצוני (v318 restore).
       try {
         google.accounts.id.prompt(function(notification) {
           var _notShown = false;
           try { _notShown = notification.isNotDisplayed() || notification.isSkippedMoment(); }
           catch(_ne) { _notShown = true; }
-          if (_notShown) _loginPopupOAuth();
+          if (_notShown) _loginFallbackRedirect();
         });
       } catch(e) {
         console.warn('[auth] prompt() threw:', e && e.message);
-        _loginPopupOAuth();
+        _loginFallbackRedirect();
       }
     });
   };
@@ -9423,7 +9423,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // GIS script failed to load — attach direct fallback handler
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true;
-      if (_isNativeApp()) { _loginFallbackRedirect(); } else { _loginPopupOAuth(); }
+      if (_isNativeApp()) { _loginFallbackRedirect(); } else { _loginFallbackRedirect(); }
     });
   };
   document.head.appendChild(script);
