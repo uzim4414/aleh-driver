@@ -9302,18 +9302,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true;
-      // Native APK: skip GSI One Tap entirely — it renders the full account-picker
-      // HTML page inside the WebView (problem 1). Go straight to the native path
-      // (@codetrix-studio/capacitor-google-auth bottom sheet).
-      if (_isNativeApp()) {
-        _loginFallbackRedirect();
-        return;
-      }
+      // Native APK: try FedCM/One Tap first (user-agent fix removed "; wv" so
+      // Google's servers may allow it). If One Tap is suppressed or unavailable,
+      // _loginFallbackRedirect() uses the native GoogleAuth plugin.
       try {
         google.accounts.id.prompt(function(notification) {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // One Tap מדוכא (FedCM / g_state) — redirect_uri רשום ב-Cloud Console
-            // isDismissedMoment אסור כאן — מופעל גם אחרי כניסה מוצלחת
             _loginFallbackRedirect();
           }
         });
