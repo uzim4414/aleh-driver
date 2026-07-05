@@ -8157,7 +8157,7 @@ async function registerPush() {
       }).then(function(result) {
         var token = result && (result.token || result);
         if (!token) { console.warn('[Push] FCM token empty'); return; }
-        gasPost('driver_register_push', { fcmToken: token, vehicleId: STATE.vehicle && STATE.vehicle.id }, { silent: true })
+        gasPost('driver_register_fcm', { fcmToken: token, vehicleId: STATE.vehicle && STATE.vehicle.id }, { silent: true })
           .then(function(r) { console.log('[Push] FCM registered:', r && r.ok); })
           .catch(function(e) { console.warn('[Push] FCM register failed:', e); });
       }).catch(function(e) { console.warn('[Push] FCM permission/token error:', e); });
@@ -10526,8 +10526,8 @@ function _gateSetDisabled(reason) {
   if (typeof _gateWatchId !== 'undefined' && _gateWatchId !== null && navigator.geolocation) {
     try { navigator.geolocation.clearWatch(_gateWatchId); _gateWatchId = null; } catch(_gsdW) {}
   }
-  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.__nativeGeoWatchId) {
-    try { BackgroundGeolocation.removeWatcher({ id: window.__nativeGeoWatchId }); } catch(_ngE) {}
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.__nativeGeoWatchId && window.BackgroundGeolocation) {
+    try { window.BackgroundGeolocation.removeWatcher({ id: window.__nativeGeoWatchId }); } catch(_ngE) {}
     window.__nativeGeoWatchId = null;
   }
   GATE_STATE = 'access-disabled';
@@ -10577,20 +10577,35 @@ function _gateInit() {
 function _gateStartWatch() {
   // Native Capacitor background GPS — replaces watchPosition when running as APK
   if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-    if (window.__nativeGeoWatchId) {
-      try { BackgroundGeolocation.removeWatcher({ id: window.__nativeGeoWatchId }); } catch(_e) {}
+    // Register plugins if not yet done (Capacitor requires explicit registerPlugin)
+    if (!window.BackgroundGeolocation && window.Capacitor.registerPlugin) {
+      window.BackgroundGeolocation = window.Capacitor.registerPlugin('BackgroundGeolocation');
+    }
+    if (!window.CapacitorFirebaseMessaging && window.Capacitor.registerPlugin) {
+      window.CapacitorFirebaseMessaging = window.Capacitor.registerPlugin('FirebaseMessaging');
+    }
+    // Remove existing native watcher if any
+    if (window.__nativeGeoWatchId && window.BackgroundGeolocation) {
+      try { window.BackgroundGeolocation.removeWatcher({ id: window.__nativeGeoWatchId }); } catch(_e) {}
       window.__nativeGeoWatchId = null;
     }
-    BackgroundGeolocation.addWatcher(
-      { backgroundMessage: 'עלה עוקב אחר מיקום לפתיחת שערי חניון', backgroundTitle: 'עלה נהגים — GPS פעיל', requestPermissions: true, stale: false, distanceFilter: 10 },
-      function(location, error) {
-        if (error) { console.warn('[GateNative] GPS error:', error.code); return; }
-        if (!location) return;
-        var fakePos = { coords: { latitude: location.latitude, longitude: location.longitude, speed: location.speed || 0, accuracy: location.accuracy } };
-        if (typeof _gateOnPosition === 'function') _gateOnPosition(fakePos);
+    if (window.BackgroundGeolocation) {
+      try {
+        window.BackgroundGeolocation.addWatcher(
+          { backgroundMessage: 'עלה עוקב אחר מיקום לפתיחת שערי חניון', backgroundTitle: 'עלה נהגים — GPS פעיל', requestPermissions: true, stale: false, distanceFilter: 10 },
+          function(location, error) {
+            if (error) { console.warn('[GateNative] GPS error:', error.code); return; }
+            if (!location) return;
+            var fakePos = { coords: { latitude: location.latitude, longitude: location.longitude, speed: location.speed || 0, accuracy: location.accuracy } };
+            if (typeof _gateOnPosition === 'function') _gateOnPosition(fakePos);
+          }
+        ).then(function(watchId) { window.__nativeGeoWatchId = watchId; });
+        return; // native watcher started — skip navigator.geolocation
+      } catch(nativeGpsErr) {
+        console.warn('[GateNative] addWatcher failed, falling back to navigator.geolocation:', nativeGpsErr);
+        // fall through to navigator.geolocation.watchPosition below
       }
-    ).then(function(watchId) { window.__nativeGeoWatchId = watchId; });
-    return; // skip navigator.geolocation.watchPosition
+    }
   }
   if (_gateWatchId !== null) { navigator.geolocation.clearWatch(_gateWatchId); }
   if (!navigator.geolocation) { _gateSetState('gps-off'); return; }
