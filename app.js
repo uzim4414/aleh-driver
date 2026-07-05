@@ -2524,18 +2524,18 @@ function _loginWebRedirect() {
   // redirect_uri must be registered as an Authorized redirect URI on the WEB
   // client in Google Cloud Console (it is already a JavaScript origin).
   if (_isNativeApp()) {
+    // User-agent override in MainActivity removes "wv" so Google permits OAuth
+    // directly inside the Capacitor WebView — no external browser needed.
     var nativeRedirect = 'https://uzim4414.github.io/aleh-driver/';
     var nNonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
     var nUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
-      + '?client_id=' + clientId               // WEB client (GOOGLE_CLIENT_ID)
+      + '?client_id=' + clientId
       + '&redirect_uri=' + encodeURIComponent(nativeRedirect)
       + '&response_type=token id_token'
       + '&scope=' + scope
       + '&nonce=' + nNonce
       + '&prompt=select_account';
-    // '_system' → Capacitor opens the external browser (where Google permits OAuth).
-    try { window.open(nUrl, '_system'); return; } catch (_) {}
-    window.location.href = nUrl; // last-resort fallback
+    window.location.href = nUrl;
     return;
   }
 
