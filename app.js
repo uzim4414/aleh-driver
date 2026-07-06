@@ -11023,6 +11023,9 @@ if (typeof APP !== 'undefined') {
 // ============================================================
 
 var _gateBgWatchId   = null;    // ID מ-BackgroundGeolocation.addWatcher()
+var _gateBgInst      = null;    // reference to BG plugin — for notif updates
+var _gateLastNotifMsg   = '';   // last notification message text
+var _gateLastNotifDistM = -999; // distM at last notification update
 var _gateMode        = 'off';   // 'always' | 'schedule' | 'off'
 var _gateModeStart   = '07:00'; // HH:MM
 var _gateModeEnd     = '18:00'; // HH:MM
@@ -11091,13 +11094,81 @@ function _gateBgPlugin() {
 
 function _gateStopWatchNative() {
   var BG = _gateBgPlugin();
-  if (!BG || !_gateBgWatchId) { _gateBgWatchId = null; return Promise.resolve(); }
+  if (!BG || !_gateBgWatchId) { _gateBgWatchId = null; _gateBgInst = null; return Promise.resolve(); }
   var id = _gateBgWatchId;
   _gateBgWatchId = null;
+  _gateBgInst = null;
+  _gateLastNotifMsg = '';
+  _gateLastNotifDistM = -999;
   return BG.removeWatcher({ id: id }).then(function() {
     console.log('[gate-native] watch removed');
   }).catch(function(e) {
     console.warn('[gate-native] removeWatcher error:', e);
+  });
+}
+
+/* Build rich notification message from current position data. */
+function _gateBuildNotifMsg(distM, speedMs) {
+  var cfg = APP._gateConfig || {};
+  var lotName = cfg.lotName || 'החניון';
+  var speedKmh = Math.round((speedMs || 0) * 3.6);
+  var distStr = distM < 1000
+    ? Math.round(distM) + 'מ\''
+    : (distM / 1000).toFixed(1) + 'ק"מ';
+  var parts = ['📍 ' + distStr + ' מ' + lotName];
+  if (speedKmh > 2) parts.push('🚗 ' + speedKmh + ' קמ"ש');
+  if (_gateMode === 'schedule') parts.push('⏰ ' + _gateModeStart + '–' + _gateModeEnd);
+  return parts.join(' • ');
+}
+
+/* Named GPS callback — used in addWatcher so it can be re-passed on notif restart. */
+function _gateBgOnLocation(location, error) {
+  if (error) {
+    console.warn('[gate-native] error:', error.code, error.message);
+    _gateSetStatus('error', (error.message || error.code || 'שגיאת מיקום'));
+    if (error.code === 'NOT_AUTHORIZED') _gateSetState('gps-off');
+    return;
+  }
+  if (!location) return;
+  var coords = {
+    latitude:  location.latitude,
+    longitude: location.longitude,
+    speed:     typeof location.speed === 'number' ? location.speed : 0,
+    accuracy:  location.accuracy
+  };
+  _gateOnPosition({ coords: coords });
+  _gateBgUpdateNotif(coords);
+}
+
+/* Restart watcher with updated notification message when distance changes >75m. */
+function _gateBgUpdateNotif(coords) {
+  if (!_gateBgInst || !_gateBgWatchId) return;
+  var cfg = APP._gateConfig || {};
+  if (!cfg.lat || !cfg.lng) return;
+  var distM = _thHaversine(
+    coords.latitude, coords.longitude,
+    parseFloat(cfg.lat), parseFloat(cfg.lng)
+  ) * 1000;
+  if (Math.abs(distM - _gateLastNotifDistM) < 75 && _gateLastNotifMsg) return;
+  var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0);
+  if (newMsg === _gateLastNotifMsg) return;
+  _gateLastNotifMsg   = newMsg;
+  _gateLastNotifDistM = distM;
+  var BG    = _gateBgInst;
+  var oldId = _gateBgWatchId;
+  _gateBgWatchId = null;
+  BG.removeWatcher({ id: oldId }).then(function() {
+    return BG.addWatcher({
+      backgroundTitle:    'עלה דרייב',
+      backgroundMessage:  newMsg,
+      requestPermissions: false,
+      stale:              false,
+      distanceFilter:     20
+    }, _gateBgOnLocation);
+  }).then(function(newId) {
+    _gateBgWatchId = newId;
+  }).catch(function(e) {
+    console.warn('[gate-native] notif update failed:', e);
   });
 }
 
@@ -11133,28 +11204,13 @@ function _gateStartWatchNative() {
       requestPermissions: true,
       stale:              false,
       distanceFilter:     20
-    }, function(location, error) {
-      if (error) {
-        console.warn('[gate-native] error:', error.code, error.message);
-        _gateSetStatus('error', (error.message || error.code || 'שגיאת מיקום'));
-        if (error.code === 'NOT_AUTHORIZED') _gateSetState('gps-off');
-        return;
-      }
-      if (!location) return;
-      _gateOnPosition({
-        coords: {
-          latitude:  location.latitude,
-          longitude: location.longitude,
-          speed:     typeof location.speed === 'number' ? location.speed : 0,
-          accuracy:  location.accuracy
-        }
-      });
-    });
+    }, _gateBgOnLocation);
   }).then(function(watcherId) {
     if (settled) return;
     settled = true;
     clearTimeout(hangTimer);
     _gateBgWatchId = watcherId;
+    _gateBgInst    = BG;
     console.log('[gate-native] watch started, id:', watcherId);
     _gateSetStatus('native');
   }).catch(function(err) {
@@ -11204,6 +11260,8 @@ function _gatePowerOff() {
     _gateWatchId = null;
   }
   _gateStopWatchNative();
+  _gateLastNotifMsg   = '';
+  _gateLastNotifDistM = -999;
   _gateSetState('idle');
   _gateSetStatus('off');
   _gateUpdateModeUI();
