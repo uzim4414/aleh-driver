@@ -11026,6 +11026,9 @@ var _gateBgWatchId   = null;    // ID מ-BackgroundGeolocation.addWatcher()
 var _gateBgInst      = null;    // reference to BG plugin — for notif updates
 var _gateLastNotifMsg   = '';   // last notification message text
 var _gateLastNotifDistM = -999; // distM at last notification update
+var _gateBgUpdating     = false;// H1: guards against overlapping notif restarts
+var _gateLastLocationTs = 0;    // heartbeat: ts of last _gateBgOnLocation
+var _gateHeartbeatTimer = null; // heartbeat setInterval handle
 var _gateMode        = 'off';   // 'always' | 'schedule' | 'off'
 var _gateModeStart   = '07:00'; // HH:MM
 var _gateModeEnd     = '18:00'; // HH:MM
@@ -11093,6 +11096,8 @@ function _gateBgPlugin() {
 }
 
 function _gateStopWatchNative() {
+  _gateStopHeartbeat();
+  _gateBgUpdating = false;
   var BG = _gateBgPlugin();
   if (!BG || !_gateBgWatchId) { _gateBgWatchId = null; _gateBgInst = null; return Promise.resolve(); }
   var id = _gateBgWatchId;
@@ -11125,11 +11130,22 @@ function _gateBuildNotifMsg(distM, speedMs) {
 function _gateBgOnLocation(location, error) {
   if (error) {
     console.warn('[gate-native] error:', error.code, error.message);
+    // H2: these error shapes usually mean the OS killed / suspended the
+    // foreground service (Samsung/OEM battery optimization). Not fixable in
+    // JS — the user must exempt the app from battery optimization in Settings.
+    var msg = (error.message || '') + '';
+    if (error.code === 'NOT_AUTHORIZED' ||
+        /killed|not available|unavailable|disabled/i.test(msg)) {
+      console.warn('[gate-native] ⚠️ foreground service may have been killed by OS ' +
+        'battery optimization. User must whitelist the app (Settings → Battery → ' +
+        'Unrestricted). Auto-restarting watcher.');
+    }
     _gateSetStatus('error', (error.message || error.code || 'שגיאת מיקום'));
     if (error.code === 'NOT_AUTHORIZED') _gateSetState('gps-off');
     return;
   }
   if (!location) return;
+  _gateLastLocationTs = Date.now();
   var coords = {
     latitude:  location.latitude,
     longitude: location.longitude,
@@ -11143,6 +11159,10 @@ function _gateBgOnLocation(location, error) {
 /* Restart watcher with updated notification message when distance changes >75m. */
 function _gateBgUpdateNotif(coords) {
   if (!_gateBgInst || !_gateBgWatchId) return;
+  // H1: never start a second restart while one is in-flight. GPS fires ~1/sec,
+  // so without this guard two callbacks race, both removeWatcher, and the
+  // foreground service is demoted (notification vanishes) with no live watcher.
+  if (_gateBgUpdating) return;
   var cfg = APP._gateConfig || {};
   if (!cfg.lat || !cfg.lng) return;
   var distM = _thHaversine(
@@ -11152,11 +11172,14 @@ function _gateBgUpdateNotif(coords) {
   if (Math.abs(distM - _gateLastNotifDistM) < 75 && _gateLastNotifMsg) return;
   var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0);
   if (newMsg === _gateLastNotifMsg) return;
+  var prevMsg   = _gateLastNotifMsg;
+  var prevDist  = _gateLastNotifDistM;
   _gateLastNotifMsg   = newMsg;
   _gateLastNotifDistM = distM;
   var BG    = _gateBgInst;
   var oldId = _gateBgWatchId;
-  _gateBgWatchId = null;
+  _gateBgUpdating = true;
+  _gateBgWatchId  = null;
   BG.removeWatcher({ id: oldId }).then(function() {
     return BG.addWatcher({
       backgroundTitle:    'עלה דרייב',
@@ -11166,10 +11189,43 @@ function _gateBgUpdateNotif(coords) {
       distanceFilter:     20
     }, _gateBgOnLocation);
   }).then(function(newId) {
-    _gateBgWatchId = newId;
+    _gateBgWatchId  = newId;
+    _gateBgUpdating = false;
   }).catch(function(e) {
-    console.warn('[gate-native] notif update failed:', e);
+    // H5: restart failed — the old watcher may be gone and the foreground
+    // service demoted. Roll back the notif markers so the next update retries,
+    // then fully restart the native watcher to re-promote the service.
+    console.warn('[gate-native] notif update failed — restarting watcher:', e);
+    _gateLastNotifMsg   = prevMsg;
+    _gateLastNotifDistM = prevDist;
+    _gateBgUpdating     = false;
+    if (_gateBgWatchId === null) {
+      // No live watcher left → notification is gone. Rebuild from scratch.
+      _gateStartWatchNative();
+    }
   });
+}
+
+/* Heartbeat: if a watcher is supposedly active but no GPS update arrived in
+   >60s, the foreground service was likely killed. Restart it. */
+function _gateStartHeartbeat() {
+  if (_gateHeartbeatTimer) return;
+  _gateHeartbeatTimer = setInterval(function() {
+    if (!_gateBgWatchId) return;           // not tracking natively
+    if (_gateBgUpdating)  return;           // a restart is already in flight
+    if (!_gateLastLocationTs) return;       // no baseline yet
+    var gap = Date.now() - _gateLastLocationTs;
+    if (gap > 60000) {
+      console.warn('[gate-native] heartbeat: no GPS for ' + Math.round(gap/1000) +
+        's — watcher likely dead, restarting');
+      _gateLastLocationTs = Date.now();     // avoid restart storm
+      _gateStartWatchNative();
+    }
+  }, 30000);
+}
+
+function _gateStopHeartbeat() {
+  if (_gateHeartbeatTimer) { clearInterval(_gateHeartbeatTimer); _gateHeartbeatTimer = null; }
 }
 
 function _gateStartWatchNative() {
@@ -11211,6 +11267,9 @@ function _gateStartWatchNative() {
     clearTimeout(hangTimer);
     _gateBgWatchId = watcherId;
     _gateBgInst    = BG;
+    _gateBgUpdating = false;
+    _gateLastLocationTs = Date.now();
+    _gateStartHeartbeat();
     console.log('[gate-native] watch started, id:', watcherId);
     _gateSetStatus('native');
   }).catch(function(err) {
