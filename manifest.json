@@ -1,6 +1,6 @@
 {
-  "name": "עלה נהגים",
-  "short_name": "עלה",
+  "name": "עלה דרייב",
+  "short_name": "עלה דרייב",
   "description": "אפליקציית נהגים — עמותת עלה",
   "start_url": "./index.html",
   "display": "standalone",

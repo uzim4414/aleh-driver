@@ -10856,7 +10856,7 @@ function _gateInit() {
   card.style.display = 'flex';
   if (!vehActive) { _gateSetState('disabled'); return; }
   _gateSetState('idle');
-  _gateStartWatch();
+  _gateStartOrStop();
 }
 
 function _gateStartWatch() {
@@ -10894,6 +10894,11 @@ function _gateOnPosition(pos) {
 
 function _gateCheckConditions(speedMs, cfg) {
   if (Date.now() < _gateCooldownUntil) return false;
+  if (_gateMode === 'off') return false;
+  if (_gateMode === 'schedule') {
+    var _scH = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
+    if (_scH < _gateModeStart || _scH > _gateModeEnd) return false;
+  }
   var speedKmh = speedMs * 3.6;
   var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
   if (maxSpeed > 0 && speedKmh > maxSpeed) return false;
@@ -11011,6 +11016,183 @@ if (typeof APP !== 'undefined') {
 }
 // ============================================================
 // END GATE MODULE
+// ============================================================
+
+// ============================================================
+// GATE BACKGROUND MODE — מנוע GPS ברקע + לוח זמנים
+// ============================================================
+
+var _gateBgWatchId   = null;    // ID מ-BackgroundGeolocation.addWatcher()
+var _gateMode        = 'off';   // 'always' | 'schedule' | 'off'
+var _gateModeStart   = '07:00'; // HH:MM
+var _gateModeEnd     = '18:00'; // HH:MM
+var _GATE_MODE_KEY       = 'aleh_gate_mode_v1';
+var _GATE_MODE_START_KEY = 'aleh_gate_mode_start_v1';
+var _GATE_MODE_END_KEY   = 'aleh_gate_mode_end_v1';
+
+function _gateLoadMode() {
+  _gateMode      = localStorage.getItem(_GATE_MODE_KEY)       || 'off';
+  _gateModeStart = localStorage.getItem(_GATE_MODE_START_KEY) || '07:00';
+  _gateModeEnd   = localStorage.getItem(_GATE_MODE_END_KEY)   || '18:00';
+}
+
+function _gateSaveMode(mode, start, end) {
+  _gateMode = mode;
+  if (start) _gateModeStart = start;
+  if (end)   _gateModeEnd   = end;
+  localStorage.setItem(_GATE_MODE_KEY,       _gateMode);
+  localStorage.setItem(_GATE_MODE_START_KEY, _gateModeStart);
+  localStorage.setItem(_GATE_MODE_END_KEY,   _gateModeEnd);
+}
+
+function _gateIsNativeCapacitor() {
+  return !!(window.Capacitor &&
+            window.Capacitor.isNativePlatform &&
+            window.Capacitor.isNativePlatform());
+}
+
+function _gateBgPlugin() {
+  return (window.Capacitor &&
+          window.Capacitor.Plugins &&
+          window.Capacitor.Plugins.BackgroundGeolocation) || null;
+}
+
+function _gateStopWatchNative() {
+  var BG = _gateBgPlugin();
+  if (!BG || !_gateBgWatchId) { _gateBgWatchId = null; return Promise.resolve(); }
+  var id = _gateBgWatchId;
+  _gateBgWatchId = null;
+  return BG.removeWatcher({ id: id }).then(function() {
+    console.log('[gate-native] watch removed');
+  }).catch(function(e) {
+    console.warn('[gate-native] removeWatcher error:', e);
+  });
+}
+
+function _gateStartWatchNative() {
+  var BG = _gateBgPlugin();
+  if (!BG) {
+    console.warn('[gate-native] BackgroundGeolocation plugin unavailable — using foreground GPS');
+    _gateStartWatch();
+    return;
+  }
+  var modeLabel = _gateMode === 'schedule'
+    ? 'מעקב פעיל ' + _gateModeStart + '–' + _gateModeEnd
+    : 'GPS עוקב לפתיחת שערי חניון אוטומטית';
+  _gateStopWatchNative().then(function() {
+    return BG.addWatcher({
+      backgroundTitle:    'עלה דרייב',
+      backgroundMessage:  modeLabel,
+      requestPermissions: true,
+      stale:              false,
+      distanceFilter:     20
+    }, function(location, error) {
+      if (error) {
+        console.warn('[gate-native] error:', error.code, error.message);
+        if (error.code === 'NOT_AUTHORIZED') _gateSetState('gps-off');
+        return;
+      }
+      if (!location) return;
+      _gateOnPosition({
+        coords: {
+          latitude:  location.latitude,
+          longitude: location.longitude,
+          speed:     typeof location.speed === 'number' ? location.speed : 0,
+          accuracy:  location.accuracy
+        }
+      });
+    });
+  }).then(function(watcherId) {
+    _gateBgWatchId = watcherId;
+    console.log('[gate-native] watch started, id:', watcherId);
+  }).catch(function(err) {
+    console.warn('[gate-native] addWatcher failed:', err.message || err);
+    _gateStartWatch();
+  });
+}
+
+/* Central entry point — decides which GPS engine to use based on stored mode.
+   Replaces the direct _gateStartWatch() call in _gateInit(). */
+function _gateStartOrStop() {
+  _gateLoadMode();
+  _gateUpdateModeUI();
+  if (_gateMode === 'off') {
+    if (_gateWatchId !== null) {
+      try { navigator.geolocation.clearWatch(_gateWatchId); } catch(_) {}
+      _gateWatchId = null;
+    }
+    _gateStopWatchNative();
+    _gateSetState('idle');
+    return;
+  }
+  // 'always' or 'schedule' — start the appropriate GPS engine
+  if (_gateIsNativeCapacitor()) {
+    _gateStartWatchNative();
+  } else {
+    _gateStartWatch();
+  }
+}
+
+/* Public: change mode and restart GPS. Called from mode-selector UI. */
+function _gateModeSet(mode, start, end) {
+  _gateSaveMode(mode, start, end);
+  _gateStartOrStop();
+}
+
+/* Public: stop GPS entirely and set mode to 'off'. Called from power button. */
+function _gatePowerOff() {
+  _gateSaveMode('off', null, null);
+  if (_gateWatchId !== null) {
+    try { navigator.geolocation.clearWatch(_gateWatchId); } catch(_) {}
+    _gateWatchId = null;
+  }
+  _gateStopWatchNative();
+  _gateSetState('idle');
+  _gateUpdateModeUI();
+}
+
+/* Sync the 3-pill mode selector and schedule panel to current _gateMode. */
+function _gateUpdateModeUI() {
+  var modeWrap = document.getElementById('gate-mode-wrap');
+  if (modeWrap) modeWrap.style.display = 'flex';
+  ['always', 'schedule', 'off'].forEach(function(m) {
+    var btn = document.getElementById('gm-btn-' + m);
+    if (!btn) return;
+    btn.classList.remove('gm-active', 'gm-active-off');
+    if (m === _gateMode) {
+      btn.classList.add(m === 'off' ? 'gm-active-off' : 'gm-active');
+    }
+  });
+  var schedPanel = document.getElementById('gm-sched-panel');
+  if (schedPanel) schedPanel.style.display = _gateMode === 'schedule' ? 'flex' : 'none';
+  var startEl = document.getElementById('gm-start');
+  var endEl   = document.getElementById('gm-end');
+  if (startEl) startEl.value = _gateModeStart;
+  if (endEl)   endEl.value   = _gateModeEnd;
+}
+
+/* Helper: apply schedule mode with current picker values. Called from "אישור" button. */
+function _gateApplySchedule() {
+  var s = document.getElementById('gm-start');
+  var e = document.getElementById('gm-end');
+  if (!s || !e || !s.value || !e.value) return;
+  _gateModeSet('schedule', s.value, e.value);
+}
+
+// Override the tap handler exposed by the legacy END GATE MODULE block and
+// add new public APIs — this runs after the original, overwriting APP properties.
+(function _gateExposePublicApi() {
+  if (typeof APP === 'undefined') { setTimeout(_gateExposePublicApi, 300); return; }
+  APP.gateCardTap  = function() {
+    if (GATE_STATE === 'error') { _gateSetState('idle'); _gateStartOrStop(); }
+  };
+  APP.gatePowerOff     = _gatePowerOff;
+  APP.gateModeSet      = _gateModeSet;
+  APP.gateApplySchedule = _gateApplySchedule;
+})();
+
+// ============================================================
+// END GATE BACKGROUND MODE
 // ============================================================
 
 function _thIsOpen(s) {
