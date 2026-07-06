@@ -11052,9 +11052,20 @@ function _gateIsNativeCapacitor() {
 }
 
 function _gateBgPlugin() {
-  return (window.Capacitor &&
-          window.Capacitor.Plugins &&
-          window.Capacitor.Plugins.BackgroundGeolocation) || null;
+  if (!window.Capacitor) return null;
+  // Already registered (bundled context)
+  var existing = window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+  if (existing) return existing;
+  // Plain HTML context: register the plugin proxy on demand
+  if (typeof window.Capacitor.registerPlugin === 'function') {
+    try {
+      var plugin = window.Capacitor.registerPlugin('BackgroundGeolocation');
+      if (plugin) return plugin;
+    } catch(e) {
+      console.warn('[gate-native] registerPlugin failed:', e);
+    }
+  }
+  return null;
 }
 
 function _gateStopWatchNative() {
