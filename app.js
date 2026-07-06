@@ -11045,6 +11045,27 @@ function _gateSaveMode(mode, start, end) {
   localStorage.setItem(_GATE_MODE_END_KEY,   _gateModeEnd);
 }
 
+/* Visible status line in the gate card. type: 'native'|'foreground'|'error'|'off'. */
+function _gateSetStatus(type, extra) {
+  var el = document.getElementById('gm-status');
+  if (!el) return;
+  var txt = '', bg = '', color = '', border = '';
+  if (type === 'native') {
+    txt = '🔵 Native GPS פעיל'; color = '#0A84FF'; bg = 'rgba(10,132,255,.12)'; border = 'rgba(10,132,255,.35)';
+  } else if (type === 'foreground') {
+    txt = '🟡 Foreground GPS פעיל'; color = '#FFD60A'; bg = 'rgba(255,214,10,.12)'; border = 'rgba(255,214,10,.35)';
+  } else if (type === 'error') {
+    txt = '🔴 שגיאה: ' + (extra || 'לא ידועה'); color = '#FF453A'; bg = 'rgba(255,69,58,.12)'; border = 'rgba(255,69,58,.4)';
+  } else {
+    el.style.display = 'none'; return;
+  }
+  el.textContent = txt;
+  el.style.color = color;
+  el.style.background = bg;
+  el.style.border = '1px solid ' + border;
+  el.style.display = 'block';
+}
+
 function _gateIsNativeCapacitor() {
   return !!(window.Capacitor &&
             window.Capacitor.isNativePlatform &&
@@ -11082,14 +11103,29 @@ function _gateStopWatchNative() {
 
 function _gateStartWatchNative() {
   var BG = _gateBgPlugin();
-  if (!BG) {
+  // In Capacitor 6, registerPlugin() always returns a truthy proxy even when
+  // the native plugin is absent — so a non-null BG does NOT prove native works.
+  // We rely on addWatcher's Promise: it resolves with a real watcherId only
+  // when the native service actually started. If the plugin proxy has no
+  // addWatcher (or it rejects), we fall back to foreground GPS and say so.
+  if (!BG || typeof BG.addWatcher !== 'function') {
     console.warn('[gate-native] BackgroundGeolocation plugin unavailable — using foreground GPS');
+    _gateSetStatus('foreground');
     _gateStartWatch();
     return;
   }
   var modeLabel = _gateMode === 'schedule'
     ? 'מעקב פעיל ' + _gateModeStart + '–' + _gateModeEnd
     : 'GPS עוקב לפתיחת שערי חניון אוטומטית';
+  // Guard against addWatcher hanging without ever resolving/rejecting.
+  var settled = false;
+  var hangTimer = setTimeout(function() {
+    if (settled) return;
+    settled = true;
+    console.warn('[gate-native] addWatcher timed out — falling back to foreground GPS');
+    _gateSetStatus('error', 'התוסף לא הגיב (timeout) — עברנו ל-GPS רגיל');
+    _gateStartWatch();
+  }, 8000);
   _gateStopWatchNative().then(function() {
     return BG.addWatcher({
       backgroundTitle:    'עלה דרייב',
@@ -11100,6 +11136,7 @@ function _gateStartWatchNative() {
     }, function(location, error) {
       if (error) {
         console.warn('[gate-native] error:', error.code, error.message);
+        _gateSetStatus('error', (error.message || error.code || 'שגיאת מיקום'));
         if (error.code === 'NOT_AUTHORIZED') _gateSetState('gps-off');
         return;
       }
@@ -11114,10 +11151,18 @@ function _gateStartWatchNative() {
       });
     });
   }).then(function(watcherId) {
+    if (settled) return;
+    settled = true;
+    clearTimeout(hangTimer);
     _gateBgWatchId = watcherId;
     console.log('[gate-native] watch started, id:', watcherId);
+    _gateSetStatus('native');
   }).catch(function(err) {
-    console.warn('[gate-native] addWatcher failed:', err.message || err);
+    if (settled) return;
+    settled = true;
+    clearTimeout(hangTimer);
+    console.warn('[gate-native] addWatcher failed:', err && (err.message || err));
+    _gateSetStatus('error', (err && (err.message || err.code)) || 'addWatcher נכשל — עברנו ל-GPS רגיל');
     _gateStartWatch();
   });
 }
@@ -11140,6 +11185,7 @@ function _gateStartOrStop() {
   if (_gateIsNativeCapacitor()) {
     _gateStartWatchNative();
   } else {
+    _gateSetStatus('foreground');
     _gateStartWatch();
   }
 }
@@ -11159,6 +11205,7 @@ function _gatePowerOff() {
   }
   _gateStopWatchNative();
   _gateSetState('idle');
+  _gateSetStatus('off');
   _gateUpdateModeUI();
 }
 
