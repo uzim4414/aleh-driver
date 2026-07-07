@@ -318,6 +318,8 @@ function _fbDeleteReminder(id) {
 
 var _gateRef = null; // module-level — מאפשר ניתוק listener ישן לפני חיבור חדש
 var _gateCooldownMap = {}; // per-gate cooldown: { [lotId]: timestamp }
+var _gateLastSpeedKmh = null; // last known speed in km/h (for drawer strip)
+var _gateLastAccM     = null; // last known GPS accuracy in metres (for drawer strip)
 
 /** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
 function _initFbSync() {
@@ -10886,9 +10888,19 @@ function _gateStartWatch() {
 function _gateOnPosition(pos) {
   var configs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
   if (configs.length === 0) return;
+  // If schedule mode and outside the time window — idle state, no gate logic, no notification
+  if (_gateMode === 'schedule') {
+    var _scNow = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
+    if (_scNow < _gateModeStart || _scNow > _gateModeEnd) {
+      _gateSetState('idle');
+      return;
+    }
+  }
   var lat = pos.coords.latitude;
   var lng = pos.coords.longitude;
   var speedMs = pos.coords.speed || 0;
+  _gateLastSpeedKmh = Math.round(speedMs * 3.6);
+  _gateLastAccM     = pos.coords.accuracy != null ? pos.coords.accuracy : null;
   var inRange = null; // nearest gate in range
   var nearestDist = Infinity;
   for (var _gi = 0; _gi < configs.length; _gi++) {

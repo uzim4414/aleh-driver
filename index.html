@@ -4491,7 +4491,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gd-seg-btn.gd-active-off { background:rgba(255,69,58,.14);border-color:rgba(255,69,58,.4);color:#FF453A; }
 #gd-sched-panel { margin-top:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:9px 12px;display:none;align-items:center;gap:8px; }
 .gd-sched-lbl { font-size:11px;color:var(--t2);white-space:nowrap; }
-.gd-time-inp { background:rgba(31,138,61,.1);border:1px solid rgba(31,138,61,.3);border-radius:7px;padding:5px 10px;font-size:13px;font-weight:700;color:#1F8A3D;direction:ltr;width:72px;text-align:center;font-family:'Outfit',monospace; }
+.gd-time-inp { background:rgba(31,138,61,.1);border:1px solid rgba(31,138,61,.3);border-radius:7px;padding:5px 10px;font-size:13px;font-weight:700;color:#1F8A3D;direction:ltr;width:90px;text-align:center;font-family:'Outfit',monospace; }
 .gd-ok-btn { margin-right:auto;background:#1F8A3D;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;color:#000;cursor:pointer;font-family:inherit; }
 .gd-div { height:1px;background:var(--border);margin:6px 0 0; }
 /* Gate cards */
@@ -6144,10 +6144,8 @@ window.fcmDebug = async function() {
   window._gdApplySched = function() {
     var s = (document.getElementById('gd-start')||{}).value || '07:00';
     var e = (document.getElementById('gd-end')||{}).value   || '18:00';
-    // Update main app schedule inputs if they exist
-    var ms = document.getElementById('gm-start'); if(ms) ms.value = s;
-    var me = document.getElementById('gm-end');   if(me) me.value = e;
-    if (typeof APP !== 'undefined' && APP.gateApplySchedule) APP.gateApplySchedule();
+    // Call gateModeSet directly with the time values — bypasses deleted #gm-start/#gm-end elements
+    if (typeof APP !== 'undefined' && APP.gateModeSet) APP.gateModeSet('schedule', s, e);
     _gdApplyModeUI('schedule');
   };
 
