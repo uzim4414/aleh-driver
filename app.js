@@ -347,8 +347,9 @@ function _initFbGateSync() {
                           (typeof gateAccess.enabled === 'string');
         var configs;
         if (isOldFormat) {
-          // Wrap legacy single config in array
-          configs = [gateAccess];
+          // Old format lacks address/lotName — delete node and re-provision with enriched data
+          configs = null;
+          if (ref) { try { ref.remove(); } catch(_rE) {} }
         } else {
           // New format: map keyed by lotId
           configs = Object.keys(gateAccess).map(function(lotId) {
@@ -357,7 +358,7 @@ function _initFbGateSync() {
             return cfg;
           }).filter(function(c){ return c.enabled !== false; });
         }
-        if (configs.length > 0) {
+        if (configs && configs.length > 0) {
           APP._gateConfig  = configs[0]; // backward compat
           APP._gateConfigs = configs;
           _gateInit();
