@@ -4965,58 +4965,6 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     <div class="gate-status-dot" id="gate-status-dot" style="display:none"></div>
   </div>
 
-  <!-- Gate mode selector — GPS background mode (hidden until gate is enabled) -->
-  <style>
-    #gate-mode-wrap{display:none;flex-direction:column;gap:8px;margin-top:2px;padding:12px 14px;background:var(--card);border-radius:18px;border:1px solid rgba(31,138,61,.18)}
-    #gate-mode-wrap .gm-row{display:flex;gap:6px}
-    .gm-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px;border-radius:11px;border:1px solid rgba(255,255,255,.09);background:transparent;color:rgba(255,255,255,.4);font-family:'Noto Sans Hebrew',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;line-height:1.2}
-    .gm-btn svg{flex-shrink:0;opacity:.5;transition:opacity .2s}
-    .gm-btn.gm-active{background:rgba(31,138,61,.12);border-color:rgba(31,138,61,.42);color:#1F8A3D}
-    .gm-btn.gm-active svg{opacity:1}
-    .gm-btn.gm-active-off{background:rgba(255,69,58,.08);border-color:rgba(255,69,58,.3);color:#FF453A}
-    .gm-btn.gm-active-off svg{opacity:1}
-    #gm-sched-panel{display:none;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:9px 12px}
-    .gm-sched-lbl{font-size:11.5px;color:var(--t2);white-space:nowrap}
-    .gm-time-inp{background:rgba(31,138,61,.1);border:1px solid rgba(31,138,61,.3);border-radius:7px;padding:5px 10px;font-size:13px;font-weight:700;color:#1F8A3D;font-family:'Outfit',monospace;direction:ltr;width:74px;text-align:center}
-    .gm-sched-sep{color:var(--t2);font-size:12px}
-    .gm-ok-btn{margin-right:auto;background:#1F8A3D;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;color:#000;cursor:pointer;font-family:'Noto Sans Hebrew',sans-serif;flex-shrink:0}
-    .gm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
-    .gm-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.04em;text-transform:uppercase}
-    .gm-power{width:26px;height:26px;border-radius:50%;background:rgba(255,69,58,.1);border:1px solid rgba(255,69,58,.28);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
-  </style>
-  <div id="gate-mode-wrap">
-    <div class="gm-header">
-      <span class="gm-title">מצב מעקב GPS</span>
-      <div class="gm-power" onclick="APP.gatePowerOff && APP.gatePowerOff()" title="כיבוי מעקב">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF453A" stroke-width="2.2" stroke-linecap="round">
-          <path d="M18.36 6.64A9 9 0 1 1 5.64 17.36"/><line x1="12" y1="2" x2="12" y2="12"/>
-        </svg>
-      </div>
-    </div>
-    <div class="gm-row">
-      <button id="gm-btn-always" class="gm-btn" onclick="APP.gateModeSet && APP.gateModeSet('always')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        תמיד פעיל
-      </button>
-      <button id="gm-btn-schedule" class="gm-btn" onclick="APP.gateModeSet && APP.gateModeSet('schedule')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        לוח זמנים
-      </button>
-      <button id="gm-btn-off" class="gm-btn gm-active-off" onclick="APP.gatePowerOff && APP.gatePowerOff()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18.36 6.64A9 9 0 1 1 5.64 17.36"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-        כיבוי
-      </button>
-    </div>
-    <div id="gm-sched-panel">
-      <span class="gm-sched-lbl">התחל</span>
-      <input type="time" id="gm-start" class="gm-time-inp" value="07:00">
-      <span class="gm-sched-sep">—</span>
-      <span class="gm-sched-lbl">סיים</span>
-      <input type="time" id="gm-end" class="gm-time-inp" value="18:00">
-      <button class="gm-ok-btn" onclick="APP.gateApplySchedule && APP.gateApplySchedule()">אישור</button>
-    </div>
-    <div id="gm-status" style="display:none;font-size:12px;font-weight:600;line-height:1.4;padding:8px 11px;border-radius:11px;text-align:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)"></div>
-  </div>
       </div>
       <div style="height:120px"></div>
     </div>

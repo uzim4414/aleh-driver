@@ -11367,24 +11367,9 @@ function _gatePowerOff() {
   _gateUpdateModeUI();
 }
 
-/* Sync the 3-pill mode selector and schedule panel to current _gateMode. */
+/* Sync gate drawer mode UI to current _gateMode (old home-screen card removed). */
 function _gateUpdateModeUI() {
-  var modeWrap = document.getElementById('gate-mode-wrap');
-  if (modeWrap) modeWrap.style.display = 'flex';
-  ['always', 'schedule', 'off'].forEach(function(m) {
-    var btn = document.getElementById('gm-btn-' + m);
-    if (!btn) return;
-    btn.classList.remove('gm-active', 'gm-active-off');
-    if (m === _gateMode) {
-      btn.classList.add(m === 'off' ? 'gm-active-off' : 'gm-active');
-    }
-  });
-  var schedPanel = document.getElementById('gm-sched-panel');
-  if (schedPanel) schedPanel.style.display = _gateMode === 'schedule' ? 'flex' : 'none';
-  var startEl = document.getElementById('gm-start');
-  var endEl   = document.getElementById('gm-end');
-  if (startEl) startEl.value = _gateModeStart;
-  if (endEl)   endEl.value   = _gateModeEnd;
+  if (typeof window._gdSyncMode === 'function') window._gdSyncMode();
 }
 
 /* Helper: apply schedule mode with current picker values. Called from "אישור" button. */
