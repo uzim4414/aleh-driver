@@ -317,6 +317,7 @@ function _fbDeleteReminder(id) {
 /* ── Master Sync Init ── */
 
 var _gateRef = null; // module-level — מאפשר ניתוק listener ישן לפני חיבור חדש
+var _gateCooldownMap = {}; // per-gate cooldown: { [lotId]: timestamp }
 
 /** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
 function _initFbSync() {
@@ -331,46 +332,58 @@ function _initFbSync() {
 
 /* ── Listener: Gate access config ── */
 function _initFbGateSync() {
-  // ניתוק listener קודם — מניעת כפילות כשהפונקציה נקראת שוב אחרי loadFullData
   if (_gateRef) { try { _gateRef.off('value'); } catch(_grE) {} _gateRef = null; }
   var ref = _fbRef('gateAccess');
   if (!ref) return;
   _gateRef = ref;
   ref.on('value', function(snap) {
     try {
-      // STATE.vehicle טרם נטען (onAuthStateChanged מוקדם מדי) — לא מוחקים ולא מסתירים.
-      // _initFbVehicleSync יפעיל אותנו שוב לאחר שloadFullData יסיים.
       if (!STATE.vehicle || !STATE.vehicle.id) return;
       var gateAccess = snap.val();
-      if (gateAccess && gateAccess.enabled && String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE') {
-        APP._gateConfig = gateAccess;
-        _gateInit();
-      } else {
-        // Self-provision: fetch config from GAS if vehicle has gate enabled
-        var vehId = STATE.vehicle && STATE.vehicle.id;
-        if (vehId && String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE') {
-          gasPost('get_gate_config', { vehicleId: vehId }, { silent: true }).then(function(r) {
-            if (r && r.ok && r.config) {
-              APP._gateConfig = r.config;
-              // Write to Firebase so future loads are instant
-              if (ref) ref.set(r.config);
-              _gateInit();
-            } else {
-              // Vehicle IS gate-enabled but no config available yet — show disabled, don't hide.
-              _gateSetDisabled('ממתין\nלהרשאה');
-            }
-          }).catch(function() {
-            _gateSetDisabled('ממתין\nלהרשאה');
-          });
+      var vehGateEnabled = String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE';
+      if (gateAccess && vehGateEnabled) {
+        // Detect format: old = top-level "enabled" field; new = map of lotId keys
+        var isOldFormat = (gateAccess.enabled !== undefined && typeof gateAccess.enabled === 'boolean') ||
+                          (typeof gateAccess.enabled === 'string');
+        var configs;
+        if (isOldFormat) {
+          // Wrap legacy single config in array
+          configs = [gateAccess];
         } else {
-          // Vehicle is assigned but gate access is NOT enabled (revoked / never granted).
-          // Show the card DISABLED (grayed, not tappable) — it must NEVER disappear.
-          _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון');
-          // Remove the stale gateAccess node so an active config can't be acted on,
-          // but keep the card visible in its disabled state.
-          if (gateAccess && ref) { try { ref.remove(); } catch(_gaRmE) {} }
-          // GPS watch is already cleared inside _gateSetDisabled().
+          // New format: map keyed by lotId
+          configs = Object.keys(gateAccess).map(function(lotId) {
+            var cfg = gateAccess[lotId];
+            cfg.lotId = lotId;
+            return cfg;
+          }).filter(function(c){ return c.enabled !== false; });
         }
+        if (configs.length > 0) {
+          APP._gateConfig  = configs[0]; // backward compat
+          APP._gateConfigs = configs;
+          _gateInit();
+          return;
+        }
+      }
+      // Self-provision: fetch from GAS
+      var vehId = STATE.vehicle && STATE.vehicle.id;
+      if (vehId && vehGateEnabled) {
+        gasPost('get_gate_config', { vehicleId: vehId }, { silent: true }).then(function(r) {
+          if (r && r.ok && (r.configs || r.config)) {
+            var cfgs = r.configs || [r.config];
+            APP._gateConfig  = cfgs[0];
+            APP._gateConfigs = cfgs;
+            // Write new-format map to Firebase
+            var map = {};
+            cfgs.forEach(function(c) { if (c.lotId) { var stored = Object.assign({}, c); delete stored.lotId; stored.enabled = true; map[c.lotId] = stored; } });
+            if (ref && Object.keys(map).length > 0) ref.set(map);
+            _gateInit();
+          } else {
+            _gateSetDisabled('ממתין\nלהרשאה');
+          }
+        }).catch(function() { _gateSetDisabled('ממתין\nלהרשאה'); });
+      } else {
+        _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון');
+        if (gateAccess && ref) { try { ref.remove(); } catch(_gaRmE) {} }
       }
     } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
   }, function(err) { console.warn('[fbSync] gate listener:', err.message); });
@@ -10870,30 +10883,55 @@ function _gateStartWatch() {
 }
 
 function _gateOnPosition(pos) {
-  var cfg = APP._gateConfig || {};
-  if (!cfg.enabled || !cfg.lat || !cfg.lng) return;
+  var configs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
+  if (configs.length === 0) return;
   var lat = pos.coords.latitude;
   var lng = pos.coords.longitude;
   var speedMs = pos.coords.speed || 0;
-  var distKm = _thHaversine(lat, lng, parseFloat(cfg.lat), parseFloat(cfg.lng));
-  var distM = distKm * 1000;
-  var radius = parseFloat(cfg.radius) || 200;
-  if (distM < radius) {
+  var inRange = null; // nearest gate in range
+  var nearestDist = Infinity;
+  for (var _gi = 0; _gi < configs.length; _gi++) {
+    var cfg = configs[_gi];
+    if (!cfg.lat || !cfg.lng) continue;
+    var distKm = _thHaversine(lat, lng, parseFloat(cfg.lat), parseFloat(cfg.lng));
+    var distM = distKm * 1000;
+    var radius = parseFloat(cfg.radius) || 200;
+    if (distM < radius && distM < nearestDist) {
+      nearestDist = distM;
+      inRange = cfg;
+    }
+  }
+  // Update drawer live distances if open
+  if (typeof _gateDrawerUpdateDistances === 'function') {
+    _gateDrawerUpdateDistances(configs, lat, lng);
+  }
+  if (inRange) {
     if (_gateOpening) return;
-    if (!_gateCheckConditions(speedMs, cfg)) return;
+    if (!_gateCheckConditions(speedMs, inRange)) return;
     _gateSetState('opening');
-    _gateOpen(cfg.lotId, distM, speedMs, lat, lng);
-  } else if (distM < 400) {
-    _gateSetState('approaching');
-    var badge = document.getElementById('gate-dist-badge');
-    if (badge) badge.textContent = Math.round(distM) + ' מ\'';
+    _gateOpen(inRange.lotId, nearestDist, speedMs, lat, lng);
   } else {
-    _gateSetState('idle');
+    // Find nearest overall for badge
+    var minDist = Infinity;
+    for (var _gj = 0; _gj < configs.length; _gj++) {
+      var c2 = configs[_gj];
+      if (!c2.lat || !c2.lng) continue;
+      var d2 = _thHaversine(lat, lng, parseFloat(c2.lat), parseFloat(c2.lng)) * 1000;
+      if (d2 < minDist) minDist = d2;
+    }
+    if (minDist < 600) {
+      _gateSetState('approaching');
+      var badge = document.getElementById('gate-dist-badge');
+      if (badge) badge.textContent = Math.round(minDist) + ' מ\'';
+    } else {
+      _gateSetState('idle');
+    }
   }
 }
 
 function _gateCheckConditions(speedMs, cfg) {
-  if (Date.now() < _gateCooldownUntil) return false;
+  var _coolUntil = (cfg && cfg.lotId && _gateCooldownMap) ? (_gateCooldownMap[cfg.lotId] || 0) : (_gateCooldownUntil || 0);
+  if (Date.now() < _coolUntil) return false;
   if (_gateMode === 'off') return false;
   if (_gateMode === 'schedule') {
     var _scH = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
@@ -10929,9 +10967,12 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
   }, { silent: true }).then(function(r) {
     _gateOpening = false;
     if (r && r.ok) {
-      var cooldownSec = parseFloat((APP._gateConfig||{}).cooldownSec) || 300;
-      _gateCooldownUntil = Date.now() + cooldownSec * 1000;
-      _gateShowSuccess(r.lotName || (APP._gateConfig||{}).lotName || 'חניון', distM);
+      var _cfgForLot = (APP._gateConfigs || []).filter(function(c){ return c.lotId === lotId; })[0] || APP._gateConfig || {};
+      var cooldownSec = parseFloat(_cfgForLot.cooldownSec) || 300;
+      if (!_gateCooldownMap) _gateCooldownMap = {};
+      _gateCooldownMap[lotId] = Date.now() + cooldownSec * 1000;
+      _gateCooldownUntil = _gateCooldownMap[lotId]; // backward compat
+      _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM);
     } else {
       _gateSetState('error');
       setTimeout(function(){ _gateSetState('idle'); }, 5000);
@@ -11359,7 +11400,9 @@ function _gateApplySchedule() {
 (function _gateExposePublicApi() {
   if (typeof APP === 'undefined') { setTimeout(_gateExposePublicApi, 300); return; }
   APP.gateCardTap  = function() {
-    if (GATE_STATE === 'error') { _gateSetState('idle'); _gateStartOrStop(); }
+    if (GATE_STATE === 'error') { _gateSetState('idle'); _gateStartOrStop(); return; }
+    // Open gate drawer
+    if (typeof _gateDrawerOpen === 'function') _gateDrawerOpen();
   };
   APP.gatePowerOff     = _gatePowerOff;
   APP.gateModeSet      = _gateModeSet;
