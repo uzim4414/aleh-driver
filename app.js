@@ -10888,11 +10888,12 @@ function _gateStartWatch() {
 function _gateOnPosition(pos) {
   var configs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
   if (configs.length === 0) return;
-  // If schedule mode and outside the time window — idle state, no gate logic, no notification
+  // If schedule mode and outside the time window — idle state, force notif rebuild
   if (_gateMode === 'schedule') {
     var _scNow = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
     if (_scNow < _gateModeStart || _scNow > _gateModeEnd) {
       _gateSetState('idle');
+      _gateLastNotifMsg = ''; // force _gateBgUpdateNotif to rebuild with paused message
       return;
     }
   }
@@ -11166,18 +11167,37 @@ function _gateStopWatchNative() {
   });
 }
 
-/* Build rich notification message from current position data. */
-function _gateBuildNotifMsg(distM, speedMs) {
-  var cfg = APP._gateConfig || {};
+/* Build notification title — reflects GPS mode + schedule state. */
+function _gateBuildNotifTitle() {
+  if (_gateMode === 'always') return '🟢 עלה דרייב — מעקב פעיל';
+  if (_gateMode === 'schedule') {
+    var _nt = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
+    var _inside = (_nt >= _gateModeStart && _nt <= _gateModeEnd);
+    if (_inside) return '🔵 עלה דרייב — לוז ' + _gateModeStart + '–' + _gateModeEnd;
+    return '⏸ עלה דרייב — ממתין ' + _gateModeStart + '–' + _gateModeEnd;
+  }
+  return 'עלה דרייב';
+}
+
+/* Build rich notification body — gate info + speed + accuracy. */
+function _gateBuildNotifMsg(distM, speedMs, accuracyM) {
+  var cfg = (APP._gateConfigs && APP._gateConfigs[0]) || APP._gateConfig || {};
   var lotName = cfg.lotName || 'החניון';
   var speedKmh = Math.round((speedMs || 0) * 3.6);
   var distStr = distM < 1000
     ? Math.round(distM) + 'מ\''
     : (distM / 1000).toFixed(1) + 'ק"מ';
-  var parts = ['📍 ' + distStr + ' מ' + lotName];
-  if (speedKmh > 2) parts.push('🚗 ' + speedKmh + ' קמ"ש');
-  if (_gateMode === 'schedule') parts.push('⏰ ' + _gateModeStart + '–' + _gateModeEnd);
-  return parts.join(' • ');
+  // Schedule paused — outside window
+  if (_gateMode === 'schedule') {
+    var _bt = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
+    if (_bt < _gateModeStart || _bt > _gateModeEnd) {
+      return '⏸ ' + lotName + ' | לוז ' + _gateModeStart + '–' + _gateModeEnd + ' · ' + distStr;
+    }
+  }
+  var parts = ['📍 ' + lotName + ' · ' + distStr];
+  if (speedKmh > 2) parts.push('🚗 ' + speedKmh + 'קמ"ש');
+  if (accuracyM != null && accuracyM < 200) parts.push('🎯 ±' + Math.round(accuracyM) + 'מ\'');
+  return parts.join(' · ');
 }
 
 /* Named GPS callback — used in addWatcher so it can be re-passed on notif restart. */
@@ -11224,7 +11244,7 @@ function _gateBgUpdateNotif(coords) {
     parseFloat(cfg.lat), parseFloat(cfg.lng)
   ) * 1000;
   if (Math.abs(distM - _gateLastNotifDistM) < 75 && _gateLastNotifMsg) return;
-  var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0);
+  var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0, coords.accuracy);
   if (newMsg === _gateLastNotifMsg) return;
   var prevMsg   = _gateLastNotifMsg;
   var prevDist  = _gateLastNotifDistM;
@@ -11236,7 +11256,7 @@ function _gateBgUpdateNotif(coords) {
   _gateBgWatchId  = null;
   BG.removeWatcher({ id: oldId }).then(function() {
     return BG.addWatcher({
-      backgroundTitle:    'עלה דרייב',
+      backgroundTitle:    _gateBuildNotifTitle(),
       backgroundMessage:  newMsg,
       requestPermissions: false,
       stale:              false,
