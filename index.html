@@ -4494,8 +4494,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gd-sched-lbl { font-size:11px;font-weight:700;color:var(--t2);white-space:nowrap; }
 .gd-time-sel { background:rgba(31,138,61,.1);border:1px solid rgba(31,138,61,.3);border-radius:7px;padding:7px 4px;font-size:15px;font-weight:700;color:#1F8A3D;font-family:'Outfit',monospace;width:52px;text-align:center;-webkit-appearance:none;appearance:none;cursor:pointer; }
 .gd-time-sep { color:#1F8A3D;font-weight:800;font-size:16px;padding:0 1px; }
-.gd-ok-btn { background:#1F8A3D;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:800;color:#000;cursor:pointer;font-family:'Noto Sans Hebrew',sans-serif;width:100%;transition:background .25s,transform .1s; }
+.gd-time-pair { display:inline-flex;align-items:center;gap:3px; }
+@keyframes gdFill { from { width:0 } to { width:100% } }
+.gd-ok-btn { position:relative;overflow:hidden;background:#1F8A3D;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:800;color:#000;cursor:pointer;font-family:'Noto Sans Hebrew',sans-serif;width:100%;transition:background .25s,transform .1s;z-index:0; }
 .gd-ok-btn:active { transform:scale(.97); }
+.gd-ok-btn::before { content:'';position:absolute;left:0;top:0;height:100%;width:0;background:rgba(255,255,255,.25);z-index:1;pointer-events:none; }
+.gd-ok-btn.gd-loading::before { animation:gdFill .65s cubic-bezier(.4,0,.2,1) forwards; }
+.gd-ok-btn span.gd-btn-txt { position:relative;z-index:2; }
 .gd-ok-btn.gd-saved { background:#30D158; }
 .gd-save-toast { text-align:center;font-size:12px;font-weight:700;color:#30D158;display:none;padding-top:2px; }
 .gd-div { height:1px;background:var(--border);margin:6px 0 0; }
@@ -6046,16 +6051,20 @@ window.fcmDebug = async function() {
     <div id="gd-sched-panel">
       <div class="gd-sched-row">
         <span class="gd-sched-lbl">התחלה</span>
-        <select id="gd-sh" class="gd-time-sel"></select>
-        <span class="gd-time-sep">:</span>
-        <select id="gd-sm" class="gd-time-sel"></select>
+        <span class="gd-time-pair" dir="ltr">
+          <select id="gd-sh" class="gd-time-sel"></select>
+          <span class="gd-time-sep">:</span>
+          <select id="gd-sm" class="gd-time-sel"></select>
+        </span>
         <div style="flex:1"></div>
         <span class="gd-sched-lbl">סיום</span>
-        <select id="gd-eh" class="gd-time-sel"></select>
-        <span class="gd-time-sep">:</span>
-        <select id="gd-em" class="gd-time-sel"></select>
+        <span class="gd-time-pair" dir="ltr">
+          <select id="gd-eh" class="gd-time-sel"></select>
+          <span class="gd-time-sep">:</span>
+          <select id="gd-em" class="gd-time-sel"></select>
+        </span>
       </div>
-      <button class="gd-ok-btn" id="gd-ok-btn" onclick="typeof _gdApplySched==='function'&&_gdApplySched()">✓ שמור לוח זמנים</button>
+      <button class="gd-ok-btn" id="gd-ok-btn" onclick="typeof _gdApplySched==='function'&&_gdApplySched()"><span class="gd-btn-txt">✓ שמור לוח זמנים</span></button>
       <div class="gd-save-toast" id="gd-save-toast">⏰ לוח זמנים נשמר ✓</div>
     </div>
   </div>
@@ -6173,17 +6182,29 @@ window.fcmDebug = async function() {
     var em = (document.getElementById('gd-em')||{}).value || '00';
     var s = sh + ':' + sm;
     var e = eh + ':' + em;
-    if (typeof APP !== 'undefined' && APP.gateModeSet) APP.gateModeSet('schedule', s, e);
-    _gdApplyModeUI('schedule');
-    // Toast + button feedback
     var btn = document.getElementById('gd-ok-btn');
     var toast = document.getElementById('gd-save-toast');
-    if (btn) { btn.classList.add('gd-saved'); btn.textContent = '✓ נשמר! ' + s + '–' + e; }
-    if (toast) toast.style.display = 'block';
+    var txtSpan = btn && btn.querySelector('.gd-btn-txt');
+    if (!btn || btn.disabled) return;
+    // Apply immediately
+    if (typeof APP !== 'undefined' && APP.gateModeSet) APP.gateModeSet('schedule', s, e);
+    _gdApplyModeUI('schedule');
+    // Progress bar animation
+    btn.disabled = true;
+    if (txtSpan) txtSpan.textContent = 'שומר...';
+    btn.classList.add('gd-loading');
     setTimeout(function() {
-      if (btn) { btn.classList.remove('gd-saved'); btn.textContent = '✓ שמור לוח זמנים'; }
-      if (toast) toast.style.display = 'none';
-    }, 2500);
+      btn.classList.remove('gd-loading');
+      btn.classList.add('gd-saved');
+      if (txtSpan) txtSpan.innerHTML = '✓ נשמר &nbsp;<span style="opacity:.75;font-size:12px;font-weight:700">' + s + '–' + e + '</span>';
+      if (toast) toast.style.display = 'block';
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.classList.remove('gd-saved');
+        if (txtSpan) txtSpan.textContent = '✓ שמור לוח זמנים';
+        if (toast) toast.style.display = 'none';
+      }, 1800);
+    }, 700);
   };
 
   function _gdRenderGates() {

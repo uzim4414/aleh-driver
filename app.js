@@ -318,8 +318,9 @@ function _fbDeleteReminder(id) {
 
 var _gateRef = null; // module-level — מאפשר ניתוק listener ישן לפני חיבור חדש
 var _gateCooldownMap = {}; // per-gate cooldown: { [lotId]: timestamp }
-var _gateLastSpeedKmh = null; // last known speed in km/h (for drawer strip)
-var _gateLastAccM     = null; // last known GPS accuracy in metres (for drawer strip)
+var _gateLastSpeedKmh    = null;  // last known speed in km/h (for drawer strip)
+var _gateLastAccM        = null;  // last known GPS accuracy in metres (for drawer strip)
+var _gateScheduleOutside = false; // true while current time is outside schedule window
 
 /** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
 function _initFbSync() {
@@ -10893,9 +10894,15 @@ function _gateOnPosition(pos) {
     var _scNow = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
     if (_scNow < _gateModeStart || _scNow > _gateModeEnd) {
       _gateSetState('idle');
-      _gateLastNotifMsg = ''; // force _gateBgUpdateNotif to rebuild with paused message
+      if (!_gateScheduleOutside) {
+        // First time entering outside-window: reset so notif rebuilds once with paused msg
+        _gateScheduleOutside = true;
+        _gateLastNotifMsg = '';
+      }
+      // Already outside: don't reset — lets _gateBgUpdateNotif skip rebuild → stable notif
       return;
     }
+    _gateScheduleOutside = false; // back inside window
   }
   var lat = pos.coords.latitude;
   var lng = pos.coords.longitude;
@@ -11172,9 +11179,8 @@ function _gateBuildNotifTitle() {
   if (_gateMode === 'always') return '🟢 עלה דרייב — מעקב פעיל';
   if (_gateMode === 'schedule') {
     var _nt = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
-    var _inside = (_nt >= _gateModeStart && _nt <= _gateModeEnd);
-    if (_inside) return '🔵 עלה דרייב — לוז ' + _gateModeStart + '–' + _gateModeEnd;
-    return '⏸ עלה דרייב — ממתין ' + _gateModeStart + '–' + _gateModeEnd;
+    if (_nt >= _gateModeStart && _nt <= _gateModeEnd) return '🔵 עלה דרייב — לוז פעיל';
+    return '⏸ עלה דרייב — ממתין';
   }
   return 'עלה דרייב';
 }
@@ -11187,11 +11193,11 @@ function _gateBuildNotifMsg(distM, speedMs, accuracyM) {
   var distStr = distM < 1000
     ? Math.round(distM) + 'מ\''
     : (distM / 1000).toFixed(1) + 'ק"מ';
-  // Schedule paused — outside window
+  // Schedule paused — outside window (no emoji repeat — title already has ⏸)
   if (_gateMode === 'schedule') {
     var _bt = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
     if (_bt < _gateModeStart || _bt > _gateModeEnd) {
-      return '⏸ ' + lotName + ' | לוז ' + _gateModeStart + '–' + _gateModeEnd + ' · ' + distStr;
+      return lotName + ' | לוז ' + _gateModeStart + '–' + _gateModeEnd + ' · ' + distStr;
     }
   }
   var parts = ['📍 ' + lotName + ' · ' + distStr];
