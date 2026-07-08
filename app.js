@@ -10895,11 +10895,12 @@ function _gateOnPosition(pos) {
     if (_scNow < _gateModeStart || _scNow > _gateModeEnd) {
       _gateSetState('idle');
       if (!_gateScheduleOutside) {
-        // First time entering outside-window: reset so notif rebuilds once with paused msg
-        _gateScheduleOutside = true;
+        // First time entering outside-window: reset msg + trigger one rebuild now
         _gateLastNotifMsg = '';
+        _gateBgUpdateNotif(pos.coords); // one-time rebuild to show "ממתין" message
+        _gateScheduleOutside = true;
       }
-      // Already outside: don't reset — lets _gateBgUpdateNotif skip rebuild → stable notif
+      // Already outside: _gateScheduleOutside=true → _gateBgOnLocation skips updateNotif → stable notif
       return;
     }
     _gateScheduleOutside = false; // back inside window
@@ -11233,7 +11234,10 @@ function _gateBgOnLocation(location, error) {
     accuracy:  location.accuracy
   };
   _gateOnPosition({ coords: coords });
-  _gateBgUpdateNotif(coords);
+  // Only update notification when actively tracking — outside-schedule = static "waiting" msg
+  if (!_gateScheduleOutside) {
+    _gateBgUpdateNotif(coords);
+  }
 }
 
 /* Restart watcher with updated notification message when distance changes >75m. */

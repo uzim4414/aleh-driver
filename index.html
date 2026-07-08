@@ -4495,6 +4495,15 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gd-time-sel { background:rgba(31,138,61,.1);border:1px solid rgba(31,138,61,.3);border-radius:7px;padding:7px 4px;font-size:15px;font-weight:700;color:#1F8A3D;font-family:'Outfit',monospace;width:52px;text-align:center;-webkit-appearance:none;appearance:none;cursor:pointer; }
 .gd-time-sep { color:#1F8A3D;font-weight:800;font-size:16px;padding:0 1px; }
 .gd-time-pair { display:inline-flex;align-items:center;gap:3px; }
+.gd-drum-wrap { display:flex;align-items:center;gap:6px; }
+.gd-drum { width:54px;height:126px;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none;position:relative;border-radius:10px;background:rgba(31,138,61,.1);border:1.5px solid rgba(31,138,61,.3); }
+.gd-drum::-webkit-scrollbar { display:none; }
+.gd-drum-item { height:42px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:20px;font-weight:700;color:rgba(31,138,61,.35);font-family:'Outfit',monospace;cursor:pointer;transition:color .12s,font-size .12s; }
+.gd-drum-item.gd-drum-sel { color:#1F8A3D;font-size:24px; }
+.gd-drum-ghost { height:42px;flex-shrink:0; }
+.gd-drum::before,.gd-drum::after { content:'';position:absolute;left:0;right:0;height:42px;background:rgba(31,138,61,.07);pointer-events:none;z-index:1; }
+.gd-drum::before { top:42px; }
+.gd-drum::after { top:42px;box-shadow:inset 0 1px 0 rgba(31,138,61,.25),inset 0 -1px 0 rgba(31,138,61,.25); }
 @keyframes gdFill { from { width:0 } to { width:100% } }
 .gd-ok-btn { position:relative;overflow:hidden;background:#1F8A3D;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:800;color:#000;cursor:pointer;font-family:'Noto Sans Hebrew',sans-serif;width:100%;transition:background .25s,transform .1s;z-index:0; }
 .gd-ok-btn:active { transform:scale(.97); }
@@ -6051,17 +6060,17 @@ window.fcmDebug = async function() {
     <div id="gd-sched-panel">
       <div class="gd-sched-row">
         <span class="gd-sched-lbl">התחלה</span>
-        <span class="gd-time-pair" dir="ltr">
-          <select id="gd-sh" class="gd-time-sel"></select>
+        <span class="gd-drum-wrap">
+          <div class="gd-drum" id="gd-sh-drum" data-drum="sh"></div>
           <span class="gd-time-sep">:</span>
-          <select id="gd-sm" class="gd-time-sel"></select>
+          <div class="gd-drum" id="gd-sm-drum" data-drum="sm"></div>
         </span>
         <div style="flex:1"></div>
         <span class="gd-sched-lbl">סיום</span>
-        <span class="gd-time-pair" dir="ltr">
-          <select id="gd-eh" class="gd-time-sel"></select>
+        <span class="gd-drum-wrap">
+          <div class="gd-drum" id="gd-eh-drum" data-drum="eh"></div>
           <span class="gd-time-sep">:</span>
-          <select id="gd-em" class="gd-time-sel"></select>
+          <div class="gd-drum" id="gd-em-drum" data-drum="em"></div>
         </span>
       </div>
       <button class="gd-ok-btn" id="gd-ok-btn" onclick="typeof _gdApplySched==='function'&&_gdApplySched()"><span class="gd-btn-txt">✓ שמור לוח זמנים</span></button>
@@ -6088,15 +6097,43 @@ window.fcmDebug = async function() {
 (function() {
   var _gdOpen = false;
 
-  function _gdInitTimeSelects() {
-    function fillSel(id, opts) {
-      var el = document.getElementById(id); if (!el || el.options.length > 0) return;
-      opts.forEach(function(v) { var o = document.createElement('option'); o.value = v; o.textContent = v; el.appendChild(o); });
+  function _gdInitDrums() {
+    function buildDrum(el, items) {
+      if (el._drumBuilt) return; el._drumBuilt = true;
+      var ghost = '<div class="gd-drum-ghost"></div>';
+      el.innerHTML = ghost + items.map(function(v) {
+        return '<div class="gd-drum-item" data-val="'+v+'">'+v+'</div>';
+      }).join('') + ghost;
+      el.addEventListener('scroll', function() { _gdDrumSnap(el); }, {passive:true});
+      el.addEventListener('click', function(e) {
+        var it = e.target.closest && e.target.closest('.gd-drum-item');
+        if (it) _gdDrumSetVal(el, it.getAttribute('data-val'));
+      });
     }
     var hrs = []; for (var h = 0; h < 24; h++) hrs.push(('0'+h).slice(-2));
     var mins = ['00','05','10','15','20','25','30','35','40','45','50','55'];
-    fillSel('gd-sh', hrs); fillSel('gd-sm', mins);
-    fillSel('gd-eh', hrs); fillSel('gd-em', mins);
+    ['gd-sh-drum','gd-eh-drum'].forEach(function(id){var el=document.getElementById(id);if(el)buildDrum(el,hrs);});
+    ['gd-sm-drum','gd-em-drum'].forEach(function(id){var el=document.getElementById(id);if(el)buildDrum(el,mins);});
+  }
+
+  function _gdDrumSnap(el) {
+    var idx = Math.round(el.scrollTop / 42);
+    var items = el.querySelectorAll('.gd-drum-item');
+    items.forEach(function(it, i) { it.classList.toggle('gd-drum-sel', i === idx); });
+  }
+
+  function _gdDrumGetVal(el) {
+    var sel = el && el.querySelector('.gd-drum-sel');
+    return sel ? sel.getAttribute('data-val') : null;
+  }
+
+  function _gdDrumSetVal(el, val) {
+    if (!el) return;
+    var items = Array.prototype.slice.call(el.querySelectorAll('.gd-drum-item'));
+    var idx = items.findIndex(function(it){ return it.getAttribute('data-val') === val; });
+    if (idx < 0) return;
+    el.scrollTo({ top: idx * 42, behavior: 'instant' });
+    items.forEach(function(it, i){ it.classList.toggle('gd-drum-sel', i === idx); });
   }
 
   function _gateDrawerOpen() {
@@ -6106,7 +6143,7 @@ window.fcmDebug = async function() {
     _gdOpen = true;
     scrim.style.display = 'block';
     sheet.style.display = 'flex';
-    _gdInitTimeSelects();
+    _gdInitDrums();
     _gdSyncMode();
     _gdRenderGates();
     // Start live update interval
@@ -6132,10 +6169,11 @@ window.fcmDebug = async function() {
     var start = (typeof _gateModeStart !== 'undefined') ? _gateModeStart : '07:00';
     var end   = (typeof _gateModeEnd   !== 'undefined') ? _gateModeEnd   : '18:00';
     var sp = start.split(':'), ep = end.split(':');
-    var sh = document.getElementById('gd-sh'); if (sh) sh.value = sp[0] || '07';
-    var sm = document.getElementById('gd-sm'); if (sm) sm.value = sp[1] || '00';
-    var eh = document.getElementById('gd-eh'); if (eh) eh.value = ep[0] || '18';
-    var em = document.getElementById('gd-em'); if (em) em.value = ep[1] || '00';
+    _gdInitDrums();
+    _gdDrumSetVal(document.getElementById('gd-sh-drum'), sp[0] || '07');
+    _gdDrumSetVal(document.getElementById('gd-sm-drum'), sp[1] || '00');
+    _gdDrumSetVal(document.getElementById('gd-eh-drum'), ep[0] || '18');
+    _gdDrumSetVal(document.getElementById('gd-em-drum'), ep[1] || '00');
     _gdApplyModeUI(mode);
   }
 
@@ -6176,10 +6214,10 @@ window.fcmDebug = async function() {
   };
 
   window._gdApplySched = function() {
-    var sh = (document.getElementById('gd-sh')||{}).value || '07';
-    var sm = (document.getElementById('gd-sm')||{}).value || '00';
-    var eh = (document.getElementById('gd-eh')||{}).value || '18';
-    var em = (document.getElementById('gd-em')||{}).value || '00';
+    var sh = _gdDrumGetVal(document.getElementById('gd-sh-drum')) || '07';
+    var sm = _gdDrumGetVal(document.getElementById('gd-sm-drum')) || '00';
+    var eh = _gdDrumGetVal(document.getElementById('gd-eh-drum')) || '18';
+    var em = _gdDrumGetVal(document.getElementById('gd-em-drum')) || '00';
     var s = sh + ':' + sm;
     var e = eh + ':' + em;
     var btn = document.getElementById('gd-ok-btn');
