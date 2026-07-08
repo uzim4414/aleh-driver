@@ -11244,6 +11244,23 @@ function _gateBgOnLocation(location, error) {
   }
   if (!location) return;
   _gateLastLocationTs = Date.now();
+  // Schedule boundary check in native callback — fires even when WebView is backgrounded.
+  // The JS setInterval timer (_gateScheduleTimer) is frozen by OS when app is in background,
+  // but this native callback always fires → reliable stop at window boundary.
+  if (_gateMode === 'schedule') {
+    var _bgNow = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
+    var _bgInWin = (_bgNow >= _gateModeStart && _bgNow <= _gateModeEnd);
+    if (!_bgInWin && !_gateScheduleOutside) {
+      // Window just closed — stop native watcher immediately (kills foreground service + notification)
+      _gateScheduleOutside = true;
+      _gateStopWatchNative();
+      _gateSetState('idle');
+      _gateSetStatus('off');
+      _gateStartScheduleTimer(); // will restart GPS when next window opens (if WebView awake)
+      return;
+    }
+    if (!_bgInWin && _gateScheduleOutside) return; // still outside — skip
+  }
   var coords = {
     latitude:  location.latitude,
     longitude: location.longitude,
