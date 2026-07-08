@@ -322,6 +322,7 @@ var _gateLastSpeedKmh    = null;  // last known speed in km/h (for drawer strip)
 var _gateLastAccM        = null;  // last known GPS accuracy in metres (for drawer strip)
 var _gateScheduleOutside = false; // true while current time is outside schedule window
 var _gateScheduleTimer   = null;  // interval that watches schedule window edges
+var _gateNativeStarting  = false; // guard against concurrent _gateStartWatchNative calls
 
 /** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
 function _initFbSync() {
@@ -11104,15 +11105,30 @@ function _gateLoadMode() {
   _gateMode      = localStorage.getItem(_GATE_MODE_KEY)       || 'off';
   _gateModeStart = localStorage.getItem(_GATE_MODE_START_KEY) || '07:00';
   _gateModeEnd   = localStorage.getItem(_GATE_MODE_END_KEY)   || '18:00';
+  // Whitelist mode value
+  var VALID_MODES = ['always', 'schedule', 'off'];
+  if (VALID_MODES.indexOf(_gateMode) < 0) {
+    console.warn('[gate] invalid _gateMode from localStorage:', _gateMode, '— defaulting to off');
+    _gateMode = 'off';
+  }
+  // Validate HH:MM format
+  var _HM_RE = /^\d{2}:\d{2}$/;
+  if (!_HM_RE.test(_gateModeStart)) _gateModeStart = '07:00';
+  if (!_HM_RE.test(_gateModeEnd))   _gateModeEnd   = '18:00';
 }
 
 function _gateSaveMode(mode, start, end) {
   _gateMode = mode;
   if (start) _gateModeStart = start;
   if (end)   _gateModeEnd   = end;
-  localStorage.setItem(_GATE_MODE_KEY,       _gateMode);
-  localStorage.setItem(_GATE_MODE_START_KEY, _gateModeStart);
-  localStorage.setItem(_GATE_MODE_END_KEY,   _gateModeEnd);
+  try {
+    localStorage.setItem(_GATE_MODE_KEY,       _gateMode);
+    localStorage.setItem(_GATE_MODE_START_KEY, _gateModeStart);
+    localStorage.setItem(_GATE_MODE_END_KEY,   _gateModeEnd);
+  } catch(e) {
+    console.warn('[gate] localStorage.setItem failed (quota/blocked):', e);
+    // In-memory values are already set above — current session survives
+  }
 }
 
 /* Visible status line in the gate card. type: 'native'|'foreground'|'error'|'off'. */
@@ -11188,8 +11204,8 @@ function _gateBuildNotifTitle() {
 }
 
 /* Build rich notification body — gate info + speed + accuracy. */
-function _gateBuildNotifMsg(distM, speedMs, accuracyM) {
-  var cfg = (APP._gateConfigs && APP._gateConfigs[0]) || APP._gateConfig || {};
+function _gateBuildNotifMsg(distM, speedMs, accuracyM, nearCfg) {
+  var cfg = nearCfg || (APP._gateConfigs && APP._gateConfigs[0]) || APP._gateConfig || {};
   var lotName = cfg.lotName || 'החניון';
   var speedKmh = Math.round((speedMs || 0) * 3.6);
   var distStr = distM < 1000
@@ -11248,14 +11264,23 @@ function _gateBgUpdateNotif(coords) {
   // so without this guard two callbacks race, both removeWatcher, and the
   // foreground service is demoted (notification vanishes) with no live watcher.
   if (_gateBgUpdating) return;
-  var cfg = APP._gateConfig || {};
-  if (!cfg.lat || !cfg.lng) return;
-  var distM = _thHaversine(
-    coords.latitude, coords.longitude,
-    parseFloat(cfg.lat), parseFloat(cfg.lng)
-  ) * 1000;
+  // Find nearest configured gate for notification distance + name
+  var _allCfgs = (APP._gateConfigs && APP._gateConfigs.length > 0)
+    ? APP._gateConfigs
+    : (APP._gateConfig ? [APP._gateConfig] : []);
+  if (_allCfgs.length === 0) return;
+  var _nearCfg = null, _nearDist = Infinity;
+  for (var _ni = 0; _ni < _allCfgs.length; _ni++) {
+    var _nc = _allCfgs[_ni];
+    if (!_nc.lat || !_nc.lng) continue;
+    var _nd = _thHaversine(coords.latitude, coords.longitude,
+      parseFloat(_nc.lat), parseFloat(_nc.lng)) * 1000;
+    if (_nd < _nearDist) { _nearDist = _nd; _nearCfg = _nc; }
+  }
+  if (!_nearCfg) return;
+  var distM = _nearDist;
   if (Math.abs(distM - _gateLastNotifDistM) < 75 && _gateLastNotifMsg) return;
-  var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0, coords.accuracy);
+  var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0, coords.accuracy, _nearCfg);
   if (newMsg === _gateLastNotifMsg) return;
   var prevMsg   = _gateLastNotifMsg;
   var prevDist  = _gateLastNotifDistM;
@@ -11314,6 +11339,11 @@ function _gateStopHeartbeat() {
 }
 
 function _gateStartWatchNative() {
+  if (_gateNativeStarting) {
+    console.warn('[gate-native] _gateStartWatchNative already in progress — skipping duplicate call');
+    return;
+  }
+  _gateNativeStarting = true;
   var BG = _gateBgPlugin();
   // In Capacitor 6, registerPlugin() always returns a truthy proxy even when
   // the native plugin is absent — so a non-null BG does NOT prove native works.
@@ -11324,6 +11354,7 @@ function _gateStartWatchNative() {
     console.warn('[gate-native] BackgroundGeolocation plugin unavailable — using foreground GPS');
     _gateSetStatus('foreground');
     _gateStartWatch();
+    _gateNativeStarting = false;
     return;
   }
   var modeLabel = _gateMode === 'schedule'
@@ -11337,6 +11368,7 @@ function _gateStartWatchNative() {
     console.warn('[gate-native] addWatcher timed out — falling back to foreground GPS');
     _gateSetStatus('error', 'התוסף לא הגיב (timeout) — עברנו ל-GPS רגיל');
     _gateStartWatch();
+    _gateNativeStarting = false;
   }, 8000);
   _gateStopWatchNative().then(function() {
     return BG.addWatcher({
@@ -11357,13 +11389,15 @@ function _gateStartWatchNative() {
     _gateStartHeartbeat();
     console.log('[gate-native] watch started, id:', watcherId);
     _gateSetStatus('native');
+    _gateNativeStarting = false;
   }).catch(function(err) {
-    if (settled) return;
+    if (settled) { _gateNativeStarting = false; return; }
     settled = true;
     clearTimeout(hangTimer);
     console.warn('[gate-native] addWatcher failed:', err && (err.message || err));
     _gateSetStatus('error', (err && (err.message || err.code)) || 'addWatcher נכשל — עברנו ל-GPS רגיל');
     _gateStartWatch();
+    _gateNativeStarting = false;
   });
 }
 
@@ -11445,6 +11479,7 @@ function _gateStartOrStop() {
 
 /* Public: change mode and restart GPS. Called from mode-selector UI. */
 function _gateModeSet(mode, start, end) {
+  _gateScheduleOutside = false; // reset on any mode change
   _gateSaveMode(mode, start, end);
   _gateStartOrStop();
 }
