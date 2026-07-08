@@ -6132,6 +6132,7 @@ window.fcmDebug = async function() {
   }
 
   function _gdDrumSnap(el) {
+    if (el._drumSetting) return;       // skip snap during programmatic scroll
     var idx = Math.round(el.scrollTop / 42);
     var items = el.querySelectorAll('.gd-drum-item');
     items.forEach(function(it, i) { it.classList.toggle('gd-drum-sel', i === idx); });
@@ -6147,8 +6148,10 @@ window.fcmDebug = async function() {
     var items = Array.prototype.slice.call(el.querySelectorAll('.gd-drum-item'));
     var idx = items.findIndex(function(it){ return it.getAttribute('data-val') === val; });
     if (idx < 0) return;
-    el.scrollTo({ top: idx * 42, behavior: 'instant' });
+    el._drumSetting = true;
+    el.scrollTop = idx * 42;           // synchronous — immediate, avoids async scrollTo race in Android WebView
     items.forEach(function(it, i){ it.classList.toggle('gd-drum-sel', i === idx); });
+    el._drumSetting = false;
   }
 
   function _gateDrawerOpen() {
@@ -6180,6 +6183,7 @@ window.fcmDebug = async function() {
   window._gateDrawerClose = _gateDrawerClose;
 
   function _gdSyncMode() {
+    if (typeof _gateLoadMode === 'function') _gateLoadMode(); // ensure fresh from storage
     var mode  = (typeof _gateMode      !== 'undefined') ? _gateMode      : 'off';
     var start = (typeof _gateModeStart !== 'undefined') ? _gateModeStart : '07:00';
     var end   = (typeof _gateModeEnd   !== 'undefined') ? _gateModeEnd   : '18:00';
@@ -6229,10 +6233,15 @@ window.fcmDebug = async function() {
   };
 
   window._gdApplySched = function() {
-    var sh = _gdDrumGetVal(document.getElementById('gd-sh-drum')) || '07';
-    var sm = _gdDrumGetVal(document.getElementById('gd-sm-drum')) || '00';
-    var eh = _gdDrumGetVal(document.getElementById('gd-eh-drum')) || '18';
-    var em = _gdDrumGetVal(document.getElementById('gd-em-drum')) || '00';
+    var sh = _gdDrumGetVal(document.getElementById('gd-sh-drum'));
+    var sm = _gdDrumGetVal(document.getElementById('gd-sm-drum'));
+    var eh = _gdDrumGetVal(document.getElementById('gd-eh-drum'));
+    var em = _gdDrumGetVal(document.getElementById('gd-em-drum'));
+    if (!sh || !sm || !eh || !em) {
+      console.warn('[gate-drawer] drum values not ready, re-syncing', sh, sm, eh, em);
+      _gdSyncMode(); // re-sync and abort — user must try again
+      return;
+    }
     var s = sh + ':' + sm;
     var e = eh + ':' + em;
     var btn = document.getElementById('gd-ok-btn');
