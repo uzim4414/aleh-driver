@@ -6215,6 +6215,21 @@ window.fcmDebug = async function() {
       if (pill) { pill.style.background='rgba(0,120,255,.1)'; pill.style.borderColor='rgba(0,120,255,.3)'; pill.style.color='#4da6ff'; }
       if (pillTxt) pillTxt.textContent = 'GPS לפי שעות';
       if (schedPanel) schedPanel.style.display = 'flex';
+      // BUGFIX: drum scrollTop was set while the panel was display:none, so the
+      // browser clamped it to 0 and the drums visually showed "00" (defaults)
+      // even though the saved values loaded correctly. Now that the panel is
+      // visible (layout exists), re-apply scroll position from the selected item.
+      ['gd-sh-drum','gd-sm-drum','gd-eh-drum','gd-em-drum'].forEach(function(did){
+        var del = document.getElementById(did);
+        if (!del) return;
+        var dItems = Array.prototype.slice.call(del.querySelectorAll('.gd-drum-item'));
+        var dIdx = dItems.findIndex(function(it){ return it.classList.contains('gd-drum-sel'); });
+        if (dIdx >= 0 && del.scrollTop !== dIdx * 42) {
+          del._drumSetting = true;
+          del.scrollTop = dIdx * 42;
+          del._drumSetting = false;
+        }
+      });
     } else {
       btnO.className = 'gd-seg-btn gd-active-off';
       if (pill) { pill.style.background='rgba(255,69,58,.08)'; pill.style.borderColor='rgba(255,69,58,.3)'; pill.style.color='#FF453A'; }
