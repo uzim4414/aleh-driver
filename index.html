@@ -4495,15 +4495,26 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gd-time-sel { background:rgba(31,138,61,.1);border:1px solid rgba(31,138,61,.3);border-radius:7px;padding:7px 4px;font-size:15px;font-weight:700;color:#1F8A3D;font-family:'Outfit',monospace;width:52px;text-align:center;-webkit-appearance:none;appearance:none;cursor:pointer; }
 .gd-time-sep { color:#1F8A3D;font-weight:800;font-size:16px;padding:0 1px; }
 .gd-time-pair { display:inline-flex;align-items:center;gap:3px; }
-.gd-drum-wrap { display:flex;align-items:center;gap:6px; }
-.gd-drum { width:54px;height:126px;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none;position:relative;border-radius:10px;background:rgba(31,138,61,.1);border:1.5px solid rgba(31,138,61,.3); }
+/* — Minimal Drum Picker — */
+.gd-time-block { display:flex;flex-direction:column;align-items:center;gap:4px; }
+.gd-time-block-lbl { font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;text-transform:uppercase; }
+.gd-drum-band { position:relative;display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.04);border-radius:12px;padding:0 10px; }
+/* Selection lines — centered horizontal seams on the container */
+.gd-drum-band::before, .gd-drum-band::after {
+  content:'';position:absolute;left:6px;right:6px;height:1px;
+  background:rgba(48,209,88,.3);pointer-events:none;z-index:10;
+}
+.gd-drum-band::before { top:calc(50% - 21px); }
+.gd-drum-band::after  { top:calc(50% + 21px); }
+.gd-drum { width:40px;height:126px;overflow-y:scroll;scroll-snap-type:y mandatory;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none; }
 .gd-drum::-webkit-scrollbar { display:none; }
-.gd-drum-item { height:42px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:20px;font-weight:700;color:rgba(31,138,61,.35);font-family:'Outfit',monospace;cursor:pointer;transition:color .12s,font-size .12s; }
-.gd-drum-item.gd-drum-sel { color:#1F8A3D;font-size:24px; }
+.gd-drum-item { height:42px;display:flex;align-items:center;justify-content:center;
+  scroll-snap-align:center;font-size:16px;font-weight:600;color:rgba(255,255,255,.15);
+  font-family:'Outfit',monospace;cursor:pointer;transition:color .1s,font-size .1s; }
+.gd-drum-item.gd-drum-sel { color:#30D158;font-size:22px;font-weight:800; }
 .gd-drum-ghost { height:42px;flex-shrink:0; }
-.gd-drum::before,.gd-drum::after { content:'';position:absolute;left:0;right:0;height:42px;background:rgba(31,138,61,.07);pointer-events:none;z-index:1; }
-.gd-drum::before { top:42px; }
-.gd-drum::after { top:42px;box-shadow:inset 0 1px 0 rgba(31,138,61,.25),inset 0 -1px 0 rgba(31,138,61,.25); }
+.gd-drum-colon { color:rgba(255,255,255,.5);font-size:18px;font-weight:700;font-family:'Outfit',monospace;line-height:1;align-self:center; }
 @keyframes gdFill { from { width:0 } to { width:100% } }
 .gd-ok-btn { position:relative;overflow:hidden;background:#1F8A3D;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:800;color:#000;cursor:pointer;font-family:'Noto Sans Hebrew',sans-serif;width:100%;transition:background .25s,transform .1s;z-index:0; }
 .gd-ok-btn:active { transform:scale(.97); }
@@ -6058,20 +6069,24 @@ window.fcmDebug = async function() {
       </button>
     </div>
     <div id="gd-sched-panel">
-      <div class="gd-sched-row">
-        <span class="gd-sched-lbl">התחלה</span>
-        <span class="gd-drum-wrap">
-          <div class="gd-drum" id="gd-sh-drum" data-drum="sh"></div>
-          <span class="gd-time-sep">:</span>
-          <div class="gd-drum" id="gd-sm-drum" data-drum="sm"></div>
-        </span>
-        <div style="flex:1"></div>
-        <span class="gd-sched-lbl">סיום</span>
-        <span class="gd-drum-wrap">
-          <div class="gd-drum" id="gd-eh-drum" data-drum="eh"></div>
-          <span class="gd-time-sep">:</span>
-          <div class="gd-drum" id="gd-em-drum" data-drum="em"></div>
-        </span>
+      <div style="display:flex;align-items:center;justify-content:space-around;gap:8px;">
+        <div class="gd-time-block">
+          <div class="gd-time-block-lbl">התחלה</div>
+          <div class="gd-drum-band">
+            <div class="gd-drum" id="gd-sh-drum" data-drum="sh"></div>
+            <span class="gd-drum-colon">:</span>
+            <div class="gd-drum" id="gd-sm-drum" data-drum="sm"></div>
+          </div>
+        </div>
+        <span style="color:rgba(255,255,255,.3);font-size:20px;margin-top:18px;">→</span>
+        <div class="gd-time-block">
+          <div class="gd-time-block-lbl">סיום</div>
+          <div class="gd-drum-band">
+            <div class="gd-drum" id="gd-eh-drum" data-drum="eh"></div>
+            <span class="gd-drum-colon">:</span>
+            <div class="gd-drum" id="gd-em-drum" data-drum="em"></div>
+          </div>
+        </div>
       </div>
       <button class="gd-ok-btn" id="gd-ok-btn" onclick="typeof _gdApplySched==='function'&&_gdApplySched()"><span class="gd-btn-txt">✓ שמור לוח זמנים</span></button>
       <div class="gd-save-toast" id="gd-save-toast">⏰ לוח זמנים נשמר ✓</div>

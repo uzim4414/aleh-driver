@@ -321,6 +321,7 @@ var _gateCooldownMap = {}; // per-gate cooldown: { [lotId]: timestamp }
 var _gateLastSpeedKmh    = null;  // last known speed in km/h (for drawer strip)
 var _gateLastAccM        = null;  // last known GPS accuracy in metres (for drawer strip)
 var _gateScheduleOutside = false; // true while current time is outside schedule window
+var _gateScheduleTimer   = null;  // interval that watches schedule window edges
 
 /** מפעיל את כל ה-listeners — נקרא פעם אחת מ-_fbSignIn */
 function _initFbSync() {
@@ -11368,6 +11369,40 @@ function _gateStartWatchNative() {
 
 /* Central entry point — decides which GPS engine to use based on stored mode.
    Replaces the direct _gateStartWatch() call in _gateInit(). */
+function _gateInWindowNow() {
+  var _now = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
+  return (_now >= _gateModeStart && _now <= _gateModeEnd);
+}
+
+function _gateStartScheduleTimer() {
+  if (_gateScheduleTimer) return; // already running
+  _gateScheduleTimer = setInterval(function() {
+    if (_gateMode !== 'schedule') { _gateStopScheduleTimer(); return; }
+    var _inW  = _gateInWindowNow();
+    var _gpsOn = !!_gateBgWatchId || (_gateWatchId !== null);
+    if (_inW && !_gpsOn) {
+      // Window just opened — start GPS
+      _gateScheduleOutside = false;
+      if (_gateIsNativeCapacitor()) { _gateStartWatchNative(); }
+      else { _gateSetStatus('foreground'); _gateStartWatch(); }
+    } else if (!_inW && _gpsOn) {
+      // Window just closed — stop GPS entirely (no foreground service = no notification)
+      _gateScheduleOutside = true;
+      _gateStopWatchNative();
+      if (_gateWatchId !== null) {
+        try { navigator.geolocation.clearWatch(_gateWatchId); } catch(_) {}
+        _gateWatchId = null;
+      }
+      _gateSetState('idle');
+      _gateSetStatus('off');
+    }
+  }, 30000); // check every 30s
+}
+
+function _gateStopScheduleTimer() {
+  if (_gateScheduleTimer) { clearInterval(_gateScheduleTimer); _gateScheduleTimer = null; }
+}
+
 function _gateStartOrStop() {
   _gateLoadMode();
   _gateUpdateModeUI();
@@ -11377,10 +11412,29 @@ function _gateStartOrStop() {
       _gateWatchId = null;
     }
     _gateStopWatchNative();
+    _gateStopScheduleTimer();
     _gateSetState('idle');
     return;
   }
-  // 'always' or 'schedule' — start the appropriate GPS engine
+  if (_gateMode === 'schedule') {
+    _gateStartScheduleTimer(); // always run the edge-watcher in schedule mode
+    if (!_gateInWindowNow()) {
+      // Outside window: keep GPS fully off — no foreground service, no notification
+      _gateStopWatchNative();
+      if (_gateWatchId !== null) {
+        try { navigator.geolocation.clearWatch(_gateWatchId); } catch(_) {}
+        _gateWatchId = null;
+      }
+      _gateScheduleOutside = true;
+      _gateSetState('idle');
+      _gateSetStatus('off');
+      return;
+    }
+    _gateScheduleOutside = false;
+  } else {
+    _gateStopScheduleTimer(); // 'always' mode — no schedule watcher needed
+  }
+  // 'always' or schedule inside window — start the appropriate GPS engine
   if (_gateIsNativeCapacitor()) {
     _gateStartWatchNative();
   } else {
@@ -11398,6 +11452,7 @@ function _gateModeSet(mode, start, end) {
 /* Public: stop GPS entirely and set mode to 'off'. Called from power button. */
 function _gatePowerOff() {
   _gateSaveMode('off', null, null);
+  _gateStopScheduleTimer();
   if (_gateWatchId !== null) {
     try { navigator.geolocation.clearWatch(_gateWatchId); } catch(_) {}
     _gateWatchId = null;
