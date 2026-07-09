@@ -10894,7 +10894,7 @@ function _gateOnPosition(pos) {
   // If schedule mode and outside the time window — idle state, force notif rebuild
   if (_gateMode === 'schedule') {
     var _scNow = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
-    if (_scNow < _gateModeStart || _scNow > _gateModeEnd) {
+    if (!_gateInWindow(_scNow, _gateModeStart, _gateModeEnd)) {
       _gateSetState('idle');
       if (!_gateScheduleOutside) {
         // First time entering outside-window: reset msg + trigger one rebuild now
@@ -10959,7 +10959,7 @@ function _gateCheckConditions(speedMs, cfg) {
   if (_gateMode === 'off') return false;
   if (_gateMode === 'schedule') {
     var _scH = ('0' + new Date().getHours()).slice(-2) + ':' + ('0' + new Date().getMinutes()).slice(-2);
-    if (_scH < _gateModeStart || _scH > _gateModeEnd) return false;
+    if (!_gateInWindow(_scH, _gateModeStart, _gateModeEnd)) return false;
   }
   var speedKmh = speedMs * 3.6;
   var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
@@ -10967,7 +10967,7 @@ function _gateCheckConditions(speedMs, cfg) {
   if (cfg.hoursStart && cfg.hoursEnd) {
     var now = new Date();
     var hhmm = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
-    if (hhmm < cfg.hoursStart || hhmm > cfg.hoursEnd) return false;
+    if (!_gateInWindow(hhmm, cfg.hoursStart, cfg.hoursEnd)) return false;
   }
   if (cfg.allowedDays) {
     var days = String(cfg.allowedDays).split(',').map(function(d){return parseInt(d.trim(),10);});
@@ -11101,6 +11101,20 @@ var _GATE_MODE_KEY       = 'aleh_gate_mode_v1';
 var _GATE_MODE_START_KEY = 'aleh_gate_mode_start_v1';
 var _GATE_MODE_END_KEY   = 'aleh_gate_mode_end_v1';
 
+/**
+ * Returns true if HH:MM time 'now' falls within [start, end] window.
+ * Handles midnight-crossing schedules (e.g. start='23:00', end='05:00').
+ * Fixes lexicographic string-compare bug: '00:52' >= '23:00' was FALSE.
+ */
+function _gateInWindow(now, start, end) {
+  if (start <= end) {
+    // Normal window: e.g. 07:00–18:00
+    return now >= start && now <= end;
+  }
+  // Midnight-crossing: e.g. 23:00–05:00
+  return now >= start || now <= end;
+}
+
 function _gateLoadMode() {
   _gateMode      = localStorage.getItem(_GATE_MODE_KEY)       || 'off';
   _gateModeStart = localStorage.getItem(_GATE_MODE_START_KEY) || '07:00';
@@ -11197,7 +11211,7 @@ function _gateBuildNotifTitle() {
   if (_gateMode === 'always') return '🟢 עלה דרייב — מעקב פעיל';
   if (_gateMode === 'schedule') {
     var _nt = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
-    if (_nt >= _gateModeStart && _nt <= _gateModeEnd) return '🔵 עלה דרייב — לוז פעיל';
+    if (_gateInWindow(_nt, _gateModeStart, _gateModeEnd)) return '🔵 עלה דרייב — לוז פעיל';
     return '⏸ עלה דרייב — ממתין';
   }
   return 'עלה דרייב';
@@ -11214,7 +11228,7 @@ function _gateBuildNotifMsg(distM, speedMs, accuracyM, nearCfg) {
   // Schedule paused — outside window (no emoji repeat — title already has ⏸)
   if (_gateMode === 'schedule') {
     var _bt = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
-    if (_bt < _gateModeStart || _bt > _gateModeEnd) {
+    if (!_gateInWindow(_bt, _gateModeStart, _gateModeEnd)) {
       return lotName + ' | לוז ' + _gateModeStart + '–' + _gateModeEnd + ' · ' + distStr;
     }
   }
@@ -11249,7 +11263,7 @@ function _gateBgOnLocation(location, error) {
   // but this native callback always fires → reliable stop at window boundary.
   if (_gateMode === 'schedule') {
     var _bgNow = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
-    var _bgInWin = (_bgNow >= _gateModeStart && _bgNow <= _gateModeEnd);
+    var _bgInWin = _gateInWindow(_bgNow, _gateModeStart, _gateModeEnd);
     if (!_bgInWin && !_gateScheduleOutside) {
       // Window just closed — stop native watcher immediately (kills foreground service + notification)
       _gateScheduleOutside = true;
@@ -11422,7 +11436,7 @@ function _gateStartWatchNative() {
    Replaces the direct _gateStartWatch() call in _gateInit(). */
 function _gateInWindowNow() {
   var _now = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
-  return (_now >= _gateModeStart && _now <= _gateModeEnd);
+  return _gateInWindow(_now, _gateModeStart, _gateModeEnd);
 }
 
 function _gateStartScheduleTimer() {
