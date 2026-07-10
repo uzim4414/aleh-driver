@@ -1827,6 +1827,75 @@ function pkConfirmSelect() {
 }
 
 /* ───── HERO VEHICLE CAROUSEL ───── */
+/* ───── DASHBOARD SWIPE ───── */
+var _dashIdx = 0;
+
+function _dashInit() {
+  var vp    = document.getElementById('dash-vp');
+  var track = document.getElementById('dash-track');
+  if (!vp || !track) return;
+
+  // dot clicks
+  document.querySelectorAll('#dash-dots .dash-dot').forEach(function(d) {
+    d.addEventListener('click', function() {
+      _dashSwitch(Number(this.getAttribute('data-idx')));
+    });
+  });
+
+  _dashInitSwipe(vp, track);
+  _dashSwitch(0, false);
+}
+
+function _dashSwitch(idx, animate) {
+  _dashIdx = idx;
+  var track = document.getElementById('dash-track');
+  if (track) {
+    if (animate === false) track.style.transition = 'none';
+    track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+    if (animate === false) requestAnimationFrame(function(){ track.style.transition = ''; });
+  }
+  document.querySelectorAll('#dash-dots .dash-dot').forEach(function(d, i) {
+    d.classList.toggle('a', i === idx);
+  });
+}
+
+function _dashInitSwipe(vp, track) {
+  var startX = 0, startY = 0, curX = 0, dragging = false, moved = false, lockAxis = null;
+  var THRESHOLD = 0.22;
+  var COUNT = 2;
+
+  function onStart(x, y) { startX = x; startY = y; dragging = true; moved = false; lockAxis = null; curX = 0; }
+  function onMove(x, y) {
+    if (!dragging) return;
+    var dx = x - startX, dy = y - startY;
+    if (!lockAxis) lockAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (lockAxis !== 'x') { dragging = false; return; }
+    if (Math.abs(dx) > 4) moved = true;
+    curX = dx;
+    var base = -(_dashIdx * 100);
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(calc(' + base + '% + ' + curX + 'px))';
+  }
+  function onEnd(isTap) {
+    if (!dragging || lockAxis !== 'x') { dragging = false; return; }
+    dragging = false;
+    track.style.transition = '';
+    if (isTap || !moved) { _dashSwitch(_dashIdx); return; }
+    var pct = curX / (vp.offsetWidth || 375);
+    var next = _dashIdx;
+    if (pct < -THRESHOLD && next < COUNT - 1) next++;
+    else if (pct > THRESHOLD && next > 0) next--;
+    _dashSwitch(next);
+  }
+
+  vp.addEventListener('touchstart', function(e){ onStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  vp.addEventListener('touchmove',  function(e){ onMove(e.touches[0].clientX, e.touches[0].clientY); },  {passive:true});
+  vp.addEventListener('touchend',   function(){ onEnd(false); });
+  vp.addEventListener('mousedown',  function(e){ onStart(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function(e){ if(dragging) onMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup',   function(){ if(dragging) onEnd(!moved); });
+}
+
 function _heroCarouselInit() {
   var vehicles = STATE._vehicles;
   if (!vehicles || vehicles.length < 2) return;
@@ -3527,6 +3596,7 @@ function initSwipe() {
 
   document.getElementById('app').addEventListener('touchstart', function(e) {
     if (e.target.closest && e.target.closest('#hero-swipe-vp')) { _swipeOnItem = true; return; } // hero carousel owns its swipe
+    if (e.target.closest && e.target.closest('#dash-vp')) { _swipeOnItem = true; return; } // dashboard swipe owns its swipe
     var mapEl = document.getElementById('th-leaflet-map');
     if (mapEl && mapEl.contains(e.target)) { _swipeOnItem = true; return; } // don't swipe when touching map
     startX = e.touches[0].clientX;
@@ -3760,6 +3830,7 @@ function startApp() {
   renderAll();
   initSwipe();
   if (STATE._vehicles && STATE._vehicles.length > 1) { try { _heroCarouselInit(); } catch(e) { console.warn('hero carousel init', e); } }
+  try { _dashInit(); } catch(e) { console.warn('dash init', e); }
   try { _initHelpFabDrag(); } catch(e) { console.warn('fab drag init', e); }
   try { _initBackButtonHandler(); } catch(e) { console.warn('back btn init', e); }
   setTimeout(APP._checkGarageReminders, 1500);

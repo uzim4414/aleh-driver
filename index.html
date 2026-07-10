@@ -1177,6 +1177,38 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .svc-foot-val { font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
 .svc-foot-val.ok { color:var(--ok); } .svc-foot-val.warn { color:var(--warn); } .svc-foot-val.red { color:var(--red); }
 
+/* ══ DASHBOARD SWIPE ══ */
+.dash-vp{
+  width:100%;overflow:hidden;
+  position:relative;
+  margin-top:10px;
+}
+.dash-track{
+  display:flex;flex-direction:row;
+  transition:transform .38s cubic-bezier(.16,1,.3,1);
+  will-change:transform;
+}
+.dash-slide{
+  flex:0 0 100%;width:100%;
+  min-height:10px; /* מתרחב לפי תוכן */
+}
+/* dots */
+.dash-dots{
+  display:flex;justify-content:center;align-items:center;
+  gap:6px;padding:10px 0 4px;
+}
+.dash-dot{
+  width:6px;height:6px;border-radius:3px;
+  background:rgba(255,255,255,0.2);
+  transition:all .3s cubic-bezier(.16,1,.3,1);
+  cursor:pointer;
+}
+.dash-dot.a{
+  width:18px;
+  background:var(--red,#1F8A3D);
+  box-shadow:0 0 8px rgba(31,138,61,0.5);
+}
+
 /* ── Garage Card ── */
 .gar-wrap { padding:16px; display:flex; flex-direction:column; gap:12px; }
 .gar-card { background:var(--card); border-radius:22px; border:1px solid var(--border); overflow:hidden; animation:fadeUp .5s ease both; }
@@ -5063,7 +5095,6 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
             </button>
           </div>
           <div id="garage-appt-widget-mount"></div>
-          <div id="fuel-widget-mount"></div>
           <div class="hero-alert hidden" id="home-alert">
             <div>
               <div class="ha-title" id="home-alert-title">התראה</div>
@@ -5073,7 +5104,24 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           </div>
         </div>
       </div>
-      <div id="svc-progress-mount"></div>
+      <!-- DASHBOARD SWIPE -->
+      <div id="dash-vp" class="dash-vp">
+        <div id="dash-track" class="dash-track">
+          <!-- slide 0: svc -->
+          <div class="dash-slide" id="dash-slide-0">
+            <div id="svc-progress-mount"></div>
+          </div>
+          <!-- slide 1: fuel -->
+          <div class="dash-slide" id="dash-slide-1">
+            <div id="fuel-widget-mount"></div>
+          </div>
+        </div>
+        <!-- dots -->
+        <div class="dash-dots" id="dash-dots">
+          <span class="dash-dot a" data-idx="0"></span>
+          <span class="dash-dot" data-idx="1"></span>
+        </div>
+      </div>
       <div class="sec">לשירותך</div>
       <div class="qa">
         <div class="qa-card" onclick="APP.openKmModal()">
