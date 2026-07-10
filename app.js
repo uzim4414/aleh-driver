@@ -3984,6 +3984,9 @@ function renderHomeScreen() {
   if (typeof APP._updateWashBadge === 'function') APP._updateWashBadge();
 
   document.getElementById('car-name').textContent = ((v.make || '') + ' ' + (v.model || '')).trim();
+  var _makeEl = document.getElementById('car-make');
+  if (_makeEl) _makeEl.textContent = v.make || '';
+  if (typeof window._applyCarBrandLogo === 'function') window._applyCarBrandLogo(v.make || '');
   document.getElementById('car-plate').textContent = formatPlate(v.num);
 
   const photo = document.getElementById('car-photo');
