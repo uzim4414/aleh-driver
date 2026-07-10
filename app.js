@@ -4438,19 +4438,19 @@ function renderServiceProgress() {
   let level, label, footTxt, footCls;
   if (remaining < 0) {
     level = 'red';  label = 'עבר מועד';  reportedPct = 100;  estPct = 100;
-    footTxt = 'עבר ב-' + Math.abs(remaining).toLocaleString('he') + ' ק"מ';
+    footTxt = 'עבר ב-<strong>' + Math.abs(remaining).toLocaleString('he') + ' ק"מ</strong>';
     footCls = 'red';
   } else if (remaining < 500) {
     level = 'red';  label = 'דחוף';
-    footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
+    footTxt = 'נותרו <strong>' + remaining.toLocaleString('he') + ' ק"מ</strong> לטיפול';
     footCls = 'red';
   } else if (remaining < 1500) {
     level = 'warn';  label = 'מתקרב';
-    footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
+    footTxt = 'נותרו <strong>' + remaining.toLocaleString('he') + ' ק"מ</strong> לטיפול';
     footCls = 'warn';
   } else {
     level = 'ok';  label = 'תקין';
-    footTxt = 'נותרו ' + remaining.toLocaleString('he') + ' ק"מ לטיפול';
+    footTxt = 'נותרו <strong>' + remaining.toLocaleString('he') + ' ק"מ</strong> לטיפול';
     footCls = 'ok';
   }
 
@@ -4458,11 +4458,13 @@ function renderServiceProgress() {
   const tickLeft = (100 - estPct);
   const showTick = estKm > reportedKm && estPct > reportedPct && estPct < 100;
 
+  const accent = level === 'warn' ? '#FF9F0A' : level === 'red' ? '#FF453A' : '#1F8A3D';
+
   mount.innerHTML =
-    '<div class="svc-card">' +
+    '<div class="svc-card ' + level + '">' +
       '<div class="svc-hdr">' +
         '<div class="svc-title-wrap">' +
-          '<div class="svc-icn"><svg width="18" height="18"><use href="#ic-tool" color="#1F8A3D"/></svg></div>' +
+          '<div class="svc-icn"><svg width="18" height="18"><use href="#ic-tool" color="' + accent + '"/></svg></div>' +
           '<div class="svc-title">טיפול הבא</div>' +
         '</div>' +
         '<div class="svc-pill ' + level + '">' + label + '</div>' +

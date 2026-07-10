@@ -1130,10 +1130,15 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 @keyframes pulseGlow { 0%,100%{ box-shadow:0 0 0 0 rgba(48,209,88,0) } 50%{ box-shadow:0 0 14px 2px rgba(48,209,88,0.35) } }
 
 /* ── Service Progress Card ── */
-.svc-card { margin:14px 16px 0; background:var(--card); border-radius:22px; padding:16px 18px 18px; border:1px solid var(--border); animation:fadeUp .55s cubic-bezier(.16,1,.3,1) .25s both; position:relative; overflow:hidden; }
+.svc-card { --svc-accent:#1F8A3D; margin:14px 16px 0; background:linear-gradient(145deg,#0f0f0f 0%,#121212 100%); border-radius:22px; padding:16px 18px 18px; border:1px solid var(--border); animation:fadeUp .55s cubic-bezier(.16,1,.3,1) .25s both; position:relative; overflow:hidden; }
+.svc-card::before { content:''; position:absolute; top:0; left:20px; right:20px; height:2px; border-radius:0 0 2px 2px; background:linear-gradient(90deg,transparent,var(--svc-accent),transparent); }
+.svc-card.warn { --svc-accent:#FF9F0A; border-color:rgba(255,159,10,0.18); }
+.svc-card.red  { --svc-accent:#FF453A; border-color:rgba(255,69,58,0.18); }
 .svc-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
 .svc-title-wrap { display:flex; align-items:center; gap:10px; }
-.svc-icn { width:34px; height:34px; border-radius:11px; background:var(--red-dim); display:flex; align-items:center; justify-content:center; }
+.svc-icn { width:34px; height:34px; border-radius:11px; background:rgba(31,138,61,0.12); border:1px solid rgba(31,138,61,0.2); display:flex; align-items:center; justify-content:center; }
+.svc-card.warn .svc-icn { background:rgba(255,159,10,0.1); border-color:rgba(255,159,10,0.2); }
+.svc-card.red  .svc-icn { background:rgba(255,69,58,0.1); border-color:rgba(255,69,58,0.2); }
 .svc-title { font-size:14px; font-weight:700; letter-spacing:-0.2px; }
 .svc-pill { font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:100px; letter-spacing:0.2px; }
 .svc-pill.ok   { background:rgba(48,209,88,0.12); color:var(--ok); }
@@ -1166,9 +1171,10 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 @keyframes barGlowWarn { 0%,100%{box-shadow:0 0 10px rgba(255,159,10,0.3)} 50%{box-shadow:0 0 24px rgba(255,159,10,0.7),0 0 48px rgba(255,159,10,0.2)} }
 @keyframes barGlowRed  { 0%,100%{box-shadow:0 0 12px rgba(255,59,48,0.4)} 50%{box-shadow:0 0 28px rgba(255,59,48,0.8),0 0 56px rgba(255,59,48,0.3)} }
 @keyframes gradientDrift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-.svc-foot { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+.svc-foot { display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); }
 .svc-foot-txt { font-size:11.5px; color:var(--t2); font-weight:500; }
-.svc-foot-val { font-size:12px; font-weight:700; }
+.svc-foot-txt strong { color:#fff; font-weight:700; }
+.svc-foot-val { font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
 .svc-foot-val.ok { color:var(--ok); } .svc-foot-val.warn { color:var(--warn); } .svc-foot-val.red { color:var(--red); }
 
 /* ── Garage Card ── */
