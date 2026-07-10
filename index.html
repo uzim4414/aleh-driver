@@ -1185,11 +1185,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 }
 .dash-track{
   display:flex;flex-direction:row;
+  width:100%;
   transition:transform .38s cubic-bezier(.16,1,.3,1);
   will-change:transform;
 }
 .dash-slide{
-  flex:0 0 100%;width:100%;
+  flex:0 0 100%;width:100%;min-width:100%;max-width:100%;
+  box-sizing:border-box;
   min-height:10px; /* מתרחב לפי תוכן */
 }
 /* dots */

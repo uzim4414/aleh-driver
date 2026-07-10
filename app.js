@@ -1849,9 +1849,11 @@ function _dashInit() {
 function _dashSwitch(idx, animate) {
   _dashIdx = idx;
   var track = document.getElementById('dash-track');
+  var vp    = document.getElementById('dash-vp');
   if (track) {
+    var w = (vp && vp.offsetWidth) || 0;
     if (animate === false) track.style.transition = 'none';
-    track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+    track.style.transform = 'translateX(-' + (idx * w) + 'px)';
     if (animate === false) requestAnimationFrame(function(){ track.style.transition = ''; });
   }
   document.querySelectorAll('#dash-dots .dash-dot').forEach(function(d, i) {
@@ -1872,9 +1874,9 @@ function _dashInitSwipe(vp, track) {
     if (lockAxis !== 'x') { dragging = false; return; }
     if (Math.abs(dx) > 4) moved = true;
     curX = dx;
-    var base = -(_dashIdx * 100);
+    var base = -(_dashIdx * (vp.offsetWidth || 375));
     track.style.transition = 'none';
-    track.style.transform = 'translateX(calc(' + base + '% + ' + curX + 'px))';
+    track.style.transform = 'translateX(' + (base + curX) + 'px)';
   }
   function onEnd(isTap) {
     if (!dragging || lockAxis !== 'x') { dragging = false; return; }
