@@ -111,23 +111,17 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .tb-avatar-btn { pointer-events:all; padding:4px; display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .tb-online-dot { position:absolute; bottom:6px; right:6px; width:9px; height:9px; border-radius:50%; background:#1F8A3D; border:2px solid rgba(0,0,0,0.6); box-shadow:0 0 6px rgba(31,138,61,0.8); }
 .bell-wrap { display:flex; transform-origin:50% 0%; animation:bellSwing 2.4s cubic-bezier(.36,.07,.19,.97) infinite; }
-.hero-img-area { height:auto; position:relative; overflow:hidden; background:linear-gradient(180deg,#0e0e0e 0%,#111 100%); display:flex; align-items:center; justify-content:center; padding-top:0; }
+.hero-img-area { height:auto; aspect-ratio:16/9; position:relative; overflow:hidden; background:linear-gradient(180deg,#0e0e0e 0%,#111 100%); display:flex; align-items:center; justify-content:center; padding-top:0; }
 .hero-img-area::before { content:''; position:absolute; top:0; left:0; right:0; z-index:3; pointer-events:none; height:90px; width:100%; background:linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 55%, transparent 100%); }
 .hero-img-area::after { content:''; position:absolute; bottom:0; left:0; right:0; height:80px; background:linear-gradient(to bottom,transparent,var(--card)); z-index:4; pointer-events:none; }
-.hero-bg-rays { position:absolute; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 60% 45% at 50% 60%, rgba(31,138,61,0.22) 0%, transparent 65%), conic-gradient(from 200deg at 50% 55%, transparent 0deg, rgba(31,138,61,0.10) 40deg, transparent 80deg, transparent 280deg, rgba(31,138,61,0.10) 320deg, transparent 360deg); filter:blur(2px); animation:groundGlow 5s ease-in-out infinite; }
+.hero-bg-rays { position:absolute; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 70% 50% at 50% 65%, rgba(31,138,61,0.10) 0%, transparent 65%); filter:blur(4px); }
 /* Diagonal green speed-line rays fanning from upper-right (behind the car) */
-.car-rays { position:absolute; inset:0; z-index:0; pointer-events:none;
-  background:
-    linear-gradient(145deg, transparent 55%, rgba(31,138,61,0.18) 55%, rgba(31,138,61,0.18) 58%, transparent 58%),
-    linear-gradient(145deg, transparent 62%, rgba(31,138,61,0.10) 62%, rgba(31,138,61,0.10) 64%, transparent 64%),
-    linear-gradient(145deg, transparent 48%, rgba(31,138,61,0.08) 48%, rgba(31,138,61,0.08) 50%, transparent 50%),
-    linear-gradient(158deg, transparent 70%, rgba(31,138,61,0.07) 70%, rgba(31,138,61,0.07) 71.5%, transparent 71.5%);
-}
-/* Subtle radial green glow behind car centre */
-.car-rays::after { content:''; position:absolute; bottom:10%; left:50%; transform:translateX(-50%); width:70%; height:40%; background:radial-gradient(ellipse, rgba(31,138,61,0.12) 0%, transparent 70%); pointer-events:none; }
-.car-wrap { position:relative; z-index:2; width:100%; display:flex; align-items:flex-end; justify-content:center; animation:carFloat 5s ease-in-out infinite; }
-#car-photo, .car-img { width:100%; max-width:100%; height:auto; object-fit:contain; display:block; position:relative; z-index:2; filter:brightness(1.1) contrast(1.05) drop-shadow(0 20px 40px rgba(0,0,0,0.6)); }
-.car-glow { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); width:240px; height:18px; background:radial-gradient(ellipse, rgba(31,138,61,0.35) 0%, transparent 70%); border-radius:50%; z-index:1; animation:groundGlow 5s ease-in-out infinite; }
+.car-rays { position:absolute; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 80% 60% at 50% 70%, rgba(31,138,61,0.08) 0%, transparent 70%); }
+/* Ray stripes removed — ambient glow only */
+.car-rays::after { display:none; }
+.car-wrap { position:relative; z-index:2; width:100%; height:100%; display:flex; align-items:center; justify-content:center; animation:carFloat 5s ease-in-out infinite; }
+#car-photo, .car-img { width:100%; height:100%; object-fit:contain; display:block; position:relative; z-index:2; filter:brightness(1.08) contrast(1.05) drop-shadow(0 8px 24px rgba(0,0,0,0.7)); }
+.car-glow { position:absolute; bottom:6%; left:50%; transform:translateX(-50%); width:72%; height:22px; background:radial-gradient(ellipse, rgba(0,0,0,0.65) 0%, transparent 70%); border-radius:50%; z-index:1; filter:blur(6px); }
 .hl-glow { position:absolute; top:68px; right:28px; width:22px; height:8px; background:rgba(200,220,255,0.8); border-radius:50%; filter:blur(4px); animation:headlightPulse 3s ease-in-out infinite; z-index:5; }
 .hero-body { padding:0 20px 18px; }
 .hero-titlebar { position:relative; z-index:6; padding:62px 20px 8px; text-align:center; }
@@ -173,13 +167,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .dot { width:6px; height:6px; border-radius:50%; background:var(--t3); }
 .dot.a { background:var(--red); width:20px; border-radius:3px; }
 /* Hero Carousel */
-.hero-swipe-vp{position:relative;width:100%;overflow:hidden}
+.hero-swipe-vp{position:relative;width:100%;height:100%;overflow:hidden}
 .hero-track{
-  display:flex;flex-direction:row;
+  display:flex;flex-direction:row;height:100%;
   transition:transform .38s cubic-bezier(.16,1,.3,1);
   will-change:transform;
 }
-.hero-slide{flex:0 0 100%;width:100%;position:relative}
+.hero-slide{flex:0 0 100%;width:100%;height:100%;position:relative}
 .swipe-hint{
   position:absolute;top:50%;transform:translateY(-50%);
   color:rgba(255,255,255,0.22);font-size:28px;line-height:1;
