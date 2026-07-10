@@ -124,6 +124,26 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .dots { display:flex; justify-content:center; gap:5px; margin:12px 0 4px; }
 .dot { width:6px; height:6px; border-radius:50%; background:var(--t3); }
 .dot.a { background:var(--red); width:20px; border-radius:3px; }
+/* Hero Carousel */
+.hero-swipe-vp{position:relative;width:100%;overflow:hidden}
+.hero-track{
+  display:flex;flex-direction:row;
+  transition:transform .38s cubic-bezier(.16,1,.3,1);
+  will-change:transform;
+}
+.hero-slide{flex:0 0 100%;width:100%;position:relative}
+.swipe-hint{
+  position:absolute;top:50%;transform:translateY(-50%);
+  color:rgba(255,255,255,0.22);font-size:28px;line-height:1;
+  pointer-events:none;user-select:none;z-index:5;
+  animation:hintPulse 2.6s ease-in-out infinite;
+}
+.swipe-hint--r{right:8px}
+.swipe-hint--l{left:8px}
+@keyframes hintPulse{
+  0%,100%{opacity:.15}
+  50%{opacity:.5}
+}
 .sec { padding:18px 20px 10px; font-size:18px; font-weight:700; letter-spacing:-0.4px; animation:fadeUp .5s ease .5s both; }
 .qa { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:0 16px; }
 .qa-card { background:var(--card); border-radius:18px; padding:16px 10px 14px; display:flex; flex-direction:column; align-items:center; gap:10px; border:1px solid var(--border); cursor:pointer; transition:transform .15s; }
@@ -4923,12 +4943,21 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     <div class="content">
       <div class="hero-card">
         <div class="hero-img-area">
-          <div class="hl-glow"></div>
-          <div class="car-glow"></div>
-          <div class="car-wrap">
-            <img id="car-photo" class="car-img" alt="רכב"
-              onerror="document.querySelector('.hero-img-area').style.display='none'"/>
+          <div id="hero-swipe-vp" class="hero-swipe-vp">
+            <div id="hero-track" class="hero-track">
+              <div class="hero-slide">
+                <div class="hl-glow"></div>
+                <div class="car-glow"></div>
+                <div class="car-wrap">
+                  <img id="car-photo" class="car-img" alt="רכב"
+                    onerror="document.querySelector('.hero-img-area').style.display='none'"/>
+                </div>
+              </div>
+            </div>
+            <div class="swipe-hint swipe-hint--r" style="display:none">›</div>
+            <div class="swipe-hint swipe-hint--l" style="display:none">‹</div>
           </div>
+          <div id="hero-dots" class="dots" style="display:none"></div>
         </div>
         <div class="hero-body">
           <div class="hero-name" id="car-name">טויוטה הייסנדר</div>

@@ -1025,7 +1025,9 @@ let STATE = {
   helpGps:       null,
   firebaseUid:   null,   // מאוכלס אחרי _fbSignIn — משמש כ-key ב-/driverData/{uid}/
   _pickerVehicles: [],   // multi-vehicle list from auth
-  _pickerCurrent: 0      // currently selected index in picker
+  _pickerCurrent: 0,     // currently selected index in picker
+  _vehicles: [],         // כל הרכבים של המשתמש (hero carousel)
+  _vehicleIdx: 0         // אינדקס הרכב הפעיל בקרוסלה
 };
 
 /* ══ GAS API ══ */
@@ -1821,6 +1823,134 @@ function pkConfirmSelect() {
   }).catch(function(err) {
     hideGreeting();
     showLoginError(err && err.message ? err.message : 'שגיאת טעינה');
+  });
+}
+
+/* ───── HERO VEHICLE CAROUSEL ───── */
+function _heroCarouselInit() {
+  var vehicles = STATE._vehicles;
+  if (!vehicles || vehicles.length < 2) return;
+  var vp    = document.getElementById('hero-swipe-vp');
+  var track = document.getElementById('hero-track');
+  var dotsEl = document.getElementById('hero-dots');
+  if (!vp || !track) return;
+
+  // build slides
+  track.innerHTML = '';
+  vehicles.forEach(function(v) {
+    var slide = document.createElement('div');
+    slide.className = 'hero-slide';
+    var imgUrl = v.appPhotoLink || v.photoLink || '';
+    var plate  = v.num || '';
+    var make   = v.make || '';
+    var model  = v.model || '';
+    slide.innerHTML =
+      '<div class="car-rays"></div>' +
+      '<div class="car-wrap">' +
+        (imgUrl ? '<img class="car-img" src="'+imgUrl+'" alt="'+make+' '+model+'">' :
+          '<div class="car-placeholder"><svg width="90" height="60" viewBox="0 0 90 60" fill="none"><rect x="5" y="20" width="80" height="30" rx="10" fill="rgba(255,255,255,0.08)"/><rect x="15" y="10" width="60" height="25" rx="8" fill="rgba(255,255,255,0.06)"/><circle cx="20" cy="52" r="7" fill="rgba(255,255,255,0.15)"/><circle cx="70" cy="52" r="7" fill="rgba(255,255,255,0.15)"/></svg></div>') +
+        '<div class="car-glow"></div>' +
+      '</div>' +
+      '<div class="hero-plate-wrap"><span class="hero-plate">'+plate+'</span></div>';
+    track.appendChild(slide);
+  });
+
+  // dots
+  if (dotsEl) {
+    dotsEl.innerHTML = '';
+    vehicles.forEach(function(v, i) {
+      var d = document.createElement('span');
+      d.className = 'dot' + (i === 0 ? ' a' : '');
+      d.setAttribute('data-idx', i);
+      d.addEventListener('click', function() { switchVehicle(Number(this.getAttribute('data-idx'))); });
+      dotsEl.appendChild(d);
+    });
+    dotsEl.style.display = 'flex';
+  }
+
+  var hintR = vp.querySelector('.swipe-hint--r');
+  if (hintR) hintR.style.display = '';
+
+  _heroCarouselInitSwipe(vp, track, vehicles.length);
+  _heroCarouselSetIdx(STATE._vehicleIdx || 0, false);
+}
+
+function _heroCarouselSetIdx(idx, animate) {
+  var track  = document.getElementById('hero-track');
+  var dotsEl = document.getElementById('hero-dots');
+  if (track) {
+    if (animate === false) track.style.transition = 'none';
+    track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+    if (animate === false) {
+      requestAnimationFrame(function() {
+        track.style.transition = '';
+      });
+    }
+  }
+  if (dotsEl) {
+    dotsEl.querySelectorAll('.dot').forEach(function(d, i) {
+      d.classList.toggle('a', i === idx);
+    });
+  }
+  var v = STATE._vehicles && STATE._vehicles[idx];
+  if (v && v.accentColor) {
+    var root = document.documentElement;
+    root.style.setProperty('--accent',     v.accentColor);
+    root.style.setProperty('--accent-dim', v.accentColor.replace(')', ',0.15)').replace('rgb(','rgba('));
+    root.style.setProperty('--accent-glow',v.accentColor.replace(')', ',0.32)').replace('rgb(','rgba('));
+  }
+}
+
+function _heroCarouselInitSwipe(vp, track, count) {
+  var startX = 0, startY = 0, curX = 0, dragging = false, lockAxis = null;
+  var THRESHOLD = 0.22;
+
+  function onStart(x, y) { startX = x; startY = y; dragging = true; lockAxis = null; }
+  function onMove(x, y) {
+    if (!dragging) return;
+    var dx = x - startX, dy = y - startY;
+    if (!lockAxis) lockAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (lockAxis !== 'x') { dragging = false; return; }
+    curX = dx;
+    var base = -(STATE._vehicleIdx * 100);
+    track.style.transition = 'none';
+    track.style.transform  = 'translateX(calc(' + base + '% + ' + curX + 'px))';
+  }
+  function onEnd() {
+    if (!dragging || lockAxis !== 'x') { dragging = false; return; }
+    dragging = false;
+    track.style.transition = '';
+    var pct = curX / (vp.offsetWidth || 375);
+    var next = STATE._vehicleIdx;
+    if (pct < -THRESHOLD && next < count - 1) next++;
+    else if (pct > THRESHOLD && next > 0) next--;
+    if (next !== STATE._vehicleIdx) switchVehicle(next);
+    else _heroCarouselSetIdx(STATE._vehicleIdx);
+  }
+
+  vp.addEventListener('touchstart', function(e) { onStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  vp.addEventListener('touchmove',  function(e) { onMove(e.touches[0].clientX, e.touches[0].clientY); },  {passive:true});
+  vp.addEventListener('touchend',   function() { onEnd(); });
+  vp.addEventListener('mousedown',  function(e) { onStart(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function(e) { if(dragging) onMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup',   function() { if(dragging) onEnd(); });
+}
+
+function switchVehicle(idx) {
+  if (!STATE._vehicles || idx === STATE._vehicleIdx) return;
+  if (idx < 0 || idx >= STATE._vehicles.length) return;
+  STATE._vehicleIdx    = idx;
+  STATE.vehicle        = STATE._vehicles[idx];
+  STATE.isActualHolder = STATE.vehicle.isActualHolder || false;
+  STATE._washLogLoaded = false;
+  STATE.washLog        = [];
+  _heroCarouselSetIdx(idx);
+  saveSession(STATE.idToken, STATE.vehicle, STATE.user);
+  if (typeof _pinSessionSave === 'function') _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
+  loadFullData().then(function() {
+    if (typeof renderAll === 'function') renderAll();
+    var ek = (STATE.user && STATE.user.email ? STATE.user.email : '').replace(/\./g,'_');
+    if (typeof _fbWriteLastLogin === 'function') _fbWriteLastLogin(ek, _vehKey(STATE.vehicle));
   });
 }
 
@@ -2794,16 +2924,14 @@ async function handleGoogleCredential(response) {
     console.log('[auth] result ok:', result.ok, 'vehicles:', result.vehicles && result.vehicles.length);
     _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth — non-blocking
     hideLoader();
-    // Multi-vehicle: show picker if more than one vehicle
-    if (result.vehicles && result.vehicles.length > 1) {
-      STATE._pickerVehicles = result.vehicles;
-      STATE._pickerCurrent  = 0;
-      renderPickerScreen(result.vehicles);
-    } else {
-      // Single vehicle — proceed as before
-      STATE.vehicle      = result.vehicle;
+    // Multi-vehicle: enter app directly with hero carousel (no picker screen)
+    {
+      var vlist = result.vehicles || (result.vehicle ? [result.vehicle] : []);
+      STATE._vehicles   = vlist;
+      STATE._vehicleIdx = 0;
+      STATE.vehicle      = vlist[0] || result.vehicle;
       STATE._washLogLoaded = false; STATE.washLog = [];
-      STATE.isActualHolder = result.isActualHolder || false;
+      STATE.isActualHolder = (STATE.vehicle && STATE.vehicle.isActualHolder) || result.isActualHolder || false;
       saveSession(STATE.idToken, STATE.vehicle, STATE.user);
       // שמור pin session ובדוק אם PIN מוגדר
       _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
@@ -2916,7 +3044,7 @@ async function fetchGovData() {
 
 async function loadFullData() {
   try {
-    const result = await gasPost('driver_vehicle');
+    const result = await gasPost('driver_vehicle', { vehicleId: STATE.vehicle ? STATE.vehicle.id : undefined });
     STATE.vehicle   = result.vehicle;
     // Do NOT reset washLog here — only reset at login/vehicle-switch so badge survives refresh
     STATE.fuelData  = result.fuelData  || null;
@@ -3398,6 +3526,7 @@ function initSwipe() {
   let startX = 0, startY = 0, _swipeOnItem = false;
 
   document.getElementById('app').addEventListener('touchstart', function(e) {
+    if (e.target.closest && e.target.closest('#hero-swipe-vp')) { _swipeOnItem = true; return; } // hero carousel owns its swipe
     var mapEl = document.getElementById('th-leaflet-map');
     if (mapEl && mapEl.contains(e.target)) { _swipeOnItem = true; return; } // don't swipe when touching map
     startX = e.touches[0].clientX;
@@ -3630,6 +3759,7 @@ function startApp() {
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function(){}); } catch(_){}
   renderAll();
   initSwipe();
+  if (STATE._vehicles && STATE._vehicles.length > 1) { try { _heroCarouselInit(); } catch(e) { console.warn('hero carousel init', e); } }
   try { _initHelpFabDrag(); } catch(e) { console.warn('fab drag init', e); }
   try { _initBackButtonHandler(); } catch(e) { console.warn('back btn init', e); }
   setTimeout(APP._checkGarageReminders, 1500);
