@@ -1853,7 +1853,7 @@ function _dashSwitch(idx, animate) {
   if (track) {
     var w = (vp && vp.offsetWidth) || 0;
     if (animate === false) track.style.transition = 'none';
-    track.style.transform = 'translateX(-' + (idx * w) + 'px)';
+    track.style.transform = 'translateX(' + (idx * w) + 'px)'; // RTL: positive → move track right to reveal slide-1 (placed left in RTL flex)
     if (animate === false) requestAnimationFrame(function(){ track.style.transition = ''; });
   }
   document.querySelectorAll('#dash-dots .dash-dot').forEach(function(d, i) {
@@ -1874,7 +1874,7 @@ function _dashInitSwipe(vp, track) {
     if (lockAxis !== 'x') { dragging = false; return; }
     if (Math.abs(dx) > 4) moved = true;
     curX = dx;
-    var base = -(_dashIdx * (vp.offsetWidth || 375));
+    var base = (_dashIdx * (vp.offsetWidth || 375)); // RTL: positive base matches _dashSwitch
     track.style.transition = 'none';
     track.style.transform = 'translateX(' + (base + curX) + 'px)';
   }
@@ -1885,8 +1885,9 @@ function _dashInitSwipe(vp, track) {
     if (isTap || !moved) { _dashSwitch(_dashIdx); return; }
     var pct = curX / (vp.offsetWidth || 375);
     var next = _dashIdx;
-    if (pct < -THRESHOLD && next < COUNT - 1) next++;
-    else if (pct > THRESHOLD && next > 0) next--;
+    // RTL: finger moves RIGHT (pct > 0) → advance to next slide (fuel); finger LEFT → back to slide 0
+    if (pct > THRESHOLD && next < COUNT - 1) next++;
+    else if (pct < -THRESHOLD && next > 0) next--;
     _dashSwitch(next);
   }
 
