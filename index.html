@@ -107,21 +107,32 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .hero-card { position:relative; margin:0 16px; background:var(--card); border-radius:26px; overflow:hidden; border:1px solid var(--border); animation:heroReveal .6s cubic-bezier(.16,1,.3,1) .1s both; }
 /* topbar overlay inside hero */
 .topbar-overlay { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:14px 18px 0; pointer-events:none; }
-.tb-bell-btn { pointer-events:all; width:40px; height:40px; display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-.tb-avatar-btn { pointer-events:all; width:46px; height:46px; background:rgba(255,255,255,0.06); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:50%; border:1.5px solid rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.tb-bell-btn { pointer-events:all; padding:4px; display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.tb-avatar-btn { pointer-events:all; padding:4px; display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .tb-online-dot { position:absolute; bottom:6px; right:6px; width:9px; height:9px; border-radius:50%; background:#1F8A3D; border:2px solid rgba(0,0,0,0.6); box-shadow:0 0 6px rgba(31,138,61,0.8); }
 .bell-wrap { display:flex; transform-origin:50% 0%; animation:bellSwing 2.4s cubic-bezier(.36,.07,.19,.97) infinite; }
-.hero-img-area { height:auto; min-height:260px; position:relative; overflow:hidden; background:linear-gradient(180deg,#0e0e0e 0%,#111 100%); display:flex; align-items:flex-end; justify-content:center; padding-top:0; }
+.hero-img-area { height:auto; min-height:max(300px,45vw); position:relative; overflow:hidden; background:linear-gradient(180deg,#0e0e0e 0%,#111 100%); display:flex; align-items:flex-end; justify-content:center; padding-top:0; }
 .hero-img-area::before { content:''; position:absolute; top:0; left:0; right:0; z-index:3; pointer-events:none; height:90px; width:100%; background:linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 55%, transparent 100%); }
 .hero-img-area::after { content:''; position:absolute; bottom:0; left:0; right:0; height:80px; background:linear-gradient(to bottom,transparent,var(--card)); z-index:4; pointer-events:none; }
-.hero-bg-rays, .car-rays { position:absolute; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 60% 45% at 50% 60%, rgba(31,138,61,0.22) 0%, transparent 65%), conic-gradient(from 200deg at 50% 55%, transparent 0deg, rgba(31,138,61,0.10) 40deg, transparent 80deg, transparent 280deg, rgba(31,138,61,0.10) 320deg, transparent 360deg); filter:blur(2px); animation:groundGlow 5s ease-in-out infinite; }
+.hero-bg-rays { position:absolute; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 60% 45% at 50% 60%, rgba(31,138,61,0.22) 0%, transparent 65%), conic-gradient(from 200deg at 50% 55%, transparent 0deg, rgba(31,138,61,0.10) 40deg, transparent 80deg, transparent 280deg, rgba(31,138,61,0.10) 320deg, transparent 360deg); filter:blur(2px); animation:groundGlow 5s ease-in-out infinite; }
+/* Diagonal green speed-line rays fanning from upper-right (behind the car) */
+.car-rays { position:absolute; inset:0; z-index:0; pointer-events:none;
+  background:
+    linear-gradient(145deg, transparent 55%, rgba(31,138,61,0.18) 55%, rgba(31,138,61,0.18) 58%, transparent 58%),
+    linear-gradient(145deg, transparent 62%, rgba(31,138,61,0.10) 62%, rgba(31,138,61,0.10) 64%, transparent 64%),
+    linear-gradient(145deg, transparent 48%, rgba(31,138,61,0.08) 48%, rgba(31,138,61,0.08) 50%, transparent 50%),
+    linear-gradient(158deg, transparent 70%, rgba(31,138,61,0.07) 70%, rgba(31,138,61,0.07) 71.5%, transparent 71.5%);
+}
+/* Subtle radial green glow behind car centre */
+.car-rays::after { content:''; position:absolute; bottom:10%; left:50%; transform:translateX(-50%); width:70%; height:40%; background:radial-gradient(ellipse, rgba(31,138,61,0.12) 0%, transparent 70%); pointer-events:none; }
 .car-wrap { position:relative; z-index:2; width:100%; display:flex; align-items:flex-end; justify-content:center; animation:carFloat 5s ease-in-out infinite; }
 #car-photo, .car-img { width:100%; max-width:100%; height:auto; object-fit:contain; display:block; mix-blend-mode:screen; position:relative; z-index:2; filter:brightness(1.1) contrast(1.05) drop-shadow(0 20px 40px rgba(0,0,0,0.6)); }
 .car-glow { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); width:240px; height:18px; background:radial-gradient(ellipse, rgba(31,138,61,0.35) 0%, transparent 70%); border-radius:50%; z-index:1; animation:groundGlow 5s ease-in-out infinite; }
 .hl-glow { position:absolute; top:68px; right:28px; width:22px; height:8px; background:rgba(200,220,255,0.8); border-radius:50%; filter:blur(4px); animation:headlightPulse 3s ease-in-out infinite; z-index:5; }
 .hero-body { padding:0 20px 18px; }
+.hero-titlebar { position:relative; z-index:6; padding:62px 20px 8px; text-align:center; }
 .hero-make { font-size:12px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:var(--t2); text-align:center; animation:fadeUp .5s ease .28s both; }
-.hero-name { font-size:22px; font-weight:800; text-align:center; letter-spacing:-0.5px; margin-top:2px; animation:fadeUp .5s ease .3s both; }
+.hero-name { font-size:clamp(2rem,8vw,3.2rem); font-weight:900; text-align:center; letter-spacing:-0.02em; text-transform:uppercase; line-height:1; margin-top:4px; animation:fadeUp .5s ease .3s both; }
 .hero-brand-row { display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:2px; }
 .hero-brand-logo { height:28px; width:auto; object-fit:contain; filter:brightness(0) invert(1); opacity:0.85; }
 #car-brand-logo[src=""]{ display:none!important; }
@@ -5021,7 +5032,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
         <div class="topbar-overlay">
           <!-- RTL: avatar ימין -->
           <div class="tb-avatar-btn" id="user-avatar" onclick="logout()" style="cursor:pointer" title="התנתק" aria-label="פרופיל">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="8" r="4"/>
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
@@ -5030,9 +5041,25 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <!-- RTL: bell שמאל -->
           <div class="tb-bell-btn" onclick="APP.nav('alerts')" aria-label="התראות">
             <div class="bell-wrap">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>
             <div class="tb-badge hidden" id="alert-badge">0</div>
+          </div>
+        </div>
+        <div class="hero-titlebar">
+          <div class="hero-brand-row">
+            <img id="car-brand-logo" class="hero-brand-logo" src="" alt="" style="display:none">
+            <div class="hero-make" id="car-make"></div>
+          </div>
+          <div class="hero-name" id="car-name">טויוטה הייסנדר</div>
+          <div class="il-plate-wrap">
+            <div class="il-plate">
+              <div class="il-blue">
+                <div class="il-flag">🇮🇱</div>
+                <div class="il-code">IL</div>
+              </div>
+              <div class="il-num" id="car-plate"></div>
+            </div>
           </div>
         </div>
         <div class="hero-img-area">
@@ -5054,20 +5081,6 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
           <div class="car-rays"></div>
         </div>
         <div class="hero-body">
-          <div class="hero-brand-row">
-            <img id="car-brand-logo" class="hero-brand-logo" src="" alt="" style="display:none">
-            <div class="hero-make" id="car-make"></div>
-          </div>
-          <div class="hero-name" id="car-name">טויוטה הייסנדר</div>
-          <div class="il-plate-wrap">
-            <div class="il-plate">
-              <div class="il-blue">
-                <div class="il-flag">🇮🇱</div>
-                <div class="il-code">IL</div>
-              </div>
-              <div class="il-num" id="car-plate"></div>
-            </div>
-          </div>
           <div id="hero-dots" class="dots" style="display:none"></div>
           <div class="hero-btns">
             <button class="hero-btn" id="btn-garage" onclick="APP.nav('vehicle');APP.switchTab('garage')">
