@@ -2356,6 +2356,8 @@ async function _bioLoginFromSplash() {
       return;
     }
     STATE.vehicle = session.vehicleData;
+    STATE._vehicles = session.vehicles || (session.vehicleData ? [session.vehicleData] : []);
+    STATE._vehicleIdx = session.vehicleIdx || 0;
     STATE.user = session.userInfo || { email: bioData.email, name: bioData.email };
     STATE.idToken = session.idToken || null;
     if (STATE.idToken && typeof _fbSignIn === 'function') {
@@ -2613,6 +2615,8 @@ function pinForgot() {
 function _bootWithPinSession(session) {
   if (!session) return;
   STATE.vehicle = session.vehicleData;
+  STATE._vehicles = session.vehicles || (session.vehicleData ? [session.vehicleData] : []);
+  STATE._vehicleIdx = session.vehicleIdx || 0;
   STATE.user = { email: session.email, name: (session.userInfo && session.userInfo.name) || session.email, picture: (session.userInfo && session.userInfo.picture) || '' };
   STATE.idToken = null; // אין token — PIN session
   STATE._washLogLoaded = false; STATE.washLog = [];
@@ -2727,7 +2731,7 @@ function pinSetupCancel() {
 function saveSession(token, vehicleData, userInfo) {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      token, vehicleData, userInfo, ts: Date.now()
+      token, vehicleData, userInfo, ts: Date.now(), vehicles: STATE._vehicles || [], vehicleIdx: STATE._vehicleIdx || 0
     }));
   } catch(e) {}
 }
@@ -3114,9 +3118,13 @@ async function fetchGovData() {
   }
 }
 
+var _loadFullDataToken = 0;
+
 async function loadFullData() {
+  var _myLoadToken = ++_loadFullDataToken;
   try {
     const result = await gasPost('driver_vehicle', { vehicleId: STATE.vehicle ? STATE.vehicle.id : undefined });
+    if (_myLoadToken !== _loadFullDataToken) return; // stale response — a newer call is in flight
     STATE.vehicle   = result.vehicle;
     // Do NOT reset washLog here — only reset at login/vehicle-switch so badge survives refresh
     STATE.fuelData  = result.fuelData  || null;
@@ -9581,6 +9589,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (session && session.token !== 'demo_token') {
     STATE.idToken = session.token;
     STATE.vehicle = session.vehicleData;
+    STATE._vehicles = session.vehicles || (session.vehicleData ? [session.vehicleData] : []);
+    STATE._vehicleIdx = session.vehicleIdx || 0;
     STATE._washLogLoaded = false; STATE.washLog = [];
     STATE.user    = session.userInfo;
 

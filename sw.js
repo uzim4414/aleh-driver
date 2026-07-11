@@ -76,6 +76,16 @@ self.addEventListener('fetch', e => {
 self.GAS_URL = self.GAS_URL || '';
 
 self.addEventListener('message', e => {
+  // Origin validation — only accept from known app origins
+  var ALLOWED_ORIGINS = [
+    'https://aleh-fleet.github.io',
+    'https://aleh.github.io',
+    'http://localhost',
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'null' // for file:// and Capacitor
+  ];
+  if (event.origin && !ALLOWED_ORIGINS.includes(event.origin)) return;
   if (!e.data) return;
   // Activate a freshly-installed SW right away (sent by the page on statechange)
   if (e.data.type === 'skip-waiting') {
