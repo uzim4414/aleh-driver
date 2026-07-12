@@ -6408,6 +6408,11 @@ window.fcmDebug = async function() {
     if (!window._gdLiveInterval) {
       window._gdLiveInterval = setInterval(_gdLiveUpdate, 2000);
     }
+    // BUG-FIX: dedicated 1s cooldown ticker (runs only while drawer is open).
+    if (!window._gdCoolInterval) {
+      window._gdCoolInterval = setInterval(_gdCooldownTick, 1000);
+    }
+    _gdCooldownTick(); // immediate paint, don't wait 1s
   }
   window._gateDrawerOpen = _gateDrawerOpen;
 
@@ -6419,6 +6424,7 @@ window.fcmDebug = async function() {
     scrim.style.display = 'none';
     sheet.style.display = 'none';
     if (window._gdLiveInterval) { clearInterval(window._gdLiveInterval); window._gdLiveInterval = null; }
+    if (window._gdCoolInterval) { clearInterval(window._gdCoolInterval); window._gdCoolInterval = null; }
   }
   window._gateDrawerClose = _gateDrawerClose;
 
@@ -6551,7 +6557,7 @@ window.fcmDebug = async function() {
       var remSec = Math.ceil((coolUntil - Date.now()) / 1000);
       var mm = Math.floor(remSec/60), ss = remSec%60;
       var timeStr = mm + ':' + ('0'+ss).slice(-2);
-      badgeHtml = '<span class="gd-gate-badge" style="background:rgba(255,159,10,.1);color:#FF9F0A;border:1px solid rgba(255,159,10,.25)">⏱ ' + timeStr + '</span>';
+      badgeHtml = '<span class="gd-gate-badge" id="gd-badge-' + idx + '" style="background:rgba(255,159,10,.1);color:#FF9F0A;border:1px solid rgba(255,159,10,.25)">⏱ ' + timeStr + '</span>';
       stateHtml = '<div class="gd-state-row cooldown" id="gd-state-' + idx + '">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
         '<span style="font-size:12px;font-weight:700;color:#FF9F0A">צינון פעיל</span>' +
@@ -6635,6 +6641,54 @@ window.fcmDebug = async function() {
       }
     });
   };
+
+  // BUG-FIX (gate cooldown): dedicated 1s ticker for the cooldown countdown.
+  // Previously the "המתן M:SS" button + "· ממתין M:SS" state row were only
+  // refreshed inside _gateDrawerUpdateDistances (driven by watchPosition, which
+  // Android fires every 3-5s), so the timer visibly jumped. This ticks every 1s,
+  // fully rebuilds the cooldown visuals (self-correcting even if a cooldown just
+  // started mid-drawer), and refreshes the card once when the cooldown expires.
+  function _gdCooldownTick() {
+    if (!_gdOpen) return;
+    var _cfgs = (typeof APP !== 'undefined' && APP._gateConfigs) || (APP && APP._gateConfig ? [APP._gateConfig] : []);
+    _cfgs.forEach(function(cfg, idx) {
+      var coolUntil = (window._gateCooldownMap || {})[cfg.lotId] || 0;
+      if (!coolUntil) return;
+      var rem = coolUntil - Date.now();
+      var card = document.getElementById('gd-card-' + idx);
+      if (!card) return;
+      if (rem > 0) {
+        var remSec = Math.ceil(rem / 1000);
+        var mm = Math.floor(remSec / 60), ss = remSec % 60;
+        var t = mm + ':' + ('0' + ss).slice(-2);
+        card.dataset.state = 'cooldown';
+        var badge = document.getElementById('gd-badge-' + idx);
+        if (badge) { badge.textContent = '⏱ ' + t; badge.style.color = '#FF9F0A'; badge.style.background = 'rgba(255,159,10,.1)'; badge.style.borderColor = 'rgba(255,159,10,.25)'; }
+        var stateDiv = document.getElementById('gd-state-' + idx);
+        if (stateDiv) {
+          stateDiv.className = 'gd-state-row cooldown';
+          stateDiv.innerHTML =
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+            '<span style="font-size:12px;font-weight:700;color:#FF9F0A">צינון פעיל</span>' +
+            '<span style="font-size:12px;color:var(--t2);margin-inline-start:4px">· ממתין ' + t + '</span>';
+        }
+        var cta = document.getElementById('gd-cta-' + idx);
+        if (cta) { cta.className = 'gd-cta-cool'; cta.disabled = true; cta.onclick = null; cta.textContent = 'המתן ' + t; }
+      } else {
+        // Cooldown just expired — refresh card to in-range/idle using last GPS fix.
+        var _lat = (typeof _gateLastLat !== 'undefined') ? _gateLastLat : null;
+        var _lng = (typeof _gateLastLng !== 'undefined') ? _gateLastLng : null;
+        if (_lat != null && _lng != null && typeof _gateDrawerUpdateDistances === 'function') {
+          _gateDrawerUpdateDistances(_cfgs, _lat, _lng);
+        } else {
+          card.dataset.state = 'idle';
+          var cta2 = document.getElementById('gd-cta-' + idx);
+          if (cta2) { cta2.className = 'gd-cta-disabled'; cta2.disabled = true; cta2.textContent = 'מחוץ לטווח'; }
+        }
+      }
+    });
+  }
+  window._gdCooldownTick = _gdCooldownTick;
 
   function _gdLiveUpdate() {
     if (!_gdOpen) return;
