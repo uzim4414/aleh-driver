@@ -11001,6 +11001,25 @@ var _gateCooldownUntil = 0;
 var _gateWatchId = null;
 var _gateOpening = false;
 
+// BUG-2026-07-12 launch auto-open guard: prevent gate from auto-opening the
+// instant the app launches while parked in range. AUTO-open (GPS proximity, no
+// user action) is only allowed after a warmup period AND after the driver has
+// actually been moving. Manual open (drawer "פתח שער" → _gateOpen directly) is
+// NOT affected — it bypasses _gateOnPosition entirely.
+var _gateWarmupDone       = false; // true after warmup timer elapses
+var _gateHasMovedSinceStart = false; // true once a GPS fix with real speed seen
+var _gateWarmupTimer      = null;  // handle for the warmup timeout
+var _gateSuccessTimer     = null;  // handle for the success-overlay auto-dismiss
+var _GATE_WARMUP_MS       = 45000; // 45s warmup before auto-open is allowed
+var _GATE_MOVE_KMH        = 5;     // min speed (km/h) counted as "moving"
+
+/* Arm the launch warmup guard. Idempotent — the warmup timer is (re)started only
+   once per app session so a later re-init doesn't reset the clock. */
+function _gateArmWarmup() {
+  if (_gateWarmupTimer !== null || _gateWarmupDone) return;
+  _gateWarmupTimer = setTimeout(function() { _gateWarmupDone = true; }, _GATE_WARMUP_MS);
+}
+
 /* Show the gate card in a DISABLED state — visible but grayed out & not tappable.
    Used when gate access was revoked / not yet granted, but the vehicle is assigned.
    The card must NEVER disappear once a vehicle is assigned. */
@@ -11057,6 +11076,7 @@ function _gateInit() {
   card.style.display = 'flex';
   if (!vehActive) { _gateSetState('disabled'); return; }
   _gateSetState('idle');
+  _gateArmWarmup(); // start launch auto-open guard countdown
   _gateStartOrStop();
 }
 
@@ -11095,6 +11115,9 @@ function _gateOnPosition(pos) {
   _gateLastLat = lat;
   _gateLastLng = lng;
   _gateLastSpeedKmh = Math.round(speedMs * 3.6);
+  // Launch guard: mark "moving" once a real speed fix arrives. Guards auto-open
+  // below so the gate never fires on the first stationary GPS fix at launch.
+  if (speedMs * 3.6 > _GATE_MOVE_KMH) _gateHasMovedSinceStart = true;
   _gateLastAccM     = pos.coords.accuracy != null ? pos.coords.accuracy : null;
   var inRange = null; // nearest gate in range
   var nearestDist = Infinity;
@@ -11115,6 +11138,16 @@ function _gateOnPosition(pos) {
   }
   if (inRange) {
     if (_gateOpening) return;
+    // Launch auto-open guard: skip auto-open until the app has been running past
+    // the warmup window AND the driver has actually moved. Without this, opening
+    // the app while parked in range fires the gate on the first GPS fix. Manual
+    // open (drawer button → _gateOpen) is unaffected — it never enters this path.
+    if (!_gateWarmupDone || !_gateHasMovedSinceStart) {
+      _gateSetState('approaching');
+      var _abadge = document.getElementById('gate-dist-badge');
+      if (_abadge) _abadge.textContent = Math.round(nearestDist) + ' מ\'';
+      return;
+    }
     if (!_gateCheckConditions(speedMs, inRange)) return;
     _gateSetState('opening');
     _gateOpen(inRange.lotId, nearestDist, speedMs, lat, lng);
@@ -11253,6 +11286,10 @@ function _gateShowSuccess(lotName, distM) {
   if (meta) meta.textContent = 'מרחק: ' + Math.round(distM) + ' מ\' · ' + timeStr;
   overlay.style.display = 'flex';
   if (bar) { bar.style.width = '0'; setTimeout(function(){ bar.style.width = '100%'; }, 50); }
+  // Tap-anywhere-to-dismiss escape hatch — driver never gets stuck even if the
+  // auto-dismiss timer is throttled/frozen (e.g. WebView backgrounded). onclick
+  // (not addEventListener) so re-showing never stacks duplicate handlers.
+  overlay.onclick = function(){ _gateHideSuccess(); };
   // Show OS notification
   if ('serviceWorker' in navigator && Notification.permission === 'granted') {
     navigator.serviceWorker.ready.then(function(reg) {
@@ -11268,10 +11305,19 @@ function _gateShowSuccess(lotName, distM) {
       });
     }).catch(function(){});
   }
-  setTimeout(function() {
-    overlay.style.display = 'none';
-    _gateSetState('idle');
-  }, 4500);
+  // Store the timer handle so re-entry can't orphan a prior timer, and the tap
+  // handler can cancel it. Guarantees the overlay always returns to idle.
+  if (_gateSuccessTimer) clearTimeout(_gateSuccessTimer);
+  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 4500);
+}
+
+/* Hide the success overlay and return the gate card to idle. Single dismiss path
+   shared by the auto-dismiss timer and the tap-to-dismiss handler. */
+function _gateHideSuccess() {
+  if (_gateSuccessTimer) { clearTimeout(_gateSuccessTimer); _gateSuccessTimer = null; }
+  var overlay = document.getElementById('gate-success-overlay');
+  if (overlay) { overlay.style.display = 'none'; overlay.onclick = null; }
+  _gateSetState('idle');
 }
 
 // Expose tap handler
