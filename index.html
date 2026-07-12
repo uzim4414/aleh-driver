@@ -2,6 +2,7 @@
 <html dir="rtl" lang="he">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://www.gstatic.com https://cdn.simpleicons.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://script.google.com https://firebasedatabase.googleapis.com https://aleh-fleet-default-rtdb.europe-west1.firebasedatabase.app wss:; frame-src 'none';">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -20,6 +21,7 @@
 <!-- Firebase Messaging SDK v11 — modular ESM loaded AFTER app.js (see bottom of body) -->
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<!-- TODO-M13: compile splash-logo.jsx + inline SplashApp JSX at build time to remove @babel/standalone runtime compiler. Both this loader and the external splash-logo.jsx (type="text/babel", line ~6148) depend on it. -->
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <style>
 :root {
@@ -4566,7 +4568,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gate-dist-badge { position:absolute;top:6px;left:6px;background:#1F8A3D;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;animation:badgeBeat 1.5s ease-in-out infinite; }
 .gate-status-dot { position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#FF9F0A; }
 /* Gate success overlay */
-#gate-success-overlay { position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#0a1f0f 0%,#0d3018 100%);padding:32px;animation:notif-landing-in .5s cubic-bezier(.22,1,.36,1) both; }
+#gate-success-overlay { position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#0a1f0f 0%,#0d3018 100%);padding:32px;animation:notif-landing-in .5s cubic-bezier(.22,1,.36,1) both; }
 .gs-icon { font-size:80px;margin-bottom:20px; }
 .gs-title { font-size:28px;font-weight:800;color:#30D158;text-align:center; }
 .gs-lot { font-size:16px;color:rgba(255,255,255,.7);margin-top:8px;text-align:center; }
@@ -4999,23 +5001,20 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
   <!-- ── Global Top Bar (visible on non-home screens; hidden on home — bell+avatar live in hero overlay) ── -->
   <div class="topbar" id="global-topbar">
-    <div style="display:flex;gap:8px">
-      <div class="tb-btn" onclick="APP.nav('alerts')">
-        <svg width="20" height="20"><use href="#ic-bell" color="#fff"/></svg>
+    <!-- RTL: bell ימין (first flex child = right) -->
+    <div class="tb-bell-btn" onclick="APP.nav('alerts')" aria-label="התראות">
+      <div class="bell-wrap">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       </div>
+      <div class="tb-badge hidden" id="alert-badge-tb">0</div>
     </div>
-    <div class="tb-logo">
-      <div class="tb-logo-name">ALEH DRIVE</div>
-      <div class="tb-logo-sub">Developed by Uzi Mosh</div>
-    </div>
-    <div class="tb-user">
-      <div>
-        <div class="tb-greet-hi">שלום,</div>
-        <div class="tb-greet-name" id="user-name">—</div>
-      </div>
-      <div class="tb-avatar" onclick="logout()" style="cursor:pointer" title="התנתק">
-        <span id="user-initials-tb" style="font-size:14px;font-weight:700;color:#8A8A8E;letter-spacing:-0.5px"></span>
-      </div>
+    <!-- RTL: avatar שמאל (last flex child = left) -->
+    <div class="tb-avatar-btn" onclick="logout()" style="cursor:pointer" title="התנתק" aria-label="פרופיל">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+      <div class="tb-online-dot"></div>
     </div>
   </div>
 
@@ -5042,7 +5041,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
         </div>
         <div class="hero-titlebar">
           <div class="hero-brand-row">
-            <img id="car-brand-logo" class="hero-brand-logo" src="" alt="" style="display:none">
+            <img id="car-brand-logo" class="hero-brand-logo" src="" alt="" loading="lazy" referrerpolicy="no-referrer" style="display:none">
             <div class="hero-make" id="car-make"></div>
           </div>
           <div class="hero-name" id="car-name">טויוטה הייסנדר</div>
@@ -5189,10 +5188,10 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
       <div class="ph-sub" id="veh-sub">—</div>
     </div>
     <div class="tabs" id="veh-tabs">
-      <div class="tab active" data-tab="info"      onclick="APP.switchTab('info')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-car"/></svg></span><span class="tab-label">הרכב</span></div>
-      <div class="tab"        data-tab="history"   onclick="APP.switchTab('history')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-clock"/></svg></span><span class="tab-label">היסטוריה</span></div>
-      <div class="tab"        data-tab="insurance" onclick="APP.switchTab('insurance')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">רישיונות וביטוחים</span></div>
-      <div class="tab"        data-tab="garage"    onclick="APP.switchTab('garage')"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-tool"/></svg></span><span class="tab-label">המוסך</span></div>
+      <div class="tab active" data-tab="info"      role="button" tabindex="0" aria-label="הרכב" onclick="APP.switchTab('info')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('info');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-car"/></svg></span><span class="tab-label">הרכב</span></div>
+      <div class="tab"        data-tab="history"   role="button" tabindex="0" aria-label="היסטוריה" onclick="APP.switchTab('history')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('history');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-clock"/></svg></span><span class="tab-label">היסטוריה</span></div>
+      <div class="tab"        data-tab="insurance" role="button" tabindex="0" aria-label="רישיונות וביטוחים" onclick="APP.switchTab('insurance')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('insurance');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">רישיונות וביטוחים</span></div>
+      <div class="tab"        data-tab="garage"    role="button" tabindex="0" aria-label="המוסך" onclick="APP.switchTab('garage')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('garage');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-tool"/></svg></span><span class="tab-label">המוסך</span></div>
     </div>
     <div class="content" id="veh-content"></div>
   </div>
@@ -5819,9 +5818,10 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   window.__VAPID_PUBLIC = "BFLZcYjxU_yOMukgr3oSnP8ayrFzw16i0s8-z1fbEy1I_E-qP0_B8k3ccvjpE8RmyGYRzSu-ybm2k94pyJfMLyg";
 </script>
 <!-- Firebase SDK (compat v9 — חושף firebase.* כ-global, ללא bundler) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- TODO-M11: add integrity SRI hash after verifying 9.23.0 gstatic bundle hashes -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js" crossorigin="anonymous"></script>
 <script src="app.js?v=80"></script>
 <script>
 window._applyCarBrandLogo = function(make) {
@@ -5871,6 +5871,11 @@ window._applyCarBrandLogo = function(make) {
   el.onerror = function(){ el.src=''; el.style.display='none'; };
 };
 window.fcmDebug = async function() {
+  // L10: guard against missing serviceWorker/controller before dereferencing
+  if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+    console.log('[fcmDebug] no SW controller');
+    return;
+  }
   const checks = {
     'Notification.permission': Notification.permission,
     'navigator.serviceWorker': !!navigator.serviceWorker,
@@ -5881,7 +5886,7 @@ window.fcmDebug = async function() {
     'App version': (document.querySelector('script[src*="app.js"]') || {}).src || 'n/a'
   };
   console.table(checks);
-  alert(JSON.stringify(checks, null, 2));
+  console.log('[fcmDebug]', JSON.stringify(checks, null, 2));
   return checks;
 };
 </script>
@@ -6263,7 +6268,7 @@ window.fcmDebug = async function() {
 </div>
 <!-- ── Gate Drawer ──────────────────────────── -->
 <div id="gd-scrim" onclick="typeof _gateDrawerClose==='function'&&_gateDrawerClose()"></div>
-<div id="gd-sheet" role="dialog" aria-modal="true">
+<div id="gd-sheet" role="dialog" aria-modal="true" aria-label="שערי חניון">
   <span class="gd-handle"></span>
   <div class="gd-hdr">
     <span class="gd-title">שערי חניון</span>
@@ -6524,6 +6529,8 @@ window.fcmDebug = async function() {
   }
 
   function _gdGateCardHtml(cfg, idx) {
+    // M14: escape all cfg-derived values injected into innerHTML (XSS hardening)
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
     var lotId = cfg.lotId || '';
     var isInRange = false; // will be updated by live loop
     var coolUntil = (window._gateCooldownMap || {})[lotId] || 0;
@@ -6557,27 +6564,27 @@ window.fcmDebug = async function() {
     var dayNames = ['א','ב','ג','ד','ה','ו','ש'];
     var daysStr = days.length >= 7 ? 'א\'–ש\'' : days.map(function(d){ return dayNames[parseInt(d.trim())]+'\''; }).join('–');
     var hoursStr = (cfg.hoursStart && cfg.hoursEnd) ? (cfg.hoursStart+'–'+cfg.hoursEnd) : 'כל היום';
-    return '<div class="gd-gate-card" data-state="' + state + '" data-lot-id="' + lotId + '" id="gd-card-' + idx + '">' +
+    return '<div class="gd-gate-card" data-state="' + state + '" data-lot-id="' + esc(lotId) + '" id="gd-card-' + idx + '">' +
       '<div class="gd-gate-head">' +
         '<div class="gd-gate-icon" style="background:' + iconBg + ';border:1px solid ' + (state==='idle'?'var(--border)':'rgba('+( state==='cooldown'?'255,159,10':'31,138,61' )+',.3)')  + '">' +
           '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 4v16M2 12h20"/></svg>' +
         '</div>' +
         '<div>' +
-          '<div class="gd-gate-name">' + (cfg.lotName||'שער') + '</div>' +
-          (cfg.address ? '<div class="gd-gate-addr">' + cfg.address + '</div>' : '') +
+          '<div class="gd-gate-name">' + esc(cfg.lotName||'שער') + '</div>' +
+          (cfg.address ? '<div class="gd-gate-addr">' + esc(cfg.address) + '</div>' : '') +
         '</div>' +
         badgeHtml +
       '</div>' +
       '<div class="gd-info-grid">' +
-        '<div class="gd-info-cell"><div class="gd-info-lbl">טווח פתיחה</div><div class="gd-info-val">' + (cfg.radius||200) + 'מ\'</div></div>' +
+        '<div class="gd-info-cell"><div class="gd-info-lbl">טווח פתיחה</div><div class="gd-info-val">' + esc(cfg.radius||200) + 'מ\'</div></div>' +
         '<div class="gd-info-sep-v"></div>' +
-        '<div class="gd-info-cell"><div class="gd-info-lbl">מהירות מקס\'</div><div class="gd-info-val">≤' + (cfg.maxSpeed||30) + ' קמ"ש</div></div>' +
+        '<div class="gd-info-cell"><div class="gd-info-lbl">מהירות מקס\'</div><div class="gd-info-val">≤' + esc(cfg.maxSpeed||30) + ' קמ"ש</div></div>' +
       '</div>' +
       '<div class="gd-info-sep-h"></div>' +
       '<div class="gd-info-grid">' +
-        '<div class="gd-info-cell"><div class="gd-info-lbl">שעות פעילות</div><div class="gd-info-val" style="direction:ltr;text-align:right">' + hoursStr + '</div></div>' +
+        '<div class="gd-info-cell"><div class="gd-info-lbl">שעות פעילות</div><div class="gd-info-val" style="direction:ltr;text-align:right">' + esc(hoursStr) + '</div></div>' +
         '<div class="gd-info-sep-v"></div>' +
-        '<div class="gd-info-cell"><div class="gd-info-lbl">ימי פעילות</div><div class="gd-info-val">' + daysStr + '</div></div>' +
+        '<div class="gd-info-cell"><div class="gd-info-lbl">ימי פעילות</div><div class="gd-info-val">' + esc(daysStr) + '</div></div>' +
       '</div>' +
       stateHtml +
       ctaHtml +

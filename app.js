@@ -983,7 +983,7 @@ function deleteNotifById(id) {
 function _applyBadgeCount(n) {
   var label = n > 99 ? '99+' : String(n);
   var show = n > 0;
-  ['alert-badge', 'alerts-badge-bottom'].forEach(function(id) {
+  ['alert-badge', 'alert-badge-tb', 'alerts-badge-bottom'].forEach(function(id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.textContent = label;
@@ -1090,6 +1090,9 @@ function _showVehicleInactiveOverlay() {
 }
 
 function _sessionExpired() {
+  // L18: clear background polling timers so they don't keep firing after logout
+  try { if (_apptPollTimer) { clearInterval(_apptPollTimer); _apptPollTimer = null; } } catch(_t1) {}
+  try { if (typeof APP !== 'undefined' && APP._garagePollTimer) { clearInterval(APP._garagePollTimer); APP._garagePollTimer = null; } } catch(_t2) {}
   // Firebase signOut — מנתק listener + מנקה session
   try { if (_fbAuth) _fbAuth.signOut(); } catch(_e) {}
   STATE.firebaseUid = null;
@@ -1143,7 +1146,10 @@ function _sessionExpired() {
 async function gasPost(action, extra, opts) {
   extra = extra || {};
   opts  = opts  || {};
-  if (!GAS_URL) return mockResponse(action, extra);
+  if (!GAS_URL) {
+    console.warn('[gasPost] GAS_URL not configured — using mock response for:', action);
+    return mockResponse(action, extra);
+  }
 
   // גישה A: אם יש bio credential — נשתמש בו כ-fallback ולא נחסום על idToken שפג
   var _bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
@@ -1618,9 +1624,9 @@ function renderPickerScreen(vehicles) {
           '<div class="pk-active-badge" id="pk-badge-' + i + '">● פעיל</div>' +
         '</div>' +
         '<div class="pk-info">' +
-          '<div class="pk-name-row">' + logoHtml + '<span class="pk-car-name">' + (v.make||'') + ' ' + (v.model||'') + '</span></div>' +
-          '<div class="pk-car-meta">' + (v.year||'') + ' · ' + (v.dept||'') + '</div>' +
-          '<div class="pk-holder-row">👤 מחזיק: ' + (v.holder||'—') + '</div>' +
+          '<div class="pk-name-row">' + logoHtml + '<span class="pk-car-name">' + _escHtml(v.make||'') + ' ' + _escHtml(v.model||'') + '</span></div>' +
+          '<div class="pk-car-meta">' + _escHtml(v.year||'') + ' · ' + _escHtml(v.dept||'') + '</div>' +
+          '<div class="pk-holder-row">👤 מחזיק: ' + _escHtml(v.holder||'—') + '</div>' +
           loginRow +
           '<div class="pk-badges-row"><span class="pk-plate">' + formatPlate(v.num||'') + '</span>' + alertHtml + '</div>' +
         '</div>' +
@@ -1864,7 +1870,7 @@ function _dashSwitch(idx, animate) {
 function _dashInitSwipe(vp, track) {
   var startX = 0, startY = 0, curX = 0, dragging = false, moved = false, lockAxis = null;
   var THRESHOLD = 0.22;
-  var COUNT = 2;
+  var COUNT = document.querySelectorAll('.dash-slide').length || 2;
 
   function onStart(x, y) { startX = x; startY = y; dragging = true; moved = false; lockAxis = null; curX = 0; }
   function onMove(x, y) {
@@ -1919,11 +1925,11 @@ function _heroCarouselInit() {
     slide.innerHTML =
       '<div class="car-rays"></div>' +
       '<div class="car-wrap">' +
-        (imgUrl ? '<img class="car-img" src="'+imgUrl+'" alt="'+make+' '+model+'">' :
+        (imgUrl ? '<img class="car-img" src="'+_escHtml(imgUrl)+'" alt="'+_escHtml(make)+' '+_escHtml(model)+'">' :
           '<div class="car-placeholder"><svg width="90" height="60" viewBox="0 0 90 60" fill="none"><rect x="5" y="20" width="80" height="30" rx="10" fill="rgba(255,255,255,0.08)"/><rect x="15" y="10" width="60" height="25" rx="8" fill="rgba(255,255,255,0.06)"/><circle cx="20" cy="52" r="7" fill="rgba(255,255,255,0.15)"/><circle cx="70" cy="52" r="7" fill="rgba(255,255,255,0.15)"/></svg></div>') +
         '<div class="car-glow"></div>' +
       '</div>' +
-      '<div class="hero-plate-wrap"><span class="hero-plate">'+plate+'</span></div>';
+      '<div class="hero-plate-wrap"><span class="hero-plate">'+_escHtml(plate)+'</span></div>';
     track.appendChild(slide);
   });
 
@@ -2017,6 +2023,7 @@ function switchVehicle(idx) {
   STATE._washLogLoaded = false;
   STATE.washLog        = [];
   _heroCarouselSetIdx(idx);
+  // L21: carousel index may be out of sync if switchVehicle resolves out of order — track with H14's request token
   saveSession(STATE.idToken, STATE.vehicle, STATE.user);
   if (typeof _pinSessionSave === 'function') _pinSessionSave(STATE.user.email, STATE.vehicle, STATE.user, STATE.idToken);
   loadFullData().then(function() {
@@ -2481,6 +2488,7 @@ function _pinLoad() {
 }
 
 function _pinSave(data) {
+  // L7: email stored in cleartext — consider hashing or using a non-identifying key
   try { localStorage.setItem(PIN_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
@@ -3006,6 +3014,10 @@ async function handleGoogleCredential(response) {
       STATE._vehicles   = vlist;
       STATE._vehicleIdx = 0;
       STATE.vehicle      = vlist[0] || result.vehicle;
+      if (!STATE.vehicle) {
+        document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;direction:rtl"><h2>אין רכב משויך לחשבון זה</h2><p>פנה למנהל המערכת</p></div>';
+        return;
+      }
       STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.isActualHolder = (STATE.vehicle && STATE.vehicle.isActualHolder) || result.isActualHolder || false;
       saveSession(STATE.idToken, STATE.vehicle, STATE.user);
@@ -3081,6 +3093,9 @@ async function fetchGovData() {
   if (!v || !v.num) return;
   const plate = String(v.num).replace(/\D/g, '');
   if (!plate) return;
+  // M25: guard against stale responses when the vehicle is switched mid-flight
+  var _govReqId = (STATE._govReqId = (STATE._govReqId || 0) + 1);
+  var _thisGovReq = _govReqId;
   STATE.govLoading = true;
   STATE.govData  = undefined;
   STATE.govWLTP  = undefined;
@@ -3089,6 +3104,7 @@ async function fetchGovData() {
     const f1  = encodeURIComponent(JSON.stringify({ mispar_rechev: plate }));
     const r1  = await fetch('https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&filters=' + f1);
     const j1  = await r1.json();
+    if (STATE._govReqId !== _thisGovReq) return; // stale response
     const reg = (j1.result && j1.result.records && j1.result.records[0]) || null;
     STATE.govData = reg;
 
@@ -3100,6 +3116,7 @@ async function fetchGovData() {
       }));
       const r2 = await fetch('https://data.gov.il/api/3/action/datastore_search?resource_id=142afde2-6228-49f9-8a29-9b6c3a0cbe40&filters=' + f2 + '&limit=5');
       const j2 = await r2.json();
+      if (STATE._govReqId !== _thisGovReq) return; // stale response
       const wRecs = (j2.result && j2.result.records) || [];
       // העדף רשומה שתואמת ramat_gimur, אחרת ראשונה
       const gimur = reg.ramat_gimur;
@@ -4044,9 +4061,10 @@ function renderAll() {
 
 function renderTopBar() {
   if (!STATE.user) return;
-  const holderName = (STATE.vehicle && STATE.vehicle.holder) || STATE.user.name;
-  const firstName = holderName.split(' ')[0];
-  document.getElementById('user-name').textContent = firstName;
+  const holderName = (STATE.vehicle && STATE.vehicle.holder) || STATE.user.name || '';
+  const firstName = String(holderName).split(' ')[0];
+  const userNameEl = document.getElementById('user-name');
+  if (userNameEl) userNameEl.textContent = firstName;
   const initialsEl = document.getElementById('user-initials');
   if (initialsEl) {
     initialsEl.textContent = getInitials(holderName);
@@ -4077,7 +4095,8 @@ function renderHomeScreen() {
     photo.src = imgUrl;
     photo.onerror = () => { photo.style.display = 'none'; };
   } else {
-    document.querySelector('.hero-img-area').style.display = 'none';
+    var _heroImgArea = document.querySelector('.hero-img-area');
+    if (_heroImgArea) _heroImgArea.style.display = 'none';
   }
 
   renderServiceProgress();
@@ -4815,14 +4834,7 @@ function _notifTimeLabel(ts) {
   return dd === 1 ? 'אתמול' : dd + ' ימים';
 }
 
-var NOTIF_ICON_BY_TYPE = {
-  overdue: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>',
-  urgent:  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
-  plan:    '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-  km_update:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-  test_due:'<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>',
-  test_urgent:'<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
-};
+/* L19: removed dead NOTIF_ICON_BY_TYPE map (no callers) */
 
 /* ── Notification redesign helpers (nrd) ── */
 var _NRD_ICONS = {
@@ -5589,10 +5601,10 @@ function renderHistory() {
       '<div class="tl-card" style="animation-delay:' + (i * 0.07) + 's">' +
         '<div class="tc-date">' + (isFirst ? '<div class="tc-red-dot"></div>' : '') + formatDate(h.date) + '</div>' +
         '<div class="tc-divider"></div>' +
-        (h.garage ? '<div class="tc-row"><div class="tc-lbl">מוסך:</div><div>' + h.garage + '</div></div>' : '') +
-        (h.city   ? '<div class="tc-row"><div class="tc-lbl">עיר:</div><div>' + h.city + '</div></div>' : '') +
+        (h.garage ? '<div class="tc-row"><div class="tc-lbl">מוסך:</div><div>' + _escHtml(h.garage) + '</div></div>' : '') +
+        (h.city   ? '<div class="tc-row"><div class="tc-lbl">עיר:</div><div>' + _escHtml(h.city) + '</div></div>' : '') +
         (h.km     ? '<div class="tc-row"><div class="tc-lbl">ק"מ:</div><div>' + Number(h.km).toLocaleString('he') + '</div></div>' : '') +
-        (h.type   ? '<div class="tc-tag">' + h.type + '</div>' : '') +
+        (h.type   ? '<div class="tc-tag">' + _escHtml(h.type) + '</div>' : '') +
       '</div>' +
     '</div>';
   }).join('');
@@ -6335,7 +6347,8 @@ async function _loadInsuranceDetails() {
       var compFileLink = comp.fileLink || (STATE.vehicle && STATE.vehicle.insCompLink) || '';
       var compCtaHtml = '';
       if (compFileLink) {
-        compCtaHtml += '<a class="ins-cta-btn ghost" href="' + compFileLink + '" target="_blank" rel="noopener">' +
+        var _safeLink = (compFileLink && (compFileLink.startsWith('https://') || compFileLink.startsWith('http://'))) ? compFileLink.replace(/"/g, '%22') : '#';
+        compCtaHtml += '<a class="ins-cta-btn ghost" href="' + _safeLink + '" target="_blank" rel="noopener">' +
             '<span class="ins-cta-icon">' +
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
             '</span>' +
@@ -8288,8 +8301,8 @@ APP._garageShowApproved = function(garageInfo, eventId, reasonLabel, requestNumb
   var contactRows = '';
   if (contact || phone) {
     contactRows += '<div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px">' +
-      (contact ? '<div style="color:#94a3b8">איש קשר: <b style="color:#f1f5f9">' + contact + '</b></div>' : '') +
-      (phone ? '<div style="color:#94a3b8;margin-top:2px" dir="ltr">' + phone + '</div>' : '') +
+      (contact ? '<div style="color:#94a3b8">איש קשר: <b style="color:#f1f5f9">' + _escHtml(contact) + '</b></div>' : '') +
+      (phone ? '<div style="color:#94a3b8;margin-top:2px" dir="ltr">' + _escHtml(phone) + '</div>' : '') +
       '<div style="display:flex;gap:8px;margin-top:8px">' +
       (phone ? '<button class="help-action-btn secondary" style="flex:1;padding:9px 6px;font-size:12px" onclick="window.open(\'tel:' + phone.replace(/[^0-9+]/g,'') + '\')">📞 חייג</button>' : '') +
       (wa ? '<button class="help-action-btn secondary" style="flex:1;padding:9px 6px;font-size:12px" onclick="window.open(\'https://wa.me/' + phoneToWa(wa) + '\')">💬 וואטסאפ</button>' : '') +
@@ -8301,12 +8314,12 @@ APP._garageShowApproved = function(garageInfo, eventId, reasonLabel, requestNumb
     '<div style="text-align:center;margin-bottom:12px">' +
       '<div style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:50px;padding:6px 16px;font-size:12px;font-weight:700;color:#fff">✅ מאושר על ידי מנהל</div>' +
     '</div>' +
-    '<div class="help-card-title" style="margin-bottom:4px">🏭 ' + (name || 'המוסך') + '</div>' +
-    (addr ? '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">📍 ' + addr + '</div>' : '') +
+    '<div class="help-card-title" style="margin-bottom:4px">🏭 ' + _escHtml(name || 'המוסך') + '</div>' +
+    (addr ? '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">📍 ' + _escHtml(addr) + '</div>' : '') +
     metaRows +
     '<hr class="help-card-divider">' +
     contactRows +
-    (bookingUrl ? '<a class="help-action-btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px" href="' + bookingUrl + '" target="_blank" rel="noopener">📅 קבע תור אונליין</a>' : '') +
+    (bookingUrl ? '<a class="help-action-btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px" href="' + ((bookingUrl.startsWith('https://') || bookingUrl.startsWith('http://')) ? bookingUrl.replace(/"/g, '%22') : '#') + '" target="_blank" rel="noopener">📅 קבע תור אונליין</a>' : '') +
     '<hr class="help-card-divider">' +
     '<div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:8px">האם קבעת תור במוסך?</div>' +
     '<div style="display:flex;gap:8px">' +
@@ -8797,6 +8810,7 @@ function closeDocViewer() {
 
 function showToast(msg) {
   const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
@@ -8805,6 +8819,7 @@ function showToast(msg) {
 
 function showLoginError(msg) {
   const el = document.getElementById('login-err');
+  if (!el) return;
   el.textContent = msg;
   el.classList.remove('hidden');
 }
@@ -8895,87 +8910,7 @@ function showNotifLanding(payload, onDone) {
   }, 4000);
 }
 
-function _buildToastChips(alertType, meta) {
-  var chips = [];
-  var c = function(label, val, unit) {
-    if (val === '' || val == null) return;
-    chips.push('<div class="nt-chip"><span class="nt-chip-label">' + _escHtml(label) + '</span><span class="nt-chip-val">' + _escHtml(String(val)) + (unit ? ' ' + unit : '') + '</span></div>');
-  };
-  switch (alertType) {
-    case 'overdue': case 'urgent':
-      c('נותר', meta.kmLeft, 'ק"מ'); c('מד נוכחי', meta.estKm); c('הבא לטיפול', meta.nextKm); break;
-    case 'plan':
-      c('נותר', meta.kmLeft, 'ק"מ'); c('הבא ב', meta.nextKm); break;
-    case 'km_update':
-      c('לפני', meta.daysSinceUpdate, 'ימים'); c('מד אחרון', meta.lastKm); break;
-    case 'test_due': case 'test_urgent':
-      c('תאריך טסט', meta.testDate); c('נותרו', meta.daysLeft, 'ימים'); break;
-    case 'garage_approved':
-      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
-      if (meta.garageInfo) c('מוסך', meta.garageInfo); break;
-    case 'garage_rejected':
-      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
-      if (meta.reasonLabel) c('סיבה', meta.reasonLabel); break;
-    case 'garage_appointment_set':
-      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
-      c('תאריך', meta.appointmentDate); c('שעה', meta.appointmentTime); if (meta.garageInfo) c('מוסך', meta.garageInfo); break;
-    case 'garage_appointment_cancelled':
-      if (meta.requestNumber) c('מספר תקלה', '#' + meta.requestNumber);
-      c('תאריך שבוטל', meta.appointmentDate); if (meta.appointmentTime) c('שעה', meta.appointmentTime); break;
-    case 'fuel_high':
-      if (meta.fuelConsumption != null) c('צריכה', meta.fuelConsumption, 'ל׳/100ק"מ');
-      if (meta.threshold != null) c('סף', meta.threshold, 'ל׳');
-      if (meta.fleetAverage != null) c('ממוצע', meta.fleetAverage, 'ל׳'); break;
-    case 'fuel_km_high':
-      if (meta.costPerKm != null) c('עלות לק"מ', '₪' + meta.costPerKm);
-      if (meta.fleetAverage != null) c('ממוצע ציי', '₪' + meta.fleetAverage); break;
-  }
-  return chips.length ? '<div class="nt-chips">' + chips.join('') + '</div>' : '';
-}
-
-function _buildToastActions(alertType, meta) {
-  var primary = null, secondary = null;
-  switch (alertType) {
-    case 'overdue': case 'urgent':
-      primary = { label: 'בקש מוסך', fn: function() { navigateForAlertType(alertType, meta); } }; break;
-    case 'plan':
-      primary = { label: 'צפה בפרטים', fn: function() { navigateForAlertType(alertType, meta); } }; break;
-    case 'km_update':
-      primary = { label: 'עדכן עכשיו', fn: function() { navigateForAlertType(alertType, meta); } }; break;
-    case 'test_due':
-      primary = { label: 'הגדר תזכורת', fn: function() { navigateForAlertType(alertType, meta); } }; break;
-    case 'test_urgent':
-      primary = { label: 'בצע טסט', fn: function() { navigateForAlertType(alertType, meta); } }; break;
-    case 'garage_approved':
-      primary = { label: 'קבע מועד', fn: function() { navigateForAlertType('garage_approved', meta); } };
-      secondary = { label: 'מאוחר יותר' }; break;
-    case 'garage_rejected':
-      primary = { label: 'שלח בקשה חדשה', fn: function() { navigateForAlertType('garage_rejected', meta); } }; break;
-    case 'garage_appointment_set':
-      primary = { label: 'הוסף ליומן', fn: function() {
-        var d = meta.appointmentDate || ''; var t = meta.appointmentTime || '00:00';
-        if (d) {
-          var parts = d.split('/');
-          if (parts.length === 3) {
-            var iso = parts[2] + '-' + parts[1] + '-' + parts[0] + 'T' + t + ':00';
-            var start = new Date(iso); var end = new Date(start.getTime() + 90 * 60000);
-            if (!isNaN(start.getTime())) {
-              var fmt = function(dt) { return dt.toISOString().replace(/[-:]/g,'').replace('.000',''); };
-              window.open('https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent('תור מוסך') + '&dates=' + fmt(start) + '/' + fmt(end), '_blank');
-            }
-          }
-        }
-      }};
-      secondary = { label: 'בסדר' }; break;
-    case 'garage_appointment_cancelled':
-      primary = { label: 'קבע מועד חדש', fn: function() { navigateForAlertType('garage_appointment_cancelled', meta); } };
-      secondary = { label: 'לא כרגע' }; break;
-    case 'fuel_high': case 'fuel_km_high':
-      primary = { label: 'דוח צריכה', fn: function() { navigateForAlertType(alertType, meta); } }; break;
-  }
-  if (!primary) primary = { label: 'פרטים', fn: function() { navigateForAlertType(alertType, meta); } };
-  return { primary: primary, secondary: secondary };
-}
+/* L19: removed dead functions _buildToastChips + _buildToastActions (no callers) */
 
 /* Auto-dismiss durations by redesign category (ms). */
 var _NRD_TOAST_DURATION = { danger: 8000, approved: 8000, reminder: 6000, warning: 6000, info: 4000 };
@@ -9387,9 +9322,16 @@ function showUpdateBanner() {
   requestAnimationFrame(function() {
     requestAnimationFrame(function() { if (bar) bar.style.width = '100%'; });
   });
-  setTimeout(function() {
-    try { window.location.reload(); } catch (e) {}
-  }, 2700);
+  // M24: reload when the new SW actually takes control (not a fixed timer that
+  // may fire before/after activation). Guard so we reload exactly once.
+  if ('serviceWorker' in navigator && !window.__reloadOnControllerChange) {
+    window.__reloadOnControllerChange = true;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (window.__didControllerReload) return;
+      window.__didControllerReload = true;
+      try { window.location.reload(); } catch (e) {}
+    });
+  }
 }
 function showUpToDate() {
   var banner = document.getElementById('splash-update-banner');
@@ -9475,6 +9417,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         } catch(_) {}
         if (!_handed) {
           try { localStorage.setItem('aleh_oauth_token', _it); } catch(_) {}
+          // M6: raw OIDC token in localStorage is a bridge only — auto-cleanup safety net
+          setTimeout(function(){ try { localStorage.removeItem('aleh_oauth_token'); } catch(_) {} }, 5000);
         }
         try { window.close(); } catch(_) {}
         // If the token was NOT handed off and the browser refused to close —
