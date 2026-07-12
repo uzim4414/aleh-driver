@@ -5023,20 +5023,20 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
     <div class="content">
       <div class="hero-card">
         <div class="topbar-overlay">
-          <!-- RTL: avatar ימין -->
+          <!-- RTL: bell ימין (first flex child = right) -->
+          <div class="tb-bell-btn" onclick="APP.nav('alerts')" aria-label="התראות">
+            <div class="bell-wrap">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <div class="tb-badge hidden" id="alert-badge">0</div>
+          </div>
+          <!-- RTL: avatar שמאל (last flex child = left) -->
           <div class="tb-avatar-btn" id="user-avatar" onclick="logout()" style="cursor:pointer" title="התנתק" aria-label="פרופיל">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="8" r="4"/>
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
             <div class="tb-online-dot"></div>
-          </div>
-          <!-- RTL: bell שמאל -->
-          <div class="tb-bell-btn" onclick="APP.nav('alerts')" aria-label="התראות">
-            <div class="bell-wrap">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            </div>
-            <div class="tb-badge hidden" id="alert-badge">0</div>
           </div>
         </div>
         <div class="hero-titlebar">

@@ -1870,7 +1870,11 @@ function _dashSwitch(idx, animate) {
 function _dashInitSwipe(vp, track) {
   var startX = 0, startY = 0, curX = 0, dragging = false, moved = false, lockAxis = null;
   var THRESHOLD = 0.22;
-  var COUNT = document.querySelectorAll('.dash-slide').length || 2;
+  // Re-query at gesture time (not once at init): if _dashInitSwipe ran before the
+  // fuel slide was in the DOM, a cached count of 1 would permanently block the
+  // swipe to slide 2 (the fuel-performance slide never shows). Always read the
+  // live count so slide 2 is reachable as soon as it exists.
+  function _slideCount() { return document.querySelectorAll('.dash-slide').length || 2; }
 
   function onStart(x, y) { startX = x; startY = y; dragging = true; moved = false; lockAxis = null; curX = 0; }
   function onMove(x, y) {
@@ -1891,6 +1895,7 @@ function _dashInitSwipe(vp, track) {
     if (isTap || !moved) { _dashSwitch(_dashIdx); return; }
     var pct = curX / (vp.offsetWidth || 375);
     var next = _dashIdx;
+    var COUNT = _slideCount();
     // RTL: finger moves RIGHT (pct > 0) → advance to next slide (fuel); finger LEFT → back to slide 0
     if (pct > THRESHOLD && next < COUNT - 1) next++;
     else if (pct < -THRESHOLD && next > 0) next--;
@@ -3015,8 +3020,13 @@ async function handleGoogleCredential(response) {
       STATE._vehicleIdx = 0;
       STATE.vehicle      = vlist[0] || result.vehicle;
       if (!STATE.vehicle) {
-        document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;direction:rtl"><h2>אין רכב משויך לחשבון זה</h2><p>פנה למנהל המערכת</p></div>';
-        return;
+        // No vehicle on this account — route through the recoverable login-error UI
+        // instead of wiping document.body (a body wipe bricks the screen and blocks
+        // any retry — the "fake screen" regression). The catch below calls
+        // showLoginError() and resets STATE so the user can try again.
+        var _noVehErr = new Error('אין רכב משויך לחשבון זה. פנה למנהל המערכת.');
+        _noVehErr.error = 'no_vehicle';
+        throw _noVehErr;
       }
       STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.isActualHolder = (STATE.vehicle && STATE.vehicle.isActualHolder) || result.isActualHolder || false;
@@ -9326,11 +9336,18 @@ function showUpdateBanner() {
   // may fire before/after activation). Guard so we reload exactly once.
   if ('serviceWorker' in navigator && !window.__reloadOnControllerChange) {
     window.__reloadOnControllerChange = true;
-    navigator.serviceWorker.addEventListener('controllerchange', function() {
+    var _doSwReload = function() {
       if (window.__didControllerReload) return;
       window.__didControllerReload = true;
       try { window.location.reload(); } catch (e) {}
-    });
+    };
+    // Reload as soon as the new SW takes control…
+    navigator.serviceWorker.addEventListener('controllerchange', _doSwReload);
+    // …but never hang: if controllerchange never fires (already-controlling SW,
+    // no waiting worker, or the event fired before this listener attached) the
+    // progress bar would sit forever until a manual refresh. Fall back to a
+    // timed reload so the update always completes on its own.
+    setTimeout(_doSwReload, 8000);
   }
 }
 function showUpToDate() {
