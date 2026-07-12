@@ -320,6 +320,8 @@ var _gateRef = null; // module-level — מאפשר ניתוק listener ישן �
 var _gateCooldownMap = {}; // per-gate cooldown: { [lotId]: timestamp }
 var _gateLastSpeedKmh    = null;  // last known speed in km/h (for drawer strip)
 var _gateLastAccM        = null;  // last known GPS accuracy in metres (for drawer strip)
+var _gateLastLat         = null;  // last known latitude  (to wire drawer CTA before next GPS tick)
+var _gateLastLng         = null;  // last known longitude (to wire drawer CTA before next GPS tick)
 var _gateScheduleOutside = false; // true while current time is outside schedule window
 var _gateScheduleTimer   = null;  // interval that watches schedule window edges
 var _gateNativeStarting  = false; // guard against concurrent _gateStartWatchNative calls
@@ -11090,6 +11092,8 @@ function _gateOnPosition(pos) {
   var lat = pos.coords.latitude;
   var lng = pos.coords.longitude;
   var speedMs = pos.coords.speed || 0;
+  _gateLastLat = lat;
+  _gateLastLng = lng;
   _gateLastSpeedKmh = Math.round(speedMs * 3.6);
   _gateLastAccM     = pos.coords.accuracy != null ? pos.coords.accuracy : null;
   var inRange = null; // nearest gate in range
@@ -11178,14 +11182,31 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
       _gateCooldownUntil = _gateCooldownMap[lotId]; // backward compat
       _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM);
     } else {
-      _gateSetState('error');
-      setTimeout(function(){ _gateSetState('idle'); }, 5000);
+      // BUG-FIX: surface the real server reason to the user (drawer may be open,
+      // hiding the main gate card — so show a visible toast everywhere).
+      _gateShowOpenError(r && (r.reason || r.error));
     }
   }).catch(function() {
     _gateOpening = false;
-    _gateSetState('error');
-    setTimeout(function(){ _gateSetState('idle'); }, 5000);
+    _gateShowOpenError('api_error');
   });
+}
+
+// Maps a server open_gate failure reason to a Hebrew message and shows it
+// via toast (visible even when the gate drawer covers the main card).
+function _gateShowOpenError(reason) {
+  var map = {
+    auth_required:    'נדרשת כניסה מחדש',
+    not_permitted:    'אין הרשאה לשער זה',
+    lot_mismatch:     'השער אינו משויך לרכב',
+    vehicle_inactive: 'הרכב אינו פעיל במערכת',
+    cooldown:         'נא להמתין לפני פתיחה חוזרת',
+    api_error:        'שגיאת תקשורת עם השער'
+  };
+  var msg = map[reason] || 'שגיאה בפתיחת השער';
+  if (typeof showToast === 'function') showToast(msg);
+  _gateSetState('error');
+  setTimeout(function(){ _gateSetState('idle'); }, 5000);
 }
 
 function _gateSetState(state) {

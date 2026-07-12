@@ -6396,6 +6396,14 @@ window.fcmDebug = async function() {
     _gdInitDrums();
     _gdSyncMode();
     _gdRenderGates();
+    // BUG-FIX: wire each gate CTA immediately using the last known GPS fix,
+    // instead of waiting for the next watchPosition tick (which may not arrive).
+    var _lat = (typeof _gateLastLat !== 'undefined') ? _gateLastLat : null;
+    var _lng = (typeof _gateLastLng !== 'undefined') ? _gateLastLng : null;
+    if (_lat != null && _lng != null && typeof _gateDrawerUpdateDistances === 'function') {
+      var _cfgs = (typeof APP !== 'undefined' && APP._gateConfigs) || (APP && APP._gateConfig ? [APP._gateConfig] : []);
+      _gateDrawerUpdateDistances(_cfgs, _lat, _lng);
+    }
     // Start live update interval
     if (!window._gdLiveInterval) {
       window._gdLiveInterval = setInterval(_gdLiveUpdate, 2000);
