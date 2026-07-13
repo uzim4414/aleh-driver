@@ -318,6 +318,8 @@ function _fbDeleteReminder(id) {
 
 var _gateRef = null; // module-level — מאפשר ניתוק listener ישן לפני חיבור חדש
 var _gateCooldownMap = {}; // per-gate cooldown: { [lotId]: timestamp }
+var _gateLatchMap    = {}; // per-gate direction latch: { [lotId]: true } — set on open, cleared when vehicle exits 300m
+var _gateLastHeading = null;  // last known GPS heading (deg, 0=N) — null when stationary/unknown
 var _gateLastSpeedKmh    = null;  // last known speed in km/h (for drawer strip)
 var _gateLastAccM        = null;  // last known GPS accuracy in metres (for drawer strip)
 var _gateLastLat         = null;  // last known latitude  (to wire drawer CTA before next GPS tick)
@@ -11193,6 +11195,15 @@ function _gateStartWatch() {
   );
 }
 
+// Forward azimuth (bearing) from point 1 → point 2, normalized 0–360°.
+function _bearingTo(lat1, lng1, lat2, lng2) {
+  var r = Math.PI/180;
+  var dLng = (lng2-lng1)*r;
+  var y = Math.sin(dLng)*Math.cos(lat2*r);
+  var x = Math.cos(lat1*r)*Math.sin(lat2*r) - Math.sin(lat1*r)*Math.cos(lat2*r)*Math.cos(dLng);
+  return (Math.atan2(y,x)*180/Math.PI + 360) % 360;
+}
+
 function _gateOnPosition(pos) {
   var configs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
   if (configs.length === 0) return;
@@ -11217,6 +11228,7 @@ function _gateOnPosition(pos) {
   var speedMs = pos.coords.speed || 0;
   _gateLastLat = lat;
   _gateLastLng = lng;
+  _gateLastHeading = pos.coords.heading;
   _gateLastSpeedKmh = Math.round(speedMs * 3.6);
   // Launch guard: mark "moving" once a real speed fix arrives. Guards auto-open
   // below so the gate never fires on the first stationary GPS fix at launch.
@@ -11229,6 +11241,8 @@ function _gateOnPosition(pos) {
     if (!cfg.lat || !cfg.lng) continue;
     var distKm = _thHaversine(lat, lng, parseFloat(cfg.lat), parseFloat(cfg.lng));
     var distM = distKm * 1000;
+    // Latch release: once the vehicle leaves the 300m hysteresis zone, re-open is allowed again
+    if (_gateLatchMap[cfg.lotId] && distM > 300) { delete _gateLatchMap[cfg.lotId]; }
     var radius = parseFloat(cfg.radius) || 200;
     if (distM < radius && distM < nearestDist) {
       nearestDist = distM;
@@ -11250,6 +11264,16 @@ function _gateOnPosition(pos) {
       var _abadge = document.getElementById('gate-dist-badge');
       if (_abadge) _abadge.textContent = Math.round(nearestDist) + ' מ\'';
       return;
+    }
+    // Direction latch: after an open, block re-open until the vehicle exits 300m
+    if (_gateLatchMap[inRange.lotId]) { _gateSetState('approaching'); return; }
+    // Direction check: only open when APPROACHING the gate. heading is null when the
+    // vehicle is stationary / heading unknown — in that case we cannot decide, so allow.
+    var _hd = pos.coords.heading;
+    if (_hd != null && !isNaN(_hd)) {
+      var _brg = _bearingTo(lat, lng, parseFloat(inRange.lat), parseFloat(inRange.lng));
+      var _diff = Math.abs(_hd - _brg); if (_diff > 180) _diff = 360 - _diff;
+      if (_diff >= 90) { _gateSetState('approaching'); return; } // leaving / perpendicular → BLOCK
     }
     if (!_gateCheckConditions(speedMs, inRange)) return;
     _gateSetState('opening');
@@ -11316,6 +11340,7 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
       if (!_gateCooldownMap) _gateCooldownMap = {};
       _gateCooldownMap[lotId] = Date.now() + cooldownSec * 1000;
       _gateCooldownUntil = _gateCooldownMap[lotId]; // backward compat
+      _gateLatchMap[lotId] = true; // direction latch — block re-open until vehicle exits 300m
       _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM, r.parkingSpot || '');
     } else {
       // BUG-FIX: surface the real server reason to the user (drawer may be open,
