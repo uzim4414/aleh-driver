@@ -145,7 +145,8 @@ const NOTIF_VISUAL = {
   test_due:                     { cat: 'reminder', action: '׳₪׳¨׳˜׳™ ׳˜׳¡׳˜'       },
   test_urgent:                  { cat: 'danger',   action: '׳×׳׳ ׳˜׳¡׳˜ ׳“׳—׳•׳£'   },
   fuel_high:                    { cat: 'warning',  action: '׳¦׳₪׳” ׳‘׳“׳•׳—'       },
-  fuel_km_high:                 { cat: 'warning',  action: '׳¦׳₪׳” ׳‘׳“׳•׳—'       }
+  fuel_km_high:                 { cat: 'warning',  action: '׳¦׳₪׳” ׳‘׳“׳•׳—'       },
+  gate_opened:                  { cat: 'approved', action: 'פרטים'           }
 };
 function notifVisual(alertType) {
   const v = NOTIF_VISUAL[alertType] || { cat: 'info', action: '׳₪׳×׳— ׳¢׳›׳©׳™׳•' };
@@ -243,6 +244,12 @@ function _buildOsNotifContent(type, m, fallback) {
       return {
         title: '׳¢׳׳•׳× ׳“׳׳§ ׳—׳¨׳™׳’׳”' + dash,
         body:  (m.costPerKm || '?') + ' ג‚×/׳§"׳ ג€” ׳׳׳•׳¦׳¢ ׳¦׳™׳™: ' + (m.fleetAverage || '?') + ' ג‚×/׳§"׳.'
+      };
+    },
+    gate_opened: function() {
+      return {
+        title: 'השער נפתח!',
+        body:  (m.lotName || 'חניון') + ' · נפתח אוטומטית עבורך'
       };
     }
   };
