@@ -15,6 +15,29 @@ const SESSION_TTL = 24 * 60 * 60 * 1000;
 var BIO_SESSION_KEY = 'aleh_bio_active_v1';
 var BIO_SESSION_TTL = 30 * 60 * 1000; // 30 minutes
 
+/* ── Push boot beacon — fires on every script load, before login/UI.
+   Proves which code version is actually running on the device and that
+   fetch→GAS works, independent of loadFullData/registerPush.
+   Second beacon after 3s re-checks Capacitor (bridge may inject late). ── */
+function _pushBootBeacon(tag) {
+  try {
+    var capNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'debug_push_log', vehicleId: 'boot', step: tag,
+        status: capNative ? 'native' : 'web',
+        detail: 'appv81 cap=' + (!!window.Capacitor) + ' native=' + capNative +
+                ' sw=' + ('serviceWorker' in navigator) + ' pm=' + ('PushManager' in window) +
+                ' ua=' + String(navigator.userAgent || '').substring(0, 90)
+      })
+    }).catch(function(){});
+  } catch(_bbE) {}
+}
+_pushBootBeacon('boot');
+setTimeout(function(){ _pushBootBeacon('boot_3s'); }, 3000);
+
 /* ══ Firebase Config + Init ══
    databaseURL נוסף ידנית — מופיע ב: Firebase Console → Realtime Database → URL בראש העמוד
    שאר הערכים מה-Console → Project Settings → aleh-driver-pwa
@@ -3176,7 +3199,13 @@ async function loadFullData() {
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
   var _isCapNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  if ((_isCapNative || 'serviceWorker' in navigator) && GAS_URL) registerPush();
+  if ((_isCapNative || 'serviceWorker' in navigator) && GAS_URL) {
+    registerPush().catch(function(_rpE){
+      _logPushStep('init_error', 'error', (_rpE && _rpE.message) || String(_rpE));
+    });
+  } else {
+    _logPushStep('init_skip', 'skipped', 'capNative=' + _isCapNative + ' sw=' + ('serviceWorker' in navigator) + ' gas=' + !!GAS_URL);
+  }
   loadNotifHistoryFromGAS();
   // Re-evaluate gate card now that STATE.vehicle is populated. On a plain refresh the
   // gate listener already fired while STATE.vehicle was null (bailed at the guard), and
@@ -8649,7 +8678,16 @@ APP._garageAppointmentNo = function() {
 
 
 /* ══ Web Push (direct PushManager.subscribe — no Firebase SDK) ══ */
+/* On-screen push debug badge — visibility without DevTools (APK has
+   webContentsDebuggingEnabled:false). Updated from every _logPushStep. */
+function _setPushDbg(msg) {
+  try {
+    var el = document.getElementById('push-dbg');
+    if (el) { el.textContent = 'push: ' + msg; el.style.display = 'block'; }
+  } catch(_) {}
+}
 async function _logPushStep(step, status, detail) {
+  _setPushDbg(step + '=' + status + (detail ? ' ' + String(detail).substring(0, 40) : ''));
   try {
     var vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : 'unknown';
     await fetch(GAS_URL, {
