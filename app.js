@@ -3175,7 +3175,8 @@ async function loadFullData() {
   }
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
-  if ('serviceWorker' in navigator && GAS_URL) registerPush();
+  var _isCapNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if ((_isCapNative || 'serviceWorker' in navigator) && GAS_URL) registerPush();
   loadNotifHistoryFromGAS();
   // Re-evaluate gate card now that STATE.vehicle is populated. On a plain refresh the
   // gate listener already fired while STATE.vehicle was null (bailed at the guard), and
@@ -8659,8 +8660,81 @@ async function _logPushStep(step, status, detail) {
   } catch(e) { /* silent */ }
 }
 
+/* ── Native FCM path (Capacitor APK) ─────────────────────────────
+   In the Capacitor WebView PushManager is undefined, so Web Push can never
+   work there. The APK bundles @capacitor-firebase/messaging — get a real FCM
+   registration token from the native layer and register it with GAS via
+   driver_register_fcm (stored as fcm_token_<vehicleId>, channel marker 'fcm').
+   Plugin proxy is created via registerPlugin() because on a remote server.url
+   page Capacitor.Plugins.X is not pre-populated (same pattern as
+   BackgroundGeolocation / BiometricAuthNative). */
+function _getNativeFcmPlugin() {
+  var cap = window.Capacitor;
+  if (!cap) return null;
+  var existing = cap.Plugins && cap.Plugins.FirebaseMessaging;
+  if (existing) return existing;
+  if (typeof cap.registerPlugin === 'function') {
+    try { return cap.registerPlugin('FirebaseMessaging'); } catch (e) { return null; }
+  }
+  return null;
+}
+
+async function registerPushNative() {
+  _logPushStep('native_fcm', 'running', '');
+  var plugin = _getNativeFcmPlugin();
+  if (!plugin) {
+    _logPushStep('native_fcm', 'error', 'FirebaseMessaging plugin unavailable');
+    console.warn('[Push] native FCM plugin unavailable');
+    return;
+  }
+  try {
+    var perm = await plugin.requestPermissions();
+    _logPushStep('native_perm', (perm && perm.receive) || 'unknown', '');
+    if (perm && perm.receive === 'denied') {
+      console.warn('[Push] native notification permission denied');
+      return;
+    }
+    var tokenResult = await plugin.getToken();
+    var fcmToken = tokenResult && tokenResult.token;
+    if (!fcmToken) {
+      _logPushStep('native_token', 'error', 'empty token');
+      console.warn('[Push] native getToken returned empty');
+      return;
+    }
+    _logPushStep('native_token', 'ok', fcmToken.substring(0, 24) + '...');
+    console.log('[Push] native FCM token:', fcmToken.substring(0, 24) + '...');
+
+    var vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : '';
+    try {
+      var regResp = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action:    'driver_register_fcm',
+          idToken:   (typeof STATE !== 'undefined' && STATE.idToken) || '',
+          vehicleId: vid,
+          fcmToken:  fcmToken
+        })
+      });
+      var regData = await regResp.json();
+      if (regData.ok) { console.log('[Push] native FCM registered with GAS ✓ vid:', vid); _logPushStep('gas_register', 'ok', 'fcm ' + vid); }
+      else { console.warn('[Push] GAS FCM register error:', regData.error); _logPushStep('gas_register', 'error', regData.error || ''); }
+    } catch (e) {
+      console.warn('[Push] GAS FCM register failed:', e.message);
+      _logPushStep('gas_register', 'error', e.message);
+    }
+  } catch (e) {
+    _logPushStep('native_fcm', 'error', e.message);
+    console.error('[Push] native FCM error:', e.message, e);
+  }
+}
+
 async function registerPush() {
   _logPushStep('start', 'running', '');
+  // Capacitor APK → native FCM, never Web Push (PushManager is undefined in the WebView)
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+    return registerPushNative();
+  }
   const pmSupported = ('serviceWorker' in navigator) && ('PushManager' in window);
   _logPushStep('pushmanager_check', ('PushManager' in window) ? 'ok' : 'not_supported', ('serviceWorker' in navigator) ? 'sw_ok' : 'sw_missing');
   if (!pmSupported) {
