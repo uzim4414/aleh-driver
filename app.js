@@ -8648,13 +8648,28 @@ APP._garageAppointmentNo = function() {
 
 
 /* ══ Web Push (direct PushManager.subscribe — no Firebase SDK) ══ */
+async function _logPushStep(step, status, detail) {
+  try {
+    var vid = (typeof STATE !== 'undefined' && STATE.vehicle && STATE.vehicle.id) ? STATE.vehicle.id : 'unknown';
+    await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'debug_push_log', vehicleId: vid, step: step, status: status, detail: String(detail||'').substring(0,200) })
+    });
+  } catch(e) { /* silent */ }
+}
+
 async function registerPush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  _logPushStep('start', 'running', '');
+  const pmSupported = ('serviceWorker' in navigator) && ('PushManager' in window);
+  _logPushStep('pushmanager_check', ('PushManager' in window) ? 'ok' : 'not_supported', ('serviceWorker' in navigator) ? 'sw_ok' : 'sw_missing');
+  if (!pmSupported) {
     console.warn('[Push] not supported');
     return;
   }
   try {
     const perm = await Notification.requestPermission();
+    _logPushStep('permission', perm, '');
     if (perm !== 'granted') { console.log('[Push] permission denied'); return; }
 
     const swReg = await navigator.serviceWorker.ready;
@@ -8701,14 +8716,20 @@ async function registerPush() {
 
     if (!subscription) {
       console.log('[Push] Creating new subscription...');
-      const subPromise = swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationServerKey });
-      const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('subscribe timeout 20s')), 20000));
-      subscription = await Promise.race([subPromise, timeoutP]);
+      try {
+        const subPromise = swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationServerKey });
+        const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('subscribe timeout 20s')), 20000));
+        subscription = await Promise.race([subPromise, timeoutP]);
+      } catch(e) {
+        _logPushStep('subscribed', 'error', e.message);
+        throw e;
+      }
     }
 
     if (!subscription) { console.warn('[Push] no subscription'); return; }
 
     const subJson = subscription.toJSON();
+    _logPushStep('subscribed', 'ok', (subJson.endpoint || '').substring(0,80));
     console.log('[Push] Subscribed! endpoint:', subJson.endpoint.substring(0, 60) + '...');
     console.log('[Push] keys:', {
       p256dh: (subJson.keys && subJson.keys.p256dh ? subJson.keys.p256dh.substring(0,20) + '...' : 'n/a'),
@@ -8730,10 +8751,11 @@ async function registerPush() {
         })
       });
       const regData = await regResp.json();
-      if (regData.ok) console.log('[Push] Registered with GAS ✓ vid:', vid);
-      else console.warn('[Push] GAS register error:', regData.error);
+      if (regData.ok) { console.log('[Push] Registered with GAS ✓ vid:', vid); _logPushStep('gas_register', 'ok', vid); }
+      else { console.warn('[Push] GAS register error:', regData.error); _logPushStep('gas_register', 'error', regData.error || ''); }
     } catch(e) {
       console.warn('[Push] gas register failed:', e.message);
+      _logPushStep('gas_register', 'error', e.message);
     }
   } catch(e) {
     console.error('[Push] error:', e.message, e);
