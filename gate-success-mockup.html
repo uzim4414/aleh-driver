@@ -1,8 +1,10 @@
-<title>Gate Success — Mockup v2</title>
+<title>Gate Success — Mockup v3</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body { height:100%; background:#000; font-family:-apple-system,'Segoe UI',sans-serif; color:#fff; overflow:hidden; direction:rtl; }
+html,body { height:100%; background:#000; font-family:'Noto Sans Hebrew',sans-serif; color:#fff; overflow:hidden; direction:rtl; }
 
 #gate-success-overlay {
   position:fixed; inset:0; z-index:100000;
@@ -92,7 +94,7 @@ html,body { height:100%; background:#000; font-family:-apple-system,'Segoe UI',s
 }
 
 /* ── Gate SVG ── */
-.gate-svg { width:90px; height:90px; overflow:visible; }
+.gate-svg { width:76px; height:76px; overflow:visible; }
 
 /* Ground + pillar */
 .g-ground { opacity:.4; }
@@ -147,12 +149,18 @@ html,body { height:100%; background:#000; font-family:-apple-system,'Segoe UI',s
   font-variant-numeric:tabular-nums;
   opacity:0; animation:rise .55s cubic-bezier(.22,1,.36,1) .58s both;
 }
-.gs-hint {
-  position:absolute; bottom:36px; left:0; right:0; text-align:center;
-  font-size:12px; font-weight:500; color:rgba(255,255,255,.28);
-  opacity:0; animation:hintPulse 2.6s ease-in-out 1.8s infinite;
+/* ── Percentage counter ── */
+.gs-pct {
+  margin-top:18px; text-align:center;
+  font-size:15px; font-weight:600;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;
+  color:rgba(48,209,88,.5);
+  direction:ltr; unicode-bidi:isolate;
+  opacity:0; animation:fadeIn .3s ease .6s forwards;
+  transition:color .3s ease;
 }
-@keyframes hintPulse { 0%,100%{opacity:.18} 50%{opacity:.5} }
+.gs-pct.done { color:rgba(48,209,88,.9); }
 </style>
 
 <div id="gate-success-overlay">
@@ -238,16 +246,32 @@ html,body { height:100%; background:#000; font-family:-apple-system,'Segoe UI',s
   <div class="gs-title" id="gs-title">השער נפתח!</div>
   <div class="gs-lot"   id="gs-lot">שער עלה ראשי</div>
   <div class="gs-meta"  id="gs-meta">מרחק: 23מ׳ · 20:55</div>
-  <div class="gs-hint">לחץ לסגירה</div>
+  <div class="gs-pct"   id="gs-pct">0%</div>
 </div>
 
 <script>
+var _pctTimer = null;
+
+function startPct(){
+  const el = document.getElementById('gs-pct');
+  el.classList.remove('done');
+  el.textContent = '0%';
+  if (_pctTimer) clearInterval(_pctTimer);
+  let pct = 0;
+  _pctTimer = setInterval(function(){
+    pct++;
+    el.textContent = pct + '%';
+    if (pct >= 100) { clearInterval(_pctTimer); _pctTimer = null; el.classList.add('done'); }
+  }, 45);
+}
+
 function playAnim(){
   const ov  = document.getElementById('gate-success-overlay');
   ov.style.animation='none'; void ov.offsetWidth; ov.style.animation='';
   document.querySelectorAll(
-    '#gs-icon,.gs-title,.gs-lot,.gs-meta,.gs-close,.g-arm,.g-check,.g-check-circle,.g-beam,.prog,.ring'
+    '#gs-icon,.gs-title,.gs-lot,.gs-meta,.gs-pct,.gs-close,.g-arm,.g-check,.g-check-circle,.g-beam,.prog,.ring'
   ).forEach(el=>{ el.style.animation='none'; void el.offsetWidth; el.style.animation=''; });
+  setTimeout(startPct, 600);
 }
 requestAnimationFrame(()=>setTimeout(playAnim,80));
 </script>
