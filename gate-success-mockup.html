@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gate Success — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800;900&family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    background:#000;
+    font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple Color Emoji',-apple-system,sans-serif;
+    color:#fff; overflow:hidden;
+  }
+
+  /* ── Full-screen overlay ─────────────────────────────── */
+  #gate-success-overlay {
+    position:fixed; inset:0; z-index:100000;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:32px;
+    background:
+      radial-gradient(120% 80% at 50% 38%, rgba(48,209,88,.16) 0%, rgba(48,209,88,.05) 32%, transparent 62%),
+      linear-gradient(165deg,#04140a 0%,#071d0f 46%,#020a05 100%);
+    overflow:hidden;
+    animation:notif-landing-in .55s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes notif-landing-in {
+    0%   { opacity:0; transform:scale(.92); }
+    100% { opacity:1; transform:scale(1); }
+  }
+
+  /* Faint moving aurora behind everything */
+  #gate-success-overlay::before {
+    content:''; position:absolute; left:50%; top:38%;
+    width:640px; height:640px; transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(48,209,88,.20) 0%, transparent 60%);
+    filter:blur(20px); pointer-events:none;
+    animation:auroraBreath 4.2s ease-in-out infinite;
+  }
+  @keyframes auroraBreath {
+    0%,100% { opacity:.55; transform:translate(-50%,-50%) scale(1); }
+    50%     { opacity:.9;  transform:translate(-50%,-50%) scale(1.12); }
+  }
+
+  /* ── Particles rising upward ─────────────────────────── */
+  .gs-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .gs-particles i {
+    position:absolute; bottom:-12px; width:6px; height:6px; border-radius:50%;
+    background:#30D158; opacity:0; filter:drop-shadow(0 0 6px rgba(48,209,88,.9));
+    animation:floatUp var(--dur) linear var(--delay) infinite;
+  }
+  @keyframes floatUp {
+    0%   { transform:translateY(0) scale(.6); opacity:0; }
+    12%  { opacity:.9; }
+    80%  { opacity:.7; }
+    100% { transform:translateY(-102vh) scale(1); opacity:0; }
+  }
+
+  /* ── Icon stack ──────────────────────────────────────── */
+  .gs-icon {
+    position:relative; width:140px; height:140px; margin-bottom:26px;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; animation:gsRise .6s cubic-bezier(.22,1,.36,1) .05s both;
+  }
+  @keyframes gsRise {
+    0%   { opacity:0; transform:translateY(14px) scale(.85); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+
+  /* Sonar rings */
+  .gs-icon .ring {
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid rgba(48,209,88,.55); pointer-events:none;
+    animation:sonar 2.6s cubic-bezier(0,0,.2,1) infinite;
+  }
+  .gs-icon .ring:nth-child(2) { animation-delay:.9s; }
+  .gs-icon .ring:nth-child(3) { animation-delay:1.8s; }
+  @keyframes sonar {
+    0%   { transform:scale(.55); opacity:.8; }
+    100% { transform:scale(2.2); opacity:0; }
+  }
+
+  /* Glowing disc holding the SVG */
+  .gs-disc {
+    position:relative; width:112px; height:112px; border-radius:50%;
+    background:radial-gradient(circle at 50% 38%, rgba(48,209,88,.28), rgba(48,209,88,.06));
+    border:1.5px solid rgba(48,209,88,.4);
+    box-shadow:0 0 44px rgba(48,209,88,.45), inset 0 0 28px rgba(48,209,88,.14);
+    display:flex; align-items:center; justify-content:center;
+    animation:discPulse 2s ease-in-out infinite;
+  }
+  @keyframes discPulse {
+    0%,100% { box-shadow:0 0 40px rgba(48,209,88,.38), inset 0 0 26px rgba(48,209,88,.12); }
+    50%     { box-shadow:0 0 62px rgba(48,209,88,.62), inset 0 0 32px rgba(48,209,88,.2); }
+  }
+
+  /* Progress ring around disc */
+  .gs-ring-svg { position:absolute; inset:-6px; transform:rotate(-90deg); }
+  .gs-ring-svg .track { stroke:rgba(255,255,255,.08); }
+  .gs-ring-svg .prog {
+    stroke:#30D158; stroke-linecap:round;
+    stroke-dasharray:352; stroke-dashoffset:352;
+    filter:drop-shadow(0 0 5px rgba(48,209,88,.8));
+    animation:ringFill .9s cubic-bezier(.22,1,.36,1) .3s forwards;
+  }
+  @keyframes ringFill { to { stroke-dashoffset:0; } }
+
+  /* The barrier SVG: post + lifting arm + checkmark reveal */
+  .gate-svg { width:64px; height:64px; overflow:visible; }
+  .gate-arm {
+    transform-box:fill-box; transform-origin:8px 22px;
+    animation:armLift 1s cubic-bezier(.5,-.4,.3,1.5) .45s both;
+  }
+  @keyframes armLift {
+    0%   { transform:rotate(0deg); }
+    100% { transform:rotate(-72deg); }
+  }
+  .gate-check {
+    stroke-dasharray:40; stroke-dashoffset:40;
+    animation:drawCheck .5s ease-out 1.25s forwards;
+  }
+  @keyframes drawCheck { to { stroke-dashoffset:0; } }
+  /* light beam sweeping as gate opens */
+  .gate-beam {
+    opacity:0; transform-box:fill-box; transform-origin:center;
+    animation:beamFlash 1s ease-out 1.15s both;
+  }
+  @keyframes beamFlash {
+    0%   { opacity:0; }
+    30%  { opacity:.85; }
+    100% { opacity:0; }
+  }
+
+  /* ── Text ────────────────────────────────────────────── */
+  .gs-title {
+    font-size:32px; font-weight:800; color:#30D158; text-align:center;
+    letter-spacing:-.5px; text-shadow:0 0 22px rgba(48,209,88,.45);
+    opacity:0; animation:gsRise .55s cubic-bezier(.22,1,.36,1) .25s both;
+  }
+  .gs-lot {
+    font-size:17px; font-weight:600; color:rgba(255,255,255,.82); margin-top:10px; text-align:center;
+    opacity:0; animation:gsRise .55s cubic-bezier(.22,1,.36,1) .42s both;
+  }
+  .gs-meta {
+    font-size:13px; color:rgba(255,255,255,.45); margin-top:6px; text-align:center;
+    font-variant-numeric:tabular-nums; letter-spacing:.02em;
+    opacity:0; animation:gsRise .55s cubic-bezier(.22,1,.36,1) .55s both;
+  }
+
+  /* ── Progress bar ────────────────────────────────────── */
+  .gs-bar-wrap {
+    position:relative; margin-top:44px; width:220px; height:6px;
+    background:rgba(255,255,255,.09); border-radius:100px; overflow:hidden;
+    opacity:0; animation:gsRise .55s ease .6s both;
+  }
+  .gs-bar {
+    height:100%; width:0; border-radius:100px;
+    background:linear-gradient(90deg,#1F8A3D,#30D158,#5eea86);
+    box-shadow:0 0 14px rgba(48,209,88,.7);
+    transition:width 4.5s linear;
+  }
+
+  .gs-hint {
+    position:absolute; bottom:38px; left:0; right:0; text-align:center;
+    font-size:12px; font-weight:600; color:rgba(255,255,255,.32);
+    opacity:0; animation:hintPulse 2.4s ease-in-out 1.4s infinite;
+  }
+  @keyframes hintPulse {
+    0%,100% { opacity:.22; }
+    50%     { opacity:.55; }
+  }
+
+  /* Replay button (mockup only) */
+  .replay {
+    position:absolute; top:16px; left:16px; z-index:5;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+    color:rgba(255,255,255,.7); font-family:inherit; font-size:12px; font-weight:700;
+    padding:7px 14px; border-radius:100px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="gate-success-overlay">
+  <button class="replay" onclick="playAnim()">↻ הרצה מחדש</button>
+
+  <div class="gs-particles" id="gs-particles"></div>
+
+  <div class="gs-icon" id="gs-icon">
+    <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+    <div class="gs-disc">
+      <svg class="gs-ring-svg" viewBox="0 0 124 124">
+        <circle class="track" cx="62" cy="62" r="56" fill="none" stroke-width="4"/>
+        <circle class="prog"  cx="62" cy="62" r="56" fill="none" stroke-width="4"/>
+      </svg>
+      <svg class="gate-svg" viewBox="0 0 64 48" fill="none">
+        <!-- light beam through the open gate -->
+        <polygon class="gate-beam" points="8,44 20,44 44,6 30,6" fill="url(#beamGrad)"/>
+        <defs>
+          <linearGradient id="beamGrad" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#30D158" stop-opacity="0"/>
+            <stop offset="1" stop-color="#5eea86" stop-opacity=".9"/>
+          </linearGradient>
+        </defs>
+        <!-- post -->
+        <rect x="4" y="16" width="8" height="30" rx="2" fill="#30D158"/>
+        <circle cx="8" cy="16" r="4" fill="#5eea86"/>
+        <!-- ground line -->
+        <rect x="2" y="44" width="58" height="3" rx="1.5" fill="rgba(48,209,88,.35)"/>
+        <!-- lifting arm (striped barrier) -->
+        <g class="gate-arm">
+          <rect x="8" y="18" width="48" height="8" rx="4" fill="#eafff0"/>
+          <rect x="14" y="18" width="9" height="8" fill="#FF453A"/>
+          <rect x="32" y="18" width="9" height="8" fill="#FF453A"/>
+          <rect x="50" y="18" width="6" height="8" fill="#FF453A"/>
+        </g>
+        <!-- checkmark that draws in after arm lifts -->
+        <path class="gate-check" d="M40 30 L46 36 L58 22" stroke="#30D158" stroke-width="4"
+              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="gs-title" id="gs-title">השער נפתח!</div>
+  <div class="gs-lot" id="gs-lot">שער עלה ראשי</div>
+  <div class="gs-meta" id="gs-meta">מרחק: 23מ׳ · 20:55</div>
+
+  <div class="gs-bar-wrap"><div class="gs-bar" id="gs-bar"></div></div>
+
+  <div class="gs-hint">לחץ לסגירה</div>
+</div>
+
+<script>
+  // Build floating particles
+  (function(){
+    const box = document.getElementById('gs-particles');
+    for (let i=0;i<22;i++){
+      const p = document.createElement('i');
+      const size = 3 + Math.random()*5;
+      p.style.left   = Math.random()*100 + '%';
+      p.style.width  = p.style.height = size + 'px';
+      p.style.setProperty('--dur',   (5 + Math.random()*5).toFixed(2)+'s');
+      p.style.setProperty('--delay', (Math.random()*6).toFixed(2)+'s');
+      p.style.opacity = 0;
+      if (Math.random() > .6) p.style.background = '#5eea86';
+      box.appendChild(p);
+    }
+  })();
+
+  // Drive the progress bar fill on load / replay
+  function playAnim(){
+    const ov  = document.getElementById('gate-success-overlay');
+    const bar = document.getElementById('gs-bar');
+    // restart CSS animations by reflow
+    ov.style.animation='none'; void ov.offsetWidth; ov.style.animation='';
+    document.querySelectorAll('#gs-icon, #gs-title, #gs-lot, #gs-meta, .gs-bar-wrap, .gate-arm, .gate-check, .gate-beam, .prog')
+      .forEach(el=>{ el.style.animation='none'; void el.offsetWidth; el.style.animation=''; });
+    bar.style.transition='none'; bar.style.width='0'; void bar.offsetWidth;
+    requestAnimationFrame(()=>{
+      bar.style.transition='width 4.5s linear';
+      bar.style.width='100%';
+    });
+  }
+  requestAnimationFrame(playAnim);
+</script>
+</body>
+</html>
