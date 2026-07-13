@@ -11010,6 +11010,7 @@ var _gateWarmupDone       = false; // true after warmup timer elapses
 var _gateHasMovedSinceStart = false; // true once a GPS fix with real speed seen
 var _gateWarmupTimer      = null;  // handle for the warmup timeout
 var _gateSuccessTimer     = null;  // handle for the success-overlay auto-dismiss
+var _gateSuccessPctTimer = null;
 var _GATE_WARMUP_MS       = 45000; // 45s warmup before auto-open is allowed
 var _GATE_MOVE_KMH        = 5;     // min speed (km/h) counted as "moving"
 
@@ -11276,24 +11277,47 @@ function _gateShowSuccess(lotName, distM) {
   var overlay = document.getElementById('gate-success-overlay');
   if (!overlay) return;
   var title = document.getElementById('gs-title');
-  var lot = document.getElementById('gs-lot');
-  var meta = document.getElementById('gs-meta');
-  var bar = document.getElementById('gs-bar');
+  var lot   = document.getElementById('gs-lot');
+  var meta  = document.getElementById('gs-meta');
+  var pct   = document.getElementById('gs-pct');
   if (title) title.textContent = 'השער נפתח!';
-  if (lot) lot.textContent = lotName;
+  if (lot)   lot.textContent   = lotName;
   var now = new Date();
   var timeStr = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
   if (meta) meta.textContent = 'מרחק: ' + Math.round(distM) + ' מ\' · ' + timeStr;
+  // Restart all CSS animations by toggling display and forcing reflow
+  overlay.style.display = 'none';
+  void overlay.offsetWidth;
   overlay.style.display = 'flex';
-  if (bar) { bar.style.width = '0'; setTimeout(function(){ bar.style.width = '100%'; }, 50); }
-  // Tap-anywhere-to-dismiss escape hatch — driver never gets stuck even if the
-  // auto-dismiss timer is throttled/frozen (e.g. WebView backgrounded). onclick
-  // (not addEventListener) so re-showing never stacks duplicate handlers.
+  // Restart keyframe animations on animated children
+  var animated = overlay.querySelectorAll('.gs-prog,.gs-g-arm,.gs-g-beam,.gs-g-check,.gs-g-check-circle,.gs-ring,.gs-close');
+  animated.forEach(function(el) {
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+  });
+  // Percentage counter: 0→100 over 4500ms (45ms × 100 steps)
+  if (_gateSuccessPctTimer) { clearInterval(_gateSuccessPctTimer); _gateSuccessPctTimer = null; }
+  if (pct) { pct.textContent = '0%'; pct.classList.remove('gs-pct-done'); }
+  var _pctVal = 0;
+  _gateSuccessPctTimer = setInterval(function() {
+    _pctVal++;
+    if (pct) pct.textContent = _pctVal + '%';
+    if (_pctVal >= 100) {
+      clearInterval(_gateSuccessPctTimer);
+      _gateSuccessPctTimer = null;
+      if (pct) pct.classList.add('gs-pct-done');
+    }
+  }, 45);
+  // Wire close button
+  var closeBtn = document.getElementById('gs-close');
+  if (closeBtn) closeBtn.onclick = function(e) { e.stopPropagation(); _gateHideSuccess(); };
+  // Tap-anywhere-to-dismiss escape hatch
   overlay.onclick = function(){ _gateHideSuccess(); };
-  // Show OS notification
+  // OS notification
   if ('serviceWorker' in navigator && Notification.permission === 'granted') {
     navigator.serviceWorker.ready.then(function(reg) {
-      reg.showNotification('🅿️ שער החניון נפתח', {
+      reg.showNotification('שער החניון נפתח', {
         body: lotName + ' · נפתח אוטומטית עבורך',
         icon: './icons/icon-192.png',
         badge: './icons/badge-blue.png',
@@ -11305,16 +11329,15 @@ function _gateShowSuccess(lotName, distM) {
       });
     }).catch(function(){});
   }
-  // Store the timer handle so re-entry can't orphan a prior timer, and the tap
-  // handler can cancel it. Guarantees the overlay always returns to idle.
   if (_gateSuccessTimer) clearTimeout(_gateSuccessTimer);
-  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 4500);
+  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 6000);
 }
 
 /* Hide the success overlay and return the gate card to idle. Single dismiss path
    shared by the auto-dismiss timer and the tap-to-dismiss handler. */
 function _gateHideSuccess() {
   if (_gateSuccessTimer) { clearTimeout(_gateSuccessTimer); _gateSuccessTimer = null; }
+  if (_gateSuccessPctTimer) { clearInterval(_gateSuccessPctTimer); _gateSuccessPctTimer = null; }
   var overlay = document.getElementById('gate-success-overlay');
   if (overlay) { overlay.style.display = 'none'; overlay.onclick = null; }
   _gateSetState('idle');

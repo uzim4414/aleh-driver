@@ -4566,14 +4566,38 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 #qa-gate-card[data-state="opening"] .gate-ripple { display:block;animation:rippleRing 1.2s ease-out infinite; }
 .gate-dist-badge { position:absolute;top:6px;left:6px;background:#1F8A3D;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;animation:badgeBeat 1.5s ease-in-out infinite; }
 .gate-status-dot { position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#FF9F0A; }
-/* Gate success overlay */
-#gate-success-overlay { position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#0a1f0f 0%,#0d3018 100%);padding:32px;animation:notif-landing-in .5s cubic-bezier(.22,1,.36,1) both; }
-.gs-icon { font-size:80px;margin-bottom:20px; }
-.gs-title { font-size:28px;font-weight:800;color:#30D158;text-align:center; }
-.gs-lot { font-size:16px;color:rgba(255,255,255,.7);margin-top:8px;text-align:center; }
-.gs-meta { font-size:13px;color:rgba(255,255,255,.4);margin-top:4px;text-align:center; }
-.gs-bar-wrap { margin-top:36px;width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden; }
-.gs-bar { height:100%;background:#30D158;border-radius:2px;width:0;transition:width 4s linear; }
+/* ── Gate success overlay v3 ── */
+#gate-success-overlay { position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:radial-gradient(110% 70% at 50% 42%,rgba(48,209,88,.18) 0%,rgba(48,209,88,.04) 38%,transparent 65%),linear-gradient(165deg,#03120a 0%,#061a0e 50%,#010805 100%);overflow:hidden;animation:gsLandingIn .55s cubic-bezier(.22,1,.36,1) both; }
+@keyframes gsLandingIn { 0%{opacity:0;transform:scale(.93)} 100%{opacity:1;transform:scale(1)} }
+#gate-success-overlay::before { content:'';position:absolute;left:50%;top:42%;width:520px;height:520px;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(48,209,88,.2) 0%,transparent 60%);filter:blur(30px);pointer-events:none;animation:gsAurora 4s ease-in-out infinite; }
+@keyframes gsAurora { 0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(1)} 50%{opacity:.85;transform:translate(-50%,-50%) scale(1.15)} }
+.gs-close { position:absolute;top:20px;left:20px;z-index:10;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.75);font-size:18px;font-weight:300;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;opacity:0;animation:gsFadeIn .4s ease 1.6s forwards; }
+@keyframes gsFadeIn { to{opacity:1} }
+.gs-icon { position:relative;width:180px;height:180px;margin-bottom:30px;display:flex;align-items:center;justify-content:center;opacity:0;animation:gsRise .65s cubic-bezier(.22,1,.36,1) .05s both; }
+@keyframes gsRise { 0%{opacity:0;transform:translateY(18px) scale(.82)} 100%{opacity:1;transform:translateY(0) scale(1)} }
+.gs-ring { position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(48,209,88,.5);animation:gsSonar 2.8s cubic-bezier(0,0,.18,1) infinite; }
+.gs-ring:nth-child(2){animation-delay:1s} .gs-ring:nth-child(3){animation-delay:2s}
+@keyframes gsSonar { 0%{transform:scale(.5);opacity:.75} 100%{transform:scale(2.1);opacity:0} }
+.gs-cprog { position:absolute;inset:-4px;transform:rotate(-90deg); }
+.gs-cprog .gs-track { stroke:rgba(255,255,255,.07); }
+.gs-cprog .gs-prog { stroke:url(#gsProgGrad);stroke-linecap:round;stroke-dasharray:502;stroke-dashoffset:502;filter:drop-shadow(0 0 6px rgba(48,209,88,.7));animation:gsProgFill 4.5s cubic-bezier(.4,0,.2,1) .5s forwards; }
+@keyframes gsProgFill { to{stroke-dashoffset:0} }
+.gs-disc { position:relative;width:138px;height:138px;border-radius:50%;background:radial-gradient(circle at 50% 35%,rgba(48,209,88,.22),rgba(10,30,16,.9));border:1.5px solid rgba(48,209,88,.35);box-shadow:0 0 50px rgba(48,209,88,.4),inset 0 0 30px rgba(48,209,88,.12);display:flex;align-items:center;justify-content:center;animation:gsDiscPulse 2.2s ease-in-out .8s infinite; }
+@keyframes gsDiscPulse { 0%,100%{box-shadow:0 0 46px rgba(48,209,88,.36),inset 0 0 28px rgba(48,209,88,.1)} 50%{box-shadow:0 0 70px rgba(48,209,88,.6),inset 0 0 36px rgba(48,209,88,.2)} }
+.gs-gate-svg { width:76px;height:76px;overflow:visible; }
+.gs-g-arm { transform-box:fill-box;transform-origin:6px 50%;animation:gsArmSwing 1.1s cubic-bezier(.34,1.56,.64,1) .5s both; }
+@keyframes gsArmSwing { 0%{transform:rotate(0deg)} 100%{transform:rotate(-82deg)} }
+.gs-g-beam { opacity:0;transform-box:fill-box;transform-origin:12px 62px;animation:gsBeamIn 1.2s ease-out 1.4s both; }
+@keyframes gsBeamIn { 0%{opacity:0;transform:scaleY(.1)} 30%{opacity:.55} 100%{opacity:.15;transform:scaleY(1)} }
+.gs-g-check { stroke-dasharray:60;stroke-dashoffset:60;animation:gsDrawCheck .55s ease-out 1.5s forwards; }
+@keyframes gsDrawCheck { to{stroke-dashoffset:0} }
+.gs-g-check-circle { transform-box:fill-box;transform-origin:center;transform:scale(0);opacity:0;animation:gsCirclePop .45s cubic-bezier(.34,1.56,.64,1) 1.48s forwards; }
+@keyframes gsCirclePop { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.gs-title { font-size:34px;font-weight:800;color:#30D158;text-align:center;letter-spacing:-.5px;text-shadow:0 0 24px rgba(48,209,88,.5);opacity:0;animation:gsRise .55s cubic-bezier(.22,1,.36,1) .28s both; }
+.gs-lot { font-size:17px;font-weight:600;color:rgba(255,255,255,.8);margin-top:12px;text-align:center;opacity:0;animation:gsRise .55s cubic-bezier(.22,1,.36,1) .44s both; }
+.gs-meta { font-size:13px;color:rgba(255,255,255,.42);margin-top:6px;text-align:center;font-variant-numeric:tabular-nums;opacity:0;animation:gsRise .55s cubic-bezier(.22,1,.36,1) .58s both; }
+.gs-pct { margin-top:18px;text-align:center;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:rgba(48,209,88,.5);direction:ltr;unicode-bidi:isolate;opacity:0;animation:gsFadeIn .3s ease .6s forwards;transition:color .3s ease; }
+.gs-pct.gs-pct-done { color:rgba(48,209,88,.9); }
 /* ── Gate Drawer ────────────────────────────── */
 #gd-scrim { position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:300;display:none;animation:scrimFade .25s ease; }
 #gd-sheet { position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;background:#000;border-radius:28px 28px 0 0;border-top:1px solid rgba(255,255,255,.1);max-height:92vh;overflow-y:auto;display:none;flex-direction:column;z-index:301;animation:modalRise .38s cubic-bezier(.16,1,.3,1); }
@@ -4678,11 +4702,57 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 <div id="notif-landing" style="display:none"></div>
 
 <div id="gate-success-overlay" style="display:none">
-  <div class="gs-icon" id="gs-icon">🅿️</div>
+  <button class="gs-close" id="gs-close">✕</button>
+  <div class="gs-icon" id="gs-icon">
+    <span class="gs-ring"></span><span class="gs-ring"></span><span class="gs-ring"></span>
+    <svg class="gs-cprog" viewBox="0 0 188 188">
+      <defs>
+        <linearGradient id="gsProgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#1F8A3D"/>
+          <stop offset="60%" stop-color="#30D158"/>
+          <stop offset="100%" stop-color="#7fff9e"/>
+        </linearGradient>
+      </defs>
+      <circle class="gs-track" cx="94" cy="94" r="80" fill="none" stroke-width="5"/>
+      <circle class="gs-prog"  cx="94" cy="94" r="80" fill="none" stroke-width="5"/>
+    </svg>
+    <div class="gs-disc">
+      <svg class="gs-gate-svg" viewBox="0 0 90 90" fill="none">
+        <defs>
+          <linearGradient id="gsArmGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"  stop-color="#2ecc71"/>
+            <stop offset="40%" stop-color="#eafff0"/>
+            <stop offset="100%" stop-color="#2ecc71"/>
+          </linearGradient>
+          <linearGradient id="gsPillarGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#5eea86"/>
+            <stop offset="100%" stop-color="#1a7a3a"/>
+          </linearGradient>
+          <radialGradient id="gsBeamGrad" cx="0%" cy="100%" r="100%">
+            <stop offset="0%"  stop-color="#30D158" stop-opacity=".7"/>
+            <stop offset="100%" stop-color="#30D158" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="45" cy="80" rx="32" ry="4" fill="#30D158" opacity=".4"/>
+        <rect x="8" y="50" width="10" height="28" rx="3" fill="url(#gsPillarGrad)"/>
+        <circle cx="13" cy="50" r="6" fill="#5eea86"/>
+        <polygon class="gs-g-beam" points="13,62 13,50 75,20 75,50" fill="url(#gsBeamGrad)"/>
+        <g class="gs-g-arm">
+          <rect x="6" y="46" width="72" height="10" rx="5" fill="url(#gsArmGrad)"/>
+          <rect x="16" y="46" width="10" height="10" rx="2" fill="#FF453A" opacity=".85"/>
+          <rect x="36" y="46" width="10" height="10" rx="2" fill="#FF453A" opacity=".85"/>
+          <rect x="58" y="46" width="8"  height="10" rx="2" fill="#FF453A" opacity=".85"/>
+          <circle cx="77" cy="51" r="5" fill="#30D158" opacity=".8"/>
+        </g>
+        <circle class="gs-g-check-circle" cx="56" cy="60" r="14" fill="rgba(48,209,88,.15)" stroke="#30D158" stroke-width="2"/>
+        <path class="gs-g-check" d="M48 60 L54 67 L64 53" stroke="#30D158" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
   <div class="gs-title" id="gs-title">השער נפתח!</div>
   <div class="gs-lot" id="gs-lot"></div>
   <div class="gs-meta" id="gs-meta"></div>
-  <div class="gs-bar-wrap"><div class="gs-bar" id="gs-bar"></div></div>
+  <div class="gs-pct" id="gs-pct">0%</div>
 </div>
 
 <svg style="display:none">
