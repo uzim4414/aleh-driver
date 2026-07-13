@@ -4595,6 +4595,8 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 @keyframes gsCirclePop { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
 .gs-title { font-size:34px;font-weight:800;color:#30D158;text-align:center;letter-spacing:-.5px;text-shadow:0 0 24px rgba(48,209,88,.5);opacity:0;animation:gsRise .55s cubic-bezier(.22,1,.36,1) .28s both; }
 .gs-lot { font-size:17px;font-weight:600;color:rgba(255,255,255,.8);margin-top:12px;text-align:center;opacity:0;animation:gsRise .55s cubic-bezier(.22,1,.36,1) .44s both; }
+.gs-spot { font-size:15px;font-weight:500;color:#30D158;margin-top:8px;text-align:center;padding:6px 16px;background:rgba(48,209,88,.12);border:1px solid rgba(48,209,88,.25);border-radius:20px;direction:rtl; }
+.gs-spot strong { font-weight:800; }
 .gs-meta { font-size:13px;color:rgba(255,255,255,.42);margin-top:6px;text-align:center;font-variant-numeric:tabular-nums;opacity:0;animation:gsRise .55s cubic-bezier(.22,1,.36,1) .58s both; }
 .gs-pct { margin-top:18px;text-align:center;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:rgba(48,209,88,.5);direction:ltr;unicode-bidi:isolate;opacity:0;animation:gsFadeIn .3s ease .6s forwards;transition:color .3s ease; }
 .gs-pct.gs-pct-done { color:rgba(48,209,88,.9); }
@@ -4751,6 +4753,7 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
   </div>
   <div class="gs-title" id="gs-title">השער נפתח!</div>
   <div class="gs-lot" id="gs-lot"></div>
+  <div class="gs-spot" id="gs-spot" style="display:none"></div>
   <div class="gs-meta" id="gs-meta"></div>
   <div class="gs-pct" id="gs-pct">0%</div>
 </div>
@@ -6472,6 +6475,14 @@ window.fcmDebug = async function() {
     if (_lat != null && _lng != null && typeof _gateDrawerUpdateDistances === 'function') {
       var _cfgs = (typeof APP !== 'undefined' && APP._gateConfigs) || (APP && APP._gateConfig ? [APP._gateConfig] : []);
       _gateDrawerUpdateDistances(_cfgs, _lat, _lng);
+    } else if (_lat == null && navigator.geolocation) {
+      // No prior GPS fix — fire one-shot to enable CTA immediately on drawer open
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        var _cfgsF = (typeof APP !== 'undefined' && APP._gateConfigs) || (APP && APP._gateConfig ? [APP._gateConfig] : []);
+        if (typeof _gateDrawerUpdateDistances === 'function') {
+          _gateDrawerUpdateDistances(_cfgsF, pos.coords.latitude, pos.coords.longitude);
+        }
+      }, function(){}, { maximumAge: 15000, timeout: 6000 });
     }
     // Start live update interval
     if (!window._gdLiveInterval) {
@@ -6660,7 +6671,7 @@ window.fcmDebug = async function() {
       '<div class="gd-info-grid">' +
         '<div class="gd-info-cell"><div class="gd-info-lbl">טווח פתיחה</div><div class="gd-info-val">' + esc(cfg.radius||200) + 'מ\'</div></div>' +
         '<div class="gd-info-sep-v"></div>' +
-        '<div class="gd-info-cell"><div class="gd-info-lbl">מהירות מקס\'</div><div class="gd-info-val">≤' + esc(cfg.maxSpeed||30) + ' קמ"ש</div></div>' +
+        '<div class="gd-info-cell"><div class="gd-info-lbl">מהירות מקס\'</div><div class="gd-info-val">≤' + esc(cfg.maxSpeed||25) + ' קמ"ש</div></div>' +
       '</div>' +
       '<div class="gd-info-sep-h"></div>' +
       '<div class="gd-info-grid">' +
@@ -6772,6 +6783,13 @@ window.fcmDebug = async function() {
     // Sync GPS mode button
     var mode = (typeof _gateMode !== 'undefined') ? _gateMode : 'off';
     _gdApplyModeUI(mode);
+    // Refresh CTA button state from latest GPS coords (fixes button staying disabled when GPS watcher is not ticking)
+    var _llu = (typeof _gateLastLat !== 'undefined') ? _gateLastLat : null;
+    var _lngu = (typeof _gateLastLng !== 'undefined') ? _gateLastLng : null;
+    if (_llu != null && _lngu != null && typeof _gateDrawerUpdateDistances === 'function') {
+      var _cfgsu = (typeof APP !== 'undefined' && APP._gateConfigs) || (APP && APP._gateConfig ? [APP._gateConfig] : []);
+      _gateDrawerUpdateDistances(_cfgsu, _llu, _lngu);
+    }
   }
 })();
 </script>

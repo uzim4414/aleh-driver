@@ -11282,7 +11282,7 @@ function _gateCheckConditions(speedMs, cfg) {
     if (!_gateInWindow(_scH, _gateModeStart, _gateModeEnd)) return false;
   }
   var speedKmh = speedMs * 3.6;
-  var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
+  var maxSpeed = parseFloat(cfg.maxSpeed) || 25;
   if (maxSpeed > 0 && speedKmh > maxSpeed) return false;
   if (cfg.hoursStart && cfg.hoursEnd) {
     var now = new Date();
@@ -11316,7 +11316,7 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
       if (!_gateCooldownMap) _gateCooldownMap = {};
       _gateCooldownMap[lotId] = Date.now() + cooldownSec * 1000;
       _gateCooldownUntil = _gateCooldownMap[lotId]; // backward compat
-      _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM);
+      _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM, r.parkingSpot || '');
     } else {
       // BUG-FIX: surface the real server reason to the user (drawer may be open,
       // hiding the main gate card — so show a visible toast everywhere).
@@ -11374,7 +11374,7 @@ function _gateSetState(state) {
   }
 }
 
-function _gateShowSuccess(lotName, distM) {
+function _gateShowSuccess(lotName, distM, parkingSpot) {
   _gateSetState('success');
   var overlay = document.getElementById('gate-success-overlay');
   if (!overlay) return;
@@ -11382,11 +11382,25 @@ function _gateShowSuccess(lotName, distM) {
   var lot   = document.getElementById('gs-lot');
   var meta  = document.getElementById('gs-meta');
   var pct   = document.getElementById('gs-pct');
+  var spot  = document.getElementById('gs-spot');
   if (title) title.textContent = 'השער נפתח!';
   if (lot)   lot.textContent   = lotName;
   var now = new Date();
   var timeStr = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
   if (meta) meta.textContent = 'מרחק: ' + Math.round(distM) + ' מ\' · ' + timeStr;
+  // Show parking spot after the progress ring completes (4500ms)
+  if (spot) {
+    spot.style.opacity = '0';
+    spot.style.display = 'none';
+    if (parkingSpot) {
+      spot.innerHTML = 'כנס לחניה <strong>' + parkingSpot + '</strong> — שמורה עבורך';
+      setTimeout(function() {
+        spot.style.display = 'block';
+        spot.style.transition = 'opacity .6s ease';
+        requestAnimationFrame(function() { spot.style.opacity = '1'; });
+      }, 4700);
+    }
+  }
   // Restart all CSS animations by toggling display and forcing reflow
   overlay.style.display = 'none';
   void overlay.offsetWidth;
@@ -11432,7 +11446,7 @@ function _gateShowSuccess(lotName, distM) {
     }).catch(function(){});
   }
   if (_gateSuccessTimer) clearTimeout(_gateSuccessTimer);
-  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 6000);
+  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 60000);
 }
 
 /* Hide the success overlay and return the gate card to idle. Single dismiss path
