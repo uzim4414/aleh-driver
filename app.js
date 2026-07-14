@@ -9411,6 +9411,9 @@ function hideGreeting() {
 /* ══ Boot ══ */
 /* ── Version display — fetches latest commit from GitHub ── */
 var __latestVerLabel = '';
+function _dsFlag() {
+  try { return localStorage.getItem('aleh_drv_session_v1') ? ' DS:✓' : ' DS:✗'; } catch(e) { return ' DS:?'; }
+}
 (function() {
   var el = document.getElementById('splash-ver-text');
   if (!el) return;
@@ -9418,7 +9421,7 @@ var __latestVerLabel = '';
   // Show cached label immediately (instant, no flicker)
   try {
     var cached = localStorage.getItem(LS_KEY);
-    if (cached) { el.textContent = cached; __latestVerLabel = 'commit ' + cached; }
+    if (cached) { el.textContent = cached + _dsFlag(); __latestVerLabel = 'commit ' + cached; }
   } catch(e) {}
   // Fetch fresh from local version.json (always available, no rate limits)
   fetch('version.json?_=' + Date.now(), { cache: 'no-store' })
@@ -9436,7 +9439,7 @@ var __latestVerLabel = '';
       var swV = data.swVersion ? ' [' + data.swVersion + ']' : '';
       var label = data.sha + (fmt ? ' · ' + fmt : '') + swV;
       __latestVerLabel = 'commit ' + label;
-      el.textContent = label;
+      el.textContent = label + _dsFlag();
       try { localStorage.setItem(LS_KEY, label); } catch(e){}
     })
     .catch(function() {
@@ -9451,7 +9454,7 @@ var __latestVerLabel = '';
         var fmt = dt ? (('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+' '+('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2)) : '';
         var label = sha + (fmt ? ' · ' + fmt : '');
         __latestVerLabel = 'commit ' + label;
-        el.textContent = label;
+        el.textContent = label + _dsFlag();
         try { localStorage.setItem(LS_KEY, label); } catch(e){}
       }).catch(function(){});
     });
@@ -9726,12 +9729,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Silent driverSession restore — check 30-day token before forcing Google splash
   var _dsBoot = _isPostLogout ? null : _driverSessionLoad();
+  console.log('[DS-BOOT] token=', _dsBoot ? _dsBoot.substring(0,8)+'...' : 'null');
   if (_dsBoot) {
     try {
       var _dsResp = await fetch(GAS_URL + '?' + new URLSearchParams({
         action: 'bio_auth', driverSession: _dsBoot
       }).toString(), { method: 'GET', signal: AbortSignal.timeout(12000) });
       var _dsData = JSON.parse(await _dsResp.text());
+      console.log('[DS-BOOT] response=', _dsData);
       if (_dsData && _dsData.ok && _dsData.vehicle) {
         STATE.vehicle = _dsData.vehicle;
         STATE.idToken = null;
