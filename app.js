@@ -15,6 +15,8 @@ const SESSION_TTL = 24 * 60 * 60 * 1000;
 var BIO_SESSION_KEY = 'aleh_bio_active_v1';
 var BIO_SESSION_TTL = 30 * 60 * 1000; // 30 minutes
 
+var DRIVER_SESSION_KEY = 'aleh_drv_session_v1';
+
 /* ══ Firebase Config + Init ══
    databaseURL נוסף ידנית — מופיע ב: Firebase Console → Realtime Database → URL בראש העמוד
    שאר הערכים מה-Console → Project Settings → aleh-driver-pwa
@@ -1163,7 +1165,9 @@ async function gasPost(action, extra, opts) {
     return { ok: false, error: 'session_expired' };
   }
 
+  var _dsTok = _driverSessionLoad();
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
+  if (_dsTok) params.driverSession = _dsTok;
   // גישה A: כשאין idToken תקין אך קיים bio credential — צרף credentialId+email ל-GAS
   var _tokBad = !STATE.idToken || (STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken));
   if (_tokBad && _hasBio) {
@@ -2315,6 +2319,11 @@ async function _bioGasAuth(email, credentialId) {
       window._bioLoginBusy = false;
       window._bioTokenRefreshTried = false;
       // שמור PIN_SESSION בלי idToken — הפינגר יעבוד שוב מ-credentialId בביקור הבא
+      // Create driver session after bio auth
+      gasPost('driver_create_session', {}, { silent: true }).then(function(r) {
+        if (r && r.ok && r.driverSession) _driverSessionSave(r.driverSession);
+        _pinSessionSave(email, data.vehicle, STATE.user, null);
+      });
       _pinSessionSave(email, data.vehicle, STATE.user, null);
       _grComplete(function() {
         hideGreeting();
@@ -2527,6 +2536,7 @@ function _pinSessionLoad() {
     var s = JSON.parse(localStorage.getItem(PIN_SESSION_KEY) || 'null');
     if (!s) return null;
     if (Date.now() - (s.ts || 0) > PIN_SESSION_TTL) { localStorage.removeItem(PIN_SESSION_KEY); return null; }
+    if (s.driverSession) _driverSessionSave(s.driverSession);
     return s;
   } catch(e) { return null; }
 }
@@ -2535,7 +2545,8 @@ function _pinSessionSave(email, vehicleData, userInfo, idToken) {
   try {
     localStorage.setItem(PIN_SESSION_KEY, JSON.stringify({
       email: email, vehicleData: vehicleData, userInfo: userInfo,
-      idToken: idToken || null, ts: Date.now()
+      idToken: idToken || null, ts: Date.now(),
+      driverSession: _driverSessionLoad() || null
     }));
   } catch(e) {}
 }
@@ -2759,6 +2770,17 @@ function loadSession() {
     if (!s || Date.now() - s.ts > SESSION_TTL) return null;
     return s;
   } catch { return null; }
+}
+
+/* ══ Driver Session Token (long-lived, survives Google token expiry) ══ */
+function _driverSessionSave(token) {
+  if (token) localStorage.setItem(DRIVER_SESSION_KEY, token);
+}
+function _driverSessionLoad() {
+  return localStorage.getItem(DRIVER_SESSION_KEY) || null;
+}
+function _driverSessionClear() {
+  localStorage.removeItem(DRIVER_SESSION_KEY);
 }
 
 /* ══ Auth ══ */
@@ -3065,6 +3087,13 @@ async function handleGoogleCredential(response) {
       showGreeting(greetName, _gEk, _gVk);
       await loadFullData();
       _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user, STATE.idToken);
+      // Create long-lived driver session (survives Google token expiry)
+      gasPost('driver_create_session', {}, { silent: true }).then(function(r) {
+        if (r && r.ok && r.driverSession) {
+          _driverSessionSave(r.driverSession);
+          _pinSessionSave(STATE.user.email || '', STATE.vehicle, STATE.user, STATE.idToken);
+        }
+      });
       _grComplete(function() {
         hideGreeting();
         _fbWriteLastLogin(_gEk, _gVk);
@@ -4019,6 +4048,7 @@ function logout() {
       // ══ שלב 2: נקה localStorage
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
+      _driverSessionClear();
       _bioSessionClear();
       if (_bioTimeoutInterval) { clearInterval(_bioTimeoutInterval); _bioTimeoutInterval = null; }
       if (_bioVisHandler) { document.removeEventListener('visibilitychange', _bioVisHandler); _bioVisHandler = null; }
@@ -11357,6 +11387,12 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
 // Maps a server open_gate failure reason to a Hebrew message and shows it
 // via toast (visible even when the gate drawer covers the main card).
 function _gateShowOpenError(reason) {
+  if (reason === 'auth_required' || reason === 'session_expired') {
+    _driverSessionClear();
+    if (!_isNativeApp()) _sessionExpired();
+    else if (typeof _showSessionExpiredOverlay === 'function') _showSessionExpiredOverlay();
+    return;
+  }
   var map = {
     auth_required:    'נדרשת כניסה מחדש',
     not_permitted:    'אין הרשאה לשער זה',
