@@ -9724,6 +9724,40 @@ document.addEventListener('DOMContentLoaded', async function() {
     localStorage.removeItem(SESSION_KEY);
   }
 
+  // Silent driverSession restore — check 30-day token before forcing Google splash
+  var _dsBoot = _isPostLogout ? null : _driverSessionLoad();
+  if (_dsBoot) {
+    try {
+      var _dsResp = await fetch(GAS_URL + '?' + new URLSearchParams({
+        action: 'bio_auth', driverSession: _dsBoot
+      }).toString(), { method: 'GET', signal: AbortSignal.timeout(12000) });
+      var _dsData = JSON.parse(await _dsResp.text());
+      if (_dsData && _dsData.ok && _dsData.vehicle) {
+        STATE.vehicle = _dsData.vehicle;
+        STATE.idToken = null;
+        var _dEmail = _dsData.email || '';
+        STATE.user = { email: _dEmail, name: _dsData.vehicle.holder || _dEmail };
+        hideLoader();
+        var _dEk = _dEmail.replace(/[.#$[\]]/g, '_');
+        var _dVk = _vehKey(_dsData.vehicle);
+        showGreeting(_dsData.vehicle.holder || _dEmail, _dEk, _dVk);
+        await loadFullData();
+        _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
+        _grComplete(function() {
+          hideGreeting();
+          _fbWriteLastLogin(_dEk, _dVk);
+          var _sp = document.getElementById('splash-screen');
+          if (_sp) _sp.classList.add('hidden');
+          _bioSessionStart();
+          startApp();
+        });
+        return;
+      } else if (_dsData && _dsData.ok === false) {
+        _driverSessionClear();
+      }
+    } catch(_e) { /* network error — keep token, fall through to splash */ }
+  }
+
   // splash-screen stays visible — login button appears via CSS at ~4s
 
   if (!GOOGLE_CLIENT_ID) {
