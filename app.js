@@ -2265,6 +2265,8 @@ async function _bioGasAuth(email, credentialId) {
   var data;
   var _bioRespText;
   var params = { action: 'bio_auth', email: email, credentialId: credentialId };
+  var _ds = _driverSessionLoad();
+  if (_ds) params.driverSession = _ds;
   var url = GAS_URL + '?' + new URLSearchParams(params).toString();
   // retry — GAS cold start can exceed a mobile browser's fetch timeout and throw
   var _bioRetries = 2;
