@@ -11267,14 +11267,13 @@ function _gateOnPosition(pos) {
     }
     // Direction latch: after an open, block re-open until the vehicle exits 300m
     if (_gateLatchMap[inRange.lotId]) { _gateSetState('approaching'); return; }
-    // Direction check: only open when APPROACHING the gate. heading is null when the
-    // vehicle is stationary / heading unknown — in that case we cannot decide, so allow.
+    // Direction check: open ONLY when we can PROVE approaching.
+    // heading is null when stationary — fail-closed: no proof = no open.
     var _hd = pos.coords.heading;
-    if (_hd != null && !isNaN(_hd)) {
-      var _brg = _bearingTo(lat, lng, parseFloat(inRange.lat), parseFloat(inRange.lng));
-      var _diff = Math.abs(_hd - _brg); if (_diff > 180) _diff = 360 - _diff;
-      if (_diff >= 90) { _gateSetState('approaching'); return; } // leaving / perpendicular → BLOCK
-    }
+    if (_hd == null || isNaN(_hd)) { _gateSetState('approaching'); return; }
+    var _brg = _bearingTo(lat, lng, parseFloat(inRange.lat), parseFloat(inRange.lng));
+    var _diff = Math.abs(_hd - _brg); if (_diff > 180) _diff = 360 - _diff;
+    if (_diff >= 90) { _gateSetState('approaching'); return; } // leaving / perpendicular → BLOCK
     if (!_gateCheckConditions(speedMs, inRange)) return;
     _gateSetState('opening');
     _gateOpen(inRange.lotId, nearestDist, speedMs, lat, lng);
@@ -11308,6 +11307,8 @@ function _gateCheckConditions(speedMs, cfg) {
   var speedKmh = speedMs * 3.6;
   var maxSpeed = parseFloat(cfg.maxSpeed) || 25;
   if (maxSpeed > 0 && speedKmh > maxSpeed) return false;
+  var minSpeed = parseFloat(cfg.minSpeed) || 3;
+  if (speedKmh < minSpeed) return false;
   if (cfg.hoursStart && cfg.hoursEnd) {
     var now = new Date();
     var hhmm = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
