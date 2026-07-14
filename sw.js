@@ -275,8 +275,15 @@ self.addEventListener('push', e => {
 
     let notif = null, meta = {};
     if (payload) {
-      notif = payload.notification || (payload.title ? payload : null);
-      meta  = payload.data || {};
+      // Data-only FCM: title+body in data payload, no notification block
+      if (payload.data && payload.data.title) {
+        meta  = payload.data;
+        notif = { title: payload.data.title, body: payload.data.body || '' };
+      } else {
+        // Legacy notification-message fallback
+        notif = payload.notification || (payload.title ? payload : null);
+        meta  = payload.data || {};
+      }
     }
 
     // No payload ג€” silent no-op (empty pushes are FCM keep-alives, not real notifications)
@@ -326,10 +333,29 @@ self.addEventListener('push', e => {
       silent:              false,
       timestamp:           Date.now(),
       data: Object.assign({}, meta, { _pushTs: relayPayload.ts }),
-      actions: [
-        { action: 'open',    title: visual.action },
-        { action: 'dismiss', title: '׳¡׳’׳•׳¨' }
-      ]
+      actions: (function() {
+        var _aMap = {
+          'gate_opened':                  ['׳₪׳¨׳˜׳™ ׳—׳ ׳™׳•׳ן', ''],
+          'test_due':                     ['׳׳›׳•׳ ׳™ ׳˜׳¡׳˜', '׳×׳–׳›׳•׳¨׳× ׳‘׳™׳•׳׳ן'],
+          'test_urgent':                  ['׳׳›׳•׳ ׳™ ׳˜׳¡׳˜ ׳¢׳›׳©׳™׳•', '׳×׳–׳›׳•׳¨׳× ׳‘׳™׳•׳׳ן'],
+          'overdue':                      ['׳₪׳×׳— ׳‘׳§׳©׳× ׳׳•׳¡׳ ', ''],
+          'urgent':                       ['׳₪׳×׳— ׳‘׳§׳©׳× ׳׳•׳¡׳ ', ''],
+          'plan':                         ['׳×׳׳ ׳×׳•׳¨', '׳¢׳“׳›׳ן ׳§"׳'],
+          'km_update':                    ['׳¢׳“׳›׳ן ׳§"׳', ''],
+          'fuel_high':                    ['׳“׳•׳— ׳¦׳¨׳™׳›׳”', "׳“׳•׳•׳— ׳׳¦'׳§-׳׳₪"],
+          'fuel_km_high':                 ['׳“׳•׳— ׳¢׳׳•׳™׳•׳×', "׳“׳•׳•׳— ׳׳¦'׳§-׳׳₪"],
+          'garage_approved':              ['׳§׳‘׳¢ ׳×׳•׳¨', '׳₪׳¨׳˜׳™ ׳׳•׳¡׳'],
+          'garage_rejected':              ['׳₪׳×׳— ׳‘׳§׳©׳” ׳—׳“׳©׳”', ''],
+          'garage_appointment_set':       ['׳”׳•׳¡׳£ ׳׳™׳•׳׳ן', '׳ ׳™׳•׳•׳˜ (Waze)'],
+          'garage_appointment_cancelled': ['׳§׳‘׳¢ ׳×׳•׳¨ ׳—׳“׳©', ''],
+          'garage_appointment_reminder':  ['׳׳—׳¥ ׳׳×׳™׳׳•׳ ׳×׳•׳¨', '']
+        };
+        var _btns = _aMap[alertType] || [meta.btn1 || '׳₪׳¨׳˜׳™׳', meta.btn2 || ''];
+        var _acts = [{ action: 'btn1', title: _btns[0] }];
+        if (_btns[1]) _acts.push({ action: 'btn2', title: _btns[1] });
+        _acts.push({ action: 'dismiss', title: '׳¡׳’׳•׳¨' });
+        return _acts;
+      })()
     });
   })());
 });
@@ -338,6 +364,9 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
   const meta = e.notification.data || {};
+  // Store which button was clicked so app can route correctly
+  if (e.action === 'btn2') meta._clickedAction = 'btn2';
+  else meta._clickedAction = 'btn1';
   // Preserve original push timestamp so clearedAt guard in saveNotifToHistory works correctly.
   // _pushTs was embedded in the notification data at showNotification time.
   const fullPayload = {
