@@ -7016,8 +7016,9 @@ window.fcmDebug = async function() {
         התנתקות
       </button>
     </div>
+    </div>
 
-    <!-- Inline logout confirm — shown instead of main view -->
+    <!-- Inline logout confirm — sibling of pp-main-view, NOT inside it -->
     <div class="pp-confirm" id="pp-confirm">
       <div class="pp-confirm-icon-wrap">
         <div class="pp-confirm-icon-ring"></div>
@@ -7036,7 +7037,6 @@ window.fcmDebug = async function() {
         </button>
         <button class="pp-btn ghost" onclick="ppCancelLogout()">ביטול</button>
       </div>
-    </div>
     </div>
 
     <div class="pp-foot" style="display:flex;align-items:center;justify-content:center;gap:5px">
