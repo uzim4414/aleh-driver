@@ -4078,7 +4078,7 @@ function openUserPopup() {
 
   // auth method + icons
   var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
-  var hasBio  = !!(bioCred && bioCred.credentialId);
+  var hasBio  = !!(bioCred && (bioCred.credentialId || bioCred.nativePlugin));
   var authMethods = [];
   if (user.email) authMethods.push('Google');
   if (hasBio)    authMethods.push('ביומטרי');
@@ -4126,17 +4126,23 @@ function openUserPopup() {
   // version
   var verEl = document.getElementById('pp-version');
   if (verEl) {
-    verEl.textContent = 'v2.0 · SW טוען...';
-    if (typeof _getAppVersion === 'function') {
-      _getAppVersion().then(function(ver) {
-        if (verEl) verEl.textContent = 'v2.0 · ' + (ver || 'SW —');
-      });
+    if (typeof _isNativeApp === 'function' && _isNativeApp()) {
+      verEl.textContent = 'v2.0 · APK';
+    } else {
+      verEl.textContent = 'v2.0 · SW טוען...';
+      if (typeof _getAppVersion === 'function') {
+        _getAppVersion().then(function(ver) {
+          if (verEl) verEl.textContent = ver ? 'v2.0 · ' + ver : 'v2.0';
+        });
+      }
     }
   }
 
-  // reset confirm state on open
+  // reset confirm + main-view state on open
+  var ppMainView = document.getElementById('pp-main-view');
   var ppConfirm = document.getElementById('pp-confirm');
   var ppMain = document.getElementById('pp-actions-main');
+  if (ppMainView) ppMainView.style.display = '';
   if (ppConfirm) ppConfirm.classList.remove('show');
   if (ppMain) ppMain.style.display = '';
 
@@ -4183,7 +4189,7 @@ function closeUserPopup() {
 
 function _ppRefreshBioDisplay() {
   var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
-  var hasBio = !!(bioCred && bioCred.credentialId);
+  var hasBio = !!(bioCred && (bioCred.credentialId || bioCred.nativePlugin));
   var user = STATE.user || {};
   // update auth method text
   var authEl = document.getElementById('pp-auth-method');
@@ -4218,7 +4224,7 @@ function _ppRefreshBioDisplay() {
 
 async function toggleBioFromPopup() {
   var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
-  var hasBio  = !!(bioCred && bioCred.credentialId);
+  var hasBio  = !!(bioCred && (bioCred.credentialId || bioCred.nativePlugin));
   var sw = document.getElementById('pp-bio-switch');
   if (hasBio) {
     // כיבוי — הסר את הביומטרי השמור
