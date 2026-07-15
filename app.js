@@ -4068,8 +4068,9 @@ function openUserPopup() {
   try { ds = localStorage.getItem('aleh_drv_session_v1'); } catch(e) {}
   var sessionEl  = document.getElementById('pp-session');
   var sessionDot = document.getElementById('pp-session-dot');
-  if (ds) {
-    if (sessionEl) sessionEl.textContent = 'פעיל · 30 ימים';
+  var _isActive = !!(ds || (STATE.user && STATE.user.email));
+  if (_isActive) {
+    if (sessionEl) sessionEl.textContent = ds ? 'פעיל · 30 ימים' : 'פעיל';
     if (sessionDot) sessionDot.style.display = '';
   } else {
     if (sessionEl) sessionEl.textContent = 'לא פעיל';
@@ -4126,16 +4127,17 @@ function openUserPopup() {
   // version
   var verEl = document.getElementById('pp-version');
   if (verEl) {
-    if (typeof _isNativeApp === 'function' && _isNativeApp()) {
-      verEl.textContent = 'v2.0 · APK';
-    } else {
-      verEl.textContent = 'v2.0 · SW טוען...';
-      if (typeof _getAppVersion === 'function') {
-        _getAppVersion().then(function(ver) {
-          if (verEl) verEl.textContent = ver ? 'v2.0 · ' + ver : 'v2.0';
-        });
-      }
-    }
+    verEl.textContent = 'v2.0 · טוען...';
+    fetch('version.json?_=' + Date.now())
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(j) {
+        if (!verEl) return;
+        var swVer = j && j.swVersion ? j.swVersion.replace('aleh-driver-', '') : '';
+        verEl.textContent = swVer ? 'v2.0 · ' + swVer : 'v2.0';
+      })
+      .catch(function() {
+        if (verEl) verEl.textContent = 'v2.0';
+      });
   }
 
   // reset confirm + main-view state on open
