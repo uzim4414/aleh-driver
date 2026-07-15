@@ -4143,7 +4143,10 @@ function openUserPopup() {
   // show overlay
   _ppOpen = true;
   overlay.classList.remove('closing');
-  overlay.style.display = 'flex';
+  overlay.style.display = 'block';
+  document.body.classList.add('pp-open');
+  var appEl = document.getElementById('app');
+  if (appEl) appEl.classList.add('pp-pushed');
   requestAnimationFrame(function() {
     overlay.classList.add('show');
   });
@@ -4165,6 +4168,9 @@ function closeUserPopup() {
   if (!overlay) return;
   overlay.classList.add('closing');
   overlay.classList.remove('show');
+  document.body.classList.remove('pp-open');
+  var appEl = document.getElementById('app');
+  if (appEl) appEl.classList.remove('pp-pushed');
   var av1 = document.querySelector('.tb-avatar-btn');
   var av2 = document.getElementById('user-avatar');
   if(av1) av1.classList.remove('active');
@@ -4172,7 +4178,7 @@ function closeUserPopup() {
   setTimeout(function() {
     overlay.classList.remove('closing');
     overlay.style.display = 'none';
-  }, 270);
+  }, 370);
 }
 
 async function toggleBioFromPopup() {

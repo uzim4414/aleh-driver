@@ -4699,40 +4699,34 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 /* ============ USER PROFILE POPUP (from mockup) ============ */
 .pp-overlay{
   position:fixed;inset:0;z-index:300;display:none;
-  background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
-  align-items:flex-end;justify-content:center;overflow-y:auto;
-  /* map mockup vars → driver vars */
+  background:rgba(0,0,0,0.45);
   --muted:var(--t2);--success:var(--ok);--danger:#FF453A;
 }
-.pp-overlay.show{display:flex;animation:kmFade .2s ease both}
-.pp-overlay.closing{animation:kmFade .22s ease reverse both}
+.pp-overlay.show{display:block;animation:kmFade .3s ease both}
+.pp-overlay.closing{animation:kmFade .3s ease reverse both}
+body.pp-open{overflow:hidden}
+#app{transition:transform .35s cubic-bezier(0.16,1,0.3,1)}
+#app.pp-pushed{transform:translateX(min(300px,80vw))}
 .pp-card{
-  position:relative;top:auto;left:auto;width:100%;max-width:480px;
-  max-height:88vh;overflow-y:auto;
-  transform-origin:bottom center;
-  background:rgba(17,17,17,0.98);
+  position:fixed;top:0;left:0;height:100%;height:100dvh;
+  width:min(300px,80vw);overflow-y:auto;overflow-x:hidden;
+  background:rgba(15,15,15,0.99);
   backdrop-filter:blur(40px) saturate(1.8);
   -webkit-backdrop-filter:blur(40px) saturate(1.8);
-  border:1px solid rgba(48,209,88,0.15);
-  border-radius:26px 26px 0 0;
-  padding:20px 18px 40px;
-  overflow:hidden;
-  box-shadow:0 -20px 80px rgba(0,0,0,0.8);
+  border:none;border-right:1px solid rgba(48,209,88,0.18);
+  border-radius:0 22px 22px 0;
+  padding:20px 16px 40px;
+  box-shadow:8px 0 60px rgba(0,0,0,0.7);
+  transform:translateX(-100%);
+  transition:transform .35s cubic-bezier(0.16,1,0.3,1);
+  z-index:301;
 }
-.pp-overlay.show .pp-card{animation:ppBorn .4s cubic-bezier(0.34,1.56,0.64,1) both}
-.pp-overlay.closing .pp-card{animation:ppDie .26s cubic-bezier(0.16,1,0.3,1) both}
-@keyframes ppBorn{
-  from{opacity:0;transform:translateY(100%)}
-  to{opacity:1;transform:translateY(0)}
-}
-@keyframes ppDie{
-  from{opacity:1;transform:translateY(0)}
-  to{opacity:0;transform:translateY(100%)}
-}
+.pp-overlay.show .pp-card{transform:translateX(0)}
+.pp-overlay.closing .pp-card{transform:translateX(-100%)}
 .pp-card::before{
-  content:"";position:absolute;top:-10px;left:50%;transform:translateX(-50%);
-  width:230px;height:150px;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(48,209,88,0.16) 0%,transparent 70%);
+  content:"";position:absolute;top:40%;right:-30px;transform:translateY(-50%);
+  width:150px;height:300px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(48,209,88,0.12) 0%,transparent 70%);
 }
 .pp-close{
   position:absolute;top:14px;left:14px;width:30px;height:30px;border-radius:50%;
