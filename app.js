@@ -4181,6 +4181,41 @@ function closeUserPopup() {
   }, 370);
 }
 
+function _ppRefreshBioDisplay() {
+  var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+  var hasBio = !!(bioCred && bioCred.credentialId);
+  var user = STATE.user || {};
+  // update auth method text
+  var authEl = document.getElementById('pp-auth-method');
+  if (authEl) {
+    var methods = [];
+    if (user.email) methods.push('Google');
+    if (hasBio) methods.push('ביומטרי');
+    authEl.textContent = methods.join(' + ') || 'Google';
+  }
+  // update Google icon
+  var gIcon = document.getElementById('pp-google-icon');
+  if (gIcon) gIcon.style.display = user.email ? 'flex' : 'none';
+  // update bio icon
+  var bIcon = document.getElementById('pp-bio-icon');
+  if (bIcon) {
+    bIcon.style.display = hasBio ? 'flex' : 'none';
+    if (hasBio && !bIcon.querySelector('img')) {
+      var fpImg = document.querySelector('.fp-icon');
+      if (fpImg) {
+        var img = document.createElement('img');
+        img.src = fpImg.src;
+        img.width = 16; img.height = 16;
+        img.style.cssText = 'filter:brightness(0) invert(1);object-fit:contain';
+        bIcon.appendChild(img);
+      }
+    }
+  }
+  // update switch state
+  var sw = document.getElementById('pp-bio-switch');
+  if (sw) sw.classList.toggle('on', hasBio);
+}
+
 async function toggleBioFromPopup() {
   var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
   var hasBio  = !!(bioCred && bioCred.credentialId);
@@ -4189,18 +4224,17 @@ async function toggleBioFromPopup() {
     // כיבוי — הסר את הביומטרי השמור
     if (typeof _bioClear === 'function') _bioClear();
     if (sw) sw.classList.remove('on');
+    _ppRefreshBioDisplay();
     var bIcon = document.getElementById('pp-bio-icon');
     if (bIcon) { bIcon.style.display = 'none'; }
     if (typeof showToast === 'function') showToast('כניסה ביומטרית בוטלה');
   } else {
-    // הפעלה — רישום ביומטרי חדש דרך bioRegister הקיים
     var user = STATE.user || {};
     try {
       await bioRegister(user.email || '', user.name || user.displayName || '');
       if (sw) sw.classList.add('on');
+      _ppRefreshBioDisplay();
       if (typeof showToast === 'function') showToast('טביעת אצבע הופעלה! בפעם הבאה תיכנס אוטומטית');
-      // רענן אייקונים אם הפופאפ עדיין פתוח
-      if (_ppOpen) { closeUserPopup(); }
     } catch(e) {
       if (sw) sw.classList.remove('on');
       if (typeof showToast === 'function') showToast('לא הצלחנו: ' + (e && e.message || 'שגיאה'));
@@ -4209,30 +4243,17 @@ async function toggleBioFromPopup() {
 }
 
 function ppShowLogoutConfirm() {
-  var main = document.getElementById('pp-actions-main');
+  var mainView = document.getElementById('pp-main-view');
   var confirm = document.getElementById('pp-confirm');
-  // הסתר את כל תוכן ה-sheet למעט ה-confirm
-  if (main) main.style.display = 'none';
-  // הסתר גם bio toggle + info rows
-  var info = document.querySelector('.pp-info');
-  var toggleRow = document.getElementById('pp-bio-toggle-row');
-  if (info) info.style.opacity = '0.3';
-  if (toggleRow) toggleRow.style.opacity = '0.3';
+  if (mainView) mainView.style.display = 'none';
   if (confirm) confirm.classList.add('show');
-  // גלול ל-confirm
-  var card = document.getElementById('pp-card');
-  if (card) card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
 }
 
 function ppCancelLogout() {
-  var main = document.getElementById('pp-actions-main');
+  var mainView = document.getElementById('pp-main-view');
   var confirm = document.getElementById('pp-confirm');
-  var info = document.querySelector('.pp-info');
-  var toggleRow = document.getElementById('pp-bio-toggle-row');
   if (confirm) confirm.classList.remove('show');
-  if (main) main.style.display = '';
-  if (info) info.style.opacity = '';
-  if (toggleRow) toggleRow.style.opacity = '';
+  if (mainView) mainView.style.display = '';
 }
 
 function ppDoLogout() {

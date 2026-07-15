@@ -4709,17 +4709,23 @@ body.pp-open{overflow:hidden}
 #app.pp-pushed{transform:translateX(min(300px,80vw))}
 .pp-card{
   position:fixed;top:0;left:0;height:100%;height:100dvh;
-  width:min(300px,80vw);overflow-y:auto;overflow-x:hidden;
+  width:min(300px,80vw);overflow:hidden;
+  display:flex;flex-direction:column;
   background:rgba(15,15,15,0.99);
   backdrop-filter:blur(40px) saturate(1.8);
   -webkit-backdrop-filter:blur(40px) saturate(1.8);
   border:none;border-right:1px solid rgba(48,209,88,0.18);
   border-radius:0 22px 22px 0;
-  padding:20px 16px 40px;
+  padding:0;
   box-shadow:8px 0 60px rgba(0,0,0,0.7);
   transform:translateX(-100%);
   transition:transform .35s cubic-bezier(0.16,1,0.3,1);
   z-index:301;
+}
+#pp-main-view{
+  flex:1;display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+  padding:14px 14px 0;
 }
 .pp-overlay.show .pp-card{transform:translateX(0)}
 .pp-overlay.closing .pp-card{transform:translateX(-100%)}
@@ -4735,8 +4741,8 @@ body.pp-open{overflow:hidden}
   transition:background .2s,transform .2s;
 }
 .pp-close:hover{background:rgba(255,255,255,0.12);transform:rotate(90deg)}
-.pp-head{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;padding-top:4px}
-.pp-avatar-wrap{position:relative;width:88px;height:88px;display:flex;align-items:center;justify-content:center}
+.pp-head{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;padding-top:32px}
+.pp-avatar-wrap{position:relative;width:76px;height:76px;display:flex;align-items:center;justify-content:center}
 .pp-ring{
   position:absolute;inset:0;border-radius:50%;padding:3px;
   background:conic-gradient(from 180deg,var(--red),#30D158,var(--red),#1F8A3D,var(--red));
@@ -4752,10 +4758,10 @@ body.pp-open{overflow:hidden}
 @keyframes ringSpin{to{transform:rotate(360deg)}}
 @keyframes ringPulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
 .pp-initials{
-  width:74px;height:74px;border-radius:50%;
+  width:62px;height:62px;border-radius:50%;
   background:radial-gradient(circle at 35% 30%,#1f3a26,#0d0d0d);
   display:flex;align-items:center;justify-content:center;
-  font-family:'Outfit',sans-serif;font-weight:800;font-size:30px;color:#fff;
+  font-family:'Outfit',sans-serif;font-weight:800;font-size:26px;color:#fff;
   letter-spacing:1px;box-shadow:inset 0 0 18px rgba(48,209,88,0.18);
 }
 .pp-overlay.show .pp-initials{animation:kmPop .5s cubic-bezier(0.34,1.56,0.64,1) .6s both}
@@ -4767,7 +4773,7 @@ body.pp-open{overflow:hidden}
 }
 .pp-info{margin-top:16px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.02)}
 .pp-row{
-  display:flex;align-items:center;gap:11px;padding:11px 12px;
+  display:flex;align-items:center;gap:11px;padding:9px 10px;
   border-bottom:1px solid rgba(255,255,255,0.05);
 }
 .pp-row:last-child{border-bottom:none}
@@ -4785,7 +4791,7 @@ body.pp-open{overflow:hidden}
 @keyframes ping{0%{transform:scale(1);opacity:.7}80%,100%{transform:scale(2.4);opacity:0}}
 .pp-toggle-row{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin-top:12px;padding:12px 14px;border-radius:16px;
+  margin-top:8px;padding:12px 14px;border-radius:16px;
   background:rgba(255,255,255,0.03);border:1px solid var(--border);
 }
 .pp-overlay.show .pp-toggle-row{animation:fadeUp .5s cubic-bezier(0.16,1,0.3,1) .32s both}
@@ -4803,14 +4809,25 @@ body.pp-open{overflow:hidden}
   transition:right .3s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 2px 6px rgba(0,0,0,0.4);
 }
 .pp-overlay .switch.on .knob{right:23px}
-.pp-actions{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.pp-actions{display:flex;flex-direction:column;gap:9px;margin-top:8px}
 /* Logout confirm state inside sheet */
-.pp-confirm { display:none; flex-direction:column; align-items:center; gap:14px; padding:8px 0 4px; text-align:center; }
-.pp-confirm.show { display:flex; animation:fadeUp .3s cubic-bezier(0.16,1,0.3,1) both; }
-.pp-confirm-ico { font-size:40px; }
-.pp-confirm-title { font-size:18px; font-weight:800; letter-spacing:-.4px; }
-.pp-confirm-sub { font-size:13px; color:var(--muted,#8A8A8E); }
-.pp-confirm-btns { display:flex; flex-direction:column; gap:9px; width:100%; margin-top:4px; }
+.pp-confirm{
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:20px 16px;text-align:center;
+  flex:1;
+}
+.pp-confirm.show{display:flex;animation:fadeUp .3s cubic-bezier(0.16,1,0.3,1) both}
+.pp-confirm-title{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.pp-confirm-sub{font-size:13px;color:var(--muted,#8A8A8E);line-height:1.5}
+.pp-confirm-btns{display:flex;flex-direction:column;gap:9px;width:100%;margin-top:8px}
+.pp-confirm-icon-wrap{
+  position:relative;width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-top:8px;
+}
+.pp-confirm-icon-ring{
+  position:absolute;inset:0;border-radius:50%;
+  background:rgba(255,69,58,0.12);border:1px solid rgba(255,69,58,0.25);
+  animation:ringPulse 2.4s ease-in-out infinite;
+}
 .pp-overlay.show .pp-actions{animation:fadeUp .5s cubic-bezier(0.16,1,0.3,1) .4s both}
 .pp-btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
@@ -4823,7 +4840,7 @@ body.pp-open{overflow:hidden}
 .pp-btn.danger:hover{background:rgba(255,69,58,0.12);border-color:rgba(255,69,58,0.5)}
 .pp-btn.danger:hover svg{animation:logoutShake .5s ease}
 @keyframes logoutShake{0%,100%{transform:translateX(0)}25%{transform:translateX(3px)}75%{transform:translateX(-3px)}}
-.pp-foot{text-align:center;font-size:10px;color:var(--muted);font-weight:600;margin-top:13px;letter-spacing:.2px}
+.pp-foot{text-align:center;font-size:10px;color:var(--muted);font-weight:600;padding:10px 0 14px;letter-spacing:.2px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.04)}
 @keyframes kmFade{from{opacity:0}to{opacity:1}}
 @keyframes kmPop{0%{transform:scale(0.4);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -6934,6 +6951,7 @@ window.fcmDebug = async function() {
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </div>
 
+    <div id="pp-main-view">
     <div class="pp-head">
       <div class="pp-avatar-wrap">
         <div class="pp-ring-glow"></div>
@@ -7001,16 +7019,24 @@ window.fcmDebug = async function() {
 
     <!-- Inline logout confirm — shown instead of main view -->
     <div class="pp-confirm" id="pp-confirm">
-      <div class="pp-confirm-ico">👋</div>
-      <div class="pp-confirm-title">להתנתק?</div>
-      <div class="pp-confirm-sub">תצטרך להתחבר שוב בפעם הבאה</div>
+      <div class="pp-confirm-icon-wrap">
+        <div class="pp-confirm-icon-ring"></div>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF453A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <path d="M16 17l5-5-5-5"/>
+          <path d="M21 12H9"/>
+        </svg>
+      </div>
+      <div class="pp-confirm-title">התנתקות</div>
+      <div class="pp-confirm-sub">הסשן הנוכחי יסתיים.<br>תצטרך להיכנס מחדש.</div>
       <div class="pp-confirm-btns">
         <button class="pp-btn danger" onclick="ppDoLogout()">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
           כן, התנתק
         </button>
         <button class="pp-btn ghost" onclick="ppCancelLogout()">ביטול</button>
       </div>
+    </div>
     </div>
 
     <div class="pp-foot" style="display:flex;align-items:center;justify-content:center;gap:5px">
