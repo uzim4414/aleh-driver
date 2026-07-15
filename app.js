@@ -4030,6 +4030,163 @@ async function _bioTimeoutReauth() {
   }
 }
 
+// ============================================================
+// USER PROFILE POPUP
+// ============================================================
+var _ppOpen = false;
+
+function openUserPopup() {
+  var overlay = document.getElementById('pp-overlay');
+  if (!overlay) return;
+
+  var user = STATE.user || {};
+  var veh  = STATE.vehicle || {};
+
+  // initials + name
+  var name = user.name || user.displayName || (veh && veh.holder) || user.email || '?';
+  var initials = String(name).trim().split(/\s+/).slice(0,2).map(function(w){ return w[0]||''; }).join('').toUpperCase() || '??';
+  var el = document.getElementById('pp-initials'); if(el) el.textContent = initials;
+  var nameEl = document.getElementById('pp-name'); if(nameEl) nameEl.textContent = name;
+
+  // email
+  var emailEl = document.getElementById('pp-email'); if(emailEl) emailEl.textContent = user.email || '—';
+
+  // phone
+  var phone = veh.phone || veh.driverPhone || '';
+  var phoneRow = document.getElementById('pp-phone-row');
+  var phoneEl  = document.getElementById('pp-phone');
+  if (phoneEl) phoneEl.textContent = phone || '—';
+  if (phoneRow) phoneRow.style.display = phone ? '' : 'none';
+
+  // license plate
+  var plate = veh.num || veh.licensePlate || '';
+  var plateEl = document.getElementById('pp-plate');
+  if (plateEl) plateEl.textContent = plate || '—';
+
+  // session
+  var ds = (typeof _driverSessionLoad === 'function') ? _driverSessionLoad() : null;
+  var sessionEl  = document.getElementById('pp-session');
+  var sessionDot = document.getElementById('pp-session-dot');
+  if (ds) {
+    if (sessionEl) sessionEl.textContent = 'פעיל · 30 ימים';
+    if (sessionDot) sessionDot.style.display = '';
+  } else {
+    if (sessionEl) sessionEl.textContent = 'לא פעיל';
+    if (sessionDot) sessionDot.style.display = 'none';
+  }
+
+  // auth method + icons
+  var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+  var hasBio  = !!(bioCred && bioCred.credentialId);
+  var authMethods = [];
+  if (user.email) authMethods.push('Google');
+  if (hasBio)    authMethods.push('ביומטרי');
+  var authEl = document.getElementById('pp-auth-method');
+  if (authEl) authEl.textContent = authMethods.join(' + ') || 'Google';
+
+  var gIcon = document.getElementById('pp-google-icon');
+  var bIcon = document.getElementById('pp-bio-icon');
+  if (gIcon) gIcon.style.display = user.email ? 'flex' : 'none';
+  if (bIcon) {
+    bIcon.style.display = hasBio ? 'flex' : 'none';
+    if (hasBio && !bIcon.querySelector('img')) {
+      var fpImg = document.querySelector('.fp-icon');
+      if (fpImg) {
+        var img = document.createElement('img');
+        img.src = fpImg.src;
+        img.width = 16; img.height = 16;
+        img.style.cssText = 'filter:brightness(0) invert(1);object-fit:contain';
+        bIcon.appendChild(img);
+      }
+    }
+  }
+
+  // bio toggle row
+  var bioRow = document.getElementById('pp-bio-toggle-row');
+  var bioSwitch = document.getElementById('pp-bio-switch');
+  var bioAvail = (typeof _bioAvailable === 'function') ? _bioAvailable() : false;
+  // הצג את שורת ה-toggle אם המכשיר תומך ביומטרי (כדי לאפשר הפעלה/כיבוי)
+  if (bioRow) bioRow.style.display = bioAvail ? '' : 'none';
+  if (bioSwitch) {
+    bioSwitch.classList.toggle('on', hasBio);
+    var tgIco = document.getElementById('pp-bio-tg-ico');
+    if (tgIco && !tgIco.querySelector('img')) {
+      var fpImg2 = document.querySelector('.fp-icon');
+      if (fpImg2) {
+        var img2 = document.createElement('img');
+        img2.src = fpImg2.src;
+        img2.width = 20; img2.height = 20;
+        img2.style.cssText = 'filter:brightness(0) invert(1);object-fit:contain';
+        tgIco.appendChild(img2);
+      }
+    }
+  }
+
+  // version
+  var verEl = document.getElementById('pp-version');
+  if (verEl) {
+    var swVer = (typeof SW_VERSION !== 'undefined') ? SW_VERSION : (window.SW_VERSION || '—');
+    verEl.textContent = 'v2.0 · SW ' + swVer;
+  }
+
+  // show overlay
+  _ppOpen = true;
+  overlay.classList.remove('closing');
+  overlay.style.display = 'block';
+  requestAnimationFrame(function() {
+    overlay.classList.add('show');
+  });
+
+  var av1 = document.querySelector('.tb-avatar-btn');
+  var av2 = document.getElementById('user-avatar');
+  if(av1) av1.classList.add('active');
+  if(av2) av2.classList.add('active');
+}
+
+function closeUserPopup() {
+  if (!_ppOpen) return;
+  _ppOpen = false;
+  var overlay = document.getElementById('pp-overlay');
+  if (!overlay) return;
+  overlay.classList.add('closing');
+  overlay.classList.remove('show');
+  var av1 = document.querySelector('.tb-avatar-btn');
+  var av2 = document.getElementById('user-avatar');
+  if(av1) av1.classList.remove('active');
+  if(av2) av2.classList.remove('active');
+  setTimeout(function() {
+    overlay.classList.remove('closing');
+    overlay.style.display = 'none';
+  }, 270);
+}
+
+async function toggleBioFromPopup() {
+  var bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+  var hasBio  = !!(bioCred && bioCred.credentialId);
+  var sw = document.getElementById('pp-bio-switch');
+  if (hasBio) {
+    // כיבוי — הסר את הביומטרי השמור
+    if (typeof _bioClear === 'function') _bioClear();
+    if (sw) sw.classList.remove('on');
+    var bIcon = document.getElementById('pp-bio-icon');
+    if (bIcon) { bIcon.style.display = 'none'; }
+    if (typeof showToast === 'function') showToast('כניסה ביומטרית בוטלה');
+  } else {
+    // הפעלה — רישום ביומטרי חדש דרך bioRegister הקיים
+    var user = STATE.user || {};
+    try {
+      await bioRegister(user.email || '', user.name || user.displayName || '');
+      if (sw) sw.classList.add('on');
+      if (typeof showToast === 'function') showToast('טביעת אצבע הופעלה! בפעם הבאה תיכנס אוטומטית');
+      // רענן אייקונים אם הפופאפ עדיין פתוח
+      if (_ppOpen) { closeUserPopup(); }
+    } catch(e) {
+      if (sw) sw.classList.remove('on');
+      if (typeof showToast === 'function') showToast('לא הצלחנו: ' + (e && e.message || 'שגיאה'));
+    }
+  }
+}
+
 function logout() {
   showConfirmModal({
     icon: '👤',
