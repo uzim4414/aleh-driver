@@ -4810,6 +4810,13 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 }
 .pp-overlay .switch.on .knob{right:23px}
 .pp-actions{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+/* Logout confirm state inside sheet */
+.pp-confirm { display:none; flex-direction:column; align-items:center; gap:14px; padding:8px 0 4px; text-align:center; }
+.pp-confirm.show { display:flex; animation:fadeUp .3s cubic-bezier(0.16,1,0.3,1) both; }
+.pp-confirm-ico { font-size:40px; }
+.pp-confirm-title { font-size:18px; font-weight:800; letter-spacing:-.4px; }
+.pp-confirm-sub { font-size:13px; color:var(--muted,#8A8A8E); }
+.pp-confirm-btns { display:flex; flex-direction:column; gap:9px; width:100%; margin-top:4px; }
 .pp-overlay.show .pp-actions{animation:fadeUp .5s cubic-bezier(0.16,1,0.3,1) .4s both}
 .pp-btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
@@ -6990,11 +6997,26 @@ window.fcmDebug = async function() {
       <div class="switch" id="pp-bio-switch" onclick="toggleBioFromPopup()"><div class="knob"></div></div>
     </div>
 
-    <div class="pp-actions">
-      <button class="pp-btn danger" onclick="closeUserPopup();logout()">
+    <!-- Main view -->
+    <div class="pp-actions" id="pp-actions-main">
+      <button class="pp-btn danger" onclick="ppShowLogoutConfirm()">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         התנתקות
       </button>
+    </div>
+
+    <!-- Inline logout confirm — shown instead of main view -->
+    <div class="pp-confirm" id="pp-confirm">
+      <div class="pp-confirm-ico">👋</div>
+      <div class="pp-confirm-title">להתנתק?</div>
+      <div class="pp-confirm-sub">תצטרך להתחבר שוב בפעם הבאה</div>
+      <div class="pp-confirm-btns">
+        <button class="pp-btn danger" onclick="ppDoLogout()">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          כן, התנתק
+        </button>
+        <button class="pp-btn ghost" onclick="ppCancelLogout()">ביטול</button>
+      </div>
     </div>
 
     <div class="pp-foot" style="display:flex;align-items:center;justify-content:center;gap:5px">

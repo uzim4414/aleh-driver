@@ -4134,6 +4134,12 @@ function openUserPopup() {
     }
   }
 
+  // reset confirm state on open
+  var ppConfirm = document.getElementById('pp-confirm');
+  var ppMain = document.getElementById('pp-actions-main');
+  if (ppConfirm) ppConfirm.classList.remove('show');
+  if (ppMain) ppMain.style.display = '';
+
   // show overlay
   _ppOpen = true;
   overlay.classList.remove('closing');
@@ -4149,6 +4155,10 @@ function openUserPopup() {
 }
 
 function closeUserPopup() {
+  var ppConfirm = document.getElementById('pp-confirm');
+  var ppMain = document.getElementById('pp-actions-main');
+  if (ppConfirm) ppConfirm.classList.remove('show');
+  if (ppMain) ppMain.style.display = '';
   if (!_ppOpen) return;
   _ppOpen = false;
   var overlay = document.getElementById('pp-overlay');
@@ -4189,6 +4199,53 @@ async function toggleBioFromPopup() {
       if (sw) sw.classList.remove('on');
       if (typeof showToast === 'function') showToast('לא הצלחנו: ' + (e && e.message || 'שגיאה'));
     }
+  }
+}
+
+function ppShowLogoutConfirm() {
+  var main = document.getElementById('pp-actions-main');
+  var confirm = document.getElementById('pp-confirm');
+  // הסתר את כל תוכן ה-sheet למעט ה-confirm
+  if (main) main.style.display = 'none';
+  // הסתר גם bio toggle + info rows
+  var info = document.querySelector('.pp-info');
+  var toggleRow = document.getElementById('pp-bio-toggle-row');
+  if (info) info.style.opacity = '0.3';
+  if (toggleRow) toggleRow.style.opacity = '0.3';
+  if (confirm) confirm.classList.add('show');
+  // גלול ל-confirm
+  var card = document.getElementById('pp-card');
+  if (card) card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
+}
+
+function ppCancelLogout() {
+  var main = document.getElementById('pp-actions-main');
+  var confirm = document.getElementById('pp-confirm');
+  var info = document.querySelector('.pp-info');
+  var toggleRow = document.getElementById('pp-bio-toggle-row');
+  if (confirm) confirm.classList.remove('show');
+  if (main) main.style.display = '';
+  if (info) info.style.opacity = '';
+  if (toggleRow) toggleRow.style.opacity = '';
+}
+
+function ppDoLogout() {
+  closeUserPopup();
+  // קרא ישירות לתוכן של logout() ללא showConfirmModal
+  STATE.idToken = null;
+  STATE.vehicle = null;
+  STATE.user    = null;
+  STATE._washLogLoaded = false;
+  STATE.washLog = [];
+  window._userInitiatedLogin = false;
+  window._bioLoginBusy       = false;
+  try { localStorage.removeItem(typeof SESSION_KEY !== 'undefined' ? SESSION_KEY : 'aleh_session_v1'); } catch(_e) {}
+  try { if (typeof _driverSessionClear === 'function') _driverSessionClear(); } catch(_e) {}
+  try { if (typeof _fbAuth !== 'undefined' && _fbAuth && typeof _fbAuth.signOut === 'function') _fbAuth.signOut(); } catch(_e) {}
+  try { if (typeof caches !== 'undefined') caches.keys().then(function(ks){ ks.forEach(function(k){ if(k.indexOf('aleh')<0) caches.delete(k); }); }); } catch(_e2) {}
+  // navigate to login
+  if (typeof location !== 'undefined') {
+    try { location.replace(location.pathname + '?logout=' + Date.now()); } catch(_r) { location.reload(); }
   }
 }
 
