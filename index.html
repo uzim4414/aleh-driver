@@ -4698,34 +4698,36 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 
 /* ============ USER PROFILE POPUP (from mockup) ============ */
 .pp-overlay{
-  position:absolute;inset:0;z-index:300;display:none;
+  position:fixed;inset:0;z-index:300;display:none;
   background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+  align-items:flex-end;justify-content:center;overflow-y:auto;
   /* map mockup vars → driver vars */
   --muted:var(--t2);--success:var(--ok);--danger:#FF453A;
 }
-.pp-overlay.show{display:block;animation:kmFade .2s ease both}
+.pp-overlay.show{display:flex;animation:kmFade .2s ease both}
 .pp-overlay.closing{animation:kmFade .22s ease reverse both}
 .pp-card{
-  position:absolute;top:82px;left:12px;width:312px;
-  transform-origin:top left;
-  background:rgba(17,17,17,0.96);
+  position:relative;top:auto;left:auto;width:100%;max-width:480px;
+  max-height:88vh;overflow-y:auto;
+  transform-origin:bottom center;
+  background:rgba(17,17,17,0.98);
   backdrop-filter:blur(40px) saturate(1.8);
   -webkit-backdrop-filter:blur(40px) saturate(1.8);
   border:1px solid rgba(48,209,88,0.15);
-  border-radius:26px;
-  padding:20px 18px 18px;
+  border-radius:26px 26px 0 0;
+  padding:20px 18px 40px;
   overflow:hidden;
-  box-shadow:0 20px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(48,209,88,0.08);
+  box-shadow:0 -20px 80px rgba(0,0,0,0.8);
 }
 .pp-overlay.show .pp-card{animation:ppBorn .4s cubic-bezier(0.34,1.56,0.64,1) both}
 .pp-overlay.closing .pp-card{animation:ppDie .26s cubic-bezier(0.16,1,0.3,1) both}
 @keyframes ppBorn{
-  from{opacity:0;transform:scale(0.3) translateY(-18px)}
-  to{opacity:1;transform:scale(1) translateY(0)}
+  from{opacity:0;transform:translateY(100%)}
+  to{opacity:1;transform:translateY(0)}
 }
 @keyframes ppDie{
-  from{opacity:1;transform:scale(1) translateY(0)}
-  to{opacity:0;transform:scale(0.32) translateY(-14px)}
+  from{opacity:1;transform:translateY(0)}
+  to{opacity:0;transform:translateY(100%)}
 }
 .pp-card::before{
   content:"";position:absolute;top:-10px;left:50%;transform:translateX(-50%);
@@ -6926,6 +6928,7 @@ window.fcmDebug = async function() {
 <!-- User Profile Popup -->
 <div class="pp-overlay" id="pp-overlay" onclick="if(event.target===this)closeUserPopup()" style="display:none">
   <div class="pp-card" id="pp-card">
+    <div style="width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.2);margin:0 auto 16px;"></div>
     <div class="pp-close" onclick="closeUserPopup()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </div>

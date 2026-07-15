@@ -4043,7 +4043,7 @@ function openUserPopup() {
   var veh  = STATE.vehicle || {};
 
   // initials + name
-  var name = user.name || user.displayName || (veh && veh.holder) || user.email || '?';
+  var name = (veh && veh.holder) || user.name || user.displayName || user.email || '?';
   var initials = String(name).trim().split(/\s+/).slice(0,2).map(function(w){ return w[0]||''; }).join('').toUpperCase() || '??';
   var el = document.getElementById('pp-initials'); if(el) el.textContent = initials;
   var nameEl = document.getElementById('pp-name'); if(nameEl) nameEl.textContent = name;
@@ -4064,7 +4064,8 @@ function openUserPopup() {
   if (plateEl) plateEl.textContent = plate || '—';
 
   // session
-  var ds = (typeof _driverSessionLoad === 'function') ? _driverSessionLoad() : null;
+  var ds = null;
+  try { ds = localStorage.getItem('aleh_drv_session_v1'); } catch(e) {}
   var sessionEl  = document.getElementById('pp-session');
   var sessionDot = document.getElementById('pp-session-dot');
   if (ds) {
@@ -4106,7 +4107,7 @@ function openUserPopup() {
   var bioSwitch = document.getElementById('pp-bio-switch');
   var bioAvail = (typeof _bioAvailable === 'function') ? _bioAvailable() : false;
   // הצג את שורת ה-toggle אם המכשיר תומך ביומטרי (כדי לאפשר הפעלה/כיבוי)
-  if (bioRow) bioRow.style.display = bioAvail ? '' : 'none';
+  if (bioRow) bioRow.style.display = (bioAvail || hasBio) ? '' : 'none';
   if (bioSwitch) {
     bioSwitch.classList.toggle('on', hasBio);
     var tgIco = document.getElementById('pp-bio-tg-ico');
@@ -4125,14 +4126,18 @@ function openUserPopup() {
   // version
   var verEl = document.getElementById('pp-version');
   if (verEl) {
-    var swVer = (typeof SW_VERSION !== 'undefined') ? SW_VERSION : (window.SW_VERSION || '—');
-    verEl.textContent = 'v2.0 · SW ' + swVer;
+    verEl.textContent = 'v2.0 · SW טוען...';
+    if (typeof _getAppVersion === 'function') {
+      _getAppVersion().then(function(ver) {
+        if (verEl) verEl.textContent = 'v2.0 · ' + (ver || 'SW —');
+      });
+    }
   }
 
   // show overlay
   _ppOpen = true;
   overlay.classList.remove('closing');
-  overlay.style.display = 'block';
+  overlay.style.display = 'flex';
   requestAnimationFrame(function() {
     overlay.classList.add('show');
   });
