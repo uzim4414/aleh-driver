@@ -164,6 +164,35 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .hero-alert { margin:12px 0 0; background:#161616; border-radius:14px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; border-right:2.5px solid var(--red); animation:fadeUp .5s ease .45s both; }
 .ha-title { font-size:13px; font-weight:600; letter-spacing:-0.2px; }
 .ha-sub { font-size:11px; color:var(--t2); margin-top:3px; }
+/* ── VEHICLE INACTIVE (BUG-2026-07-22) ──────────────────────────────
+   Built from .hero-alert and the existing .gate-access-disabled treatment so
+   the locked state reads as part of the app, not a bolted-on warning. Amber
+   (--warn) because this is a state, not an error. */
+.veh-locked-banner { margin:12px 0 0; background:#161616; border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:11px; border-right:2.5px solid var(--warn); animation:fadeUp .5s ease .4s both; }
+.veh-locked-banner.hidden { display:none; }
+.vlb-icon { width:34px; height:34px; flex-shrink:0; background:rgba(255,159,10,0.12); border:1px solid rgba(255,159,10,0.22); border-radius:12px; display:flex; align-items:center; justify-content:center; animation:vlbBreathe 3.2s ease-in-out infinite; }
+.vlb-txt { flex:1; min-width:0; }
+.vlb-title { font-size:13px; font-weight:700; letter-spacing:-0.2px; color:var(--warn); }
+.vlb-sub { font-size:11px; color:var(--t2); margin-top:3px; line-height:1.45; }
+@keyframes vlbBreathe { 0%,100%{opacity:.72} 50%{opacity:1} }
+/* Locked quick-action / hero buttons — mirrors #qa-gate-card.gate-access-disabled */
+.qa-card.is-locked, .hb-btn.is-locked {
+  cursor:default; pointer-events:none; filter:saturate(0); opacity:.45;
+  position:relative;
+}
+.qa-card.is-locked .qa-icon-box, .hb-btn.is-locked .hb-icon { background:rgba(255,255,255,0.05) !important; border-color:var(--border) !important; }
+.qa-card.is-locked .qa-lbl, .hb-btn.is-locked .hb-txt { color:var(--t2) !important; }
+.qa-card.is-locked .qa-icon-box::after {
+  content:"🔒"; position:absolute; bottom:-4px; inset-inline-end:-4px;
+  font-size:11px; line-height:1; filter:saturate(1);
+}
+.help-item.is-locked { opacity:.45 !important; transform:none !important; cursor:not-allowed; pointer-events:none; }
+/* Carousel slide of an inactive vehicle — desaturated, with a lock chip next to
+   the plate, so a driver holding several vehicles sees which one is out. */
+.hero-slide.slide-inactive .car-wrap { filter:saturate(0); opacity:.55; }
+.hero-slide.slide-inactive .car-rays,
+.hero-slide.slide-inactive .car-glow { opacity:.15; }
+.hero-plate-lock { display:inline-flex; align-items:center; gap:4px; margin-inline-start:7px; padding:2px 8px; border-radius:8px; background:rgba(255,159,10,0.14); border:1px solid rgba(255,159,10,0.3); color:var(--warn); font-size:10px; font-weight:700; letter-spacing:-0.2px; vertical-align:middle; }
 .dots { display:flex; justify-content:center; gap:5px; margin:12px 0 4px; }
 .dot { width:6px; height:6px; border-radius:50%; background:var(--t3); }
 .dot.a { background:var(--red); width:20px; border-radius:3px; }
@@ -5322,6 +5351,19 @@ body.pp-open{overflow:hidden}
               <span class="hb-txt">מסמכי הרכב</span>
               <span class="hb-arr">›</span>
             </button>
+          </div>
+          <!-- Vehicle inactive notice — same shape as .hero-alert, amber instead of green -->
+          <div class="veh-locked-banner hidden" id="veh-locked-banner">
+            <div class="vlb-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <div class="vlb-txt">
+              <div class="vlb-title">הרכב מושבת</div>
+              <div class="vlb-sub" id="vlb-sub">הפעולות אינן זמינות · לפרטים פנה למנהל הצי</div>
+            </div>
           </div>
           <div id="garage-appt-widget-mount"></div>
           <div class="hero-alert hidden" id="home-alert">

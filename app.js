@@ -1149,9 +1149,66 @@ function _sessionExpired() {
   _showSessionExpiredOverlay();
 }
 
+/* Actions that change something about the vehicle. Blocked outright while the
+   vehicle is inactive (BUG-2026-07-22) — the UI locks the cards too, but this
+   is the funnel every one of them passes through, including the offline queue
+   replay, so nothing slips past a missed UI guard. Read-only actions
+   (driver_auth, driver_vehicle, view_doc_b64, …) are deliberately absent. */
+var VEHICLE_MUTATING_ACTIONS = [
+  'driver_update_km', 'save_wash', 'save_wash_rating', 'driver_field_event',
+  'garage_request_action', 'garage_set_appointment', 'cancel_appointment',
+  'save_garage_reminder', 'open_gate', 'save_test_completion', 'save_test_failure',
+  'send_test_invoice', 'send_test_documents'
+];
+
+function _isVehActive(v) {
+  var s = String((v && v.isActive !== undefined && v.isActive !== null && v.isActive !== '' ? v.isActive : 'true')).toLowerCase().trim();
+  return !(s === 'false' || s === 'no' || s === '0' || s === 'לא');
+}
+
+/* True when the CURRENTLY SELECTED vehicle is inactive. A driver with several
+   vehicles keeps full functionality on the others — switchVehicle re-renders
+   and this flips back. */
+function _vehicleLocked() {
+  return !!(STATE.vehicle && !_isVehActive(STATE.vehicle));
+}
+
+/* Paints the locked state for the currently selected vehicle. Idempotent and
+   symmetric — switching to an active vehicle clears everything it set, which is
+   what makes a multi-vehicle driver keep full functionality on the others. */
+function _applyVehicleLock() {
+  var locked = _vehicleLocked();
+  try { document.body.classList.toggle('veh-locked', locked); } catch(_b) {}
+
+  var banner = document.getElementById('veh-locked-banner');
+  if (banner) banner.classList.toggle('hidden', !locked);
+
+  var sub = document.getElementById('vlb-sub');
+  if (sub && locked) {
+    sub.textContent = (STATE._vehicles && STATE._vehicles.length > 1)
+      ? 'הפעולות לרכב זה אינן זמינות · החלק לרכב אחר או פנה למנהל הצי'
+      : 'הפעולות אינן זמינות · לפרטים פנה למנהל הצי';
+  }
+
+  ['.qa-card', '.hb-btn', '.help-item'].forEach(function(sel) {
+    var nodes = document.querySelectorAll(sel);
+    for (var i = 0; i < nodes.length; i++) {
+      /* leave the "coming soon" items alone — they own their disabled styling */
+      if (nodes[i].classList.contains('help-item-soon')) continue;
+      nodes[i].classList.toggle('is-locked', locked);
+      if (locked) nodes[i].setAttribute('aria-disabled', 'true');
+      else nodes[i].removeAttribute('aria-disabled');
+    }
+  });
+}
+
 async function gasPost(action, extra, opts) {
   extra = extra || {};
   opts  = opts  || {};
+  if (_vehicleLocked() && VEHICLE_MUTATING_ACTIONS.indexOf(action) > -1) {
+    if (!opts.silent) showToast('הרכב מושבת — הפעולה אינה זמינה');
+    return { ok: false, error: 'vehicle_inactive' };
+  }
   if (!GAS_URL) {
     console.warn('[gasPost] GAS_URL not configured — using mock response for:', action);
     return mockResponse(action, extra);
@@ -1213,6 +1270,10 @@ async function gasPost(action, extra, opts) {
 
 async function gasPostForm(action, params) {
   // שולח POST עם FormData — לפעולות עם payload גדול (תמונה base64)
+  if (_vehicleLocked() && VEHICLE_MUTATING_ACTIONS.indexOf(action) > -1) {
+    showToast('הרכב מושבת — הפעולה אינה זמינה');
+    return { ok: false, error: 'vehicle_inactive' };
+  }
   // גישה A: bio credential כ-fallback ל-idToken שפג
   var _bioCred2 = (typeof _bioLoad === 'function') ? _bioLoad() : null;
   var _hasBio2 = !!(_bioCred2 && _bioCred2.credentialId && _bioCred2.email);
@@ -1930,7 +1991,7 @@ function _heroCarouselInit() {
   track.innerHTML = '';
   vehicles.forEach(function(v) {
     var slide = document.createElement('div');
-    slide.className = 'hero-slide';
+    slide.className = 'hero-slide' + (_isVehActive(v) ? '' : ' slide-inactive');
     var imgUrl = v.appPhotoLink || v.photoLink || '';
     var plate  = v.num || '';
     var make   = v.make || '';
@@ -1942,7 +2003,9 @@ function _heroCarouselInit() {
           '<div class="car-placeholder"><svg width="90" height="60" viewBox="0 0 90 60" fill="none"><rect x="5" y="20" width="80" height="30" rx="10" fill="rgba(255,255,255,0.08)"/><rect x="15" y="10" width="60" height="25" rx="8" fill="rgba(255,255,255,0.06)"/><circle cx="20" cy="52" r="7" fill="rgba(255,255,255,0.15)"/><circle cx="70" cy="52" r="7" fill="rgba(255,255,255,0.15)"/></svg></div>') +
         '<div class="car-glow"></div>' +
       '</div>' +
-      '<div class="hero-plate-wrap"><span class="hero-plate">'+_escHtml(plate)+'</span></div>';
+      '<div class="hero-plate-wrap"><span class="hero-plate">'+_escHtml(plate)+'</span>' +
+        (_isVehActive(v) ? '' : '<span class="hero-plate-lock">🔒 מושבת</span>') +
+      '</div>';
     track.appendChild(slide);
   });
 
@@ -4364,6 +4427,10 @@ function renderAll() {
   renderAlerts();
   renderHistory();
   renderService();
+  /* Last, so it paints over whatever the renders above just rebuilt.
+     switchVehicle() ends in renderAll, so this also clears the lock when the
+     driver swipes to an active vehicle (BUG-2026-07-22). */
+  try { _applyVehicleLock(); } catch(_vl) { console.warn('[lock]', _vl); }
 }
 
 function renderTopBar() {
@@ -11497,7 +11564,7 @@ function _gateInit() {
   var cfg = APP._gateConfig || {};
   if (!cfg.enabled) { card.style.display = 'none'; return; }
   // Guard: vehicle must be active
-  var vehActive = !STATE.vehicle || String(STATE.vehicle.isActive || 'true').toLowerCase() === 'true';
+  var vehActive = !STATE.vehicle || _isVehActive(STATE.vehicle);   /* shared helper — was a local, stricter check */
   card.style.display = 'flex';
   if (!vehActive) { _gateSetState('disabled'); return; }
   _gateSetState('idle');
