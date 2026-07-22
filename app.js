@@ -1158,7 +1158,7 @@ var VEHICLE_MUTATING_ACTIONS = [
   'driver_update_km', 'save_wash', 'save_wash_rating', 'driver_field_event',
   'garage_request_action', 'garage_set_appointment', 'cancel_appointment',
   'save_garage_reminder', 'open_gate', 'save_test_completion', 'save_test_failure',
-  'send_test_invoice', 'send_test_documents'
+  'send_test_invoice', 'send_test_documents', 'driver_report_fault'
 ];
 
 function _isVehActive(v) {
@@ -1224,6 +1224,14 @@ async function gasPost(action, extra, opts) {
 
   var _dsTok = _driverSessionLoad();
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
+  /* Tell the server WHICH vehicle this is about (BUG-2026-07-23). The token
+     only carries an email, so without this the server fell back to the first
+     row matching that email — an arbitrary choice for a driver holding two.
+     Injected centrally so every current and future call inherits it; explicit
+     values passed by the caller are never overwritten. */
+  if (params.vehicleId === undefined && STATE.vehicle && STATE.vehicle.id) {
+    params.vehicleId = STATE.vehicle.id;
+  }
   if (_dsTok) params.driverSession = _dsTok;
   // גישה A: כשאין idToken תקין אך קיים bio credential — צרף credentialId+email ל-GAS
   var _tokBad = !STATE.idToken || (STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken));
@@ -1279,6 +1287,10 @@ async function gasPostForm(action, params) {
   var _hasBio2 = !!(_bioCred2 && _bioCred2.credentialId && _bioCred2.email);
   if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken) && !_hasBio2) {
     _sessionExpired(); throw new Error('session_expired');
+  }
+  /* Same vehicle disambiguation as gasPost (BUG-2026-07-23) */
+  if (params && params.vehicleId === undefined && STATE.vehicle && STATE.vehicle.id) {
+    params.vehicleId = STATE.vehicle.id;
   }
   var fd = new FormData();
   fd.append('action', action);
@@ -7215,6 +7227,12 @@ function _showHelpCard(html) {
   if (items) items.style.display = 'none';
   if (wrap)  { wrap.style.display = ''; wrap.innerHTML = html; }
 }
+
+/* The fuel-alert card's button calls APP._fireFieldEvent, which was never
+   defined — _fireFieldEvent is a plain global. The `&&` guard in its onclick
+   swallowed the miss, so the button did nothing and said nothing
+   (BUG-2026-07-23). Assigned here, after `const APP` is initialised. */
+APP._fireFieldEvent = _fireFieldEvent;
 
 APP._helpBackToMenu = function() {
   var wrap  = document.getElementById('help-card-wrap');
