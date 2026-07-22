@@ -1190,7 +1190,7 @@ function _applyVehicleLock() {
       : 'הפעולות אינן זמינות · לפרטים פנה למנהל הצי';
   }
 
-  ['.qa-card', '.hb-btn', '.help-item'].forEach(function(sel) {
+  ['.qa-card', '.hero-btn', '.help-item'].forEach(function(sel) {
     var nodes = document.querySelectorAll(sel);
     for (var i = 0; i < nodes.length; i++) {
       /* leave the "coming soon" items alone — they own their disabled styling */
@@ -7007,7 +7007,10 @@ const APP = {
     document.getElementById('km-modal-btn-text').textContent = 'שולח...';
     document.getElementById('km-modal-spinner').classList.remove('hidden');
     try {
-      await gasPost('driver_update_km', { km: km });
+      /* Send the selected vehicle explicitly — a driver with several vehicles
+         used to have the reading land on whichever row came first in the sheet
+         (BUG-2026-07-22). */
+      await gasPost('driver_update_km', { km: km, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '' });
       if (STATE.vehicle) {
         STATE.vehicle.lastServiceKm = km;
         STATE.vehicle.currentKm = km;

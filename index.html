@@ -176,12 +176,12 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .vlb-sub { font-size:11px; color:var(--t2); margin-top:3px; line-height:1.45; }
 @keyframes vlbBreathe { 0%,100%{opacity:.72} 50%{opacity:1} }
 /* Locked quick-action / hero buttons — mirrors #qa-gate-card.gate-access-disabled */
-.qa-card.is-locked, .hb-btn.is-locked {
+.qa-card.is-locked, .hero-btn.is-locked {
   cursor:default; pointer-events:none; filter:saturate(0); opacity:.45;
   position:relative;
 }
-.qa-card.is-locked .qa-icon-box, .hb-btn.is-locked .hb-icon { background:rgba(255,255,255,0.05) !important; border-color:var(--border) !important; }
-.qa-card.is-locked .qa-lbl, .hb-btn.is-locked .hb-txt { color:var(--t2) !important; }
+.qa-card.is-locked .qa-icon-box, .hero-btn.is-locked .hb-icon { background:rgba(255,255,255,0.05) !important; border-color:var(--border) !important; }
+.qa-card.is-locked .qa-lbl, .hero-btn.is-locked .hb-txt { color:var(--t2) !important; }
 .qa-card.is-locked .qa-icon-box::after {
   content:"🔒"; position:absolute; bottom:-4px; inset-inline-end:-4px;
   font-size:11px; line-height:1; filter:saturate(1);
