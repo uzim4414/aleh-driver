@@ -11941,7 +11941,10 @@ function _gateShowSuccess(lotName, distM, parkingSpot) {
     }).catch(function(){});
   }
   if (_gateSuccessTimer) clearTimeout(_gateSuccessTimer);
-  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 60000);
+  // C4-a (2026-07-24, PLAN-gate-wayfinding): overlay auto-dismiss shortened 60s→15s —
+  // the gate already opened ~200m out, so a long landing is unneeded. C4-b will transition
+  // this into the parking-spot wayfinding screen instead of a plain dismiss.
+  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 15000);
 }
 
 /* Hide the success overlay and return the gate card to idle. Single dismiss path
