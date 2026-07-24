@@ -11805,6 +11805,7 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
       _gateCooldownMap[lotId] = Date.now() + cooldownSec * 1000;
       _gateCooldownUntil = _gateCooldownMap[lotId]; // backward compat
       _gateLatchMap[lotId] = true; // direction latch — block re-open until vehicle exits 300m
+      _wfLotId = lotId; _wfLotName = r.lotName || _cfgForLot.lotName || 'חניון';   // C4-b: for wayfinding transition
       _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM, r.parkingSpot || '');
     } else {
       // BUG-FIX: surface the real server reason to the user (drawer may be open,
@@ -11941,10 +11942,10 @@ function _gateShowSuccess(lotName, distM, parkingSpot) {
     }).catch(function(){});
   }
   if (_gateSuccessTimer) clearTimeout(_gateSuccessTimer);
-  // C4-a (2026-07-24, PLAN-gate-wayfinding): overlay auto-dismiss shortened 60s→15s —
-  // the gate already opened ~200m out, so a long landing is unneeded. C4-b will transition
-  // this into the parking-spot wayfinding screen instead of a plain dismiss.
-  _gateSuccessTimer = setTimeout(function() { _gateHideSuccess(); }, 15000);
+  // C4-a/C4-b (2026-07-24, PLAN-gate-wayfinding): after 15s the success overlay transitions
+  // into the parking-spot wayfinding screen (not a plain dismiss). Manual close (X/tap) still
+  // dismisses via _gateHideSuccess.
+  _gateSuccessTimer = setTimeout(function() { _wfFromGate(); }, 15000);
 }
 
 /* Hide the success overlay and return the gate card to idle. Single dismiss path
@@ -11956,6 +11957,83 @@ function _gateHideSuccess() {
   if (overlay) { overlay.style.display = 'none'; overlay.onclick = null; }
   _gateSetState('idle');
 }
+
+/* ══════ C4-b: parking-spot wayfinding screen (2026-07-24, PLAN-gate-wayfinding) ══════ */
+var _wfLotId = '', _wfLotName = '';
+var _WF_GLYPH = { gate:'⛔', ramp_down:'↓', ramp_up:'↑', turn:'↰', junction:'✚', one_way:'→', dead_end:'⊘', elevator:'⇅', stairs:'≡', building_entry:'⌂', accessible:'♿', payment:'₪', speed_bump:'⌢', floor_marker:'±' };
+var _WF_COLOR = { gate:'#22C55E', ramp_down:'#22D3EE', ramp_up:'#22D3EE', turn:'#3b82f6', junction:'#8B5CF6', one_way:'#3b82f6', dead_end:'#EF4444', elevator:'#FFB020', stairs:'#FFB020', building_entry:'#F59E0B', accessible:'#3b82f6', payment:'#10B981', speed_bump:'#F59E0B', floor_marker:'#94A3B8' };
+var _WF_LABEL = { gate:'שער', ramp_down:'רמפה', ramp_up:'עלייה', turn:'עיקול', junction:'צומת', one_way:'חד-סטרי', dead_end:'מבוי סתום', elevator:'מעלית', stairs:'מדרגות', building_entry:'כניסה למבנה', accessible:'נגישות', payment:'תשלום', speed_bump:'סף מהירות', floor_marker:'מפלס' };
+function _wfEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function _wfRouteMeters(route, mpu){
+  if(!route || route.length<2 || !mpu) return 0;
+  var d=0; for(var i=1;i<route.length;i++){ var dx=route[i].x-route[i-1].x, dy=route[i].y-route[i-1].y; d+=Math.sqrt(dx*dx+dy*dy); }
+  return Math.round(d*mpu);
+}
+// order landmarks by their nearest position along the route → turn-by-turn summary
+function _wfManeuvers(route, landmarks){
+  if(!landmarks || !landmarks.length) return [];
+  var pts = (route&&route.length)?route:[];
+  function alongT(m){ if(!pts.length) return 0; var best=1e9,bi=0; for(var i=0;i<pts.length;i++){var dx=pts[i].x-m.x,dy=pts[i].y-m.y,dd=dx*dx+dy*dy; if(dd<best){best=dd;bi=i;}} return bi; }
+  return landmarks.slice().sort(function(a,b){return alongT(a)-alongT(b);}).map(function(m){ return { type:m.type, label:_WF_LABEL[m.type]||m.type, glyph:_WF_GLYPH[m.type]||'•' }; });
+}
+function _wfBuildSvg(d){
+  var ext = d.ext || {x:0,y:0,w:100,h:82};
+  var vb = ext.x+' '+ext.y+' '+ext.w+' '+ext.h;
+  var spotsSvg = (d.spots||[]).map(function(s){
+    var isT = d.assignedSpotId && String(s.id)===String(d.assignedSpotId);
+    var cx=s.x+s.w/2, cy=s.y+s.h/2;
+    return '<g transform="rotate('+(s.rot||0)+' '+cx+' '+cy+')">'+
+      '<rect x="'+s.x+'" y="'+s.y+'" width="'+s.w+'" height="'+s.h+'" rx="1.2" fill="'+(isT?'#FFB020':'#28345f')+'" stroke="'+(isT?'#FFD166':'#3b4a7d')+'" stroke-width="'+(isT?0.6:0.35)+'"'+(isT?' filter="url(#wfGlow)"':' opacity="0.85"')+'></rect>'+
+      (isT?'<text x="'+cx+'" y="'+(cy+2.2)+'" text-anchor="middle" font-size="5" font-weight="900" fill="#3a2500" font-family="Noto Sans Hebrew,Arial">'+_wfEsc(s.label)+'</text>':'')+
+    '</g>';
+  }).join('');
+  var routeSvg='', carSvg='';
+  if((d.route||[]).length>1){
+    var dd=d.route.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y;}).join(' ');
+    routeSvg='<path d="'+dd+'" fill="none" stroke="#22D3EE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" filter="url(#wfGlow)"></path>'+
+      '<path d="'+dd+'" fill="none" stroke="#fff" stroke-width="0.55" stroke-dasharray="2,2.5"><animate attributeName="stroke-dashoffset" from="9" to="0" dur="0.8s" repeatCount="indefinite"></animate></path>';
+    carSvg='<circle r="2" fill="#fff" stroke="#22D3EE" stroke-width="0.6"><animateMotion dur="5s" repeatCount="indefinite" rotate="auto" path="'+dd+'"></animateMotion></circle>';
+  }
+  var lmSvg=(d.landmarks||[]).map(function(m){
+    return '<g transform="translate('+m.x+','+m.y+')"><circle r="2.6" fill="'+(_WF_COLOR[m.type]||'#94A3B8')+'" stroke="#0b1330" stroke-width="0.35"></circle>'+
+      '<text y="1" text-anchor="middle" font-size="3" fill="#0b1330" font-weight="bold" font-family="Noto Sans Hebrew,Arial">'+(_WF_GLYPH[m.type]||'•')+'</text></g>';
+  }).join('');
+  return '<svg viewBox="'+vb+'" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">'+
+    '<defs><filter id="wfGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.1" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs>'+
+    spotsSvg+routeSvg+lmSvg+carSvg+'</svg>';
+}
+function _wfRender(d){
+  var ov=document.getElementById('wayfinding-overlay'); if(!ov) return;
+  var lotEl=document.getElementById('wf-lot-svg'); if(lotEl) lotEl.innerHTML=_wfBuildSvg(d);
+  var lname=document.getElementById('wf-lotname'); if(lname) lname.textContent=d.lotName||_wfLotName||'חניון';
+  var spotEl=document.getElementById('wf-spot-num'); if(spotEl) spotEl.textContent=d.assignedSpot||'—';
+  var meters=_wfRouteMeters(d.route,d.scaleMPU);
+  var distEl=document.getElementById('wf-dist'); if(distEl) distEl.textContent = meters>0 ? (meters+' מ׳') : 'החניה שלך';
+  var mans=_wfManeuvers(d.route,d.landmarks);
+  var mEl=document.getElementById('wf-maneuvers');
+  if(mEl){ mEl.innerHTML = mans.length ? mans.map(function(m){ return '<span class="wf-man"><i style="background:'+(_WF_COLOR[m.type]||'#94A3B8')+'">'+m.glyph+'</i>'+_wfEsc(m.label)+'</span>'; }).join('<span class="wf-man-sep">›</span>') : '<span class="wf-man-none">עקוב אחר המסלול לחניה שלך</span>'; }
+  var noSpot=document.getElementById('wf-nospot');
+  if(noSpot) noSpot.style.display = d.assignedSpot ? 'none' : 'block';
+}
+function _wfShow(lotId, lotName){
+  var ov=document.getElementById('wayfinding-overlay'); if(!ov) return;
+  _wfLotId=lotId||_wfLotId; _wfLotName=lotName||_wfLotName;
+  // show immediately (skeleton), then fill from server
+  var lname=document.getElementById('wf-lotname'); if(lname) lname.textContent=_wfLotName||'חניון';
+  ov.style.display='flex';
+  gasPost('get_lot_wayfinding', { lotId:_wfLotId }, { silent:true }).then(function(r){
+    if(r && r.ok){ _wfRender(r); }
+    else { var mEl=document.getElementById('wf-maneuvers'); if(mEl) mEl.innerHTML='<span class="wf-man-none">'+((r&&r.error)||'לא ניתן לטעון מפת חניון')+'</span>'; }
+  }).catch(function(){ var mEl=document.getElementById('wf-maneuvers'); if(mEl) mEl.innerHTML='<span class="wf-man-none">שגיאת תקשורת</span>'; });
+}
+function _wfFromGate(){
+  var s=document.getElementById('gate-success-overlay'); if(s){ s.style.display='none'; s.onclick=null; }
+  if(_gateSuccessTimer){ clearTimeout(_gateSuccessTimer); _gateSuccessTimer=null; }
+  if(_gateSuccessPctTimer){ clearInterval(_gateSuccessPctTimer); _gateSuccessPctTimer=null; }
+  _gateSetState('idle');
+  _wfShow(_wfLotId, _wfLotName);
+}
+function _wfHide(){ var ov=document.getElementById('wayfinding-overlay'); if(ov) ov.style.display='none'; }
 
 // Expose tap handler
 if (typeof APP !== 'undefined') {

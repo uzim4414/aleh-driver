@@ -4596,6 +4596,26 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .gate-dist-badge { position:absolute;top:6px;left:6px;background:#1F8A3D;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;animation:badgeBeat 1.5s ease-in-out infinite; }
 .gate-status-dot { position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#FF9F0A; }
 /* ── Gate success overlay v3 ── */
+/* C4-b wayfinding overlay */
+#wayfinding-overlay{position:fixed;inset:0;z-index:100000;display:none;flex-direction:column;background:radial-gradient(120% 80% at 50% 100%,#1a2a5e 0%,#131A3A 42%,#0B1026 80%);animation:gsLandingIn .5s cubic-bezier(.22,1,.36,1) both;overflow:hidden}
+#wayfinding-overlay .wf-close{position:absolute;top:calc(14px + env(safe-area-inset-top));inset-inline-end:16px;z-index:6;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff;font-size:15px;cursor:pointer}
+.wf-top{display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top)) 20px 8px;z-index:5}
+.wf-openchip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#30D158;background:rgba(48,209,88,.12);border:1px solid rgba(48,209,88,.28);padding:6px 12px;border-radius:20px}
+.wf-lotname{font-size:13.5px;font-weight:600;color:rgba(234,240,255,.6)}
+.wf-lot{flex:1;min-height:0;margin:6px 14px;position:relative}
+.wf-lot svg{width:100%;height:100%}
+.wf-nospot{text-align:center;color:#FFD166;font-size:12.5px;font-weight:600;margin:0 20px}
+.wf-sheet{background:rgba(20,28,58,.82);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid rgba(255,255,255,.08);border-radius:24px 24px 0 0;padding:16px 20px calc(18px + env(safe-area-inset-bottom));z-index:5}
+.wf-sheet-top{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.wf-spot-block{display:flex;flex-direction:column}
+.wf-spot-lbl{font-size:11px;font-weight:700;color:rgba(234,240,255,.42)}
+.wf-spot-num{font-size:44px;font-weight:900;color:#FFD166;line-height:1;text-shadow:0 0 22px rgba(255,176,32,.5)}
+.wf-dist{font-size:20px;font-weight:800;color:#22D3EE;font-variant-numeric:tabular-nums}
+.wf-maneuvers{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:14px}
+.wf-man{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#cbd5e1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:5px 10px;border-radius:12px}
+.wf-man i{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#0b1330;font-weight:800;font-style:normal}
+.wf-man-sep{color:rgba(234,240,255,.3);font-weight:800}
+.wf-man-none{font-size:12.5px;font-weight:600;color:rgba(234,240,255,.5)}
 #gate-success-overlay { position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:radial-gradient(110% 70% at 50% 42%,rgba(48,209,88,.18) 0%,rgba(48,209,88,.04) 38%,transparent 65%),linear-gradient(165deg,#03120a 0%,#061a0e 50%,#010805 100%);overflow:hidden;animation:gsLandingIn .55s cubic-bezier(.22,1,.36,1) both; }
 @keyframes gsLandingIn { 0%{opacity:0;transform:scale(.93)} 100%{opacity:1;transform:scale(1)} }
 #gate-success-overlay::before { content:'';position:absolute;left:50%;top:42%;width:520px;height:520px;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(48,209,88,.2) 0%,transparent 60%);filter:blur(30px);pointer-events:none;animation:gsAurora 4s ease-in-out infinite; }
@@ -4934,6 +4954,24 @@ body.pp-open{overflow:hidden}
   <div class="gs-spot" id="gs-spot" style="display:none"></div>
   <div class="gs-meta" id="gs-meta"></div>
   <div class="gs-pct" id="gs-pct">0%</div>
+</div>
+
+<!-- C4-b: parking-spot wayfinding overlay -->
+<div id="wayfinding-overlay" style="display:none">
+  <button class="wf-close" onclick="_wfHide()" aria-label="סגור">✕</button>
+  <div class="wf-top">
+    <span class="wf-openchip">✓ השער נפתח</span>
+    <span class="wf-lotname" id="wf-lotname">חניון</span>
+  </div>
+  <div class="wf-lot" id="wf-lot-svg"></div>
+  <div id="wf-nospot" class="wf-nospot" style="display:none">לא נמצאה חניה מוקצית — עקוב אחר המסלול</div>
+  <div class="wf-sheet">
+    <div class="wf-sheet-top">
+      <div class="wf-spot-block"><span class="wf-spot-lbl">החניה שלך</span><span class="wf-spot-num" id="wf-spot-num">—</span></div>
+      <div class="wf-dist" id="wf-dist">החניה שלך</div>
+    </div>
+    <div class="wf-maneuvers" id="wf-maneuvers"></div>
+  </div>
 </div>
 
 <svg style="display:none">
