@@ -11554,6 +11554,13 @@ var _gateSuccessTimer     = null;  // handle for the success-overlay auto-dismis
 var _gateSuccessPctTimer = null;
 var _GATE_WARMUP_MS       = 45000; // 45s warmup before auto-open is allowed
 var _GATE_MOVE_KMH        = 5;     // min speed (km/h) counted as "moving"
+// BUG-2026-07-24: native BackgroundGeolocation gives `bearing`/`speed` that are
+// often null (null when stationary; WebView geolocation similar). Derive heading &
+// speed from the delta between consecutive fixes so the direction proof works.
+var _GATE_MIN_MOVE_M      = 8;     // min metres between fixes to trust a derived heading/speed (above GPS noise)
+var _gatePrevFixLat = null;        // previous fix latitude  (for delta-derived heading/speed)
+var _gatePrevFixLng = null;        // previous fix longitude
+var _gatePrevFixTs  = 0;           // previous fix timestamp (ms)
 
 /* Arm the launch warmup guard. Idempotent — the warmup timer is (re)started only
    once per app session so a later re-init doesn't reset the clock. */
@@ -11662,10 +11669,29 @@ function _gateOnPosition(pos) {
   }
   var lat = pos.coords.latitude;
   var lng = pos.coords.longitude;
-  var speedMs = pos.coords.speed || 0;
+  // BUG-2026-07-24: device speed/heading are often null (native bearing null when
+  // stationary; WebView geolocation likewise). Derive them from the delta between
+  // consecutive fixes; distanceFilter:20 guarantees each fix is a real move, so the
+  // travel bearing/speed are trustworthy. Below the noise threshold → stay null
+  // (fail-closed later: can't prove approaching → no auto-open while parked).
+  var _rawSpeed   = (typeof pos.coords.speed === 'number'   && !isNaN(pos.coords.speed))   ? pos.coords.speed   : null;
+  var _rawHeading = (typeof pos.coords.heading === 'number' && !isNaN(pos.coords.heading)) ? pos.coords.heading : null;
+  var _nowTs = Date.now();
+  var _derivedSpeed = null, _derivedHeading = null;
+  if (_gatePrevFixLat != null && _gatePrevFixTs) {
+    var _dtSec  = (_nowTs - _gatePrevFixTs) / 1000;
+    var _movedM = _thHaversine(_gatePrevFixLat, _gatePrevFixLng, lat, lng) * 1000;
+    if (_dtSec > 0.5 && _dtSec < 90 && _movedM >= _GATE_MIN_MOVE_M) {
+      _derivedSpeed   = _movedM / _dtSec;                                        // m/s
+      _derivedHeading = _bearingTo(_gatePrevFixLat, _gatePrevFixLng, lat, lng);  // direction of travel
+    }
+  }
+  _gatePrevFixLat = lat; _gatePrevFixLng = lng; _gatePrevFixTs = _nowTs;
+  var speedMs    = (_rawSpeed   != null) ? _rawSpeed   : (_derivedSpeed != null ? _derivedSpeed : 0);
+  var headingDeg = (_rawHeading != null) ? _rawHeading : _derivedHeading;   // null when movement < threshold
   _gateLastLat = lat;
   _gateLastLng = lng;
-  _gateLastHeading = pos.coords.heading;
+  _gateLastHeading = headingDeg;
   _gateLastSpeedKmh = Math.round(speedMs * 3.6);
   // Launch guard: mark "moving" once a real speed fix arrives. Guards auto-open
   // below so the gate never fires on the first stationary GPS fix at launch.
@@ -11705,8 +11731,8 @@ function _gateOnPosition(pos) {
     // Direction latch: after an open, block re-open until the vehicle exits 300m
     if (_gateLatchMap[inRange.lotId]) { _gateSetState('approaching'); return; }
     // Direction check: open ONLY when we can PROVE approaching.
-    // heading is null when stationary — fail-closed: no proof = no open.
-    var _hd = pos.coords.heading;
+    // heading is null when stationary / below the move threshold — fail-closed: no proof = no open.
+    var _hd = headingDeg;
     if (_hd == null || isNaN(_hd)) { _gateSetState('approaching'); return; }
     var _brg = _bearingTo(lat, lng, parseFloat(inRange.lat), parseFloat(inRange.lng));
     var _diff = Math.abs(_hd - _brg); if (_diff > 180) _diff = 360 - _diff;
@@ -12130,10 +12156,14 @@ function _gateBgOnLocation(location, error) {
     }
     if (!_bgInWin && _gateScheduleOutside) return; // still outside — skip
   }
+  // BUG-2026-07-24: the plugin's Location exposes `bearing` (course), NOT `heading`.
+  // Map it through so the direction proof in _gateOnPosition has data; leave null
+  // (not 0) when unavailable so the delta-derivation there can kick in.
   var coords = {
     latitude:  location.latitude,
     longitude: location.longitude,
-    speed:     typeof location.speed === 'number' ? location.speed : 0,
+    speed:     (typeof location.speed === 'number' && !isNaN(location.speed)) ? location.speed : null,
+    heading:   (typeof location.bearing === 'number' && !isNaN(location.bearing) && location.bearing >= 0) ? location.bearing : null,
     accuracy:  location.accuracy
   };
   _gateOnPosition({ coords: coords });
