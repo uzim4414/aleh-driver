@@ -11969,6 +11969,35 @@ function _wfRouteMeters(route, mpu){
   var d=0; for(var i=1;i<route.length;i++){ var dx=route[i].x-route[i-1].x, dy=route[i].y-route[i-1].y; d+=Math.sqrt(dx*dx+dy*dy); }
   return Math.round(d*mpu);
 }
+// distance markers every stepM meters along the route + total + arc-length midpoint (mirrors the Fleet editor)
+function _wfRouteMarkers(route, mpu, stepM){
+  var res={total:0, marks:[], mid:null};
+  if(!route || route.length<2 || !mpu) return res;
+  var segs=[], total=0;
+  for(var i=1;i<route.length;i++){
+    var dx=route[i].x-route[i-1].x, dy=route[i].y-route[i-1].y, lu=Math.sqrt(dx*dx+dy*dy);
+    segs.push({a:route[i-1], b:route[i], m:lu*mpu}); total+=lu*mpu;
+  }
+  res.total=total;
+  var next=stepM, acc=0;
+  for(var s=0;s<segs.length;s++){
+    var seg=segs[s], segEnd=acc+seg.m;
+    while(next<=segEnd+0.001 && next<total){
+      var t=(seg.m>0)?((next-acc)/seg.m):0;
+      res.marks.push({ x:seg.a.x+(seg.b.x-seg.a.x)*t, y:seg.a.y+(seg.b.y-seg.a.y)*t, m:Math.round(next) });
+      next+=stepM;
+    }
+    acc=segEnd;
+  }
+  var half=total/2, acc2=0;
+  for(var s2=0;s2<segs.length;s2++){
+    var sg=segs[s2];
+    if(acc2+sg.m>=half){ var tt=(sg.m>0)?((half-acc2)/sg.m):0; res.mid={x:sg.a.x+(sg.b.x-sg.a.x)*tt, y:sg.a.y+(sg.b.y-sg.a.y)*tt}; break; }
+    acc2+=sg.m;
+  }
+  if(!res.mid){ var mi=Math.floor(route.length/2); res.mid={x:route[mi].x, y:route[mi].y}; }
+  return res;
+}
 // order landmarks by their nearest position along the route → turn-by-turn summary
 function _wfManeuvers(route, landmarks){
   if(!landmarks || !landmarks.length) return [];
@@ -11992,6 +12021,20 @@ function _wfBuildSvg(d){
     var dd=d.route.map(function(p,i){return (i?'L':'M')+p.x+' '+p.y;}).join(' ');
     routeSvg='<path d="'+dd+'" fill="none" stroke="#22D3EE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" filter="url(#wfGlow)"></path>'+
       '<path d="'+dd+'" fill="none" stroke="#fff" stroke-width="0.55" stroke-dasharray="2,2.5"><animate attributeName="stroke-dashoffset" from="9" to="0" dur="0.8s" repeatCount="indefinite"></animate></path>';
+    // real meterage on the route: 10 m markers + total badge at the midpoint (same math as the Fleet editor)
+    if(d.scaleMPU>0){
+      var mk=_wfRouteMarkers(d.route, d.scaleMPU, 10);
+      routeSvg+=mk.marks.map(function(p){
+        return '<g><circle cx="'+p.x+'" cy="'+p.y+'" r="0.9" fill="#0b1330" stroke="#22D3EE" stroke-width="0.35"></circle>'+
+          '<text x="'+p.x+'" y="'+(p.y-1.6)+'" text-anchor="middle" font-size="2.3" fill="#22D3EE" font-weight="bold" font-family="Noto Sans Hebrew,Arial">'+p.m+'</text></g>';
+      }).join('');
+      if(mk.mid && mk.total>0){
+        var lbl='≈ '+Math.round(mk.total)+' מ׳', bw=(lbl.length*1.6+4);
+        routeSvg+='<g transform="translate('+mk.mid.x+','+(mk.mid.y-4.2)+')">'+
+          '<rect x="'+(-bw/2).toFixed(2)+'" y="-3.8" width="'+bw.toFixed(2)+'" height="5.6" rx="2.8" fill="#0b1330" stroke="#22D3EE" stroke-width="0.45" opacity="0.96"></rect>'+
+          '<text x="0" y="0.3" text-anchor="middle" font-size="3.2" fill="#22D3EE" font-weight="bold" font-family="Noto Sans Hebrew,Arial">'+lbl+'</text></g>';
+      }
+    }
     carSvg='<circle r="2" fill="#fff" stroke="#22D3EE" stroke-width="0.6"><animateMotion dur="5s" repeatCount="indefinite" rotate="auto" path="'+dd+'"></animateMotion></circle>';
   }
   var lmSvg=(d.landmarks||[]).map(function(m){
