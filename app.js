@@ -349,29 +349,74 @@ function _initFbSync() {
    stays null — _fbRef() then returns null, the listener never attaches, this fallback never fired,
    APP._gateConfig stayed undefined and _gateInit hid the card outright. The gate is the core
    function of this app; it must not depend on a secondary sync channel. */
+/* מטמון קונפיג שער — BUG-2026-07-27c תסמין D.
+   הכרטיס היה מוצג רק בסוף השרשרת loadFullData → get_gate_config → _gateInit, כלומר
+   אחרי round-trip מלא ל-GAS (cold start נמשך שניות) — ולכן "הופיע באיחור".
+   הקונפיג האחרון נשמר מקומית, הכרטיס מצויר ממנו מיד, ותשובת השרת מיישבת אותו. */
+var GATE_CFG_CACHE_KEY = 'aleh_gate_cfg_v1';
+var GATE_CFG_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 יום
+
+function _gateCfgCacheLoad(vehId) {
+  try {
+    var raw = JSON.parse(localStorage.getItem(GATE_CFG_CACHE_KEY) || 'null');
+    if (!raw || raw.vehId !== vehId) return null;                  // רכב אחר — לא לצייר קונפיג זר
+    if (!raw.configs || !raw.configs.length) return null;
+    if (Date.now() - (raw.ts || 0) > GATE_CFG_CACHE_TTL) return null;
+    return raw.configs;
+  } catch(e) { return null; }
+}
+
+function _gateCfgCacheSave(vehId, configs) {
+  try {
+    localStorage.setItem(GATE_CFG_CACHE_KEY, JSON.stringify({ vehId: vehId, configs: configs, ts: Date.now() }));
+  } catch(e) {}
+}
+
+function _gateCfgCacheClear() {
+  try { localStorage.removeItem(GATE_CFG_CACHE_KEY); } catch(e) {}
+}
+
 function _gateLoadConfigFromGas(fbRefOrNull) {
   var vehId = STATE.vehicle && STATE.vehicle.id;
   var vehGateEnabled = String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE';
   if (!vehId || !vehGateEnabled) {
+    _gateCfgCacheClear();   // ההרשאה בוטלה — אסור שהמטמון יחזיר את הכרטיס בהפעלה הבאה
     _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון');
     return;
+  }
+  // ציור מיידי מהמטמון — לפני שהרשת בכלל יצאה לדרך
+  if (!APP._gateConfigs || !APP._gateConfigs.length) {
+    var _cachedCfgs = _gateCfgCacheLoad(vehId);
+    if (_cachedCfgs) {
+      APP._gateConfig  = _cachedCfgs[0];
+      APP._gateConfigs = _cachedCfgs;
+      _gateInit();
+    }
   }
   gasPost('get_gate_config', { vehicleId: vehId }, { silent: true }).then(function(r) {
     if (r && r.ok && (r.configs || r.config)) {
       var cfgs = r.configs || [r.config];
+      // יישוב מול המטמון: אם הקונפיג זהה — לא לאתחל שוב (אתחול חוזר מפעיל מחדש
+      // את ה-watcher הנייטיבי ואת שירות החזית ללא כל צורך).
+      var _same = JSON.stringify(APP._gateConfigs || null) === JSON.stringify(cfgs);
       APP._gateConfig  = cfgs[0];
       APP._gateConfigs = cfgs;
+      _gateCfgCacheSave(vehId, cfgs);
       // Mirror to Firebase only when we actually have a ref — never a precondition.
       if (fbRefOrNull) {
         var map = {};
         cfgs.forEach(function(c) { if (c.lotId) { var stored = Object.assign({}, c); delete stored.lotId; stored.enabled = true; map[c.lotId] = stored; } });
         if (Object.keys(map).length > 0) { try { fbRefOrNull.set(map); } catch(_setE) {} }
       }
-      _gateInit();
+      if (!_same) _gateInit();
     } else {
+      _gateCfgCacheClear();
       _gateSetDisabled('ממתין\nלהרשאה');
     }
-  }).catch(function() { _gateSetDisabled('ממתין\nלהרשאה'); });
+  }).catch(function() {
+    // כשל רשת — אם כבר ציירנו מהמטמון, להשאיר את הכרטיס פעיל במקום להשבית אותו
+    if (!APP._gateConfigs || !APP._gateConfigs.length) _gateSetDisabled('ממתין\nלהרשאה');
+  });
 }
 
 function _initFbGateSync() {
@@ -2025,13 +2070,10 @@ function pkConfirmSelect() {
   STATE._washLogLoaded = false; STATE.washLog = [];
   STATE.isActualHolder = chosen.isActualHolder || false;
   saveSession(STATE.idToken, chosen, STATE.user);
-  // שמור pin session ובדוק אם PIN מוגדר
+  // שמור את מטמון ה-session של המכשיר
   _pinSessionSave(STATE.user.email, chosen, STATE.user, STATE.idToken);
   if (_bioAvailable() && !_bioLoad()) {
     setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
-  } else if (!_pinLoad() && !_bioLoad()) {
-    // אל תציע PIN אם bio רשום — המשתמש כבר יש לו כניסה מהירה
-    setTimeout(function(){ _offerPinSetup(STATE.user.email, chosen, STATE.user); }, 1500);
   }
   var _grEk = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
   var _grVk = _vehKey(chosen);
@@ -2700,41 +2742,14 @@ function bioOfferDecline() {
   }
 }
 
-/* ===== PIN Auth — Quick Login ===== */
+/* ===== Device session cache =====
+   PIN_SESSION_KEY הוא **לא** קוד PIN — כניסת ה-PIN הוסרה מהאפליקציה (2026-07-27,
+   SESSION-2026-07-27-cold-start-auth-gate). זהו מטמון ה-session של המכשיר:
+   הנתיב הביומטרי ושחזור driverSession קוראים ממנו את הרכב/המשתמש/ה-token.
+   השם נשמר בכוונה — שינויו היה מנתק כל נהג קיים. */
 
-var PIN_KEY = 'aleh_pin_v1'; // { hash, email, salt, createdAt }
 var PIN_SESSION_KEY = 'aleh_pin_session_v1'; // { email, vehicleData, userInfo, ts }
 var PIN_SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 ימים
-
-function _pinHash(pin, salt) {
-  // SHA-256 של pin+salt (Web Crypto sync fallback via simple hash)
-  var str = pin + ':' + salt + ':aleh2026';
-  var hash = 0;
-  for (var i = 0; i < str.length; i++) {
-    var chr = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + chr;
-    hash |= 0;
-  }
-  // עוד rounds לחיזוק
-  for (var r = 0; r < 1000; r++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(r % str.length);
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36) + str.length.toString(36);
-}
-
-function _pinLoad() {
-  try { return JSON.parse(localStorage.getItem(PIN_KEY) || 'null'); } catch(e) { return null; }
-}
-
-function _pinSave(data) {
-  // L7: email stored in cleartext — consider hashing or using a non-identifying key
-  try { localStorage.setItem(PIN_KEY, JSON.stringify(data)); } catch(e) {}
-}
-
-function _pinClear() {
-  try { localStorage.removeItem(PIN_KEY); localStorage.removeItem(PIN_SESSION_KEY); } catch(e) {}
-}
 
 function _bioSessionStart() {
   if (!_bioLoad()) return;
@@ -2751,6 +2766,46 @@ function _bioSessionExpired() {
     var s = JSON.parse(raw);
     return Date.now() - (s.startTs || 0) > BIO_SESSION_TTL;
   } catch(e) { return false; }
+}
+
+/* ══ שער כניסה יחיד בהפעלה טרייה ══
+   BUG-2026-07-27c תסמין A. שתי שאלות שהתערבבו ומופרדות כאן:
+     "המכשיר מורשה?"   → driverSession (30 יום מתגלגל, אימות מול השרת)
+     "זה האדם הנכון?"  → ביומטרי מקומי (נדרש בכל הפעלה טרייה)
+   נקרא רק מנתיבי השחזור השקטים, *אחרי* loadFullData() ו*לפני* startApp():
+   זו נקודת ההשתלה הבטוחה היחידה — המעקב, שעון החימום של השער (45ש') והפתיחה
+   האוטומטית כבר רצים, והאימות חוסם אך ורק את חשיפת הממשק.
+   אסור לחייב כאן _bioGasAuth — רישום ביומטרי נייטיבי נשמר ללא credentialId
+   ולכן _bioGasAuth נכשל תמיד ב-APK והיה נועל את הנהג בחוץ. */
+async function _coldStartAuthGate() {
+  if (window._authGatePassed) return true;
+  var bio = _bioLoad();
+  // אין ביומטרי רשום או אין תמיכה — אין שכבת זהות מקומית לבקש. התנהגות קיימת.
+  if (!bio || !bio.email || !_bioAvailable()) { window._authGatePassed = true; return true; }
+  try {
+    await bioAuthenticate(bio.email, bio.credentialId); // נוכחות מקומית בלבד
+    window._authGatePassed = true;
+    _bioSessionStart();
+    return true;
+  } catch (e) {
+    try { console.warn('[authGate] denied:', (e && e.message) || e); } catch(_) {}
+    return false;
+  }
+}
+
+/* כישלון או ביטול בשער — חזרה למסך הכניסה הקיים (ביומטרי + Google).
+   לא נעילה ולא מסך תקוע: המשתמש בוחר מחדש איך להיכנס. */
+function _authGateShowLogin() {
+  try { hideGreeting(); } catch(_) {}
+  try { hideLoader(); } catch(_) {}
+  var appEl = document.getElementById('app');
+  if (appEl) { appEl.classList.add('hidden'); appEl.style.display = 'none'; }
+  var sp = document.getElementById('splash-screen');
+  if (sp) { sp.classList.remove('hidden'); sp.style.removeProperty('display'); }
+  var bio = _bioLoad();
+  if (bio && _bioAvailable()) _showBioLoginButton(bio);
+  var errEl = document.getElementById('login-err');
+  if (errEl) { errEl.textContent = 'נדרש אימות זהות כדי להיכנס'; errEl.classList.remove('hidden'); }
 }
 
 function _pinSessionLoad() {
@@ -2771,210 +2826,6 @@ function _pinSessionSave(email, vehicleData, userInfo, idToken) {
       driverSession: _driverSessionLoad() || null
     }));
   } catch(e) {}
-}
-
-function _pinAvailable() {
-  return !!_pinLoad();
-}
-
-// הצג מסך PIN לאימות
-function _showPinScreen(pinSession) {
-  var overlay = document.getElementById('pin-screen');
-  if (!overlay) {
-    // DOM חסר — אל תאתחל אפליקציה ללא אימות, הצג splash
-    var splash = document.getElementById('splash-screen');
-    if (splash) { splash.classList.remove('hidden'); splash.style.removeProperty('display'); }
-    return;
-  }
-  var splash = document.getElementById('splash-screen');
-  if (splash) splash.style.display = 'none';
-  overlay.style.display = 'flex';
-  window._pendingPinSession = pinSession;
-  window._enteredPin = '';
-  _pinUpdateDots('');
-  document.getElementById('pin-email-label').textContent = pinSession.email || '';
-}
-
-function _pinUpdateDots(pin) {
-  var dots = document.querySelectorAll('.pin-dot');
-  dots.forEach(function(d, i) {
-    d.classList.toggle('filled', i < pin.length);
-  });
-}
-
-function pinKeyPress(digit) {
-  if (window._enteredPin === undefined) window._enteredPin = '';
-  if (window._enteredPin.length >= 4) return;
-  window._enteredPin += String(digit);
-  _pinUpdateDots(window._enteredPin);
-  if (window._enteredPin.length === 4) {
-    setTimeout(_pinVerify, 120);
-  }
-}
-
-function pinBackspace() {
-  if (!window._enteredPin) return;
-  window._enteredPin = window._enteredPin.slice(0, -1);
-  _pinUpdateDots(window._enteredPin);
-}
-
-function _pinVerify() {
-  var stored = _pinLoad();
-  if (!stored) { _pinAuthFail('PIN לא מוגדר'); return; }
-  var entered = window._enteredPin || '';
-  var hashed = _pinHash(entered, stored.salt);
-  if (hashed === stored.hash) {
-    _pinAuthSuccess();
-  } else {
-    _pinAuthFail('PIN שגוי — נסה שוב');
-    window._enteredPin = '';
-    _pinUpdateDots('');
-    // רעידה
-    var dotsEl = document.getElementById('pin-dots');
-    if (dotsEl) {
-      dotsEl.classList.add('pin-shake');
-      setTimeout(function(){ dotsEl.classList.remove('pin-shake'); }, 500);
-    }
-  }
-}
-
-function _pinAuthSuccess() {
-  var overlay = document.getElementById('pin-screen');
-  var dotsEl = document.getElementById('pin-dots');
-  if (dotsEl) dotsEl.classList.add('pin-success');
-  setTimeout(function() {
-    if (overlay) overlay.style.display = 'none';
-    _bootWithPinSession(window._pendingPinSession);
-  }, 350);
-}
-
-function _pinAuthFail(msg) {
-  var errEl = document.getElementById('pin-error');
-  if (errEl) { errEl.textContent = msg; setTimeout(function(){ errEl.textContent = ''; }, 2000); }
-}
-
-function pinForgot() {
-  _pinClear();
-  var overlay = document.getElementById('pin-screen');
-  if (overlay) overlay.style.display = 'none';
-  var splash = document.getElementById('splash-screen');
-  if (splash) splash.style.display = 'flex';
-}
-
-// boot עם pin session
-function _bootWithPinSession(session) {
-  if (!session) return;
-  STATE.vehicle = session.vehicleData;
-  STATE._vehicles = session.vehicles || (session.vehicleData ? [session.vehicleData] : []);
-  STATE._vehicleIdx = session.vehicleIdx || 0;
-  STATE.user = { email: session.email, name: (session.userInfo && session.userInfo.name) || session.email, picture: (session.userInfo && session.userInfo.picture) || '' };
-  STATE.idToken = null; // אין token — PIN session
-  STATE._washLogLoaded = false; STATE.washLog = [];
-  if (typeof _fbSignIn === 'function' && STATE.idToken) _fbSignIn(STATE.idToken).catch(function(){});
-  if (typeof loadFullData === 'function') {
-    loadFullData().then(startApp).catch(startApp);
-  } else { startApp(); }
-}
-
-// הצג הצעת הגדרת PIN אחרי login מוצלח
-function _offerPinSetup(email, vehicleData, userInfo) {
-  var modal = document.getElementById('pin-offer-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-  window._pendingPinEmail = email;
-  window._pendingPinVehicle = vehicleData;
-  window._pendingPinUser = userInfo;
-}
-
-function pinOfferAccept() {
-  var modal = document.getElementById('pin-offer-modal');
-  if (modal) modal.style.display = 'none';
-  _showPinSetup();
-}
-
-function pinOfferDecline() {
-  var modal = document.getElementById('pin-offer-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-// הגדרת PIN חדש
-function _showPinSetup() {
-  var overlay = document.getElementById('pin-setup-screen');
-  if (!overlay) return;
-  overlay.style.display = 'flex';
-  window._setupPin = '';
-  window._setupPinConfirm = '';
-  window._setupStep = 1;
-  document.getElementById('pin-setup-title').textContent = 'בחר קוד PIN';
-  document.getElementById('pin-setup-subtitle').textContent = 'הזן 4 ספרות לכניסה מהירה';
-  _pinSetupUpdateDots('');
-}
-
-function pinSetupKeyPress(digit) {
-  if (window._setupStep === 1) {
-    if (window._setupPin.length >= 4) return;
-    window._setupPin += String(digit);
-    _pinSetupUpdateDots(window._setupPin);
-    if (window._setupPin.length === 4) {
-      setTimeout(function() {
-        window._setupStep = 2;
-        window._setupPinConfirm = '';
-        document.getElementById('pin-setup-title').textContent = 'אשר קוד PIN';
-        document.getElementById('pin-setup-subtitle').textContent = 'הזן שוב את אותו הקוד';
-        _pinSetupUpdateDots('');
-      }, 200);
-    }
-  } else {
-    if (window._setupPinConfirm.length >= 4) return;
-    window._setupPinConfirm += String(digit);
-    _pinSetupUpdateDots(window._setupPinConfirm);
-    if (window._setupPinConfirm.length === 4) {
-      setTimeout(_pinSetupFinish, 120);
-    }
-  }
-}
-
-function pinSetupBackspace() {
-  if (window._setupStep === 1) {
-    window._setupPin = window._setupPin.slice(0,-1);
-    _pinSetupUpdateDots(window._setupPin);
-  } else {
-    window._setupPinConfirm = window._setupPinConfirm.slice(0,-1);
-    _pinSetupUpdateDots(window._setupPinConfirm);
-  }
-}
-
-function _pinSetupUpdateDots(pin) {
-  var dots = document.querySelectorAll('.pin-setup-dot');
-  dots.forEach(function(d, i) { d.classList.toggle('filled', i < pin.length); });
-}
-
-function _pinSetupFinish() {
-  if (window._setupPin !== window._setupPinConfirm) {
-    var errEl = document.getElementById('pin-setup-error');
-    if (errEl) { errEl.textContent = 'הקודים לא תואמים — נסה שוב'; setTimeout(function(){ errEl.textContent = ''; }, 2000); }
-    window._setupStep = 1;
-    window._setupPin = '';
-    window._setupPinConfirm = '';
-    document.getElementById('pin-setup-title').textContent = 'בחר קוד PIN';
-    document.getElementById('pin-setup-subtitle').textContent = 'הזן 4 ספרות לכניסה מהירה';
-    _pinSetupUpdateDots('');
-    var dotsEl = document.getElementById('pin-setup-dots');
-    if (dotsEl) { dotsEl.classList.add('pin-shake'); setTimeout(function(){ dotsEl.classList.remove('pin-shake'); }, 500); }
-    return;
-  }
-  var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  var hash = _pinHash(window._setupPin, salt);
-  _pinSave({ hash: hash, salt: salt, email: window._pendingPinEmail, createdAt: new Date().toISOString() });
-  _pinSessionSave(window._pendingPinEmail, window._pendingPinVehicle, window._pendingPinUser, STATE.idToken);
-  var overlay = document.getElementById('pin-setup-screen');
-  if (overlay) overlay.style.display = 'none';
-  showToast('כניסה מהירה הופעלה! ');
-}
-
-function pinSetupCancel() {
-  var overlay = document.getElementById('pin-setup-screen');
-  if (overlay) overlay.style.display = 'none';
 }
 
 /* ══ Session ══ */
@@ -3302,8 +3153,6 @@ async function handleGoogleCredential(response) {
       } catch(_me) {}
       if (_bioAvailable() && !_bioLoad()) {
         setTimeout(function(){ _offerBio(STATE.user.email, STATE.user.name||STATE.user.email); }, 1500);
-      } else if (!_pinLoad() && !_bioLoad()) {
-        setTimeout(function(){ _offerPinSetup(STATE.user.email, STATE.vehicle, STATE.user); }, 1500);
       }
       var greetName = result.isActualHolder
         ? (STATE.user.name || (result.vehicle && result.vehicle.holder))
@@ -4125,6 +3974,9 @@ function _initHelpFabDrag() {
 
 /* ══ Start App ══ */
 function startApp() {
+  // כל נתיב שמגיע לכאן כבר הוכיח זהות (Google / ביומטרי / שער ההפעלה הטרייה).
+  // סימון יחיד — מונע בקשת אימות כפולה מנתיב אחר באותה הפעלה.
+  window._authGatePassed = true;
   hideLoader();
   var _appEl = document.getElementById('app');
   _appEl.classList.remove('hidden');
@@ -4527,7 +4379,9 @@ function logout() {
 
       // ══ שלב 2: נקה localStorage
       localStorage.removeItem(SESSION_KEY);
-      try { localStorage.removeItem(PIN_KEY); } catch(_e) {}
+      try { localStorage.removeItem('aleh_pin_v1'); } catch(_e) {} // legacy PIN — הוסר 2026-07-27
+      _gateCfgCacheClear();          // מטמון קונפיג השער שייך לנהג שיצא
+      window._authGatePassed = false; // הכניסה הבאה תעבור שוב בשער
       _driverSessionClear();
       _bioSessionClear();
       if (_bioTimeoutInterval) { clearInterval(_bioTimeoutInterval); _bioTimeoutInterval = null; }
@@ -10168,16 +10022,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     var _lbp = document.getElementById('login-buttons-panel');
     if (_lbp) _lbp.classList.add('nobio');
   }
-  var _pinData = _pinLoad();
-  var _pinSess = _pinSessionLoad();
-  // אם כניסה ביומטרית זמינה על ה-splash — היא קודמת ל-PIN. אל תציג קודפד.
-  if (!_bioShown && _pinData && _pinSess) {
-    hideLoader();
-    _showPinScreen(_pinSess);
-    return; // ← חיוני: עצור boot, אל תיגע ב-Google
-  }
-  // session רגיל ללא PIN — שמור pin session להצעה עתידית
-  if (!_pinData && session && session.token !== 'demo_token' && session.userInfo && !_isTokenExpired(session.token)) {
+  // כניסת PIN הוסרה (2026-07-27) — ניקוי חד-פעמי של המפתח הישן ממכשירים קיימים.
+  try { localStorage.removeItem('aleh_pin_v1'); } catch(_e) {}
+  // מטמון ה-session של המכשיר — שמור אותו לשימוש הנתיב הביומטרי
+  if (session && session.token !== 'demo_token' && session.userInfo && !_isTokenExpired(session.token)) {
     _pinSessionSave(session.userInfo.email, session.vehicleData, session.userInfo, session.token);
   }
 
@@ -10204,6 +10052,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         var _sVk = _vehKey(STATE.vehicle);
         showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _sVk);
         await loadFullData();
+        // שער כניסה — שחזור שקט מ-session אינו מוכיח מי מחזיק בטלפון
+        if (!(await _coldStartAuthGate())) { _authGateShowLogin(); return; }
         _grComplete(function() {
           hideGreeting();
           _fbWriteLastLogin(_sEk, _sVk);
@@ -10241,6 +10091,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         showGreeting(_dsData.vehicle.holder || _dEmail, _dEk, _dVk);
         await loadFullData();
         _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
+        // שער כניסה — driverSession מוכיח "מכשיר מורשה", לא "האדם הנכון"
+        if (!(await _coldStartAuthGate())) { _authGateShowLogin(); return; }
         _grComplete(function() {
           hideGreeting();
           _fbWriteLastLogin(_dEk, _dVk);
