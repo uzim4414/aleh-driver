@@ -342,10 +342,46 @@ function _initFbSync() {
 }
 
 /* ── Listener: Gate access config ── */
+/* BUG-2026-07-27b: fetch the gate config straight from GAS, with no Firebase involved.
+   This used to live INSIDE the Firebase listener below, which meant it could only ever run if
+   Firebase auth had succeeded. When a driver is restored from a durable session or biometrics we
+   deliberately run with STATE.idToken === null, so _fbSignIn is never called and STATE.firebaseUid
+   stays null — _fbRef() then returns null, the listener never attaches, this fallback never fired,
+   APP._gateConfig stayed undefined and _gateInit hid the card outright. The gate is the core
+   function of this app; it must not depend on a secondary sync channel. */
+function _gateLoadConfigFromGas(fbRefOrNull) {
+  var vehId = STATE.vehicle && STATE.vehicle.id;
+  var vehGateEnabled = String((STATE.vehicle||{}).gateAccessEnabled).toUpperCase() === 'TRUE';
+  if (!vehId || !vehGateEnabled) {
+    _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון');
+    return;
+  }
+  gasPost('get_gate_config', { vehicleId: vehId }, { silent: true }).then(function(r) {
+    if (r && r.ok && (r.configs || r.config)) {
+      var cfgs = r.configs || [r.config];
+      APP._gateConfig  = cfgs[0];
+      APP._gateConfigs = cfgs;
+      // Mirror to Firebase only when we actually have a ref — never a precondition.
+      if (fbRefOrNull) {
+        var map = {};
+        cfgs.forEach(function(c) { if (c.lotId) { var stored = Object.assign({}, c); delete stored.lotId; stored.enabled = true; map[c.lotId] = stored; } });
+        if (Object.keys(map).length > 0) { try { fbRefOrNull.set(map); } catch(_setE) {} }
+      }
+      _gateInit();
+    } else {
+      _gateSetDisabled('ממתין\nלהרשאה');
+    }
+  }).catch(function() { _gateSetDisabled('ממתין\nלהרשאה'); });
+}
+
 function _initFbGateSync() {
   if (_gateRef) { try { _gateRef.off('value'); } catch(_grE) {} _gateRef = null; }
   var ref = _fbRef('gateAccess');
-  if (!ref) return;
+  if (!ref) {
+    // No Firebase auth (session/biometric login) — go straight to GAS instead of giving up.
+    _gateLoadConfigFromGas(null);
+    return;
+  }
   _gateRef = ref;
   ref.on('value', function(snap) {
     try {
@@ -376,27 +412,9 @@ function _initFbGateSync() {
           return;
         }
       }
-      // Self-provision: fetch from GAS
-      var vehId = STATE.vehicle && STATE.vehicle.id;
-      if (vehId && vehGateEnabled) {
-        gasPost('get_gate_config', { vehicleId: vehId }, { silent: true }).then(function(r) {
-          if (r && r.ok && (r.configs || r.config)) {
-            var cfgs = r.configs || [r.config];
-            APP._gateConfig  = cfgs[0];
-            APP._gateConfigs = cfgs;
-            // Write new-format map to Firebase
-            var map = {};
-            cfgs.forEach(function(c) { if (c.lotId) { var stored = Object.assign({}, c); delete stored.lotId; stored.enabled = true; map[c.lotId] = stored; } });
-            if (ref && Object.keys(map).length > 0) ref.set(map);
-            _gateInit();
-          } else {
-            _gateSetDisabled('ממתין\nלהרשאה');
-          }
-        }).catch(function() { _gateSetDisabled('ממתין\nלהרשאה'); });
-      } else {
-        _gateSetDisabled('ביטלו הרשאת\nכניסה לחניון');
-        if (gateAccess && ref) { try { ref.remove(); } catch(_gaRmE) {} }
-      }
+      // Self-provision: fetch from GAS (shared with the no-Firebase path above)
+      if (!vehGateEnabled && gateAccess && ref) { try { ref.remove(); } catch(_gaRmE) {} }
+      _gateLoadConfigFromGas(ref);
     } catch(e) { console.warn('[fbSync] gate onValue:', e.message); }
   }, function(err) { console.warn('[fbSync] gate listener:', err.message); });
 }
