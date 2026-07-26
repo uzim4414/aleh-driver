@@ -11648,6 +11648,10 @@ function _bearingTo(lat1, lng1, lat2, lng2) {
   return (Math.atan2(y,x)*180/Math.PI + 360) % 360;
 }
 
+// Live occupancy park-watch (PLAN-2026-07-26): gate-open = arrival (report 'parked'),
+// geofence-exit (>300m) = departure (report 'left'). Only movement-coupled transitions are
+// used — reliable despite distanceFilter:20 suppressing stationary GPS fixes.
+var _parkWatch = null;
 function _gateOnPosition(pos) {
   var configs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
   if (configs.length === 0) return;
@@ -11706,6 +11710,11 @@ function _gateOnPosition(pos) {
     var distM = distKm * 1000;
     // Latch release: once the vehicle leaves the 300m hysteresis zone, re-open is allowed again
     if (_gateLatchMap[cfg.lotId] && distM > 300) { delete _gateLatchMap[cfg.lotId]; }
+    // Live occupancy: vehicle left the 300m zone after having parked → free the spot.
+    if (_parkWatch && _parkWatch.parked && _parkWatch.lotId === cfg.lotId && distM > 300) {
+      _parkWatch = null;
+      gasPost('report_parking_state', { lotId: cfg.lotId, state: 'left', source: 'gate' }, { silent: true });
+    }
     var radius = parseFloat(cfg.radius) || 200;
     if (distM < radius && distM < nearestDist) {
       nearestDist = distM;
@@ -11807,6 +11816,9 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
       _gateLatchMap[lotId] = true; // direction latch — block re-open until vehicle exits 300m
       _wfLotId = lotId; _wfLotName = r.lotName || _cfgForLot.lotName || 'חניון';   // C4-b: for wayfinding transition
       _gateShowSuccess(r.lotName || _cfgForLot.lotName || 'חניון', distM, r.parkingSpot || '');
+      // Live occupancy: gate opened = arrival at the driver's assigned spot. GAS resolves the spot.
+      _parkWatch = { lotId: lotId, parked: true };
+      gasPost('report_parking_state', { lotId: lotId, state: 'parked', source: 'gate' }, { silent: true });
     } else {
       // BUG-FIX: surface the real server reason to the user (drawer may be open,
       // hiding the main gate card — so show a visible toast everywhere).
@@ -12077,6 +12089,97 @@ function _wfFromGate(){
   _wfShow(_wfLotId, _wfLotName);
 }
 function _wfHide(){ var ov=document.getElementById('wayfinding-overlay'); if(ov) ov.style.display='none'; }
+
+// ============================================================
+// מצב חניון — LIVE OCCUPANCY VIEW (PLAN-2026-07-26)
+// Layout + my-spot come from get_lot_wayfinding (driver-authorized); live occupied
+// state is read directly from Firebase lotOccupancy/{lotId} (driver READS only —
+// GAS stays the sole writer). Driver sees free/occupied/mine — never other names.
+// ============================================================
+var _poSpots = [], _poMySpotId = '', _poLotId = '', _poFbRef = null;
+// Resolve the driver's lot: last gate lot, else the sole/first configured gate.
+function _poResolveLot(){
+  if (_wfLotId) return { id:_wfLotId, name:_wfLotName||'חניון' };
+  var cfgs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
+  if (cfgs.length) return { id:cfgs[0].lotId, name:cfgs[0].lotName||'חניון' };
+  return null;
+}
+function _poFromDrawer(){
+  var lot = _poResolveLot();
+  if (!lot || !lot.id){ if (typeof showToast==='function') showToast('אין חניון משויך',''); return; }
+  if (typeof _gateDrawerClose==='function') _gateDrawerClose();
+  _poShow(lot.id, lot.name);
+}
+function _poShow(lotId, lotName){
+  var ov=document.getElementById('parking-occupancy-overlay'); if(!ov) return;
+  _poLotId=lotId||_poLotId;
+  var ln=document.getElementById('po-lotname'); if(ln) ln.textContent=lotName||'חניון';
+  var chip=document.getElementById('po-chip'); if(chip){ chip.className='po-chip'; chip.innerHTML='<span class="d"></span>טוען…'; }
+  var grid=document.getElementById('po-grid'); if(grid) grid.innerHTML='<div class="po-empty">טוען מפת חניון…</div>';
+  ov.style.display='flex';
+  gasPost('get_lot_wayfinding', { lotId:_poLotId }, { silent:true }).then(function(r){
+    if(r && r.ok){ _poRender(r); _poAttachLive(_poLotId); }
+    else { var g=document.getElementById('po-grid'); if(g) g.innerHTML='<div class="po-empty">'+((r&&r.error)||'לא ניתן לטעון מפת חניון')+'</div>'; }
+  }).catch(function(){ var g=document.getElementById('po-grid'); if(g) g.innerHTML='<div class="po-empty">שגיאת תקשורת</div>'; });
+}
+function _poHide(){
+  var ov=document.getElementById('parking-occupancy-overlay'); if(ov) ov.style.display='none';
+  try{ if(_poFbRef){ _poFbRef.off('value'); _poFbRef=null; } }catch(e){}
+}
+function _poRender(d){
+  _poLotId = d.lotId || _poLotId;
+  _poMySpotId = d.assignedSpotId || '';
+  var ln=document.getElementById('po-lotname'); if(ln) ln.textContent=d.lotName||'חניון';
+  // sort spots by numeric label for a stable, readable grid
+  _poSpots = (d.spots||[]).slice().sort(function(a,b){
+    var na=parseInt(a.label,10), nb=parseInt(b.label,10);
+    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
+    return String(a.label).localeCompare(String(b.label));
+  });
+  var wrap=document.getElementById('po-myspot-wrap'), my=document.getElementById('po-mySpot');
+  if(wrap && my){
+    if(d.assignedSpot){ wrap.style.display='flex'; my.textContent=d.assignedSpot; }
+    else wrap.style.display='none';
+  }
+  _poApplyLive({}); // render immediately as all-free; the Firebase listener fills real state
+}
+function _poAttachLive(lotId){
+  if(typeof firebase==='undefined' || !_fbDb){ setTimeout(function(){ _poAttachLive(lotId); }, 800); return; }
+  try{ if(_poFbRef){ _poFbRef.off('value'); _poFbRef=null; } }catch(e){}
+  _poFbRef=_fbDb.ref('lotOccupancy/'+lotId);
+  _poFbRef.on('value', function(snap){
+    if(_poLotId!==lotId) return;
+    _poApplyLive(snap.val()||{});
+  }, function(err){ console.warn('[po] listener:', err && err.message); });
+}
+function _poApplyLive(live){
+  var spots=_poSpots||[], total=spots.length, occ=0;
+  var grid=document.getElementById('po-grid'); if(!grid) return;
+  grid.innerHTML=spots.map(function(s){
+    var isOcc=!!(live[s.id] && live[s.id].occupied);
+    var isMine=(_poMySpotId && String(s.id)===String(_poMySpotId));
+    if(isOcc && !isMine) occ++;
+    if(isOcc && isMine) occ++; // mine counts toward occupied too, but styled as mine
+    var cls=isMine?'mine':(isOcc?'occ':'free');
+    return '<div class="po-g '+cls+'">'+(s.label||'')+'</div>';
+  }).join('');
+  var free=total-occ;
+  var setT=function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  setT('po-freeN', free); setT('po-occN', occ); setT('po-totN', total);
+  var bar=document.getElementById('po-bar'); if(bar) bar.style.width=(total?Math.round(occ/total*100):0)+'%';
+  var chip=document.getElementById('po-chip');
+  if(chip){
+    if(free<=0){ chip.className='po-chip full'; chip.innerHTML='<span class="d"></span>החניון מלא'; }
+    else { chip.className='po-chip'; chip.innerHTML='<span class="d"></span>יש מקום פנוי'; }
+  }
+  // my-spot pill
+  var pill=document.getElementById('po-myPill');
+  if(pill && _poMySpotId){
+    var mineOcc=!!(live[_poMySpotId] && live[_poMySpotId].occupied);
+    if(mineOcc){ pill.className='pill occ'; pill.textContent='תפוסה — חנית כאן'; }
+    else { pill.className='pill'; pill.textContent='פנויה — ממתינה לך'; }
+  }
+}
 
 // Expose tap handler
 if (typeof APP !== 'undefined') {

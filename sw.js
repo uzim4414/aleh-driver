@@ -10,7 +10,7 @@
    Cache / offline
    ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• */
 
-const CACHE_NAME = 'aleh-driver-v399';
+const CACHE_NAME = 'aleh-driver-v400';
 
 // Pending notifications buffer ג€” survives until client collects them (max 60s)
 let _pendingNotifs = [];

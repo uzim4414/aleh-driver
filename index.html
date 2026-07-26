@@ -4974,6 +4974,68 @@ body.pp-open{overflow:hidden}
   </div>
 </div>
 
+<!-- ══════ מצב חניון — תפוסה חיה (PLAN-2026-07-26) ══════ -->
+<style>
+#parking-occupancy-overlay{position:fixed;inset:0;z-index:100000;display:none;flex-direction:column;background:radial-gradient(120% 80% at 50% 0%,#132014 0%,#0a0d0b 45%,#05060a 85%);animation:gsLandingIn .45s cubic-bezier(.22,1,.36,1) both}
+#parking-occupancy-overlay .po-top{padding:calc(16px + env(safe-area-inset-top)) 20px 6px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#parking-occupancy-overlay .po-h{font-size:20px;font-weight:800;letter-spacing:-.4px;color:#fff}
+#parking-occupancy-overlay .po-back{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer}
+#parking-occupancy-overlay .po-scroll{flex:1;overflow-y:auto;padding-bottom:calc(24px + env(safe-area-inset-bottom));scrollbar-width:thin}
+#parking-occupancy-overlay .po-scroll::-webkit-scrollbar{width:8px}#parking-occupancy-overlay .po-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}
+#parking-occupancy-overlay .po-hero{margin:14px 16px 0;background:linear-gradient(160deg,#141c14 0%,#111 55%,#0d0d0d 100%);border-radius:26px;border:1px solid var(--border);overflow:hidden;position:relative;animation:poFade .5s ease both}
+#parking-occupancy-overlay .po-hero::before{content:'';position:absolute;top:-40%;left:50%;width:120%;height:70%;transform:translateX(-50%);background:radial-gradient(50% 60% at 50% 40%,rgba(48,209,88,.14),transparent 70%);pointer-events:none}
+#parking-occupancy-overlay .po-hero-in{padding:22px 22px 20px;text-align:center;position:relative}
+#parking-occupancy-overlay .po-lotname{font-size:13.5px;font-weight:600;color:var(--t2)}
+#parking-occupancy-overlay .po-chip{display:inline-flex;align-items:center;gap:7px;margin-top:12px;padding:6px 15px;border-radius:999px;font-size:13px;font-weight:800;background:rgba(48,209,88,.15);color:var(--ok);border:1px solid rgba(48,209,88,.3)}
+#parking-occupancy-overlay .po-chip.full{background:rgba(255,69,58,.15);color:#FF453A;border-color:rgba(255,69,58,.35)}
+#parking-occupancy-overlay .po-chip .d{width:8px;height:8px;border-radius:50%;background:currentColor;animation:poPulse 1.6s ease-in-out infinite}
+#parking-occupancy-overlay .po-big{font-size:60px;font-weight:900;letter-spacing:-2px;line-height:1;margin-top:14px;color:#fff}
+#parking-occupancy-overlay .po-big .u{font-size:20px;font-weight:600;color:var(--t2);margin-inline-start:6px}
+#parking-occupancy-overlay .po-sub{font-size:13px;font-weight:600;color:var(--t2);margin-top:6px}
+#parking-occupancy-overlay .po-bar{height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;margin:16px 4px 6px}
+#parking-occupancy-overlay .po-bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--red),#3ec46a);transition:width .5s ease}
+#parking-occupancy-overlay .po-updated{font-size:11px;color:var(--t2);margin-top:8px;display:inline-flex;align-items:center;gap:6px}
+#parking-occupancy-overlay .po-updated .d{width:6px;height:6px;border-radius:50%;background:var(--ok);animation:poPulse 1.6s infinite}
+#parking-occupancy-overlay .po-myspot{margin:14px 16px 0;background:var(--card);border-radius:20px;border:1px solid var(--border);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;animation:poFade .5s ease .1s both}
+#parking-occupancy-overlay .po-myspot .l{font-size:11px;font-weight:700;color:var(--t2)}
+#parking-occupancy-overlay .po-myspot .n{font-size:34px;font-weight:900;color:#FFD166;line-height:1;text-shadow:0 0 18px rgba(255,176,32,.4)}
+#parking-occupancy-overlay .po-myspot .pill{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:800;background:rgba(48,209,88,.14);color:var(--ok);border:1px solid rgba(48,209,88,.28);text-align:center}
+#parking-occupancy-overlay .po-myspot .pill.occ{background:rgba(255,176,32,.16);color:#FFD166;border-color:rgba(255,176,32,.3)}
+#parking-occupancy-overlay .po-sec{padding:20px 20px 8px;font-size:16px;font-weight:700;letter-spacing:-.3px;color:#fff}
+#parking-occupancy-overlay .po-legend{display:flex;gap:14px;font-size:11.5px;color:var(--t2);padding:0 20px 10px;flex-wrap:wrap}
+#parking-occupancy-overlay .po-legend span{display:inline-flex;align-items:center;gap:6px}#parking-occupancy-overlay .po-legend i{width:10px;height:10px;border-radius:3px}
+#parking-occupancy-overlay .po-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;padding:0 16px 24px}
+#parking-occupancy-overlay .po-g{aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:1.5px solid}
+#parking-occupancy-overlay .po-g.free{background:rgba(48,209,88,.13);border-color:rgba(48,209,88,.4);color:#4ade80}
+#parking-occupancy-overlay .po-g.occ{background:rgba(255,69,58,.1);border-color:rgba(255,69,58,.28);color:#ff6b6b}
+#parking-occupancy-overlay .po-g.mine{background:rgba(255,176,32,.18);border-color:#FFD166;color:#FFD166;box-shadow:0 0 14px rgba(255,176,32,.4)}
+#parking-occupancy-overlay .po-empty{padding:50px 24px;text-align:center;color:var(--t2);font-size:13.5px}
+@keyframes poFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes poPulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+<div id="parking-occupancy-overlay">
+  <div class="po-top"><span class="po-h">מצב חניון</span>
+    <button class="po-back" onclick="_poHide()" aria-label="סגור"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+  </div>
+  <div class="po-scroll">
+    <div class="po-hero"><div class="po-hero-in">
+      <div class="po-lotname" id="po-lotname">חניון</div>
+      <div class="po-chip" id="po-chip"><span class="d"></span>טוען…</div>
+      <div class="po-big"><span id="po-freeN">—</span><span class="u">פנויות</span></div>
+      <div class="po-sub"><span id="po-occN">—</span> מתוך <span id="po-totN">—</span> תפוסות</div>
+      <div class="po-bar"><i id="po-bar" style="width:0%"></i></div>
+      <div class="po-updated"><span class="d"></span>מתעדכן חי</div>
+    </div></div>
+    <div class="po-myspot" id="po-myspot-wrap" style="display:none">
+      <div><div class="l">החניה שלך</div><div class="n" id="po-mySpot">—</div></div>
+      <div class="pill" id="po-myPill">—</div>
+    </div>
+    <div class="po-sec">מפת החניון</div>
+    <div class="po-legend"><span><i style="background:#30D158"></i>פנוי</span><span><i style="background:#FF453A"></i>תפוס</span><span><i style="background:#FFD166"></i>החניה שלך</span></div>
+    <div class="po-grid" id="po-grid"></div>
+  </div>
+</div>
+
 <svg style="display:none">
 <defs>
 <symbol id="ic-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
@@ -6572,6 +6634,10 @@ window.fcmDebug = async function() {
   <span class="gd-handle"></span>
   <div class="gd-hdr">
     <span class="gd-title">שערי חניון</span>
+    <button onclick="typeof _poFromDrawer==='function'&&_poFromDrawer()" style="margin-inline-start:auto;margin-inline-end:8px;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;background:rgba(48,209,88,.14);border:1px solid rgba(48,209,88,.3);color:var(--ok);font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer" aria-label="מצב חניון">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      מצב חניון
+    </button>
     <button class="gd-close" onclick="typeof _gateDrawerClose==='function'&&_gateDrawerClose()" aria-label="סגור">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
