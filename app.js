@@ -1076,10 +1076,82 @@ function _showSessionExpiredOverlay() {
       '<div style="font-size:40px">🔒</div>' +
       '<div style="color:#fff;font-size:18px;font-weight:700">פג תוקף ההתחברות</div>' +
       '<div style="color:#94a3b8;font-size:14px">יש להתחבר מחדש להמשך</div>' +
-      '<button onclick="window.location.reload()" style="background:#2563eb;color:#fff;border:none;border-radius:12px;padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px">🔄 התחבר מחדש</button>';
+      '<button id="se-reconnect-btn" onclick="_authRecover(this)" style="background:#2563eb;color:#fff;border:none;border-radius:12px;padding:12px 32px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px">🔄 התחבר מחדש</button>';
     document.body.appendChild(el);
   }
   el.style.display = 'flex';
+}
+
+/* BUG-2026-07-26: the reconnect button used to call window.location.reload() and NOTHING
+   else — it invoked no auth code at all, which is why tapping it never reconnected. A
+   reload cannot help: boot finds the expired Google token, wipes it, and lands back on the
+   splash. Recover for real, cheapest path first:
+     1) biometric/driverSession via _bioGasAuth — works with NO Google token at all,
+     2) only if that is unavailable/fails, fall back to a real Google sign-in. */
+async function _authRecover(btn) {
+  if (window._authRecovering) return;
+  window._authRecovering = true;
+  var _orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'מתחבר…'; }
+  function _fail(msg) {
+    window._authRecovering = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = _orig || '🔄 התחבר מחדש'; }
+    if (msg && typeof showToast === 'function') showToast(msg);
+  }
+  try {
+    var bio = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+    var hasSession = (typeof _driverSessionLoad === 'function') && !!_driverSessionLoad();
+    // Path 1 — durable session / biometric credential. No Google needed.
+    if (bio && bio.email && bio.credentialId && typeof _bioGasAuth === 'function') {
+      window._bioLoginBusy = false;
+      var ok = await _bioGasAuth(bio.email, bio.credentialId);
+      if (ok) {
+        var ov = document.getElementById('session-expired-overlay');
+        if (ov) ov.style.display = 'none';
+        window._authRecovering = false;
+        return;
+      }
+    } else if (hasSession) {
+      // Session token but no enrolled biometric — ask the server to restore straight from it.
+      // Drop the dead Google token first: gasPost short-circuits with 'session_expired'
+      // when idToken is present-but-expired and no bio credential exists, which would
+      // block this recovery before it ever reached the network.
+      STATE.idToken = null;
+      var r = await gasPost('bio_auth', {}, { silent: true });
+      if (r && r.ok && r.vehicle) {
+        STATE.vehicle = r.vehicle;
+        STATE.user = { email: r.email || '', name: (r.vehicle && r.vehicle.holder) || r.email || '' };
+        STATE.idToken = null;
+        if (r.driverSession) _driverSessionSave(r.driverSession);
+        var ov2 = document.getElementById('session-expired-overlay');
+        if (ov2) ov2.style.display = 'none';
+        try { await loadFullData(); } catch (_lf) {}
+        if (typeof startApp === 'function') startApp();
+        window._authRecovering = false;
+        return;
+      }
+    }
+    // Path 2 — real Google sign-in. Mark the gesture so handleGoogleCredential does not bail.
+    window._userInitiatedLogin = true;
+    if (typeof _isNativeApp === 'function' && _isNativeApp()) {
+      if (typeof _loginFallbackRedirect === 'function') { _loginFallbackRedirect(); window._authRecovering = false; return; }
+      return _fail('לא ניתן להתחבר — נסה לפתוח מחדש את האפליקציה');
+    }
+    if (window.google && google.accounts && google.accounts.id && GOOGLE_CLIENT_ID) {
+      try { document.cookie = 'g_state=;max-age=0;path=/'; } catch (_c) {}
+      google.accounts.id.prompt(function(n) {
+        var notShown = false;
+        try { notShown = n.isNotDisplayed() || n.isSkippedMoment(); } catch (_ne) { notShown = true; }
+        if (notShown && typeof _loginFallbackRedirect === 'function') _loginFallbackRedirect();
+      });
+      window._authRecovering = false;
+      return;
+    }
+    if (typeof _loginFallbackRedirect === 'function') { _loginFallbackRedirect(); window._authRecovering = false; return; }
+    _fail('לא ניתן להתחבר כעת');
+  } catch (e) {
+    _fail('ההתחברות נכשלה — נסה שוב');
+  }
 }
 
 function _showVehicleInactiveOverlay() {
@@ -1096,6 +1168,23 @@ function _showVehicleInactiveOverlay() {
 }
 
 function _sessionExpired() {
+  /* BUG-2026-07-26: a expired Google token is NOT a logout. Before tearing anything down,
+     try the self-sufficient path (durable driverSession / enrolled biometric) which needs
+     no Google at all. Tearing down first — signOut + wiping STATE — was destroying the very
+     credentials needed to recover, which is why only a full app restart worked. */
+  if (!window._sessionExpiredRecovering) {
+    var _seBio = (typeof _bioLoad === 'function') ? _bioLoad() : null;
+    var _seDs  = (typeof _driverSessionLoad === 'function') ? _driverSessionLoad() : null;
+    if (_seDs || (_seBio && _seBio.email && _seBio.credentialId)) {
+      window._sessionExpiredRecovering = true;
+      _authRecover(null).then(function() {
+        window._sessionExpiredRecovering = false;
+      }).catch(function() {
+        window._sessionExpiredRecovering = false;
+      });
+      return;
+    }
+  }
   // L18: clear background polling timers so they don't keep firing after logout
   try { if (_apptPollTimer) { clearInterval(_apptPollTimer); _apptPollTimer = null; } } catch(_t1) {}
   try { if (typeof APP !== 'undefined' && APP._garagePollTimer) { clearInterval(APP._garagePollTimer); APP._garagePollTimer = null; } } catch(_t2) {}
@@ -1109,9 +1198,9 @@ function _sessionExpired() {
   STATE.user = null;
   var _hfab2 = document.getElementById('help-fab'); if (_hfab2) _hfab2.style.display = 'none';
 
-  // Prevent One Tap from auto-signing in the same user on next prompt.
-  // Without this, clicking "login" after explicit logout logs in silently.
-  try { window.google && google.accounts && google.accounts.id && google.accounts.id.disableAutoSelect(); } catch(_) {}
+  /* BUG-2026-07-26: disableAutoSelect() used to run HERE, immediately before the silent
+     One Tap prompt below — it suppressed the very re-auth the next lines attempt. It
+     belongs in an explicit logout (where it still runs), not in a token expiry. */
 
   // Native APK: just show the overlay — login button uses _loginFallbackRedirect.
   if (_isNativeApp()) {
@@ -1122,6 +1211,10 @@ function _sessionExpired() {
   // Try silent Google token refresh — if user's Google session is still active,
   // handleGoogleCredential will fire automatically and re-login without user interaction.
   if (window.google && google.accounts && google.accounts.id && GOOGLE_CLIENT_ID) {
+    /* BUG-2026-07-26: without this flag handleGoogleCredential returns immediately
+       (its _userInitiatedLogin guard), so even a successful One Tap was discarded and
+       the silent-refresh path could never complete. */
+    window._userInitiatedLogin = true;
     var _fallbackTimer = setTimeout(_showSessionExpiredOverlay, 4000);
     try {
       google.accounts.id.prompt(function(notification) {
@@ -2411,6 +2504,9 @@ async function _bioGasAuth(email, credentialId) {
   STATE.vehicle = data.vehicle;
   STATE.user = { email: email, name: (data.vehicle && data.vehicle.holder) || email };
   STATE.idToken = null;
+  // BUG-2026-07-26: bio_auth now returns a durable session — persist it so the biometric
+  // path is self-sustaining and never needs Google again.
+  if (data.driverSession) _driverSessionSave(data.driverSession);
   var sp = document.getElementById('splash-screen');
   var _bioEk = email.replace(/[.#$[\]]/g, '_');
   var _bioVk = _vehKey(data.vehicle);
@@ -3138,6 +3234,10 @@ async function handleGoogleCredential(response) {
     console.log('[auth] calling driver_auth for', STATE.user.email);
     const result = await gasPost('driver_auth');
     console.log('[auth] result ok:', result.ok, 'vehicles:', result.vehicles && result.vehicles.length);
+    /* BUG-2026-07-26: the server now mints the durable session inside driver_auth itself,
+       so save it here. Previously this depended solely on a follow-up driver_create_session
+       call which never routed on GET — meaning no durable session ever existed. */
+    if (result && result.driverSession) _driverSessionSave(result.driverSession);
     _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth — non-blocking
     hideLoader();
     // Multi-vehicle: enter app directly with hero carousel (no picker screen)
@@ -10106,6 +10206,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (_dsData && _dsData.ok && _dsData.vehicle) {
         STATE.vehicle = _dsData.vehicle;
         STATE.idToken = null;
+        // BUG-2026-07-26: keep the rolling session fresh on every silent restore.
+        if (_dsData.driverSession) _driverSessionSave(_dsData.driverSession);
         var _dEmail = _dsData.email || '';
         STATE.user = { email: _dEmail, name: _dsData.vehicle.holder || _dEmail };
         hideLoader();
@@ -10123,9 +10225,12 @@ document.addEventListener('DOMContentLoaded', async function() {
           startApp();
         });
         return;
-      } else if (_dsData && _dsData.ok === false) {
-        _driverSessionClear();
       }
+      /* BUG-2026-07-26: a boot-time `ok:false` used to clear the durable token. That answer
+         is also produced by transient conditions (Firebase read failure inside
+         _getDriverSession, cold start, no vehicle row yet) — destroying the token on it cost
+         the driver the whole 30-day session. Keep it; a genuinely dead token simply fails
+         again next boot and costs one request. Only explicit logout clears. */
     } catch(_e) { /* network error — keep token, fall through to splash */ }
   }
 
@@ -10182,12 +10287,21 @@ document.addEventListener('visibilitychange', async function() {
   if (document.visibilityState !== 'visible') return;
   // Fake-screen guard: #app גלוי אבל אין session — מצב לא תקין (bfcache / Samsung restore).
   // מופעל לפני כל guard אחר כדי לתפוס כל מנגנון שמציג את האפליקציה ללא אימות.
+  /* BUG-2026-07-26: this guard tested ONLY STATE.idToken. A driver who signed in with
+     biometrics / a durable session deliberately runs with idToken === null (see _bioGasAuth),
+     so every single return to the app reloaded the page — an endless reload loop that looked
+     like "the app keeps logging me out". A driverSession or an enrolled biometric credential
+     backing a loaded vehicle is a perfectly valid authenticated state. */
+  var _fsAuthed = !!STATE.idToken ||
+    (!!STATE.vehicle && ((typeof _driverSessionLoad === 'function' && !!_driverSessionLoad()) ||
+                         (typeof _bioLoad === 'function' && !!_bioLoad())));
   var _fsApp = document.getElementById('app');
-  if (_fsApp && !_fsApp.classList.contains('hidden') && _fsApp.style.display !== 'none' && !STATE.idToken) {
+  if (_fsApp && !_fsApp.classList.contains('hidden') && _fsApp.style.display !== 'none' && !_fsAuthed) {
     window.location.reload(true);
     return;
   }
-  if (!STATE.idToken || !STATE.vehicle) return;
+  if (!_fsAuthed || !STATE.vehicle) return;
+  if (!STATE.idToken) return;   // session/bio login — no Google token to refresh against
   if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
   // Throttled appointment sync — not on every screen-on
   if (Date.now() - _lastApptSync >= _APPT_SYNC_MIN) {
@@ -11843,9 +11957,12 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
 // via toast (visible even when the gate drawer covers the main card).
 function _gateShowOpenError(reason) {
   if (reason === 'auth_required' || reason === 'session_expired') {
-    _driverSessionClear();
-    if (!_isNativeApp()) _sessionExpired();
-    else if (typeof _showSessionExpiredOverlay === 'function') _showSessionExpiredOverlay();
+    /* BUG-2026-07-26: this used to call _driverSessionClear() first — one transient auth
+       blip (GAS cold start, a failed Firebase read inside _getDriverSession) permanently
+       destroyed the 30-day durable token, so the driver could never recover without a full
+       restart + Google sign-in. A failed request is NOT proof the session is invalid.
+       Keep the token and attempt a real recovery; only an explicit logout clears it. */
+    _sessionExpired();
     return;
   }
   // BUG-2026-07-26: the map was incomplete — too_far/speed/hours/day/not_your_vehicle fell
