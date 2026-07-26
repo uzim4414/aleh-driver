@@ -12683,6 +12683,28 @@ function _gateStartHeartbeat() {
   }, 30000);
 }
 
+/* BUG-2026-07-27: hand the gate coordinates to the native layer. From then on the foreground
+   notification is computed in BackgroundGeolocationService.onLocationResult — it stays live even
+   while Android has this WebView frozen, which is exactly when JS-driven updates used to die.
+   Native also retunes GPS precision by proximity (2m inside the lot ... 100m far away).
+   Safe on older builds: the method simply won't exist and we carry on with the JS path. */
+function _gatePushNativeTargets() {
+  try {
+    if (!_gateIsNativeCapacitor()) return;
+    var BG = _gateBgInst || (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation);
+    if (!BG || typeof BG.setLiveTargets !== 'function') return;
+    var cfgs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
+    var targets = cfgs.filter(function(c){ return c && c.lat && c.lng; }).map(function(c){
+      return { lotId: String(c.lotId||''), name: String(c.lotName||'החניון'),
+               lat: parseFloat(c.lat), lng: parseFloat(c.lng) };
+    });
+    if (!targets.length) return;
+    BG.setLiveTargets({ title: _gateBuildNotifTitle(), targets: targets })
+      .then(function(){ console.log('[gate-native] live targets pushed:', targets.length); })
+      .catch(function(e){ console.warn('[gate-native] setLiveTargets:', e && e.message); });
+  } catch (e) { console.warn('[gate-native] pushTargets:', e && e.message); }
+}
+
 /* BUG-2026-07-27: called when the app becomes visible again. While Android had the WebView
    frozen the notification kept its last text, so the first thing we do on resume is take a
    real fix and force the notification to match it — bypassing the distance threshold, which
@@ -12695,6 +12717,7 @@ function _gateForceRefresh() {
     if (_gateIsNativeCapacitor() && !_gateBgWatchId && !_gateBgUpdating && _gateShouldTrack()) {
       _gateStartWatchNative();
     }
+    _gatePushNativeTargets();   // keep native in sync if the lot list changed while we were away
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(function(pos) {
       _gateOnPosition(pos);
@@ -12760,6 +12783,8 @@ function _gateStartWatchNative() {
     _gateBgUpdating = false;
     _gateLastLocationTs = Date.now();
     _gateStartHeartbeat();
+    // BUG-2026-07-27: from here the notification is rendered natively — push the gates it needs.
+    _gatePushNativeTargets();
     console.log('[gate-native] watch started, id:', watcherId);
     _gateSetStatus('native');
     _gateNativeStarting = false;
