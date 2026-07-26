@@ -6966,7 +6966,10 @@ window.fcmDebug = async function() {
       '<div class="gd-info-grid">' +
         '<div class="gd-info-cell"><div class="gd-info-lbl">טווח פתיחה</div><div class="gd-info-val">' + esc(cfg.radius||200) + 'מ\'</div></div>' +
         '<div class="gd-info-sep-v"></div>' +
-        '<div class="gd-info-cell"><div class="gd-info-lbl">מהירות מקס\'</div><div class="gd-info-val">≤' + esc(cfg.maxSpeed||25) + ' קמ"ש</div></div>' +
+        /* BUG-2026-07-27: the "≤" is bidi-neutral, so inside this RTL block it reordered and
+           rendered as "≥30" — telling the driver the opposite of the rule. Isolate the
+           comparison so it always reads left-to-right. Default aligned to Fleet's own default (30). */
+        '<div class="gd-info-cell"><div class="gd-info-lbl">מהירות מקס\'</div><div class="gd-info-val"><span dir="ltr" style="unicode-bidi:isolate">&#8804;' + esc(cfg.maxSpeed||30) + '</span> קמ"ש</div></div>' +
       '</div>' +
       '<div class="gd-info-sep-h"></div>' +
       '<div class="gd-info-grid">' +

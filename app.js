@@ -10300,6 +10300,8 @@ document.addEventListener('visibilitychange', async function() {
     window.location.reload(true);
     return;
   }
+  // BUG-2026-07-27: correct a notification that went stale while the OS froze this WebView.
+  try { if (typeof _gateForceRefresh === 'function') _gateForceRefresh(); } catch (_gfr) {}
   if (!_fsAuthed || !STATE.vehicle) return;
   if (!STATE.idToken) return;   // session/bio login — no Google token to refresh against
   if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
@@ -11817,6 +11819,10 @@ function _gateOnPosition(pos) {
   _gateLastAccM     = pos.coords.accuracy != null ? pos.coords.accuracy : null;
   var inRange = null; // nearest gate in range
   var nearestDist = Infinity;
+  /* BUG-2026-07-27: nearest gate REGARDLESS of range. Every surface (notification, home
+     badge, drawer) must render the same number from the same fix — previously each computed
+     its own, and the notification kept showing a value long after it stopped being true. */
+  var absNearest = Infinity, absCfg = null;
   for (var _gi = 0; _gi < configs.length; _gi++) {
     var cfg = configs[_gi];
     if (!cfg.lat || !cfg.lng) continue;
@@ -11829,12 +11835,23 @@ function _gateOnPosition(pos) {
       _parkWatch = null;
       gasPost('report_parking_state', { lotId: cfg.lotId, state: 'left', source: 'gate' }, { silent: true });
     }
+    if (distM < absNearest) { absNearest = distM; absCfg = cfg; }
     var radius = parseFloat(cfg.radius) || 200;
     if (distM < radius && distM < nearestDist) {
       nearestDist = distM;
       inRange = cfg;
     }
   }
+  // Publish this fix once; all three surfaces read from here.
+  _gateLive = {
+    lat: lat, lng: lng,
+    distM: (absNearest === Infinity ? null : absNearest),
+    speedKmh: Math.round(speedMs * 3.6),
+    accM: _gateLastAccM,
+    lotId: absCfg ? absCfg.lotId : null,
+    lotName: absCfg ? (absCfg.lotName || '') : '',
+    ts: Date.now()
+  };
   // Update drawer live distances if open
   if (typeof _gateDrawerUpdateDistances === 'function') {
     _gateDrawerUpdateDistances(configs, lat, lng);
@@ -11891,7 +11908,9 @@ function _gateCheckConditions(speedMs, cfg) {
     if (!_gateInWindow(_scH, _gateModeStart, _gateModeEnd)) return false;
   }
   var speedKmh = speedMs * 3.6;
-  var maxSpeed = parseFloat(cfg.maxSpeed) || 25;
+  // BUG-2026-07-27: must match the server's GATE_DEFAULT_MAX_KMH (30) and the Fleet form default,
+  // otherwise the client silently pre-blocks an attempt the server would have allowed.
+  var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
   if (maxSpeed > 0 && speedKmh > maxSpeed) return false;
   var minSpeed = parseFloat(cfg.minSpeed) || 3;
   if (speedKmh < minSpeed) return false;
@@ -12338,6 +12357,20 @@ var _gateBgInst      = null;    // reference to BG plugin — for notif updates
 var _gateLastNotifMsg   = '';   // last notification message text
 var _gateLastNotifDistM = -999; // distM at last notification update
 var _gateBgUpdating     = false;// H1: guards against overlapping notif restarts
+var _gateBgUpdatingSince = 0;   // BUG-2026-07-27: when that guard was raised, so a frozen restart can be detected
+/* Single source of truth for every surface that shows gate telemetry (notification,
+   home-screen badge, drawer). Written ONLY by _gateOnPosition. `ts` is what makes a stale
+   reading detectable instead of being presented as current. */
+var _gateLive = { lat:null, lng:null, distM:null, speedKmh:0, accM:null, lotId:null, lotName:'', ts:0 };
+// True when the gate module is supposed to be receiving locations right now.
+function _gateShouldTrack() {
+  if (_gateMode === 'off') return false;
+  if (_gateMode === 'schedule') {
+    var t = ('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2);
+    return _gateInWindow(t, _gateModeStart, _gateModeEnd);
+  }
+  return true;
+}
 var _gateLastLocationTs = 0;    // heartbeat: ts of last _gateBgOnLocation
 var _gateHeartbeatTimer = null; // heartbeat setInterval handle
 var _gateMode        = 'off';   // 'always' | 'schedule' | 'off'
@@ -12481,6 +12514,12 @@ function _gateBuildNotifMsg(distM, speedMs, accuracyM, nearCfg) {
   var parts = ['📍 ' + lotName + ' · ' + distStr];
   if (speedKmh > 2) parts.push('🚗 ' + speedKmh + 'קמ"ש');
   if (accuracyM != null && accuracyM < 200) parts.push('🎯 ±' + Math.round(accuracyM) + 'מ\'');
+  /* BUG-2026-07-27: stamp the measurement time. Android keeps showing the foreground-service
+     text unchanged while the OS has the WebView frozen, so a distance from 20 minutes ago looked
+     exactly like a live one (644מ' shown while the driver was 4.5km away). The app cannot force
+     the OS to run our JS — but it must never present a stale reading as current. */
+  var _nt = new Date();
+  parts.push('🕐 ' + ('0'+_nt.getHours()).slice(-2) + ':' + ('0'+_nt.getMinutes()).slice(-2));
   return parts.join(' · ');
 }
 
@@ -12574,6 +12613,7 @@ function _gateBgUpdateNotif(coords) {
   var BG    = _gateBgInst;
   var oldId = _gateBgWatchId;
   _gateBgUpdating = true;
+  _gateBgUpdatingSince = Date.now();   // BUG-2026-07-27: lets the heartbeat spot a frozen restart
   _gateBgWatchId  = null;
   BG.removeWatcher({ id: oldId }).then(function() {
     return BG.addWatcher({
@@ -12586,6 +12626,7 @@ function _gateBgUpdateNotif(coords) {
   }).then(function(newId) {
     _gateBgWatchId  = newId;
     _gateBgUpdating = false;
+    _gateBgUpdatingSince = 0;
   }).catch(function(e) {
     // H5: restart failed — the old watcher may be gone and the foreground
     // service demoted. Roll back the notif markers so the next update retries,
@@ -12594,6 +12635,7 @@ function _gateBgUpdateNotif(coords) {
     _gateLastNotifMsg   = prevMsg;
     _gateLastNotifDistM = prevDist;
     _gateBgUpdating     = false;
+    _gateBgUpdatingSince = 0;
     if (_gateBgWatchId === null) {
       // No live watcher left → notification is gone. Rebuild from scratch.
       _gateStartWatchNative();
@@ -12606,8 +12648,30 @@ function _gateBgUpdateNotif(coords) {
 function _gateStartHeartbeat() {
   if (_gateHeartbeatTimer) return;
   _gateHeartbeatTimer = setInterval(function() {
-    if (!_gateBgWatchId) return;           // not tracking natively
-    if (_gateBgUpdating)  return;           // a restart is already in flight
+    /* BUG-2026-07-27: DEADLOCK FIX. _gateBgUpdateNotif sets _gateBgWatchId=null and
+       _gateBgUpdating=true *before* removeWatcher(). If the WebView is frozen by the OS
+       mid-flight (routine on Samsung/Android background restrictions), that promise never
+       settles — and BOTH early-returns below used to fire forever, so nothing ever restored
+       the watcher. Result: GPS callbacks stop, the foreground-service notification keeps
+       showing its last text, and the driver sees a confidently wrong distance.
+       A restart that has been "in flight" longer than 30s is not in flight — it is stuck. */
+    if (_gateBgUpdating) {
+      var stuckFor = Date.now() - (_gateBgUpdatingSince || 0);
+      if (_gateBgUpdatingSince && stuckFor > 30000) {
+        console.warn('[gate-native] notif restart stuck ' + Math.round(stuckFor / 1000) + 's — forcing recovery');
+        _gateBgUpdating = false; _gateBgUpdatingSince = 0;
+        _gateStartWatchNative();
+      }
+      return;
+    }
+    // Watcher vanished while we should be tracking (killed service / aborted restart) → rebuild.
+    if (!_gateBgWatchId) {
+      if (_gateShouldTrack && _gateShouldTrack()) {
+        console.warn('[gate-native] no watcher while tracking is expected — rebuilding');
+        _gateStartWatchNative();
+      }
+      return;
+    }
     if (!_gateLastLocationTs) return;       // no baseline yet
     var gap = Date.now() - _gateLastLocationTs;
     if (gap > 60000) {
@@ -12617,6 +12681,30 @@ function _gateStartHeartbeat() {
       _gateStartWatchNative();
     }
   }, 30000);
+}
+
+/* BUG-2026-07-27: called when the app becomes visible again. While Android had the WebView
+   frozen the notification kept its last text, so the first thing we do on resume is take a
+   real fix and force the notification to match it — bypassing the distance threshold, which
+   would otherwise suppress the correction. Also revives a watcher that died while frozen. */
+function _gateForceRefresh() {
+  try {
+    if (_gateBgUpdatingSince && (Date.now() - _gateBgUpdatingSince) > 30000) {
+      _gateBgUpdating = false; _gateBgUpdatingSince = 0;
+    }
+    if (_gateIsNativeCapacitor() && !_gateBgWatchId && !_gateBgUpdating && _gateShouldTrack()) {
+      _gateStartWatchNative();
+    }
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      _gateOnPosition(pos);
+      _gateLastNotifDistM = -99999;   // force the next notif build to pass the threshold
+      _gateLastNotifMsg   = '';
+      if (typeof _gateBgUpdateNotif === 'function' && _gateBgInst && _gateBgWatchId) {
+        _gateBgUpdateNotif(pos.coords);
+      }
+    }, function(){}, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  } catch (e) { console.warn('[gate] force refresh:', e && e.message); }
 }
 
 function _gateStopHeartbeat() {
