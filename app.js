@@ -2467,15 +2467,22 @@ function _showBioLoginButton(bioData) {
 async function _bioGasAuth(email, credentialId) {
   var bioBtn = document.getElementById('bio-login-btn');
   var errEl = document.getElementById('login-err');
-  if (!email || !credentialId) {
+  /* BUG-2026-07-27c: native (APK) biometric enrolment stores {email, deviceName, nativePlugin:true}
+     with NO credentialId — only the WebAuthn path produces one. This guard therefore rejected every
+     native biometric login before a single byte hit the network, always surfacing
+     "יש להיכנס פעם אחת עם Google לחידוש הנתונים" even though the fingerprint had just been accepted.
+     The server authenticates on driverSession FIRST (_bioAuth → _getDriverSession), so a durable
+     session is a perfectly valid credential here. Only refuse when we have neither. */
+  var _ds = _driverSessionLoad();
+  if (!email || (!credentialId && !_ds)) {
     window._bioLoginBusy = false;
     setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
     return false;
   }
   var data;
   var _bioRespText;
-  var params = { action: 'bio_auth', email: email, credentialId: credentialId };
-  var _ds = _driverSessionLoad();
+  var params = { action: 'bio_auth', email: email };
+  if (credentialId) params.credentialId = credentialId;
   if (_ds) params.driverSession = _ds;
   var url = GAS_URL + '?' + new URLSearchParams(params).toString();
   // retry — GAS cold start can exceed a mobile browser's fetch timeout and throw
