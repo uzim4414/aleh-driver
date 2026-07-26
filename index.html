@@ -7005,7 +7005,7 @@ window.fcmDebug = async function() {
         if (badge) { badge.id = ''; badge.textContent = '● בטווח'; badge.style.background='rgba(31,138,61,.12)'; badge.style.color='#30D158'; badge.style.borderColor='rgba(31,138,61,.25)'; }
         if (stateDiv) stateDiv.innerHTML = '<span class="gd-live-dot"><i class="ping"></i><i></i></span><span class="gd-live-dist">' + Math.round(distM) + 'מ\'</span><span class="gd-live-lbl">ממך כעת</span><span class="gd-live-hint">עדכון GPS חי</span>';
         if (stateDiv) { stateDiv.className = 'gd-state-row in-range'; }
-        if (cta) { cta.className = 'gd-cta'; cta.disabled = false; cta.textContent = 'פתח שער'; cta.onclick = function(){ if(typeof _gateOpen==='function') _gateOpen(cfg.lotId, distM, 0, lat, lng); }; }
+        if (cta) { cta.className = 'gd-cta'; cta.disabled = false; cta.textContent = 'פתח שער'; cta.onclick = function(){ if(typeof _gateOpen==='function') _gateOpen(cfg.lotId, distM, 0, lat, lng, 'manual'); }; }
       } else {
         card.dataset.state = 'idle';
         var dStr = distM !== null ? (distM > 1000 ? (distM/1000).toFixed(1)+' ק"מ' : Math.round(distM)+'מ\'') : '—';

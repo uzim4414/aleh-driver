@@ -11907,7 +11907,10 @@ function _gateCheckConditions(speedMs, cfg) {
   return true;
 }
 
-function _gateOpen(lotId, distM, speedMs, lat, lng) {
+/* BUG-2026-07-26b: `trigger` tells the gate log whether a human pressed "פתח שער" in the
+   drawer or the GPS geofence fired on its own — without it both look identical in the report.
+   Defaults to 'auto' so the automatic caller needs no change. */
+function _gateOpen(lotId, distM, speedMs, lat, lng, trigger) {
   _gateOpening = true;
   var uid = STATE.firebaseUid || (STATE.user && STATE.user.uid) || '';
   var vehId = (STATE.vehicle && STATE.vehicle.id) || '';
@@ -11920,7 +11923,8 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
     lat: lat,
     lng: lng,
     accuracy: (_gateLastAccM != null ? Math.round(_gateLastAccM) : ''),
-    heading:  (_gateLastHeading != null ? Math.round(_gateLastHeading) : '')
+    heading:  (_gateLastHeading != null ? Math.round(_gateLastHeading) : ''),
+    trigger:  (trigger === 'manual' ? 'manual' : 'auto')
   }, { silent: true }).then(function(r) {
     _gateOpening = false;
     if (r && r.ok) {
