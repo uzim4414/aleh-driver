@@ -11802,9 +11802,11 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
     vehicleId: vehId,
     uid: uid,
     dist: Math.round(distM),
-    speed: Math.round(speedMs * 3.6 * 10) / 10,
+    speed: Math.round(speedMs * 3.6 * 10) / 10,   // km/h (server compares to maxSpeed in km/h)
     lat: lat,
-    lng: lng
+    lng: lng,
+    accuracy: (_gateLastAccM != null ? Math.round(_gateLastAccM) : ''),
+    heading:  (_gateLastHeading != null ? Math.round(_gateLastHeading) : '')
   }, { silent: true }).then(function(r) {
     _gateOpening = false;
     if (r && r.ok) {
@@ -11822,10 +11824,17 @@ function _gateOpen(lotId, distM, speedMs, lat, lng) {
     } else {
       // BUG-FIX: surface the real server reason to the user (drawer may be open,
       // hiding the main gate card — so show a visible toast everywhere).
+      // BUG-2026-07-26: apply a short client-side backoff on failure so the gate does NOT
+      // re-attempt on every GPS fix (which spammed errors + hammered the server). Short enough
+      // that slowing down / conditions changing recovers quickly.
+      if (!_gateCooldownMap) _gateCooldownMap = {};
+      _gateCooldownMap[lotId] = Date.now() + 12000;
       _gateShowOpenError(r && (r.reason || r.error));
     }
   }).catch(function() {
     _gateOpening = false;
+    if (!_gateCooldownMap) _gateCooldownMap = {};
+    _gateCooldownMap[lotId] = Date.now() + 12000;
     _gateShowOpenError('api_error');
   });
 }
@@ -11839,11 +11848,19 @@ function _gateShowOpenError(reason) {
     else if (typeof _showSessionExpiredOverlay === 'function') _showSessionExpiredOverlay();
     return;
   }
+  // BUG-2026-07-26: the map was incomplete — too_far/speed/hours/day/not_your_vehicle fell
+  // through to the generic "שגיאה בפתיחת שער", hiding the real reason (this is what masked the
+  // speed-unit bug). Every server reason now maps to a clear Hebrew message.
   var map = {
     auth_required:    'נדרשת כניסה מחדש',
     not_permitted:    'אין הרשאה לשער זה',
     lot_mismatch:     'השער אינו משויך לרכב',
     vehicle_inactive: 'הרכב אינו פעיל במערכת',
+    not_your_vehicle: 'הרכב אינו משויך אליך',
+    too_far:          'רחוק מדי מהשער',
+    speed:            'מהירות גבוהה מדי — האט',
+    hours:            'מחוץ לשעות הפעילות',
+    day:              'יום לא מורשה לכניסה',
     cooldown:         'נא להמתין לפני פתיחה חוזרת',
     api_error:        'שגיאת תקשורת עם השער'
   };
@@ -12422,7 +12439,11 @@ function _gateBgUpdateNotif(coords) {
   }
   if (!_nearCfg) return;
   var distM = _nearDist;
-  if (Math.abs(distM - _gateLastNotifDistM) < 75 && _gateLastNotifMsg) return;
+  // BUG-2026-07-26: the flat 75m threshold made the notification freeze near the gate — it
+  // showed 82m while the driver was already at the gate. Make it adaptive: fine (15m) up close
+  // where accuracy matters, coarse (75m) far away to avoid watcher-restart thrash.
+  var _notifThresh = distM < 150 ? 15 : (distM < 400 ? 40 : 75);
+  if (Math.abs(distM - _gateLastNotifDistM) < _notifThresh && _gateLastNotifMsg) return;
   var newMsg = _gateBuildNotifMsg(distM, coords.speed || 0, coords.accuracy, _nearCfg);
   if (newMsg === _gateLastNotifMsg) return;
   var prevMsg   = _gateLastNotifMsg;
