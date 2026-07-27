@@ -2408,9 +2408,7 @@ async function bioRegister(email, displayName) {
   return credId;
 }
 
-/* אימות ביומטרי — נקודת-החנק היחידה של "זה האדם הנכון".
-   BUG-2026-07-27d: כל אימות מקומי מוצלח מסמן _authGatePassed, לא משנה מי ביקש אותו.
-   בלי זה, אצבע שהונחה בנתיב אחד לא נספרה בנתיב אחר ו-_coldStartAuthGate ביקש אצבע שנייה. */
+// אימות ביומטרי — מופעל אך ורק מלחיצת המשתמש על "כניסה ביומטרית"
 async function bioAuthenticate(email, credentialId) {
   if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
 
@@ -2422,7 +2420,6 @@ async function bioAuthenticate(email, credentialId) {
       cancelTitle: 'ביטול',
       allowDeviceCredential: false
     });
-    window._authGatePassed = true;
     var session = _pinSessionLoad();
     return {
       ok: true,
@@ -2448,7 +2445,6 @@ async function bioAuthenticate(email, credentialId) {
     timeout: 60000
   }});
   if (!assertion) throw new Error('האימות בוטל');
-  window._authGatePassed = true;
   var session2 = _pinSessionLoad();
   return {
     ok: true,
@@ -2640,6 +2636,27 @@ async function _bioLoginFromSplash() {
       await bioAuthenticate(bioData.email, bioData.credentialId);
     }
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
+
+    /* BUG-2026-07-27e — מסלול מהיר: ה-boot כבר אימת את ה-session מול השרת וטען את
+       הנתונים ברקע בזמן שמסך הכניסה הוצג. אחרי שטביעת האצבע אושרה אין שום סיבה
+       לסבב רשת נוסף — פותחים ישירות. זה מה שהופך את הכניסה למיידית. */
+    if (window._prefetchOk && STATE.vehicle) {
+      var _fEk = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
+      var _fVk = _vehKey(STATE.vehicle);
+      var _fSp = document.getElementById('splash-screen');
+      showGreeting(STATE.vehicle.holder || (STATE.user && STATE.user.name), _fEk, _fVk);
+      window._bioLoginBusy = false;
+      window._bioTokenRefreshTried = false;
+      _grComplete(function() {
+        hideGreeting();
+        _fbWriteLastLogin(_fEk, _fVk);
+        if (_fSp) _fSp.classList.add('hidden');
+        _bioSessionStart();
+        startApp();
+      });
+      return;
+    }
+
     var session = _pinSessionLoad();
     // גישה A: אחרי שטביעת האצבע הצליחה — אם אין idToken תקין, נסה credentialId מול GAS.
     // כך פינגר עובד לצמיתות (TTL 30 יום) בלי צורך ב-Google מחדש.
@@ -2782,45 +2799,11 @@ function _bioSessionExpired() {
 var _bootFlowId = 0;
 function _bootFlowAbort() { _bootFlowId++; }
 
-/* ══ שער כניסה יחיד בהפעלה טרייה ══
-   BUG-2026-07-27c תסמין A. שתי שאלות שהתערבבו ומופרדות כאן:
-     "המכשיר מורשה?"   → driverSession (30 יום מתגלגל, אימות מול השרת)
-     "זה האדם הנכון?"  → ביומטרי מקומי (נדרש בכל הפעלה טרייה)
-   נקרא רק מנתיבי השחזור השקטים, *אחרי* loadFullData() ו*לפני* startApp():
-   זו נקודת ההשתלה הבטוחה היחידה — המעקב, שעון החימום של השער (45ש') והפתיחה
-   האוטומטית כבר רצים, והאימות חוסם אך ורק את חשיפת הממשק.
-   אסור לחייב כאן _bioGasAuth — רישום ביומטרי נייטיבי נשמר ללא credentialId
-   ולכן _bioGasAuth נכשל תמיד ב-APK והיה נועל את הנהג בחוץ. */
-async function _coldStartAuthGate() {
-  if (window._authGatePassed) return true;
-  var bio = _bioLoad();
-  // אין ביומטרי רשום או אין תמיכה — אין שכבת זהות מקומית לבקש. התנהגות קיימת.
-  if (!bio || !bio.email || !_bioAvailable()) { window._authGatePassed = true; return true; }
-  try {
-    await bioAuthenticate(bio.email, bio.credentialId); // נוכחות מקומית בלבד
-    window._authGatePassed = true;
-    _bioSessionStart();
-    return true;
-  } catch (e) {
-    try { console.warn('[authGate] denied:', (e && e.message) || e); } catch(_) {}
-    return false;
-  }
-}
-
-/* כישלון או ביטול בשער — חזרה למסך הכניסה הקיים (ביומטרי + Google).
-   לא נעילה ולא מסך תקוע: המשתמש בוחר מחדש איך להיכנס. */
-function _authGateShowLogin() {
-  try { hideGreeting(); } catch(_) {}
-  try { hideLoader(); } catch(_) {}
-  var appEl = document.getElementById('app');
-  if (appEl) { appEl.classList.add('hidden'); appEl.style.display = 'none'; }
-  var sp = document.getElementById('splash-screen');
-  if (sp) { sp.classList.remove('hidden'); sp.style.removeProperty('display'); }
-  var bio = _bioLoad();
-  if (bio && _bioAvailable()) _showBioLoginButton(bio);
-  var errEl = document.getElementById('login-err');
-  if (errEl) { errEl.textContent = 'נדרש אימות זהות כדי להיכנס'; errEl.classList.remove('hidden'); }
-}
+/* ══ שער הכניסה — הוסר 2026-07-27 (BUG-2026-07-27e) ══
+   `_coldStartAuthGate` ביקש טביעת אצבע *אחרי* שהשחזור השקט כבר פתח את האפליקציה,
+   ולכן הבקשה קפצה באמצע הברכה. הזרימה התקנית שונה: **הפעלה טרייה נוחתת על מסך
+   הכניסה**, ורק לחיצה מפורשת על "ביומטרי"/"Google" מתחילה את הטעינה.
+   כלומר מסך הכניסה **הוא** השער — פונקציית שער נפרדת הפכה לקוד מת והוסרה. */
 
 function _pinSessionLoad() {
   try {
@@ -3988,9 +3971,8 @@ function _initHelpFabDrag() {
 
 /* ══ Start App ══ */
 function startApp() {
-  // כל נתיב שמגיע לכאן כבר הוכיח זהות (Google / ביומטרי / שער ההפעלה הטרייה).
-  // סימון יחיד — מונע בקשת אימות כפולה מנתיב אחר באותה הפעלה.
-  window._authGatePassed = true;
+  // מגיעים לכאן רק מלחיצת כניסה מפורשת (ביומטרי / Google / demo) או מהתאוששות
+  // session תוך כדי עבודה. אין יותר שום נתיב שנכנס לאפליקציה מעצמו.
   hideLoader();
   var _appEl = document.getElementById('app');
   _appEl.classList.remove('hidden');
@@ -4401,7 +4383,6 @@ function logout() {
       localStorage.removeItem(SESSION_KEY);
       try { localStorage.removeItem('aleh_pin_v1'); } catch(_e) {} // legacy PIN — הוסר 2026-07-27
       _gateCfgCacheClear();          // מטמון קונפיג השער שייך לנהג שיצא
-      window._authGatePassed = false; // הכניסה הבאה תעבור שוב בשער
       _driverSessionClear();
       _bioSessionClear();
       if (_bioTimeoutInterval) { clearInterval(_bioTimeoutInterval); _bioTimeoutInterval = null; }
@@ -10069,63 +10050,41 @@ document.addEventListener('DOMContentLoaded', async function() {
       STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.user    = null;
     } else {
-      var _sFlow = _bootFlowId; // מזהה הזרימה — מחווה מפורשת של המשתמש תבטל אותה
-      try {
-        _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
-        hideLoader();
-        var _sEk = STATE.user && STATE.user.email ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
-        var _sVk = _vehKey(STATE.vehicle);
-        showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _sVk);
-        await loadFullData();
-        if (_sFlow !== _bootFlowId) return;   // המשתמש התחיל כניסה מפורשת — נטוש בשקט
-        // שער כניסה — שחזור שקט מ-session אינו מוכיח מי מחזיק בטלפון
-        if (!(await _coldStartAuthGate())) { _authGateShowLogin(); return; }
+      /* BUG-2026-07-27e: הפעלה טרייה **תמיד** נוחתת על מסך הכניסה. ה-session השמור
+         משמש כאן רק לטעינה מוקדמת **שקטה**: הנתונים נטענים ומעקב השער מותנע ברקע,
+         אבל הממשק לא נחשף ולא מוצגת ברכה. רק לחיצה מפורשת על "ביומטרי"/"Google"
+         פותחת את האפליקציה — ואז היא מהירה כי הנתונים כבר כאן. */
+      var _sFlow = _bootFlowId;
+      _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
+      hideLoader();
+      loadFullData().then(function() {
         if (_sFlow !== _bootFlowId) return;
-        _grComplete(function() {
-          if (_sFlow !== _bootFlowId) return;
-          hideGreeting();
-          _fbWriteLastLogin(_sEk, _sVk);
-          _bioSessionStart();
-          startApp();
-        });
-        return;
-      } catch(e) {
-        hideGreeting();
-        localStorage.removeItem(SESSION_KEY);
-      }
+        window._prefetchOk = true;   // הנתונים מוכנים — הכניסה תדלג על סבב הרשת
+      }).catch(function() {
+        // כשל טעינה מוקדמת — לא מציגים כלום; מסך הכניסה כבר גלוי והנתיב הרגיל ייקח מכאן
+        try { localStorage.removeItem(SESSION_KEY); } catch(_) {}
+      });
     }
   } else if (session && session.token === 'demo_token') {
     localStorage.removeItem(SESSION_KEY);
   }
 
-  // Silent driverSession restore — check 30-day token before forcing Google splash
+  /* ══ טעינה מוקדמת שקטה מ-driverSession ══
+     BUG-2026-07-27e: בעבר הנתיב הזה **נכנס לאפליקציה לבד**. עכשיו הוא רק מכין:
+     מאמת את ה-session מול השרת, טוען נתונים ומתניע את מעקב השער — **בלי ברכה,
+     בלי בקשת אצבע ובלי לחשוף את הממשק**. מסך הכניסה נשאר על המסך עד שהמשתמש לוחץ.
+     מעקב השער רץ ברקע גם בלי כניסה — זו ההחלטה שאושרה (השער נפתח גם כשהממשק נעול). */
   var _dsBoot = _isPostLogout ? null : _driverSessionLoad();
-  if (_dsBoot) {
-    var _dFlow = _bootFlowId; // מזהה הזרימה — מחווה מפורשת של המשתמש תבטל אותה
-    /* BUG-2026-07-27d: בזמן ההמתנה ל-GAS (cold start = שניות) הוצג **מסך הכניסה**,
-       והמשתמש לחץ "ביומטרי" — וכך נפתח נתיב מקביל לשחזור שכבר רץ. עכשיו מוצג מסך
-       הברכה עם השם מהמטמון, כלומר "מתחבר…" במקום הזמנה להתחבר.
-       מושהה ב-400ms: תשובה מהירה או כישלון מהיר לא יגרמו להבהוב. */
-    var _dsCache = _pinSessionLoad() || {};
-    var _dsCachedName = (_dsCache.vehicleData && _dsCache.vehicleData.holder) ||
-                        (_dsCache.userInfo && _dsCache.userInfo.name) || '';
-    var _preGreeted = false;
-    var _preGrTimer = _dsCachedName ? setTimeout(function() {
-      if (_dFlow !== _bootFlowId) return;
-      hideLoader();
-      showGreeting(_dsCachedName,
-        _dsCache.email ? _dsCache.email.replace(/[.#$[\]]/g, '_') : '',
-        _vehKey(_dsCache.vehicleData));
-      _preGreeted = true;
-    }, 400) : null;
+  if (_dsBoot && !window._prefetchOk && !(STATE.vehicle && STATE.idToken)) {
+    var _dFlow = _bootFlowId; // מחווה מפורשת של המשתמש מבטלת את הטעינה המוקדמת
     try {
       var _dsResp = await fetch(GAS_URL + '?' + new URLSearchParams({
         action: 'bio_auth', driverSession: _dsBoot
       }).toString(), { method: 'GET', signal: AbortSignal.timeout(12000) });
       var _dsData = JSON.parse(await _dsResp.text());
-      if (_preGrTimer) { clearTimeout(_preGrTimer); _preGrTimer = null; }
-      if (_dFlow !== _bootFlowId) return;   // המשתמש התחיל כניסה מפורשת — נטוש בשקט
-      if (_dsData && _dsData.ok && _dsData.vehicle) {
+      /* אין כאן אף return: גם אם הטעינה המוקדמת מצליחה וגם אם המשתמש לחץ באמצע,
+         ה-boot **חייב** להמשיך לחיווט כפתור ה-Google שנמצא מתחת. */
+      if (_dFlow === _bootFlowId && _dsData && _dsData.ok && _dsData.vehicle) {
         STATE.vehicle = _dsData.vehicle;
         STATE.idToken = null;
         // BUG-2026-07-26: keep the rolling session fresh on every silent restore.
@@ -10133,25 +10092,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         var _dEmail = _dsData.email || '';
         STATE.user = { email: _dEmail, name: _dsData.vehicle.holder || _dEmail };
         hideLoader();
-        var _dEk = _dEmail.replace(/[.#$[\]]/g, '_');
-        var _dVk = _vehKey(_dsData.vehicle);
-        showGreeting(_dsData.vehicle.holder || _dEmail, _dEk, _dVk);
         await loadFullData();
-        if (_dFlow !== _bootFlowId) return;
-        _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
-        // שער כניסה — driverSession מוכיח "מכשיר מורשה", לא "האדם הנכון"
-        if (!(await _coldStartAuthGate())) { _authGateShowLogin(); return; }
-        if (_dFlow !== _bootFlowId) return;
-        _grComplete(function() {
-          if (_dFlow !== _bootFlowId) return;
-          hideGreeting();
-          _fbWriteLastLogin(_dEk, _dVk);
-          var _sp = document.getElementById('splash-screen');
-          if (_sp) _sp.classList.add('hidden');
-          _bioSessionStart();
-          startApp();
-        });
-        return;
+        if (_dFlow === _bootFlowId) {
+          _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
+          window._prefetchOk = true;   // הנתונים מוכנים — הכניסה תדלג על סבב הרשת
+        }
       }
       /* BUG-2026-07-26: a boot-time `ok:false` used to clear the durable token. That answer
          is also produced by transient conditions (Firebase read failure inside
@@ -10159,9 +10104,6 @@ document.addEventListener('DOMContentLoaded', async function() {
          the driver the whole 30-day session. Keep it; a genuinely dead token simply fails
          again next boot and costs one request. Only explicit logout clears. */
     } catch(_e) { /* network error — keep token, fall through to splash */ }
-    // השחזור לא הצליח — לבטל את הברכה המושהית / להסיר אותה ולחזור למסך הכניסה
-    if (_preGrTimer) { clearTimeout(_preGrTimer); _preGrTimer = null; }
-    if (_preGreeted && _dFlow === _bootFlowId) hideGreeting();
   }
 
   // splash-screen stays visible — login button appears via CSS at ~4s
