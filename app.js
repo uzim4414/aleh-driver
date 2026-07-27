@@ -2408,7 +2408,9 @@ async function bioRegister(email, displayName) {
   return credId;
 }
 
-// אימות ביומטרי
+/* אימות ביומטרי — נקודת-החנק היחידה של "זה האדם הנכון".
+   BUG-2026-07-27d: כל אימות מקומי מוצלח מסמן _authGatePassed, לא משנה מי ביקש אותו.
+   בלי זה, אצבע שהונחה בנתיב אחד לא נספרה בנתיב אחר ו-_coldStartAuthGate ביקש אצבע שנייה. */
 async function bioAuthenticate(email, credentialId) {
   if (!_bioAvailable()) throw new Error('WebAuthn לא נתמך');
 
@@ -2420,6 +2422,7 @@ async function bioAuthenticate(email, credentialId) {
       cancelTitle: 'ביטול',
       allowDeviceCredential: false
     });
+    window._authGatePassed = true;
     var session = _pinSessionLoad();
     return {
       ok: true,
@@ -2445,6 +2448,7 @@ async function bioAuthenticate(email, credentialId) {
     timeout: 60000
   }});
   if (!assertion) throw new Error('האימות בוטל');
+  window._authGatePassed = true;
   var session2 = _pinSessionLoad();
   return {
     ok: true,
@@ -2612,6 +2616,7 @@ async function _bioGasAuth(email, credentialId) {
 async function _bioLoginFromSplash() {
   if (window._bioLoginBusy) return;
   window._bioLoginBusy = true;
+  _bootFlowAbort(); // מחווה מפורשת — השחזור השקט שרץ ברקע נוטש (BUG-2026-07-27d)
   // v267: clear leaked flags from any prior aborted timeout-reauth attempt
   if (!window._bioSkipAuthenticate) {
     window._bioPendingTokenRefresh = false;
@@ -2767,6 +2772,15 @@ function _bioSessionExpired() {
     return Date.now() - (s.startTs || 0) > BIO_SESSION_TTL;
   } catch(e) { return false; }
 }
+
+/* ══ בעלות על זרימת הכניסה ══
+   BUG-2026-07-27d: השחזור השקט ב-boot ממתין ל-GAS (cold start = שניות). בזמן ההמתנה
+   כפתורי הכניסה כבר גלויים, ולחיצה עליהם פתחה נתיב **מקביל** — שני greeting (המחוון
+   קפץ אחורה), שתי בקשות טביעת אצבע, ושתי קריאות startApp.
+   הכלל: **מחווה מפורשת של המשתמש מנצחת.** היא מגדילה את _bootFlowId, והשחזור השקט
+   נוטש בשקט בגבול ה-await הבא. אין שני נתיבים חיים בו-זמנית. */
+var _bootFlowId = 0;
+function _bootFlowAbort() { _bootFlowId++; }
 
 /* ══ שער כניסה יחיד בהפעלה טרייה ══
    BUG-2026-07-27c תסמין A. שתי שאלות שהתערבבו ומופרדות כאן:
@@ -3984,8 +3998,14 @@ function startApp() {
   var _hfab = document.getElementById('help-fab'); if (_hfab) _hfab.style.display = '';
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function(){}); } catch(_){}
   renderAll();
-  initSwipe();
   if (STATE._vehicles && STATE._vehicles.length > 1) { try { _heroCarouselInit(); } catch(e) { console.warn('hero carousel init', e); } }
+  /* BUG-2026-07-27d: startApp נקרא גם מ-_authRecover בזמן שהאפליקציה כבר פועלת, ובעבר
+     גם משני נתיבי כניסה שרצו במקביל. הצגה+רינדור חוזרים הם מה שהנתיב הזה צריך; אתחולי
+     ה-listeners והטיימרים חייבים לרוץ **פעם אחת** — אחרת מצטברים מאזינים כפולים
+     ו-setInterval נוסף שמפעיל את בדיקת המוסך פעמיים בדקה. */
+  if (window._appStarted) return;
+  window._appStarted = true;
+  initSwipe();
   try { _dashInit(); } catch(e) { console.warn('dash init', e); }
   try { _initHelpFabDrag(); } catch(e) { console.warn('fab drag init', e); }
   try { _initBackButtonHandler(); } catch(e) { console.warn('back btn init', e); }
@@ -9657,6 +9677,10 @@ function _grSetRing(pct) {
 }
 
 function _grAnimatePct() {
+  /* BUG-2026-07-27d: קריאה חוזרת בזמן שהמחוון כבר רץ אִפסה את start והמחוון **קפץ אחורה**
+     (המשתמש ראה 80%→50%→100%). המחוון מייצג את הכניסה כולה, לא את השלב הבודד —
+     ולכן ריצה שכבר בעיצומה ממשיכה, ורק _grComplete/hideGreeting מסיימים אותה. */
+  if (_grPctTimer && !_grDone) return;
   clearInterval(_grPctTimer);
   _grDone = false;
   var el  = document.getElementById('gr-pct');
@@ -10045,6 +10069,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       STATE._washLogLoaded = false; STATE.washLog = [];
       STATE.user    = null;
     } else {
+      var _sFlow = _bootFlowId; // מזהה הזרימה — מחווה מפורשת של המשתמש תבטל אותה
       try {
         _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
         hideLoader();
@@ -10052,9 +10077,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         var _sVk = _vehKey(STATE.vehicle);
         showGreeting((STATE.vehicle && STATE.vehicle.holder) || (STATE.user && STATE.user.name), _sEk, _sVk);
         await loadFullData();
+        if (_sFlow !== _bootFlowId) return;   // המשתמש התחיל כניסה מפורשת — נטוש בשקט
         // שער כניסה — שחזור שקט מ-session אינו מוכיח מי מחזיק בטלפון
         if (!(await _coldStartAuthGate())) { _authGateShowLogin(); return; }
+        if (_sFlow !== _bootFlowId) return;
         _grComplete(function() {
+          if (_sFlow !== _bootFlowId) return;
           hideGreeting();
           _fbWriteLastLogin(_sEk, _sVk);
           _bioSessionStart();
@@ -10073,11 +10101,30 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Silent driverSession restore — check 30-day token before forcing Google splash
   var _dsBoot = _isPostLogout ? null : _driverSessionLoad();
   if (_dsBoot) {
+    var _dFlow = _bootFlowId; // מזהה הזרימה — מחווה מפורשת של המשתמש תבטל אותה
+    /* BUG-2026-07-27d: בזמן ההמתנה ל-GAS (cold start = שניות) הוצג **מסך הכניסה**,
+       והמשתמש לחץ "ביומטרי" — וכך נפתח נתיב מקביל לשחזור שכבר רץ. עכשיו מוצג מסך
+       הברכה עם השם מהמטמון, כלומר "מתחבר…" במקום הזמנה להתחבר.
+       מושהה ב-400ms: תשובה מהירה או כישלון מהיר לא יגרמו להבהוב. */
+    var _dsCache = _pinSessionLoad() || {};
+    var _dsCachedName = (_dsCache.vehicleData && _dsCache.vehicleData.holder) ||
+                        (_dsCache.userInfo && _dsCache.userInfo.name) || '';
+    var _preGreeted = false;
+    var _preGrTimer = _dsCachedName ? setTimeout(function() {
+      if (_dFlow !== _bootFlowId) return;
+      hideLoader();
+      showGreeting(_dsCachedName,
+        _dsCache.email ? _dsCache.email.replace(/[.#$[\]]/g, '_') : '',
+        _vehKey(_dsCache.vehicleData));
+      _preGreeted = true;
+    }, 400) : null;
     try {
       var _dsResp = await fetch(GAS_URL + '?' + new URLSearchParams({
         action: 'bio_auth', driverSession: _dsBoot
       }).toString(), { method: 'GET', signal: AbortSignal.timeout(12000) });
       var _dsData = JSON.parse(await _dsResp.text());
+      if (_preGrTimer) { clearTimeout(_preGrTimer); _preGrTimer = null; }
+      if (_dFlow !== _bootFlowId) return;   // המשתמש התחיל כניסה מפורשת — נטוש בשקט
       if (_dsData && _dsData.ok && _dsData.vehicle) {
         STATE.vehicle = _dsData.vehicle;
         STATE.idToken = null;
@@ -10090,10 +10137,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         var _dVk = _vehKey(_dsData.vehicle);
         showGreeting(_dsData.vehicle.holder || _dEmail, _dEk, _dVk);
         await loadFullData();
+        if (_dFlow !== _bootFlowId) return;
         _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
         // שער כניסה — driverSession מוכיח "מכשיר מורשה", לא "האדם הנכון"
         if (!(await _coldStartAuthGate())) { _authGateShowLogin(); return; }
+        if (_dFlow !== _bootFlowId) return;
         _grComplete(function() {
+          if (_dFlow !== _bootFlowId) return;
           hideGreeting();
           _fbWriteLastLogin(_dEk, _dVk);
           var _sp = document.getElementById('splash-screen');
@@ -10109,13 +10159,16 @@ document.addEventListener('DOMContentLoaded', async function() {
          the driver the whole 30-day session. Keep it; a genuinely dead token simply fails
          again next boot and costs one request. Only explicit logout clears. */
     } catch(_e) { /* network error — keep token, fall through to splash */ }
+    // השחזור לא הצליח — לבטל את הברכה המושהית / להסיר אותה ולחזור למסך הכניסה
+    if (_preGrTimer) { clearTimeout(_preGrTimer); _preGrTimer = null; }
+    if (_preGreeted && _dFlow === _bootFlowId) hideGreeting();
   }
 
   // splash-screen stays visible — login button appears via CSS at ~4s
 
   if (!GOOGLE_CLIENT_ID) {
     // Demo mode — login button goes straight in
-    document.getElementById('login-btn').addEventListener('click', demoLogin);
+    document.getElementById('login-btn').addEventListener('click', function() { _bootFlowAbort(); demoLogin(); });
     return;
   }
 
@@ -10126,6 +10179,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     initGoogleAuth();
     document.getElementById('login-btn').addEventListener('click', function() {
       window._userInitiatedLogin = true;
+      _bootFlowAbort(); // מחווה מפורשת — השחזור השקט נוטש (BUG-2026-07-27d)
       // Native APK: use SocialLogin plugin (Credential Manager bottom sheet).
       if (_isNativeApp()) { _loginFallbackRedirect(); return; }
       // PWA: מחק g_state cookie לפני prompt כדי לאפס One Tap backoff (suppressed_by_user).
