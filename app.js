@@ -12404,13 +12404,18 @@ function _poLiveStatus(state, detail){
   if(!el){
     el=document.createElement('div');
     el.id='po-live-status';
-    el.style.cssText='margin:0 0 10px;padding:8px 12px;border-radius:10px;font-size:13px;display:none;'+
-                     'background:rgba(255,159,10,.12);border:1px solid rgba(255,159,10,.4);color:#FF9F0A';
+    el.style.cssText='margin:0 0 10px;padding:8px 38px 8px 12px;border-radius:10px;font-size:13px;display:none;'+
+                     'background:rgba(255,159,10,.12);border:1px solid rgba(255,159,10,.4);color:#FF9F0A;position:relative';
     host.parentNode.insertBefore(el, host);
   }
   if(state==='ok'){ el.style.display='none'; return; }
   el.style.display='block';
-  el.textContent='⚠ העדכון החי מנותק — התצוגה עשויה לא לשקף את המצב בפועל'+(detail?' ('+detail+')':'');
+  // כפתור סגירה — הודעה שנקראה לא נשארת מול העיניים
+  el.innerHTML='<button type="button" aria-label="סגור הודעה" onclick="this.parentNode.style.display=\'none\'" '+
+    'style="position:absolute;left:8px;top:7px;width:22px;height:22px;border:none;cursor:pointer;'+
+    'background:rgba(0,0,0,.18);border-radius:7px;color:inherit;font-size:13px;line-height:1;padding:0">✕</button><span></span>';
+  el.querySelector('span').textContent=
+    '⚠ העדכון החי מנותק — התצוגה עשויה לא לשקף את המצב בפועל'+(detail?' ('+detail+')':'');
   try{ console.warn('[po] live disconnected:', detail); }catch(_){}
 }
 
