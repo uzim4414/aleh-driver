@@ -2614,8 +2614,9 @@ async function _bioGasAuth(email, credentialId) {
 async function _bioLoginFromSplash() {
   if (window._bioLoginBusy) return;
   window._bioLoginBusy = true;
-  _bootFlowAbort();            // מחווה מפורשת — השחזור השקט שרץ ברקע נוטש (BUG-2026-07-27d)
-  _bootWatchdogArm('כניסה ביומטרית'); // רשת ביטחון: אין מסך אחרי 4ש' → חזרה למסך הכניסה
+  /* BUG-2026-07-27h: **לא** מבטלים כאן את הטעינה המוקדמת. היא טוענת בדיוק את מה
+     שהכניסה הביומטרית צריכה — אותו משתמש, אותו רכב — וביטולה רק אילץ סבב GAS נוסף.
+     (ביטול נשאר בנתיב Google/demo, שם עלול להיכנס חשבון אחר.) */
   // v267: clear leaked flags from any prior aborted timeout-reauth attempt
   if (!window._bioSkipAuthenticate) {
     window._bioPendingTokenRefresh = false;
@@ -2640,17 +2641,32 @@ async function _bioLoginFromSplash() {
     }
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
 
-    /* BUG-2026-07-27e — מסלול מהיר: ה-boot כבר אימת את ה-session מול השרת וטען את
-       הנתונים ברקע בזמן שמסך הכניסה הוצג. אחרי שטביעת האצבע אושרה אין שום סיבה
-       לסבב רשת נוסף — פותחים ישירות. זה מה שהופך את הכניסה למיידית. */
+    /* ══ BUG-2026-07-27h — משוב מיידי ══
+       האצבע אושרה = המשתמש סיים את חלקו. מכאן ואילך **אסור שיראה מסך סטטי**.
+       הברכה והמחוון עולים **מיד**, לפני כל פנייה לרשת. השם נלקח מ-STATE אם
+       הטעינה המוקדמת כבר סיפקה אותו, אחרת ממטמון ה-session של המכשיר. */
+    var _gCache = _pinSessionLoad() || {};
+    var _gName = (STATE.vehicle && STATE.vehicle.holder) ||
+                 (_gCache.vehicleData && _gCache.vehicleData.holder) ||
+                 (_gCache.userInfo && _gCache.userInfo.name) || bioData.email || '';
+    var _gEmail = (STATE.user && STATE.user.email) || _gCache.email || bioData.email || '';
+    showGreeting(_gName, _gEmail ? _gEmail.replace(/[.#$[\]]/g,'_') : '',
+                 _vehKey(STATE.vehicle || _gCache.vehicleData));
+    _bootWatchdogArm('כניסה ביומטרית');
+
+    /* הטעינה המוקדמת שרצה ברקע עושה **בדיוק** את העבודה שנדרשת כאן. קודם ביטלנו
+       אותה (`_bootFlowAbort`) וביצענו את אותה קריאה מחדש — מה שהוסיף סבב GAS שלם
+       (3 שניות ויותר ב-cold start). עכשיו פשוט ממתינים לה. */
+    if (!window._prefetchOk && window._prefetchPromise) {
+      try { await window._prefetchPromise; } catch (_) {}
+    }
+
     if (window._prefetchOk && STATE.vehicle) {
       var _fEk = (STATE.user && STATE.user.email) ? STATE.user.email.replace(/[.#$[\]]/g,'_') : '';
       var _fVk = _vehKey(STATE.vehicle);
       var _fSp = document.getElementById('splash-screen');
-      showGreeting(STATE.vehicle.holder || (STATE.user && STATE.user.name), _fEk, _fVk);
       window._bioLoginBusy = false;
       window._bioTokenRefreshTried = false;
-      _bootWatchdogArm('כניסה ביומטרית מהירה');
       _grComplete(function() {
         /* BUG-2026-07-27f — סדר הפעולות קריטי: **קודם חושפים את הממשק**, ורק אחר כך
            מסתירים ספלאש וברכה. בסדר ההפוך, חריגה באמצע השאירה מסך שחור: הספלאש כבר
@@ -9786,7 +9802,9 @@ function _grAnimatePct() {
   var gr  = document.getElementById('greeting');
   if (!el) return;
   el.textContent = '0%';
-  var start = performance.now(), delay = 700, dur = 2100;
+  // BUG-2026-07-27h: ההשהיה הייתה 700ms — כמעט שנייה שבה המחוון עומד על 0% והמשתמש
+  // חושב שכלום לא קורה. 180ms מספיקות כדי שהברכה תיכנס לתמונה, והתנועה מתחילה מיד.
+  var start = performance.now(), delay = 180, dur = 2100;
   var CAP = 90, CRAWL_MAX = 97;
   var crawling = false;
   _grPctTimer = setInterval(function() {
@@ -10178,12 +10196,15 @@ document.addEventListener('DOMContentLoaded', async function() {
       /* BUG-2026-07-27g: **אסור** לקרוא כאן hideLoader() — הוא מסתיר את מסך הספלאש
          עצמו (`splash-screen.classList.add('hidden')`), ובטעינה שקטה אין ברכה שתבוא
          במקומו → מסך שחור. מסך הכניסה חייב להישאר עד לחיצה מפורשת. */
-      loadFullData().then(function() {
-        if (_sFlow !== _bootFlowId) return;
+      // BUG-2026-07-27h: נחשף כ-promise כדי שהלחיצה הביומטרית תמתין לו במקום לשכפל אותו
+      window._prefetchPromise = loadFullData().then(function() {
+        if (_sFlow !== _bootFlowId) return false;
         window._prefetchOk = true;   // הנתונים מוכנים — הכניסה תדלג על סבב הרשת
+        return true;
       }).catch(function() {
         // כשל טעינה מוקדמת — לא מציגים כלום; מסך הכניסה כבר גלוי והנתיב הרגיל ייקח מכאן
         try { localStorage.removeItem(SESSION_KEY); } catch(_) {}
+        return false;
       });
     }
   } else if (session && session.token === 'demo_token') {
@@ -10197,35 +10218,42 @@ document.addEventListener('DOMContentLoaded', async function() {
      מעקב השער רץ ברקע גם בלי כניסה — זו ההחלטה שאושרה (השער נפתח גם כשהממשק נעול). */
   var _dsBoot = _isPostLogout ? null : _driverSessionLoad();
   if (_dsBoot && !window._prefetchOk && !(STATE.vehicle && STATE.idToken)) {
-    var _dFlow = _bootFlowId; // מחווה מפורשת של המשתמש מבטלת את הטעינה המוקדמת
-    try {
-      var _dsResp = await fetch(GAS_URL + '?' + new URLSearchParams({
-        action: 'bio_auth', driverSession: _dsBoot
-      }).toString(), { method: 'GET', signal: AbortSignal.timeout(12000) });
-      var _dsData = JSON.parse(await _dsResp.text());
-      /* אין כאן אף return: גם אם הטעינה המוקדמת מצליחה וגם אם המשתמש לחץ באמצע,
-         ה-boot **חייב** להמשיך לחיווט כפתור ה-Google שנמצא מתחת. */
-      if (_dFlow === _bootFlowId && _dsData && _dsData.ok && _dsData.vehicle) {
-        STATE.vehicle = _dsData.vehicle;
-        STATE.idToken = null;
-        // BUG-2026-07-26: keep the rolling session fresh on every silent restore.
-        if (_dsData.driverSession) _driverSessionSave(_dsData.driverSession);
-        var _dEmail = _dsData.email || '';
-        STATE.user = { email: _dEmail, name: _dsData.vehicle.holder || _dEmail };
-        // BUG-2026-07-27g: כאן היה hideLoader() — הוא מסתיר את הספלאש עצמו ובטעינה
-        // שקטה אין ברכה שתחליף אותו → מסך שחור שתי שניות אחרי הטעינה. הוסר.
-        await loadFullData();
-        if (_dFlow === _bootFlowId) {
+    /* BUG-2026-07-27h — שני שינויי ביצועים קריטיים:
+       1. **לא חוסם.** קודם היה `await` כאן, ולכן חיווט כפתור ה-Google וטעינת ספריית
+          GSI המתינו לסבב מלא מול GAS (cold start = שניות).
+       2. **חשוף כ-`window._prefetchPromise`.** הלחיצה הביומטרית ממתינה לתוצאה הזו
+          במקום לבטל אותה ולבצע את אותה קריאה מחדש — מה שהיה מכפיל את זמן ההמתנה. */
+    window._prefetchPromise = (async function() {
+      var _dFlow = _bootFlowId;
+      try {
+        var _dsResp = await fetch(GAS_URL + '?' + new URLSearchParams({
+          action: 'bio_auth', driverSession: _dsBoot
+        }).toString(), { method: 'GET', signal: AbortSignal.timeout(12000) });
+        var _dsData = JSON.parse(await _dsResp.text());
+        if (_dFlow !== _bootFlowId) return false;   // כניסה עם חשבון אחר התחילה
+        if (_dsData && _dsData.ok && _dsData.vehicle) {
+          STATE.vehicle = _dsData.vehicle;
+          STATE.idToken = null;
+          // BUG-2026-07-26: keep the rolling session fresh on every silent restore.
+          if (_dsData.driverSession) _driverSessionSave(_dsData.driverSession);
+          var _dEmail = _dsData.email || '';
+          STATE.user = { email: _dEmail, name: _dsData.vehicle.holder || _dEmail };
+          // BUG-2026-07-27g: כאן היה hideLoader() — הוא מסתיר את הספלאש עצמו ובטעינה
+          // שקטה אין ברכה שתחליף אותו → מסך שחור. הוסר.
+          await loadFullData();
+          if (_dFlow !== _bootFlowId) return false;
           _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
           window._prefetchOk = true;   // הנתונים מוכנים — הכניסה תדלג על סבב הרשת
+          return true;
         }
-      }
-      /* BUG-2026-07-26: a boot-time `ok:false` used to clear the durable token. That answer
-         is also produced by transient conditions (Firebase read failure inside
-         _getDriverSession, cold start, no vehicle row yet) — destroying the token on it cost
-         the driver the whole 30-day session. Keep it; a genuinely dead token simply fails
-         again next boot and costs one request. Only explicit logout clears. */
-    } catch(_e) { /* network error — keep token, fall through to splash */ }
+        /* BUG-2026-07-26: a boot-time `ok:false` used to clear the durable token. That answer
+           is also produced by transient conditions (Firebase read failure inside
+           _getDriverSession, cold start, no vehicle row yet) — destroying the token on it cost
+           the driver the whole 30-day session. Keep it; a genuinely dead token simply fails
+           again next boot and costs one request. Only explicit logout clears. */
+      } catch(_e) { /* network error — keep token, fall through to splash */ }
+      return false;
+    })();
   }
 
   // splash-screen stays visible — login button appears via CSS at ~4s
