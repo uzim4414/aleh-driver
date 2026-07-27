@@ -2672,12 +2672,25 @@ async function _bioGasAuth(email, credentialId) {
         try { _fbWriteLastLogin(_bioEk, _bioVk); } catch (_) {}
       });
     }).catch(function() {
+      /* BUG-2026-07-27i — כאן נולד מסך שחור: הברכה הוצגה **מעל האפליקציה**, הטעינה
+         נכשלה, ואיש לא הסיר אותה. בנוסף STATE נמחק גם כשהאפליקציה כבר רצה —
+         כלומר אימות חוזר שנכשל הרס סשן תקין. שני הדברים תוקנו. */
       window._bioLoginBusy = false;
-      STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
-      setTimeout(function() { showToast('שגיאת כניסה — נסה שוב'); }, 200);
+      try { hideGreeting(); } catch (_) {}
+      if (window._appStarted && STATE.vehicle) {
+        // אימות חוזר תוך כדי עבודה — האפליקציה ממשיכה, לא מוחקים כלום
+        _screenEnsureVisible('bioGasAuth: טעינה נכשלה באימות חוזר');
+        setTimeout(function() { showToast('העדכון נכשל — הנתונים עשויים להיות ישנים'); }, 200);
+      } else {
+        STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
+        try { _showLoginScreen(); } catch (_) {}
+        setTimeout(function() { showToast('שגיאת כניסה — נסה שוב'); }, 200);
+      }
     });
   } catch(e2) {
     window._bioLoginBusy = false;
+    try { hideGreeting(); } catch (_) {}
+    try { _screenEnsureVisible('bioGasAuth: חריגה'); } catch (_) {}
     return false;
   }
   return true;
@@ -2795,11 +2808,17 @@ async function _bioLoginFromSplash() {
       });
     }).catch(function(loadErr) {
       // loadFullData נכשל (token פג / רשת) — אסור להפעיל את האפליקציה עם נתוני קאש ישנים
+      // BUG-2026-07-27i: הברכה הוצגה כאן ואיש לא הסיר אותה → כיסוי תקוע.
       window._bioLoginBusy = false;
-      STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
-      setTimeout(function() {
-        showToast('שגיאת כניסה — יש להיכנס מחדש עם Google');
-      }, 200);
+      try { hideGreeting(); } catch (_) {}
+      if (window._appStarted && STATE.vehicle) {
+        _screenEnsureVisible('bioLogin: טעינה נכשלה תוך כדי סשן');
+        setTimeout(function() { showToast('העדכון נכשל — הנתונים עשויים להיות ישנים'); }, 200);
+      } else {
+        STATE.vehicle = null; STATE.user = null; STATE.idToken = null;
+        try { _showLoginScreen(); } catch (_) {}
+        setTimeout(function() { showToast('שגיאת כניסה — יש להיכנס מחדש עם Google'); }, 200);
+      }
     });
   } catch(err) {
     window._bioLoginBusy = false;
@@ -2945,27 +2964,83 @@ function _bootWatchdogArm(tag) {
   }, 4000);
 }
 
-/* ══ שומר-מסך גלובלי — BUG-2026-07-27g ══
-   רשת הביטחון הקודמת נדרכה רק בלחיצת כניסה, ולכן לא כיסתה מסך שחור שנוצר **לבד**
-   בזמן הטעינה השקטה. השומר הזה בודק כל 1.5ש' במשך 45 השניות הראשונות: אם אין שום
-   מסך גלוי — מחזיר את מסך הכניסה. אין מצב שבו המשתמש רואה שחור. */
+/* ══ שומר-מסך קבוע — BUG-2026-07-27i ══
+   הגרסה הקודמת רצה **45 שניות בלבד** מהאתחול, ולכן מסך שחור שנוצר בדקה ה-20
+   (אחרי חזרה מרקע ואימות חוזר) לא היה מכוסה כלל. עכשיו הבדיקה רצה **תמיד**,
+   ובנוסף מיד עם חזרה לחזית — הרגע שבו התקלה דווחה.
+
+   ההתאוששות מבדילה בין שני מצבים, וזה ההבדל בין תיקון לנזק:
+     • אמצע סשן (האפליקציה כבר רצה ויש רכב) → מחזירים את **הממשק**, בלי למחוק כלום.
+     • לפני כניסה → מחזירים את **מסך הכניסה**. */
+function _screenIsVisible(el) {
+  if (!el || el.classList.contains('hidden')) return false;
+  var cs = getComputedStyle(el);
+  return cs.display !== 'none' && cs.visibility !== 'hidden' && parseFloat(cs.opacity || '1') > 0.05;
+}
+
+/** האם קיים overlay לגיטימי שמכסה את המסך (מודאל אימות, צפייה במסמך, הכוונה וכו') */
+function _screenHasOverlay() {
+  var nodes = document.querySelectorAll('body > div, body > section');
+  for (var i = 0; i < nodes.length; i++) {
+    var el = nodes[i];
+    if (!_screenIsVisible(el)) continue;
+    var cs = getComputedStyle(el);
+    if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
+    var r = el.getBoundingClientRect();
+    if (r.height >= window.innerHeight * 0.5 && r.width >= window.innerWidth * 0.5) return true;
+  }
+  return false;
+}
+
+/**
+ * מוודא שיש מסך גלוי. מחזיר true אם היה צורך בהתאוששות.
+ * זו ההבטחה היחידה שאסור להפר: **בכל רגע נתון המשתמש רואה משהו.**
+ */
+function _screenEnsureVisible(reason) {
+  var app = document.getElementById('app');
+  var sp  = document.getElementById('splash-screen');
+  var gr  = document.getElementById('greeting');
+  if (_screenIsVisible(app) || _screenIsVisible(sp) || _screenIsVisible(gr)) return false;
+  if (_screenHasOverlay()) return false;   // מודאל לגיטימי מכסה — לא נוגעים
+
+  var midSession = !!(window._appStarted && STATE && STATE.vehicle);
+  try {
+    if (midSession && app) {
+      app.classList.remove('hidden');
+      app.style.removeProperty('display');
+      try { renderAll(); } catch (_r) {}
+    } else if (sp) {
+      sp.classList.remove('hidden');
+      sp.style.removeProperty('display');
+      try { var bio = _bioLoad(); if (bio && _bioAvailable()) _showBioLoginButton(bio); } catch (_) {}
+    }
+  } catch (_e) {}
+
+  var detail = (reason || 'screen-guard') + (midSession ? ' · שוחזר הממשק' : ' · שוחזר מסך הכניסה');
+  _bootFailSave(detail);
+  try { console.error('[screenGuard] מסך ריק זוהה —', detail); } catch (_) {}
+  return true;
+}
+
 function _screenGuardStart() {
-  var ticks = 0;
-  var iv = setInterval(function() {
-    if (++ticks > 30) { clearInterval(iv); return; }   // 45 שניות
-    var vis = function(el) {
-      return !!el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
-    };
-    var app = document.getElementById('app');
-    var sp  = document.getElementById('splash-screen');
-    var gr  = document.getElementById('greeting');
-    if (vis(app) || vis(sp) || vis(gr)) return;
-    // אין שום מסך — להחזיר את הספלאש מיד ולתעד
-    if (sp) { sp.classList.remove('hidden'); sp.style.removeProperty('display'); }
-    try { var bio = _bioLoad(); if (bio && _bioAvailable()) _showBioLoginButton(bio); } catch (_) {}
-    _bootFailSave('screen-guard: מסך ריק אחרי ' + (ticks * 1.5).toFixed(1) + 'ש׳');
-    try { console.error('[screenGuard] מסך ריק — הספלאש הוחזר'); } catch (_) {}
-  }, 1500);
+  if (window._screenGuardOn) return;
+  window._screenGuardOn = true;
+  /* רץ תמיד, לא רק באתחול — מסך שחור יכול להיוולד בכל רגע.
+     **ללא תלות ב-visibilityState בכוונה:** ה-WebView של אנדרואיד מדווח לעיתים
+     `hidden` גם כשהמסך מוצג (הודגם בבדיקה — הבדיקה דילגה והכשילה את עצמה).
+     הבדיקה זולה (שלוש קריאות סגנון), ובכל מקרה מתאוששת רק כשאין שום מסך. */
+  setInterval(function() {
+    _screenEnsureVisible('screen-guard: בדיקה תקופתית');
+  }, 2000);
+  // חזרה מרקע — הרגע המדויק שבו התקלה דווחה. בדיקה מיידית, בלי להמתין למחזור.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    setTimeout(function() { _screenEnsureVisible('screen-guard: חזרה מרקע'); }, 400);
+  });
+  // גם focus — אנדרואיד לא תמיד משגר visibilitychange בחזרה לאפליקציה
+  window.addEventListener('focus', function() {
+    setTimeout(function() { _screenEnsureVisible('screen-guard: חזרה לחזית'); }, 400);
+  });
 }
 
 /* מציג בהפעלה הבאה את סיבת הכשל האחרונה — כך יש ראיה במקום ניחוש */
