@@ -2080,9 +2080,10 @@ function pkConfirmSelect() {
   showGreeting((chosen.holder) || STATE.user.name, _grEk, _grVk);
   loadFullData().then(function() {
     _grComplete(function() {
-      hideGreeting();
-      _fbWriteLastLogin(_grEk, _grVk);
-      startApp();
+      // BUG-2026-07-27f: קודם חושפים ממשק, אחר כך מסתירים
+      try { startApp(); } catch (e) { _bootRecoverToLogin('startApp: ' + ((e && e.message) || e)); return; }
+      try { hideGreeting(); } catch (_) {}
+      try { _fbWriteLastLogin(_grEk, _grVk); } catch (_) {}
     });
   }).catch(function(err) {
     hideGreeting();
@@ -2590,11 +2591,12 @@ async function _bioGasAuth(email, credentialId) {
       });
       _pinSessionSave(email, data.vehicle, STATE.user, null);
       _grComplete(function() {
-        hideGreeting();
-        _fbWriteLastLogin(_bioEk, _bioVk);
-        if (sp) sp.classList.add('hidden');
-        _bioSessionStart();
-        startApp();
+        // BUG-2026-07-27f: קודם חושפים ממשק, אחר כך מסתירים — ראה ההסבר במסלול המהיר
+        try { startApp(); } catch (e) { _bootRecoverToLogin('startApp: ' + ((e && e.message) || e)); return; }
+        try { hideGreeting(); } catch (_) {}
+        try { if (sp) sp.classList.add('hidden'); } catch (_) {}
+        try { _bioSessionStart(); } catch (_) {}
+        try { _fbWriteLastLogin(_bioEk, _bioVk); } catch (_) {}
       });
     }).catch(function() {
       window._bioLoginBusy = false;
@@ -2612,7 +2614,8 @@ async function _bioGasAuth(email, credentialId) {
 async function _bioLoginFromSplash() {
   if (window._bioLoginBusy) return;
   window._bioLoginBusy = true;
-  _bootFlowAbort(); // מחווה מפורשת — השחזור השקט שרץ ברקע נוטש (BUG-2026-07-27d)
+  _bootFlowAbort();            // מחווה מפורשת — השחזור השקט שרץ ברקע נוטש (BUG-2026-07-27d)
+  _bootWatchdogArm('כניסה ביומטרית'); // רשת ביטחון: אין מסך אחרי 4ש' → חזרה למסך הכניסה
   // v267: clear leaked flags from any prior aborted timeout-reauth attempt
   if (!window._bioSkipAuthenticate) {
     window._bioPendingTokenRefresh = false;
@@ -2647,12 +2650,22 @@ async function _bioLoginFromSplash() {
       showGreeting(STATE.vehicle.holder || (STATE.user && STATE.user.name), _fEk, _fVk);
       window._bioLoginBusy = false;
       window._bioTokenRefreshTried = false;
+      _bootWatchdogArm('כניסה ביומטרית מהירה');
       _grComplete(function() {
-        hideGreeting();
-        _fbWriteLastLogin(_fEk, _fVk);
-        if (_fSp) _fSp.classList.add('hidden');
-        _bioSessionStart();
-        startApp();
+        /* BUG-2026-07-27f — סדר הפעולות קריטי: **קודם חושפים את הממשק**, ורק אחר כך
+           מסתירים ספלאש וברכה. בסדר ההפוך, חריגה באמצע השאירה מסך שחור: הספלאש כבר
+           הוסתר והממשק עדיין לא נחשף. כל שלב עטוף בנפרד כדי שכשל בשלב משני
+           (כתיבת "כניסה אחרונה" ל-Firebase, למשל) לא ימנע את פתיחת האפליקציה. */
+        try {
+          startApp();
+        } catch (e) {
+          _bootRecoverToLogin('startApp: ' + ((e && e.message) || e));
+          return;
+        }
+        try { hideGreeting(); } catch (_) {}
+        try { if (_fSp) _fSp.classList.add('hidden'); } catch (_) {}
+        try { _bioSessionStart(); } catch (_) {}
+        try { _fbWriteLastLogin(_fEk, _fVk); } catch (_) {}
       });
       return;
     }
@@ -2684,11 +2697,12 @@ async function _bioLoginFromSplash() {
       // שמור PIN_SESSION רק אחרי שהנתונים נטענו בהצלחה
       _pinSessionSave(bioData.email, session.vehicleData, session.userInfo, session.idToken);
       _grComplete(function() {
-        hideGreeting();
-        _fbWriteLastLogin(_bioEk, _bioVk);
-        if (sp) sp.classList.add('hidden');
-        _bioSessionStart();
-        startApp();
+        // BUG-2026-07-27f: קודם חושפים ממשק, אחר כך מסתירים
+        try { startApp(); } catch (e) { _bootRecoverToLogin('startApp: ' + ((e && e.message) || e)); return; }
+        try { hideGreeting(); } catch (_) {}
+        try { if (sp) sp.classList.add('hidden'); } catch (_) {}
+        try { _bioSessionStart(); } catch (_) {}
+        try { _fbWriteLastLogin(_bioEk, _bioVk); } catch (_) {}
       });
     }).catch(function(loadErr) {
       // loadFullData נכשל (token פג / רשת) — אסור להפעיל את האפליקציה עם נתוני קאש ישנים
@@ -2798,6 +2812,63 @@ function _bioSessionExpired() {
    נוטש בשקט בגבול ה-await הבא. אין שני נתיבים חיים בו-זמנית. */
 var _bootFlowId = 0;
 function _bootFlowAbort() { _bootFlowId++; }
+
+/* ══ רשת ביטחון לכניסה — BUG-2026-07-27f ══
+   מסך שחור אחרי אימות = הספלאש כבר הוסתר והממשק לא נחשף. אסור שמצב כזה ישאיר
+   את הנהג תקוע: כל כשל בשרשרת הכניסה מחזיר אותו למסך הכניסה, ושומר את הסיבה
+   כדי שתוצג בהפעלה הבאה (בלי זה אין שום דרך לדעת מה קרה במכשיר). */
+var BOOT_FAIL_KEY = 'aleh_boot_fail_v1';
+
+function _bootFailSave(reason) {
+  try { localStorage.setItem(BOOT_FAIL_KEY, JSON.stringify({ reason: String(reason || ''), ts: Date.now() })); } catch (_) {}
+}
+
+function _bootRecoverToLogin(reason) {
+  _bootFailSave(reason);
+  try { console.error('[boot] התאוששות למסך הכניסה:', reason); } catch (_) {}
+  try { clearTimeout(window._bootWdTimer); } catch (_) {}
+  var gr = document.getElementById('greeting');
+  if (gr) { gr.classList.add('hidden'); gr.style.opacity = ''; gr.style.transition = ''; }
+  var app = document.getElementById('app');
+  if (app) { app.classList.add('hidden'); app.style.display = 'none'; }
+  var sp = document.getElementById('splash-screen');
+  if (sp) { sp.classList.remove('hidden'); sp.style.removeProperty('display'); }
+  window._bioLoginBusy = false;
+  window._appStarted = false;
+  try { var bio = _bioLoad(); if (bio && _bioAvailable()) _showBioLoginButton(bio); } catch (_) {}
+  var errEl = document.getElementById('login-err');
+  if (errEl) { errEl.textContent = 'הטעינה נכשלה — נסה שוב'; errEl.classList.remove('hidden'); }
+}
+
+/* שומר על ההבטחה "אחרי אימות רואים מסך": אם 4 שניות אחרי תחילת הכניסה אין שום
+   מסך גלוי (לא ממשק, לא ספלאש, לא ברכה) — מחזירים למסך הכניסה במקום להשאיר שחור. */
+function _bootWatchdogArm(tag) {
+  try { clearTimeout(window._bootWdTimer); } catch (_) {}
+  window._bootWdTimer = setTimeout(function() {
+    var app = document.getElementById('app');
+    var sp  = document.getElementById('splash-screen');
+    var gr  = document.getElementById('greeting');
+    var vis = function(el) {
+      return !!el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+    };
+    var appOk = vis(app) && (document.getElementById('screen-home') || {}).innerHTML;
+    if (!appOk && !vis(sp) && !vis(gr)) _bootRecoverToLogin('watchdog: מסך ריק אחרי ' + (tag || 'כניסה'));
+  }, 4000);
+}
+
+/* מציג בהפעלה הבאה את סיבת הכשל האחרונה — כך יש ראיה במקום ניחוש */
+function _bootFailShowLast() {
+  var raw = null;
+  try { raw = JSON.parse(localStorage.getItem(BOOT_FAIL_KEY) || 'null'); } catch (_) {}
+  if (!raw || !raw.reason) return;
+  try { localStorage.removeItem(BOOT_FAIL_KEY); } catch (_) {}
+  if (Date.now() - (raw.ts || 0) > 30 * 60 * 1000) return; // ישן מדי — לא רלוונטי
+  var errEl = document.getElementById('login-err');
+  if (errEl) {
+    errEl.textContent = 'כשל בכניסה הקודמת: ' + raw.reason;
+    errEl.classList.remove('hidden');
+  }
+}
 
 /* ══ שער הכניסה — הוסר 2026-07-27 (BUG-2026-07-27e) ══
    `_coldStartAuthGate` ביקש טביעת אצבע *אחרי* שהשחזור השקט כבר פתח את האפליקציה,
@@ -3167,10 +3238,11 @@ async function handleGoogleCredential(response) {
         }
       });
       _grComplete(function() {
-        hideGreeting();
-        _fbWriteLastLogin(_gEk, _gVk);
-        _bioSessionStart();
-        startApp();
+        // BUG-2026-07-27f: קודם חושפים ממשק, אחר כך מסתירים
+        try { startApp(); } catch (e) { _bootRecoverToLogin('startApp: ' + ((e && e.message) || e)); return; }
+        try { hideGreeting(); } catch (_) {}
+        try { _bioSessionStart(); } catch (_) {}
+        try { _fbWriteLastLogin(_gEk, _gVk); } catch (_) {}
       });
     }
   } catch(err) {
@@ -3979,7 +4051,15 @@ function startApp() {
   _appEl.style.removeProperty('display'); // מסיר כל display:none שהוגדר inline (logout protection)
   var _hfab = document.getElementById('help-fab'); if (_hfab) _hfab.style.display = '';
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function(){}); } catch(_){}
-  renderAll();
+  /* BUG-2026-07-27f: חריגה ב-renderAll השאירה ממשק גלוי אך **ריק** — מסך שחור.
+     נכשל? מתאוששים למסך הכניסה עם הסיבה, במקום להשאיר את הנהג בלי כלום. */
+  try {
+    renderAll();
+  } catch (e) {
+    _bootRecoverToLogin('renderAll: ' + ((e && e.message) || e));
+    return;
+  }
+  try { clearTimeout(window._bootWdTimer); } catch (_) {}
   if (STATE._vehicles && STATE._vehicles.length > 1) { try { _heroCarouselInit(); } catch(e) { console.warn('hero carousel init', e); } }
   /* BUG-2026-07-27d: startApp נקרא גם מ-_authRecover בזמן שהאפליקציה כבר פועלת, ובעבר
      גם משני נתיבי כניסה שרצו במקביל. הצגה+רינדור חוזרים הם מה שהנתיב הזה צריך; אתחולי
@@ -10022,6 +10102,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   var _bioShown = !!(_bioData && _bioAvailable());
   _wireLoginRipple();
+  _bootFailShowLast();   // אם הכניסה הקודמת נכשלה — הסיבה מוצגת כאן (BUG-2026-07-27f)
   if (!_bioShown) {
     // אין ביומטרי רשום — פאנל במצב "Google בלבד"
     var _lbp = document.getElementById('login-buttons-panel');
