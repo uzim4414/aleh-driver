@@ -2856,6 +2856,29 @@ function _bootWatchdogArm(tag) {
   }, 4000);
 }
 
+/* ══ שומר-מסך גלובלי — BUG-2026-07-27g ══
+   רשת הביטחון הקודמת נדרכה רק בלחיצת כניסה, ולכן לא כיסתה מסך שחור שנוצר **לבד**
+   בזמן הטעינה השקטה. השומר הזה בודק כל 1.5ש' במשך 45 השניות הראשונות: אם אין שום
+   מסך גלוי — מחזיר את מסך הכניסה. אין מצב שבו המשתמש רואה שחור. */
+function _screenGuardStart() {
+  var ticks = 0;
+  var iv = setInterval(function() {
+    if (++ticks > 30) { clearInterval(iv); return; }   // 45 שניות
+    var vis = function(el) {
+      return !!el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+    };
+    var app = document.getElementById('app');
+    var sp  = document.getElementById('splash-screen');
+    var gr  = document.getElementById('greeting');
+    if (vis(app) || vis(sp) || vis(gr)) return;
+    // אין שום מסך — להחזיר את הספלאש מיד ולתעד
+    if (sp) { sp.classList.remove('hidden'); sp.style.removeProperty('display'); }
+    try { var bio = _bioLoad(); if (bio && _bioAvailable()) _showBioLoginButton(bio); } catch (_) {}
+    _bootFailSave('screen-guard: מסך ריק אחרי ' + (ticks * 1.5).toFixed(1) + 'ש׳');
+    try { console.error('[screenGuard] מסך ריק — הספלאש הוחזר'); } catch (_) {}
+  }, 1500);
+}
+
 /* מציג בהפעלה הבאה את סיבת הכשל האחרונה — כך יש ראיה במקום ניחוש */
 function _bootFailShowLast() {
   var raw = null;
@@ -2957,8 +2980,9 @@ function _loginFallbackRedirect() {
         })
         .catch(function(err) {
           console.error('SocialLogin native error:', err);
-          hideLoader();
-          // User cancelled or no credentials — stay on login screen
+          // BUG-2026-07-27g: כאן היה hideLoader() — שמסתיר את מסך הכניסה במקום להשאיר
+          // אותו. ביטול כניסת Google הותיר מסך שחור.
+          _showLoginScreen();
         });
       return;
     }
@@ -3267,11 +3291,11 @@ async function demoLogin() {
     STATE.user = { email: 'demo@aleh.org', name: 'משה כהן', picture: '' };
     saveSession(STATE.idToken, STATE.vehicle, STATE.user);
     await loadFullData();
-    startApp();
+    startApp();   // הוא זה שמסתיר את הספלאש — אחרי שהממשק כבר גלוי
   } catch(err) {
+    // BUG-2026-07-27g: הוסר `finally { hideLoader() }` — בכשל הוא הסתיר את מסך
+    // הכניסה יחד עם הודעת השגיאה שיושבת בתוכו.
     showLoginError(err.message);
-  } finally {
-    hideLoader();
   }
 }
 
@@ -9396,7 +9420,20 @@ function showToast(msg) {
   t._timer = setTimeout(function() { t.classList.remove('show'); }, 2800);
 }
 
+/* מחזיר את מסך הכניסה לתצוגה — BUG-2026-07-27g.
+   `hideLoader()` מסתיר את הספלאש עצמו, ולכן כל נתיב שגיאה שקרא לו הותיר מסך שחור
+   **עם הודעת שגיאה בלתי נראית** (ההודעה יושבת בתוך הספלאש). */
+function _showLoginScreen() {
+  var sp = document.getElementById('splash-screen');
+  if (sp) { sp.classList.remove('hidden'); sp.style.removeProperty('display'); }
+  var app = document.getElementById('app');
+  if (app && !window._appStarted) { app.classList.add('hidden'); app.style.display = 'none'; }
+  try { var bio = _bioLoad(); if (bio && _bioAvailable()) _showBioLoginButton(bio); } catch (_) {}
+  window._bioLoginBusy = false;
+}
+
 function showLoginError(msg) {
+  _showLoginScreen();   // בלי זה ההודעה נכתבת למסך שהוסתר — המשתמש רואה שחור
   const el = document.getElementById('login-err');
   if (!el) return;
   el.textContent = msg;
@@ -10103,6 +10140,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   var _bioShown = !!(_bioData && _bioAvailable());
   _wireLoginRipple();
   _bootFailShowLast();   // אם הכניסה הקודמת נכשלה — הסיבה מוצגת כאן (BUG-2026-07-27f)
+  _screenGuardStart();   // שומר-מסך: אין מצב שהמשתמש רואה שחור (BUG-2026-07-27g)
   if (!_bioShown) {
     // אין ביומטרי רשום — פאנל במצב "Google בלבד"
     var _lbp = document.getElementById('login-buttons-panel');
@@ -10137,7 +10175,9 @@ document.addEventListener('DOMContentLoaded', async function() {
          פותחת את האפליקציה — ואז היא מהירה כי הנתונים כבר כאן. */
       var _sFlow = _bootFlowId;
       _fbSignIn(STATE.idToken).catch(function() {}); // Firebase Auth מ-session שמור — non-blocking
-      hideLoader();
+      /* BUG-2026-07-27g: **אסור** לקרוא כאן hideLoader() — הוא מסתיר את מסך הספלאש
+         עצמו (`splash-screen.classList.add('hidden')`), ובטעינה שקטה אין ברכה שתבוא
+         במקומו → מסך שחור. מסך הכניסה חייב להישאר עד לחיצה מפורשת. */
       loadFullData().then(function() {
         if (_sFlow !== _bootFlowId) return;
         window._prefetchOk = true;   // הנתונים מוכנים — הכניסה תדלג על סבב הרשת
@@ -10172,7 +10212,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (_dsData.driverSession) _driverSessionSave(_dsData.driverSession);
         var _dEmail = _dsData.email || '';
         STATE.user = { email: _dEmail, name: _dsData.vehicle.holder || _dEmail };
-        hideLoader();
+        // BUG-2026-07-27g: כאן היה hideLoader() — הוא מסתיר את הספלאש עצמו ובטעינה
+        // שקטה אין ברכה שתחליף אותו → מסך שחור שתי שניות אחרי הטעינה. הוסר.
         await loadFullData();
         if (_dFlow === _bootFlowId) {
           _pinSessionSave(_dEmail, _dsData.vehicle, STATE.user, null);
