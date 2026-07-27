@@ -51,6 +51,20 @@ var _fbApp, _fbAuth, _fbDb, _fbSyncReady = false;
     // onAuthStateChanged — מופעל גם כשה-SDK מחדש session מ-IndexedDB (אחרי token פג תוקף)
     // מבטיח ש-_initFbSync תמיד תרוץ גם אם signInWithCredential נכשל
     _fbAuth.onAuthStateChanged(function(user) {
+      /* SESSION-2026-07-27-firebase-rules-and-auth — זהות סינתטית:
+         מאז שה-GAS מנפיק custom token, ההזדהות עשויה להיות עם uid חלופי
+         (`drv_<email>`) עבור נהג שאין לו חשבון Firebase Auth. ל-uid כזה אין
+         צומת `driverData` משלו, ולכן:
+           • סימון STATE.firebaseUid היה מפנה את `_fbRef` לצומת **ריק** — בדיוק
+             הרגרסיה שהעלימה את כרטיס השער (BUG-2026-07-27b).
+           • _initFbSync היה מחבר ערוץ התראות שני על צומת ריק.
+         ההזדהות עצמה מספיקה ל-lotOccupancy (נתיב מוחלט), ולכן במקרה הזה
+         מזדהים בלבד ולא נוגעים בסנכרון. */
+      var _synthetic = user && /^(drv_|admin_)/.test(String(user.uid || ''));
+      if (user && _synthetic) {
+        console.log('[fbAuth] זהות סינתטית — הזדהות בלבד, בלי לגעת בסנכרון:', user.uid);
+        return;
+      }
       if (user && !_fbSyncReady) {
         _fbSyncReady = true;
         STATE.firebaseUid = user.uid;
@@ -1127,6 +1141,65 @@ async function _fbSignIn(googleIdToken) {
     console.warn('[fbAuth] signInWithCredential failed (token expired?) — onAuthStateChanged יטפל:', e.message);
     return false;
   }
+}
+
+/* ══ הזדהות Firebase ללא Google — SESSION-2026-07-27-firebase-rules-and-auth ══
+   מאז v403 נהג שמשוחזר מ-session/ביומטרי רץ בכוונה עם idToken=null, ולכן
+   _fbSignIn לא נקרא ו-STATE.firebaseUid נשאר null. התוצאה: `_fbRef` מחזיר null,
+   אף מאזין Firebase לא נרשם, ו-lotOccupancy (נתיב מוחלט) חסום גם הוא.
+   כאן ה-GAS מנפיק custom token ל-driverSession שהוא כבר אימת.
+
+   **תוספת בלבד:** כשל כאן לא משנה דבר במסלול הכניסה — הנתיבים שנשענים על GAS
+   (שער, נתונים, התראות) ממשיכים לעבוד בדיוק כמו קודם. */
+var _fbCustomSignInPromise = null;
+
+function _fbSignInCustom() {
+  if (_fbCustomSignInPromise) return _fbCustomSignInPromise;
+  _fbCustomSignInPromise = (async function() {
+    try {
+      if (!_fbAuth) return false;
+      // כבר מזוהה — לא נוגעים ב-STATE.firebaseUid. אם ההזדהות היא ב-custom token
+      // עם uid חלופי, סימונו היה מפנה את _fbRef לצומת ריק (ראה ההסבר למטה).
+      if (_fbAuth.currentUser) return true;
+      var ds = (typeof _driverSessionLoad === 'function') ? _driverSessionLoad() : null;
+      if (!ds && !STATE.idToken) return false;
+      var r = await gasPost('get_firebase_token',
+                            { driverSession: ds || '', idToken: STATE.idToken || '' },
+                            { silent: true });
+      if (!r || !r.ok || !r.token) {
+        console.warn('[fbAuth] הנפקת custom token נכשלה:', r && r.error);
+        return false;
+      }
+      await _fbAuth.signInWithCustomToken(r.token);
+      /* ⚠ בכוונה **לא** מסמנים STATE.firebaseUid ולא מפעילים _initFbSync:
+         1. סימון ה-uid היה גורם ל-`_fbRef` להחזיר נתיב, ו-_initFbGateSync היה
+            מאזין ל-driverData/{uid}/gateAccess — צומת ריק עבור נהג שנכנס בלי
+            Google — במקום לפנות ל-GAS. זו בדיוק הרגרסיה שהעלימה את כרטיס השער
+            (BUG-2026-07-27b).
+         2. הפעלת כל מאזיני ה-driverData מחזירה לחיים ערוץ התראות שני, שכבר גרם
+            לכרטיסים כפולים בעבר.
+         הזדהות בלבד מספיקה ל-lotOccupancy, שהוא נתיב מוחלט. הרחבה לשאר הנתיבים
+         היא משימה נפרדת עם בדיקת דדופליקציה. */
+      console.log('[fbAuth] מזוהה ב-custom token (ללא שינוי בסנכרון הקיים)');
+      return true;
+    } catch (e) {
+      console.warn('[fbAuth] custom token נכשל:', e && e.message);
+      return false;
+    } finally {
+      // מאפשר ניסיון נוסף בהמשך הריצה (למשל אחרי חידוש session)
+      setTimeout(function(){ _fbCustomSignInPromise = null; }, 30000);
+    }
+  })();
+  return _fbCustomSignInPromise;
+}
+
+/** מבטיח הזדהות כלשהי מול Firebase — Google אם יש, אחרת custom token. */
+async function _fbEnsureAuth() {
+  try {
+    if (_fbAuth && _fbAuth.currentUser) return true;
+    if (STATE.idToken && await _fbSignIn(STATE.idToken)) return true;
+    return await _fbSignInCustom();
+  } catch (_) { return false; }
 }
 
 function _showSessionExpiredOverlay() {
@@ -12323,14 +12396,38 @@ function _poRender(d){
   }
   _poApplyLive({}); // render immediately as all-free; the Firebase listener fills real state
 }
+/* אינדיקציה גלויה כשהעדכון החי מנותק — SESSION-2026-07-27-firebase-rules-and-auth.
+   קודם כל כשל דיווח ב-console.warn בלבד, והמסך פשוט הציג הכל כפנוי. */
+function _poLiveStatus(state, detail){
+  var host=document.getElementById('po-grid'); if(!host) return;
+  var el=document.getElementById('po-live-status');
+  if(!el){
+    el=document.createElement('div');
+    el.id='po-live-status';
+    el.style.cssText='margin:0 0 10px;padding:8px 12px;border-radius:10px;font-size:13px;display:none;'+
+                     'background:rgba(255,159,10,.12);border:1px solid rgba(255,159,10,.4);color:#FF9F0A';
+    host.parentNode.insertBefore(el, host);
+  }
+  if(state==='ok'){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.textContent='⚠ העדכון החי מנותק — התצוגה עשויה לא לשקף את המצב בפועל'+(detail?' ('+detail+')':'');
+  try{ console.warn('[po] live disconnected:', detail); }catch(_){}
+}
+
 function _poAttachLive(lotId){
   if(typeof firebase==='undefined' || !_fbDb){ setTimeout(function(){ _poAttachLive(lotId); }, 800); return; }
   try{ if(_poFbRef){ _poFbRef.off('value'); _poFbRef=null; } }catch(e){}
-  _poFbRef=_fbDb.ref('lotOccupancy/'+lotId);
-  _poFbRef.on('value', function(snap){
+  // lotOccupancy דורש auth != null — הנהג רץ לרוב בלי Google, ולכן נדרש custom token
+  _fbEnsureAuth().then(function(ok){
+    if(!ok){ _poLiveStatus('down','אין הזדהות מול Firebase'); return; }
     if(_poLotId!==lotId) return;
-    _poApplyLive(snap.val()||{});
-  }, function(err){ console.warn('[po] listener:', err && err.message); });
+    _poFbRef=_fbDb.ref('lotOccupancy/'+lotId);
+    _poFbRef.on('value', function(snap){
+      if(_poLotId!==lotId) return;
+      _poLiveStatus('ok');
+      _poApplyLive(snap.val()||{});
+    }, function(err){ _poLiveStatus('down', (err && err.message) || 'שגיאת מאזין'); });
+  });
 }
 function _poApplyLive(live){
   var spots=_poSpots||[], total=spots.length, occ=0;
