@@ -3129,8 +3129,8 @@ function _getNativePlugin(name) {
    שמפורסם ב-Pages בכל release. גרסה חדשה → באנר "עדכן" שפותח את ה-APK בדפדפן חיצוני (WebView לא מתקין). */
 function _apkUpdateCheck() {
   if (!_isNativeApp()) return;                                  /* PWA לעולם לא מנודנד */
-  if (window._apkChkRan) return; window._apkChkRan = true;      /* פעם אחת לסשן (מסך-כניסה או אחרי-כניסה) */
-  var App = _getNativePlugin('App'); if (!App || !App.getInfo) return;
+  var App = _getNativePlugin('App'); if (!App || !App.getInfo) return;   /* לא מוכן עדיין → נסה שוב בקריאה הבאה */
+  if (window._apkChkRan) return; window._apkChkRan = true;      /* guard רק אחרי שהפלאגין זמין (פעם אחת לסשן) */
   try {
     App.getInfo().then(function(info) {
       var installed = parseInt(info && info.build, 10); if (!installed) return;   /* build = versionCode */
@@ -10244,6 +10244,10 @@ window.addEventListener('pageshow', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', async function() {
+
+  /* פופאפ-עדכון על ה-splash מוקדם ככל האפשר (native, once-guard) — גם למשתמשי auto-login שלא רואים
+     את מסך-הכניסה. חוזר על עצמו ב-_showLoginScreen/startApp אם הפלאגין עדיין לא היה מוכן כאן. */
+  setTimeout(function(){ try { _apkUpdateCheck(); } catch(_e){} }, 800);
 
   // Handle OAuth implicit-flow redirect callback (fallback for browsers where GSI One Tap fails)
   if (location.hash && location.hash.indexOf('id_token') !== -1) {
