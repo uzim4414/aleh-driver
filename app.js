@@ -3125,6 +3125,67 @@ function _getNativePlugin(name) {
   return (_cap.Plugins && _cap.Plugins[name]) || (_cap.registerPlugin && _cap.registerPlugin(name)) || null;
 }
 
+/* ══ עדכון-APK אוטומטי (SESSION-2026-08-07) ══ native בלבד. משווה versionCode מותקן מול apk-version.json
+   שמפורסם ב-Pages בכל release. גרסה חדשה → באנר "עדכן" שפותח את ה-APK בדפדפן חיצוני (WebView לא מתקין). */
+function _apkUpdateCheck() {
+  if (!_isNativeApp()) return;                                  /* PWA לעולם לא מנודנד */
+  if (window._apkChkRan) return; window._apkChkRan = true;      /* פעם אחת לסשן (מסך-כניסה או אחרי-כניסה) */
+  var App = _getNativePlugin('App'); if (!App || !App.getInfo) return;
+  try {
+    App.getInfo().then(function(info) {
+      var installed = parseInt(info && info.build, 10); if (!installed) return;   /* build = versionCode */
+      fetch('apk-version.json?_=' + Date.now(), { cache: 'no-store' })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(m) {
+          if (!m || !m.versionCode) return;
+          if (parseInt(m.versionCode, 10) <= installed) return;                    /* מעודכן */
+          try { var sn = JSON.parse(localStorage.getItem('aleh_apk_upd_snooze') || 'null');
+                if (sn && sn.code === m.versionCode && (Date.now() - sn.ts) < 86400000) return; } catch(e){}   /* snooze 24ש' */
+          _showApkUpdatePopup(m);
+        }).catch(function(){});                                 /* offline → בלע-שקט (אין toast) */
+    }).catch(function(){});
+  } catch(e){}
+}
+/* פופאפ-זכוכית מרהיב על מסך-ההתחברות (בקשת עוזי) — עדכון APK חדש: גרסה + תאריך + מה-השתנה + הורדה.
+   ה"מה השתנה" = m.notes מהמניפסט (מוזן מ-Changes של השחרור = אותו תיעוד-גרסאות שנשמר ל-DB). */
+function _showApkUpdatePopup(m) {
+  if (document.getElementById('apk-update-pop')) return;
+  var url = m.url || 'https://uzim4414.github.io/aleh-driver/downloads/aleh-driver-latest.apk';   /* מוחלט — דפדפן חיצוני */
+  var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  var fmtDate = function(d){ var x=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return x?(x[3]+'/'+x[2]+'/'+x[1]):String(d||''); };
+  var parts = String(m.notes||'').split(/\n|·|;|•/).map(function(s){ return s.trim(); }).filter(Boolean);
+  var notesInner = parts.length > 1
+    ? ('<ul style="margin:0;padding-right:17px;padding-left:0">' + parts.map(function(p){ return '<li style="margin:2px 0">' + esc(p) + '</li>'; }).join('') + '</ul>')
+    : (parts.length === 1 ? esc(parts[0]) : '');
+  var notesBlock = notesInner
+    ? '<div style="text-align:right;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 15px;margin-bottom:18px">' +
+        '<div style="font-size:11px;font-weight:800;color:#8fd6a3;margin-bottom:6px">מה חדש בגרסה זו</div>' +
+        '<div style="font-size:13px;color:#dfe2e5;line-height:1.7">' + notesInner + '</div></div>'
+    : '';
+  if (!document.getElementById('apk-pop-css')) {
+    var st = document.createElement('style'); st.id = 'apk-pop-css';
+    st.textContent = '@keyframes apkFade{from{opacity:0}to{opacity:1}}@keyframes apkPop{from{opacity:0;transform:translateY(16px) scale(.94)}to{opacity:1;transform:none}}';
+    document.head.appendChild(st);
+  }
+  var ov = document.createElement('div'); ov.id = 'apk-update-pop';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);display:flex;align-items:center;justify-content:center;padding:24px;animation:apkFade .25s ease;font-family:inherit';
+  ov.innerHTML =
+    '<div style="width:100%;max-width:360px;background:rgba(22,22,25,.82);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.13);border-radius:24px;padding:26px 22px;box-shadow:0 24px 70px rgba(0,0,0,.6);text-align:center;animation:apkPop .35s cubic-bezier(.2,.9,.3,1.15)">' +
+      '<div style="width:60px;height:60px;margin:0 auto 14px;border-radius:18px;background:linear-gradient(145deg,#1F8A3D,#25a349);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(31,138,61,.45)">' +
+        '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg></div>' +
+      '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:5px">עדכון חדש זמין</div>' +
+      '<div style="font-size:12.5px;color:#b9bec4;margin-bottom:16px">גרסה <b style="color:#fff">' + esc(m.version||'') + '</b>' + (m.date ? (' · ' + fmtDate(m.date)) : '') + '</div>' +
+      notesBlock +
+      '<button id="apk-pop-go" style="width:100%;background:#1F8A3D;color:#fff;border:0;border-radius:14px;padding:15px;font-size:15.5px;font-weight:800;font-family:inherit;box-shadow:0 6px 18px rgba(31,138,61,.4);cursor:pointer">הורד את העדכון</button>' +
+      '<button id="apk-pop-later" style="width:100%;background:none;border:0;color:#9aa0a6;padding:12px 0 0;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">אחר כך</button>' +
+    '</div>';
+  document.body.appendChild(ov);
+  var snooze = function(){ try { localStorage.setItem('aleh_apk_upd_snooze', JSON.stringify({ code:m.versionCode, ts:Date.now() })); } catch(e){} ov.remove(); };
+  document.getElementById('apk-pop-go').onclick = function(){ try { window.open(url, '_system'); } catch(e){ try { window.open(url, '_blank'); } catch(_){} } };
+  document.getElementById('apk-pop-later').onclick = snooze;
+  ov.addEventListener('click', function(e){ if (e.target === ov) snooze(); });   /* הקשה על הרקע = אחר כך */
+}
+
 function _loginFallbackRedirect() {
   // Native APK: use @capgo/capacitor-social-login with Credential Manager API.
   // style:'bottom' = bottom sheet (same UX as PWA One Tap).
@@ -4261,6 +4322,7 @@ function startApp() {
   try { _initBackButtonHandler(); } catch(e) { console.warn('back btn init', e); }
   setTimeout(APP._checkGarageReminders, 1500);
   setInterval(APP._checkGarageReminders, 60000); // re-check every 60s while app is open
+  setTimeout(function(){ try { _apkUpdateCheck(); } catch(e){} }, 4000); // בדיקת עדכון-APK (native בלבד, פעם אחת)
 
   // Handle cold-start from OS notification tap (SW encoded notif in URL)
   try {
@@ -9594,6 +9656,8 @@ function _showLoginScreen() {
   if (app && !window._appStarted) { app.classList.add('hidden'); app.style.display = 'none'; }
   try { var bio = _bioLoad(); if (bio && _bioAvailable()) _showBioLoginButton(bio); } catch (_) {}
   window._bioLoginBusy = false;
+  /* עדכון-APK: פופאפ על מסך-ההתחברות מיד כשיש גרסה חדשה (native בלבד, פעם-אחת לסשן — בקשת עוזי). */
+  setTimeout(function(){ try { _apkUpdateCheck(); } catch(_e){} }, 1200);
 }
 
 function showLoginError(msg) {

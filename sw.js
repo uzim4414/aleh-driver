@@ -45,6 +45,9 @@ self.addEventListener('fetch', e => {
   /* cross-origin (GAS, Google APIs, gstatic firebase) ג€” ׳×׳׳™׳“ ׳¨׳©׳×, ׳׳׳ ׳”׳×׳¢׳¨׳‘׳•׳× */
   if (!url.startsWith(self.location.origin)) return;
 
+  /* APK + manifest + landing page (SESSION-2026-08-07) — network-only, no SW cache (always freshest) */
+  if (url.includes('/downloads/') || url.includes('apk-version.json') || url.includes('/get/')) return;
+
   /* FCM scope endpoint ג€” ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳×׳׳™׳“ ׳¨׳©׳× ׳˜׳¨׳™׳™׳” */
   if (url.includes('firebase-cloud-messaging-push-scope')) return;
 
