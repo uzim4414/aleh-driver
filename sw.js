@@ -79,16 +79,11 @@ self.addEventListener('fetch', e => {
 self.GAS_URL = self.GAS_URL || '';
 
 self.addEventListener('message', e => {
-  // Origin validation — only accept from known app origins
-  var ALLOWED_ORIGINS = [
-    'https://aleh-fleet.github.io',
-    'https://aleh.github.io',
-    'http://localhost',
-    'http://localhost:3000',
-    'http://localhost:8080',
-    'null' // for file:// and Capacitor
-  ];
-  if (event.origin && !ALLOWED_ORIGINS.includes(event.origin)) return;
+  /* אימות-מקור: SW מקבל הודעות רק מלקוחות same-origin (או 'null' ל-Capacitor/file://).
+     BUG-2026-08-07: היה `event.origin` — אין גלובל `event` ב-SW → ReferenceError שהפיל את **כל**
+     ה-message-handler (get-pending-notifs / skip-waiting / set-gas-url / GET_VERSION). הפרמטר הוא `e`;
+     והודעת client→SW נותנת origin ריק/same-origin, לכן מקבלים same-origin/ריק/null בלבד (בלי רשימה-מיושנת). */
+  if (e.origin && e.origin !== self.location.origin && e.origin !== 'null') return;
   if (!e.data) return;
   // Activate a freshly-installed SW right away (sent by the page on statechange)
   if (e.data.type === 'skip-waiting') {
