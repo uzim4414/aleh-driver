@@ -934,14 +934,6 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .dr-sub.warn{color:var(--warn)}
 
 #splash-screen { position:fixed; inset:0; z-index:200; }
-/* שכבת-גישור ל-PWA: תמונת האייקון (זהה ל-splash של הדפדפן) נצבעת בפריים הראשון
-   וממלאת את הפער עד שאנימציית מד-המהירות מתחילה — מעבר חלק בלי קפיצה/פער.
-   אותו ?v=3 כמו ב-manifest = פגיעת-מטמון מיידית. BUG-2026-08-08d. */
-#splash-static-icon { position:fixed; top:50%; left:50%; width:150px; height:150px;
-  transform:translate(-50%,-50%); z-index:201; pointer-events:none; opacity:1;
-  transition:opacity .55s ease; }
-#splash-static-icon.gone { opacity:0; }
-#splash-screen.hidden #splash-static-icon { display:none; }
 #splash-screen.hidden { display:none !important; }
 .splash-dev-credit { position:absolute; bottom:18px; left:0; right:0; text-align:center; font-size:10px; letter-spacing:0.32em; color:rgba(255,255,255,0.28); font-family:'Outfit','Manrope',sans-serif; text-transform:uppercase; pointer-events:none; }
 /* ══════════════════════════════════════════════════════
@@ -4964,9 +4956,6 @@ body.pp-open{overflow:hidden}
 
 <div id="splash-screen">
   <div class="stage">
-    <!-- שכבת-גישור ל-PWA (BUG-2026-08-08d): אייקון סטטי זהה ל-splash של הדפדפן,
-         דוהה כשאנימציית מד-המהירות מתחילה (מעבר חלק, בלי פער). -->
-    <img id="splash-static-icon" src="icons/icon-512.png?v=3" alt="" aria-hidden="true">
     <div id="splash-react-root"></div>
     <div class="login-chrome">
       <div class="bottom login-buttons-panel" id="login-buttons-panel">
@@ -6323,10 +6312,6 @@ window.fcmDebug = async function() {
   if (root && screen && !screen.classList.contains('hidden')) {
     ReactDOM.createRoot(root).render(<SplashApp />);
   }
-  /* דהיית שכבת-הגישור (icon-512 הסטטי) אחרי שהאנימציה התחילה להצטייר → מעבר
-     חלק מ-splash-הדפדפן דרך האייקון אל האנימציה, בלי פער/קפיצה. BUG-2026-08-08d. */
-  var _si = document.getElementById('splash-static-icon');
-  if (_si) { setTimeout(function(){ _si.classList.add('gone'); }, 1000); }
 })();
 </script>
 <!-- ══════════════════════════════════════════
