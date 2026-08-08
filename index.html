@@ -934,6 +934,9 @@ body { background:#000; font-family:'Noto Sans Hebrew','Segoe UI Emoji','Apple C
 .dr-sub.warn{color:var(--warn)}
 
 #splash-screen { position:fixed; inset:0; z-index:200; }
+/* ניהול-אפליקציה-מרחוק · שלב 1: מקטע עם יכולת כבויה (data-cap) מקבל cap-off ומוסתר.
+   ברירת-מחדל הכל-דלוק — cap-off נוסף רק כשה-capId=false במפורש. כלל בסיס #9. */
+.cap-off { display:none !important; }
 #splash-screen.hidden { display:none !important; }
 .splash-dev-credit { position:absolute; bottom:18px; left:0; right:0; text-align:center; font-size:10px; letter-spacing:0.32em; color:rgba(255,255,255,0.28); font-family:'Outfit','Manrope',sans-serif; text-transform:uppercase; pointer-events:none; }
 /* ══════════════════════════════════════════════════════
@@ -5213,7 +5216,7 @@ body.pp-open{overflow:hidden}
         <div class="hero-body">
           <div id="hero-dots" class="dots" style="display:none"></div>
           <div class="hero-btns">
-            <button class="hero-btn" id="btn-garage" onclick="APP.nav('vehicle');APP.switchTab('garage')">
+            <button class="hero-btn" id="btn-garage" data-cap="home.myGarage" onclick="APP.nav('vehicle');APP.switchTab('garage')">
               <div class="hb-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>
@@ -5225,7 +5228,7 @@ body.pp-open{overflow:hidden}
               <span class="hb-txt">המוסך שלך</span>
               <span class="hb-arr">›</span>
             </button>
-            <button class="hero-btn" id="btn-docs" onclick="APP.nav('vehicle');APP.switchTab('docs')">
+            <button class="hero-btn" id="btn-docs" data-cap="home.vehicleDocs" onclick="APP.nav('vehicle');APP.switchTab('docs')">
               <div class="hb-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -5253,7 +5256,7 @@ body.pp-open{overflow:hidden}
             </div>
           </div>
           <div id="garage-appt-widget-mount"></div>
-          <div class="hero-alert hidden" id="home-alert">
+          <div class="hero-alert hidden" id="home-alert" data-cap="home.upcomingAlerts">
             <div>
               <div class="ha-title" id="home-alert-title">התראה</div>
               <div class="ha-sub" id="home-alert-sub">—</div>
@@ -5266,29 +5269,29 @@ body.pp-open{overflow:hidden}
       <div id="dash-vp" class="dash-vp">
         <div id="dash-track" class="dash-track">
           <!-- slide 0: svc -->
-          <div class="dash-slide" id="dash-slide-0">
+          <div class="dash-slide" id="dash-slide-0" data-cap="home.nextService">
             <div id="svc-progress-mount"></div>
           </div>
           <!-- slide 1: fuel -->
-          <div class="dash-slide" id="dash-slide-1">
+          <div class="dash-slide" id="dash-slide-1" data-cap="home.fuel">
             <div id="fuel-widget-mount"></div>
           </div>
         </div>
         <!-- dots -->
         <div class="dash-dots" id="dash-dots">
-          <span class="dash-dot a" data-idx="0"></span>
-          <span class="dash-dot" data-idx="1"></span>
+          <span class="dash-dot a" data-idx="0" data-cap="home.nextService"></span>
+          <span class="dash-dot" data-idx="1" data-cap="home.fuel"></span>
         </div>
       </div>
       <div class="sec">לשירותך</div>
       <div class="qa">
-        <div class="qa-card" onclick="APP.openKmModal()">
+        <div class="qa-card" data-cap="home.qa.km" onclick="APP.openKmModal()">
           <div class="qa-icon-box"><svg width="22" height="22"><use href="#ic-gauge" color="#1F8A3D"/></svg></div>
           <div class="qa-lbl">עדכון<br>ק"מ</div>
         </div>
 
         <!-- כרטיס טסט הרכב -->
-        <div class="qa-card qa-card--test" id="qa-test-card" onclick="APP.openTestHub ? APP.openTestHub() : APP.nav('testhub')">
+        <div class="qa-card qa-card--test" id="qa-test-card" data-cap="home.qa.test" onclick="APP.openTestHub ? APP.openTestHub() : APP.nav('testhub')">
           <div class="test-ring-wrap" id="test-ring-wrap">
             <svg width="46" height="46" viewBox="0 0 46 46">
               <circle class="test-ring-bg" cx="23" cy="23" r="18"/>
@@ -5301,7 +5304,7 @@ body.pp-open{overflow:hidden}
         </div>
 
         <!-- כרטיס רחיצה -->
-        <div class="qa-card" id="qa-wash-card" onclick="APP.openWash()" style="position:relative">
+        <div class="qa-card" id="qa-wash-card" data-cap="home.qa.wash" onclick="APP.openWash()" style="position:relative">
           <div class="qa-icon-box" style="background:rgba(8,145,178,0.12)">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 12c0-4 3-7 8-7s8 3 8 7"/><path d="M2 16c0 2.2 1.8 4 4 4h12c2.2 0 4-1.8 4-4v-1H2v1z"/>
@@ -5313,7 +5316,7 @@ body.pp-open{overflow:hidden}
         </div>
 
   <!-- כרטיס 4: שערי חניון וחניה -->
-  <div class="qa-card" id="qa-gate-card" data-state="idle" style="display:none;position:relative;overflow:hidden" onclick="APP.gateCardTap && APP.gateCardTap()">
+  <div class="qa-card" id="qa-gate-card" data-cap="home.qa.gate" data-state="idle" style="display:none;position:relative;overflow:hidden" onclick="APP.gateCardTap && APP.gateCardTap()">
     <div class="gate-ripple" id="gate-ripple"></div>
     <div class="qa-icon-box" id="gate-icon-box" style="background:var(--red-dim);transition:background .3s">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F8A3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="gate-icon-svg">
@@ -5338,10 +5341,10 @@ body.pp-open{overflow:hidden}
       <div class="ph-sub" id="veh-sub">—</div>
     </div>
     <div class="tabs" id="veh-tabs">
-      <div class="tab active" data-tab="info"      role="button" tabindex="0" aria-label="הרכב" onclick="APP.switchTab('info')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('info');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-car"/></svg></span><span class="tab-label">הרכב</span></div>
-      <div class="tab"        data-tab="history"   role="button" tabindex="0" aria-label="היסטוריה" onclick="APP.switchTab('history')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('history');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-clock"/></svg></span><span class="tab-label">היסטוריה</span></div>
-      <div class="tab"        data-tab="insurance" role="button" tabindex="0" aria-label="רישיונות וביטוחים" onclick="APP.switchTab('insurance')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('insurance');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">רישיונות וביטוחים</span></div>
-      <div class="tab"        data-tab="garage"    role="button" tabindex="0" aria-label="המוסך" onclick="APP.switchTab('garage')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('garage');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-tool"/></svg></span><span class="tab-label">המוסך</span></div>
+      <div class="tab active" data-tab="info" data-cap="vehicle.tab.info"      role="button" tabindex="0" aria-label="הרכב" onclick="APP.switchTab('info')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('info');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-car"/></svg></span><span class="tab-label">הרכב</span></div>
+      <div class="tab"        data-tab="history" data-cap="vehicle.tab.serviceHistory"   role="button" tabindex="0" aria-label="היסטוריה" onclick="APP.switchTab('history')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('history');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-clock"/></svg></span><span class="tab-label">היסטוריה</span></div>
+      <div class="tab"        data-tab="insurance" data-cap="vehicle.tab.insurance" role="button" tabindex="0" aria-label="רישיונות וביטוחים" onclick="APP.switchTab('insurance')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('insurance');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-shield"/></svg></span><span class="tab-label">רישיונות וביטוחים</span></div>
+      <div class="tab"        data-tab="garage" data-cap="vehicle.tab.garage"    role="button" tabindex="0" aria-label="המוסך" onclick="APP.switchTab('garage')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();APP.switchTab('garage');}"><span class="tab-icon"><svg width="20" height="20"><use href="#ic-tool"/></svg></span><span class="tab-label">המוסך</span></div>
     </div>
     <div class="content" id="veh-content"></div>
   </div>
@@ -5819,7 +5822,7 @@ body.pp-open{overflow:hidden}
   </div><!-- /screen-wash -->
 
   <!-- Help FAB (draggable) -->
-  <button class="help-fab" id="help-fab" aria-label="עלה בקשר" style="display:none">
+  <button class="help-fab" id="help-fab" data-cap="roadside" aria-label="עלה בקשר" style="display:none">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a0f00" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
       <line x1="12" y1="9" x2="12" y2="13"/>
@@ -5843,14 +5846,14 @@ body.pp-open{overflow:hidden}
     </div>
     <div class="help-menu-scroll">
     <div class="help-menu-items" id="help-menu-items">
-      <button class="help-item" id="hitem-puncture" onclick="APP.helpPuncture()">
+      <button class="help-item" id="hitem-puncture" data-cap="roadside.puncture" onclick="APP.helpPuncture()">
         <span class="help-item-icon" style="background:linear-gradient(135deg,#1F8A3D,#16652e)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
         </span>
         <div class="help-item-text"><span class="help-item-title">פנצ&#x27;ר</span><span class="help-item-sub">ספק שירות + פנצריות 24/7</span></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <button class="help-item" id="hitem-battery" onclick="APP.helpBattery()">
+      <button class="help-item" id="hitem-battery" data-cap="roadside.battery" onclick="APP.helpBattery()">
         <span class="help-item-icon" style="background:#fff;border:2px solid #e2e8f0;padding:2px">
           <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
             <rect x="2"  y="2"  width="16" height="16" rx="5" fill="#1565C0"/>
@@ -5865,14 +5868,14 @@ body.pp-open{overflow:hidden}
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <button class="help-item" id="hitem-towing" onclick="APP.helpTowing()">
+      <button class="help-item" id="hitem-towing" data-cap="roadside.towing" onclick="APP.helpTowing()">
         <span class="help-item-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
         </span>
         <div class="help-item-text"><span class="help-item-title">גרר</span><span class="help-item-sub">ביטוח מקיף — גרירה</span></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <button class="help-item" id="hitem-windshield" onclick="APP.helpWindshield()">
+      <button class="help-item" id="hitem-windshield" data-cap="roadside.windshield" onclick="APP.helpWindshield()">
         <span class="help-item-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 17 L4 9 Q6 4 12 4 Q18 4 20 9 L19 17 Z"/>
@@ -5882,7 +5885,7 @@ body.pp-open{overflow:hidden}
         <div class="help-item-text"><span class="help-item-title">שמשות</span><span class="help-item-sub">תביעת ביטוח — אילן קארגלס</span></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <button class="help-item" id="hitem-appointment" onclick="APP.helpGarage()">
+      <button class="help-item" id="hitem-appointment" data-cap="roadside.garage" onclick="APP.helpGarage()">
         <span class="help-item-icon" style="background:linear-gradient(135deg,#0f766e,#0d9488)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         </span>
@@ -5923,7 +5926,7 @@ body.pp-open{overflow:hidden}
       <svg class="bn-ic" width="20" height="20"><use href="#ic-home"/></svg>
       <span class="bn-lbl">ראשי</span>
     </div>
-    <div class="bn-item" id="bn-alerts" onclick="APP.nav('alerts')">
+    <div class="bn-item" id="bn-alerts" data-cap="nav.alerts" onclick="APP.nav('alerts')">
       <svg class="bn-ic" width="20" height="20"><use href="#ic-bell"/></svg>
       <span class="bn-lbl">התראות</span>
       <div class="bn-badge hidden" id="alerts-badge-bottom">0</div>
@@ -5932,7 +5935,7 @@ body.pp-open{overflow:hidden}
       <svg class="bn-ic" width="20" height="20"><use href="#ic-car"/></svg>
       <span class="bn-lbl">הרכב</span>
     </div>
-    <div class="bn-item" id="bn-history" onclick="APP.nav('history')">
+    <div class="bn-item" id="bn-history" data-cap="nav.history" onclick="APP.nav('history')">
       <svg class="bn-ic" width="20" height="20"><use href="#ic-clock"/></svg>
       <span class="bn-lbl">היסטוריה</span>
     </div>

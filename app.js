@@ -2185,17 +2185,24 @@ function _dashInit() {
 }
 
 function _dashSwitch(idx, animate) {
+  /* גדר-יכולות (שלב 1): שקופית שכבויה (data-cap→cap-off) קורסת ב-flex; סופרים ומיישרים
+     רק שקופיות/נקודות גלויות, כדי שכיבוי "הטיפול הבא"/"ביצועי דלק" לא ישאיר שקופית ריקה/נקודה מתה. */
+  var visN = document.querySelectorAll('.dash-slide:not(.cap-off)').length || 1;
+  idx = Math.max(0, Math.min(idx, visN - 1));
   _dashIdx = idx;
   var track = document.getElementById('dash-track');
   var vp    = document.getElementById('dash-vp');
   if (track) {
     var w = (vp && vp.offsetWidth) || 0;
     if (animate === false) track.style.transition = 'none';
-    track.style.transform = 'translateX(' + (idx * w) + 'px)'; // RTL: positive → move track right to reveal slide-1 (placed left in RTL flex)
+    track.style.transform = 'translateX(' + (idx * w) + 'px)'; // RTL: positive → reveal next visible slide (hidden slides collapse to 0)
     if (animate === false) requestAnimationFrame(function(){ track.style.transition = ''; });
   }
-  document.querySelectorAll('#dash-dots .dash-dot').forEach(function(d, i) {
-    d.classList.toggle('a', i === idx);
+  var _vi = 0;
+  document.querySelectorAll('#dash-dots .dash-dot').forEach(function(d) {
+    if (d.classList.contains('cap-off')) { d.classList.remove('a'); return; }  /* נקודה מגּודרת — לא פעילה */
+    d.classList.toggle('a', _vi === idx);
+    _vi++;
   });
 }
 
@@ -2206,7 +2213,7 @@ function _dashInitSwipe(vp, track) {
   // fuel slide was in the DOM, a cached count of 1 would permanently block the
   // swipe to slide 2 (the fuel-performance slide never shows). Always read the
   // live count so slide 2 is reachable as soon as it exists.
-  function _slideCount() { return document.querySelectorAll('.dash-slide').length || 2; }
+  function _slideCount() { return document.querySelectorAll('.dash-slide:not(.cap-off)').length || 1; }
 
   function onStart(x, y) { startX = x; startY = y; dragging = true; moved = false; lockAxis = null; curX = 0; }
   function onMove(x, y) {
@@ -3692,6 +3699,7 @@ async function loadFullData() {
   _syncActiveAppointmentFromGAS();
   // Continuous safety net — catches admin-set appointments missed by Firebase listener
   _startActiveAppointmentPoll();
+  _applyCapGating();   /* יכולות-אפליקציה: החל gating אחרי שהרכב-הנבחר + caps עודכנו · שלב 1 */
 }
 
 /* Startup safety net: reconcile the locally-stored activeGarageAppointment
@@ -7319,6 +7327,31 @@ function renderService() {
   // km display lives in the modal now; nothing else to render here
 }
 
+/* ══ ניהול-אפליקציה-מרחוק — gating יכולות פר-(נהג,רכב) · שלב 1 ══════════════════
+   caps מגיע מתגובת-GAS על STATE.vehicle.caps (מפתח email+vehicleId בשרת). חסר/{} =
+   הכל-דלוק (ברירת-מחדל, תאימות-לאחור). רק capId שסומן false מפורש מכבה מקטע.
+   gating דקלרטיבי: אלמנט עם data-cap="<capId>" מקבל class cap-off (display:none) כשכבוי.
+   כלל בסיס #9. ANALYSIS-2026-08-08-driver-app-remote-control. */
+function _capEnabled(capId) {
+  try {
+    var caps = STATE && STATE.vehicle && STATE.vehicle.caps;
+    if (!caps || typeof caps !== 'object') return true;   /* ברירת-מחדל: דלוק */
+    return caps[capId] !== false;                          /* רק false מפורש מכבה */
+  } catch (_e) { return true; }
+}
+function _applyCapGating(root) {
+  try {
+    var els = (root || document).querySelectorAll('[data-cap]');
+    for (var i = 0; i < els.length; i++) {
+      var cap = els[i].getAttribute('data-cap');
+      if (cap && !_capEnabled(cap)) els[i].classList.add('cap-off');
+      else els[i].classList.remove('cap-off');
+    }
+    /* אחרי גידור: יישר-מחדש את קרוסלת-ה-dashboard (שקופית/נקודה שהוסתרה) — re-clamp + transform. */
+    if (typeof _dashSwitch === 'function' && document.getElementById('dash-track')) _dashSwitch(_dashIdx);
+  } catch (_e) {}
+}
+
 /* ══ Navigation ══ */
 const APP = {
   nav: function(screen) {
@@ -7340,11 +7373,13 @@ const APP = {
       _nrdActiveTab = 'unread';
       renderNotifHistory();
     }
+    _applyCapGating();   /* יכולות-אפליקציה · שלב 1 */
   },
 
   switchTab: function(tab) {
     STATE.currentTab = tab;
     renderVehicleScreen(tab);
+    _applyCapGating();   /* יכולות-אפליקציה · שלב 1 */
   },
 
   openKmModal: function() {
