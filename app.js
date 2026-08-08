@@ -10312,6 +10312,16 @@ window.addEventListener('pageshow', function(e) {
 
 document.addEventListener('DOMContentLoaded', async function() {
 
+  /* אות "מוכן" ל-splash הנייטיב (Android APK): MainActivity מחזיק את splash-המערכת
+     (שחור-שקוף) עד שהספלש-כניסה צויר, ואז מסירה חלקה בלי הבזק-אייקון/פער. rAF כפול =
+     אחרי ה-paint הראשון של #splash-screen. native בלבד — ב-PWA/דפדפן window.AndroidSplash
+     לא קיים (no-op). timeout של 3ש' ב-MainActivity מבטיח שלעולם לא ייתקע. BUG-2026-08-08b. */
+  try {
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      try { if (window.AndroidSplash && window.AndroidSplash.ready) window.AndroidSplash.ready(); } catch(_e){}
+    }); });
+  } catch(_e){}
+
   /* פופאפ-עדכון על ה-splash מוקדם ככל האפשר (native, once-guard) — גם למשתמשי auto-login שלא רואים
      את מסך-הכניסה. חוזר על עצמו ב-_showLoginScreen/startApp אם הפלאגין עדיין לא היה מוכן כאן. */
   setTimeout(function(){ try { _apkUpdateCheck(); } catch(_e){} }, 800);
