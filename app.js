@@ -3151,6 +3151,14 @@ function _apkUpdateCheck() {
 function _showApkUpdatePopup(m, installedVer) {
   if (document.getElementById('apk-update-pop')) return;
   var url = m.url || 'https://uzim4414.github.io/aleh-driver/downloads/aleh-driver-latest.apk';
+  // ── הורדה חוצת-origin (תיקון סופי לכפתור שלא הוריד) ─────────────────────────
+  // ה-APK יושב תחת server.url (uzim4414.github.io/aleh-driver). ה-WebView של
+  // Capacitor מסווג כל https באותו origin כ"ניווט פנימי" ומנסה לטעון את ה-APK
+  // בתוך ה-WebView עצמו → מסך ריק, שום הורדה. (Waze/tel עבדו רק כי הם scheme
+  // לא-http שמופנה ל-intent.) URL חוצה-origin (github.com/raw → raw.githubusercontent)
+  // נופל מחוץ ל-allowNavigation → Capacitor מנתב לדפדפן החיצוני → ה-APK יורד כרגיל.
+  // אומת: raw מחזיר 200 · application/octet-stream · 10,214,803 בתים (תואם manifest).
+  url = String(url).replace(/^https:\/\/uzim4414\.github\.io\/aleh-driver\//, 'https://github.com/uzim4414/aleh-driver/raw/main/');
   var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
   var fmtDate = function(d){ var x=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return x?(x[3]+'/'+x[2]+'/'+x[1]):String(d||''); };
   var fmtSize = function(b){ if(!b) return ''; var mb=b/1048576; return (mb>=10?mb.toFixed(0):mb.toFixed(1))+' MB'; };
@@ -3188,9 +3196,11 @@ function _showApkUpdatePopup(m, installedVer) {
     document.head.appendChild(st);
   }
   var ov = document.createElement('div'); ov.id = 'apk-update-pop';
-  /* backdrop: הספלש מטושטש מבעד לזכוכית + זוהר-ירוק מותג משלנו — כך הזכוכית קולטת גוון גם מעל ספלש כהה,
-     ונראית שקופה/זכוכית בכל דפדפן (גם ללא תמיכת backdrop-filter — הגוון-הירוק חודר דרך הכרטיס השקוף). */
-  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:radial-gradient(125% 90% at 50% 34%,rgba(31,138,61,.30),rgba(8,12,10,.5) 58%,rgba(0,0,0,.66));backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%);display:flex;align-items:center;justify-content:center;padding:22px;animation:apkFade .3s ease;font-family:inherit';
+  /* backdrop קליל בכוונה: הפופאפ יושב על מסך-האפליקציה החי (ה-splash-screen עם הלוגו
+     וכפתורי-הכניסה), לא מסתיר אותו. dim נמוך (.34) + blur עדין (13px) → האפליקציה
+     נראית מטושטשת ומעומעמת מאחורי הזכוכית, כך שברור שזה פופאפ *חלק מהמסך* ולא מסך
+     נפרד. רקע כהה-אטום (.66) הוא ששיקר "מסך חדש" — לכן הורד. */
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:radial-gradient(120% 85% at 50% 30%,rgba(31,138,61,.16),rgba(0,0,0,.34) 72%);backdrop-filter:blur(13px) saturate(125%);-webkit-backdrop-filter:blur(13px) saturate(125%);display:flex;align-items:center;justify-content:center;padding:26px;animation:apkFade .3s ease;font-family:inherit';
   /* Hero — חללית + 4 ניצוצות + שתי שכבות-עננים שממסגרות את הכותרת (העיצוב המאושר).
      גרדיאנט-ירוק דוהה מלמעלה-למטה; העננים בתחתית ה-hero נמסים לתוך גוף-הזכוכית. */
   var rocketSvg =
@@ -3219,7 +3229,7 @@ function _showApkUpdatePopup(m, installedVer) {
       '<div style="position:absolute;left:0;right:0;bottom:-1px;line-height:0">' + cloudsSvg + '</div>' +
     '</div>';
   ov.innerHTML =
-    '<div style="position:relative;width:100%;max-width:360px;background:linear-gradient(160deg,rgba(46,48,52,.5),rgba(20,22,24,.55));backdrop-filter:blur(44px) saturate(200%);-webkit-backdrop-filter:blur(44px) saturate(200%);border:1px solid rgba(255,255,255,.16);border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.2);overflow:hidden;animation:apkPop .42s cubic-bezier(.2,.9,.28,1.1)">' +
+    '<div style="position:relative;width:100%;max-width:344px;background:linear-gradient(160deg,rgba(46,48,52,.62),rgba(20,22,24,.66));backdrop-filter:blur(44px) saturate(200%);-webkit-backdrop-filter:blur(44px) saturate(200%);border:1px solid rgba(255,255,255,.16);border-radius:28px;box-shadow:0 24px 60px rgba(0,0,0,.62),0 4px 18px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.22);overflow:hidden;animation:apkPop .42s cubic-bezier(.2,.9,.28,1.1)">' +
       heroHtml +
       '<div style="padding:14px 22px 20px;text-align:center">' +
         '<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.3px;margin-bottom:3px">עדכון זמין</div>' +
@@ -3233,8 +3243,10 @@ function _showApkUpdatePopup(m, installedVer) {
     '</div>';
   document.body.appendChild(ov);
   document.getElementById('apk-pop-go').onclick = function(){
-    try { window.open(url, '_blank'); }              /* הדפוס העובד באפליקציה (Waze/מפות/tel) — פותח דפדפן חיצוני */
-    catch(e){ try { window.location.href = url; } catch(_){} }
+    /* URL חוצה-origin → Capacitor מנתב לדפדפן החיצוני (הורדה). location.href אמין
+       בשני ההקשרים: WebView native (override→חיצוני) וגם PWA/דפדפן (הורדת octet-stream). */
+    try { window.location.href = url; }
+    catch(e){ try { window.open(url, '_blank'); } catch(_){} }
   };
   var close = function(){ ov.remove(); };            /* בלי snooze — פתיחה-מחדש תציג שוב */
   document.getElementById('apk-pop-later').onclick = close;
