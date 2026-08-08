@@ -3130,7 +3130,7 @@ function _getNativePlugin(name) {
 function _apkUpdateCheck() {
   if (!_isNativeApp()) return;                                  /* PWA לעולם לא מנודנד */
   var App = _getNativePlugin('App'); if (!App || !App.getInfo) return;   /* לא מוכן עדיין → נסה שוב בקריאה הבאה */
-  if (window._apkChkRan) return; window._apkChkRan = true;      /* guard רק אחרי שהפלאגין זמין (פעם אחת לסשן) */
+  if (window._apkChkRan) return; window._apkChkRan = true;      /* פעם אחת לטעינת-עמוד; פתיחה-מחדש = בדיקה-מחדש */
   try {
     App.getInfo().then(function(info) {
       var installed = parseInt(info && info.build, 10); if (!installed) return;   /* build = versionCode */
@@ -3139,51 +3139,106 @@ function _apkUpdateCheck() {
         .then(function(m) {
           if (!m || !m.versionCode) return;
           if (parseInt(m.versionCode, 10) <= installed) return;                    /* מעודכן */
-          try { var sn = JSON.parse(localStorage.getItem('aleh_apk_upd_snooze') || 'null');
-                if (sn && sn.code === m.versionCode && (Date.now() - sn.ts) < 86400000) return; } catch(e){}   /* snooze 24ש' */
-          _showApkUpdatePopup(m);
+          /* בלי snooze מתמשך — מופיע בכל פתיחה עד שמעדכנים (בקשת עוזי). "אחר כך" = סגירה לסשן הזה בלבד. */
+          _showApkUpdatePopup(m, (info && info.version) || '');
         }).catch(function(){});                                 /* offline → בלע-שקט (אין toast) */
     }).catch(function(){});
   } catch(e){}
 }
-/* פופאפ-זכוכית מרהיב על מסך-ההתחברות (בקשת עוזי) — עדכון APK חדש: גרסה + תאריך + מה-השתנה + הורדה.
-   ה"מה השתנה" = m.notes מהמניפסט (מוזן מ-Changes של השחרור = אותו תיעוד-גרסאות שנשמר ל-DB). */
-function _showApkUpdatePopup(m) {
+/* פופאפ-עדכון APK — סגנון glass/Apple, כהה, אינפורמטיבי (מותקן→חדש · תאריך · גודל · מה-חדש).
+   כפתור פותח את ה-APK בדפדפן החיצוני (`_blank` — הדפוס העובד באפליקציה; WebView לא מתקין).
+   ה"מה חדש" = m.notes מהמניפסט (מוזן מ-Changes של השחרור = תיעוד-הגרסאות ב-DB). */
+function _showApkUpdatePopup(m, installedVer) {
   if (document.getElementById('apk-update-pop')) return;
-  var url = m.url || 'https://uzim4414.github.io/aleh-driver/downloads/aleh-driver-latest.apk';   /* מוחלט — דפדפן חיצוני */
+  var url = m.url || 'https://uzim4414.github.io/aleh-driver/downloads/aleh-driver-latest.apk';
   var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
   var fmtDate = function(d){ var x=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return x?(x[3]+'/'+x[2]+'/'+x[1]):String(d||''); };
+  var fmtSize = function(b){ if(!b) return ''; var mb=b/1048576; return (mb>=10?mb.toFixed(0):mb.toFixed(1))+' MB'; };
   var parts = String(m.notes||'').split(/\n|·|;|•/).map(function(s){ return s.trim(); }).filter(Boolean);
-  var notesInner = parts.length > 1
-    ? ('<ul style="margin:0;padding-right:17px;padding-left:0">' + parts.map(function(p){ return '<li style="margin:2px 0">' + esc(p) + '</li>'; }).join('') + '</ul>')
-    : (parts.length === 1 ? esc(parts[0]) : '');
-  var notesBlock = notesInner
-    ? '<div style="text-align:right;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 15px;margin-bottom:18px">' +
-        '<div style="font-size:11px;font-weight:800;color:#8fd6a3;margin-bottom:6px">מה חדש בגרסה זו</div>' +
-        '<div style="font-size:13px;color:#dfe2e5;line-height:1.7">' + notesInner + '</div></div>'
+  var chk = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2.6" style="flex-shrink:0;margin-top:2px"><path d="M20 6 9 17l-5-5"/></svg>';
+  var notesRows = parts.length
+    ? parts.map(function(p){ return '<div style="display:flex;gap:8px;align-items:flex-start;padding:3px 0"><span style="display:flex">' + chk + '</span><span style="flex:1">' + esc(p) + '</span></div>'; }).join('')
     : '';
+  var notesBlock = notesRows
+    ? '<div style="text-align:right;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:12px 15px;margin:0 0 17px">' +
+        '<div style="font-size:11px;font-weight:800;color:#7fdc9a;letter-spacing:.3px;margin-bottom:6px">מה חדש בגרסה זו</div>' +
+        '<div style="font-size:13px;color:#eef0f2;line-height:1.6">' + notesRows + '</div></div>'
+    : '';
+  var metaBits = [];
+  if (m.date) metaBits.push(fmtDate(m.date));
+  if (m.size) metaBits.push(fmtSize(m.size));
+  var metaLine = metaBits.length ? '<div style="font-size:11.5px;color:#8b9096;margin:2px 0 16px">' + esc(metaBits.join('  ·  ')) + '</div>' : '<div style="height:8px"></div>';
+  /* השוואת-גרסאות — הליבה האינפורמטיבית: מה מותקן ↔ מה חדש */
+  var verCompare =
+    '<div style="display:flex;align-items:center;justify-content:center;gap:9px;margin:2px 0 4px">' +
+      (installedVer ? '<div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#c2c7cc;font-size:12px;font-weight:700;padding:5px 13px;border-radius:999px">מותקן ' + esc(installedVer) + '</div>' : '') +
+      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8a9096" stroke-width="2.4"><path d="M5 12h14"/><path d="m12 5-7 7 7 7"/></svg>' +
+      '<div style="background:linear-gradient(135deg,rgba(31,138,61,.42),rgba(52,199,89,.32));border:1px solid rgba(52,199,89,.55);color:#c5ffd6;font-size:12px;font-weight:800;padding:5px 13px;border-radius:999px">חדש ' + esc(m.version||'') + '</div>' +
+    '</div>';
   if (!document.getElementById('apk-pop-css')) {
     var st = document.createElement('style'); st.id = 'apk-pop-css';
-    st.textContent = '@keyframes apkFade{from{opacity:0}to{opacity:1}}@keyframes apkPop{from{opacity:0;transform:translateY(16px) scale(.94)}to{opacity:1;transform:none}}';
+    st.textContent =
+      '@keyframes apkFade{from{opacity:0}to{opacity:1}}' +
+      '@keyframes apkPop{from{opacity:0;transform:translateY(18px) scale(.94)}to{opacity:1;transform:none}}' +
+      '#apk-pop-go{transition:transform .12s ease,filter .12s ease}' +
+      '#apk-pop-go:active{transform:scale(.97);filter:brightness(1.1)}' +          /* אפקט לחיצה — כפתור עדכן */
+      '#apk-pop-later{transition:opacity .12s ease}' +
+      '#apk-pop-later:active{opacity:.55}' +                                        /* אפקט לחיצה — כפתור אחר כך */
+      '@media (prefers-reduced-motion: reduce){#apk-update-pop,#apk-update-pop *{animation:none !important}}';
     document.head.appendChild(st);
   }
   var ov = document.createElement('div'); ov.id = 'apk-update-pop';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);display:flex;align-items:center;justify-content:center;padding:24px;animation:apkFade .25s ease;font-family:inherit';
+  /* backdrop: הספלש מטושטש מבעד לזכוכית + זוהר-ירוק מותג משלנו — כך הזכוכית קולטת גוון גם מעל ספלש כהה,
+     ונראית שקופה/זכוכית בכל דפדפן (גם ללא תמיכת backdrop-filter — הגוון-הירוק חודר דרך הכרטיס השקוף). */
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:radial-gradient(125% 90% at 50% 34%,rgba(31,138,61,.30),rgba(8,12,10,.5) 58%,rgba(0,0,0,.66));backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%);display:flex;align-items:center;justify-content:center;padding:22px;animation:apkFade .3s ease;font-family:inherit';
+  /* Hero — חללית + 4 ניצוצות + שתי שכבות-עננים שממסגרות את הכותרת (העיצוב המאושר).
+     גרדיאנט-ירוק דוהה מלמעלה-למטה; העננים בתחתית ה-hero נמסים לתוך גוף-הזכוכית. */
+  var rocketSvg =
+    '<svg width="46" height="64" viewBox="0 0 46 64" fill="none">' +
+      '<path d="M16 44 C17 53 23 62 23 62 C23 62 29 53 30 44 Z" fill="url(#apkfl)"/>' +
+      '<path d="M23 3 C32 12 34 30 31 43 L15 43 C12 30 14 12 23 3 Z" fill="#f3f6f8"/>' +
+      '<path d="M23 3 C32 12 34 30 31 43 L23 43 Z" fill="#d7dee3"/>' +
+      '<circle cx="23" cy="20" r="5.2" fill="#0c4d22" stroke="#34c759" stroke-width="1.6"/>' +
+      '<path d="M15 34 L6 44 L15 42 Z" fill="#1F8A3D"/>' +
+      '<path d="M31 34 L40 44 L31 42 Z" fill="#25a349"/>' +
+      '<defs><linearGradient id="apkfl" x1="23" y1="44" x2="23" y2="62" gradientUnits="userSpaceOnUse"><stop stop-color="#ffd85c"/><stop offset="1" stop-color="#ff8a1f"/></linearGradient></defs>' +
+    '</svg>';
+  var cloudsSvg =
+    '<svg width="100%" height="46" viewBox="0 0 360 46" preserveAspectRatio="none" fill="none">' +
+      '<path d="M0,46 L0,22 C25,12 45,20 60,16 C80,10 100,21 120,15 C145,9 165,21 190,15 C215,10 240,22 265,15 C290,10 315,21 340,16 C350,14 360,20 360,22 L360,46 Z" fill="rgba(255,255,255,.10)"/>' +
+      '<path d="M0,46 L0,30 C20,22 40,28 58,24 C78,17 96,28 118,23 C142,17 162,29 188,23 C214,18 236,29 262,23 C288,18 312,28 336,24 C348,22 360,27 360,29 L360,46 Z" fill="rgba(255,255,255,.19)"/>' +
+    '</svg>';
+  var sparkStyle = 'position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 0 6px rgba(255,255,255,.7)';
+  var heroHtml =
+    '<div style="position:relative;height:118px;background:linear-gradient(180deg,rgba(31,138,61,.62) 0%,rgba(31,138,61,.34) 60%,rgba(31,138,61,.12) 100%)">' +
+      '<span style="' + sparkStyle + ';top:22px;left:40px"></span>' +
+      '<span style="' + sparkStyle + ';top:44px;left:72px"></span>' +
+      '<span style="' + sparkStyle + ';top:30px;right:48px"></span>' +
+      '<span style="' + sparkStyle + ';top:58px;right:86px"></span>' +
+      '<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%) rotate(-7deg);filter:drop-shadow(0 8px 16px rgba(0,0,0,.4))">' + rocketSvg + '</div>' +
+      '<div style="position:absolute;left:0;right:0;bottom:-1px;line-height:0">' + cloudsSvg + '</div>' +
+    '</div>';
   ov.innerHTML =
-    '<div style="width:100%;max-width:360px;background:rgba(22,22,25,.82);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.13);border-radius:24px;padding:26px 22px;box-shadow:0 24px 70px rgba(0,0,0,.6);text-align:center;animation:apkPop .35s cubic-bezier(.2,.9,.3,1.15)">' +
-      '<div style="width:60px;height:60px;margin:0 auto 14px;border-radius:18px;background:linear-gradient(145deg,#1F8A3D,#25a349);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(31,138,61,.45)">' +
-        '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg></div>' +
-      '<div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:5px">עדכון חדש זמין</div>' +
-      '<div style="font-size:12.5px;color:#b9bec4;margin-bottom:16px">גרסה <b style="color:#fff">' + esc(m.version||'') + '</b>' + (m.date ? (' · ' + fmtDate(m.date)) : '') + '</div>' +
-      notesBlock +
-      '<button id="apk-pop-go" style="width:100%;background:#1F8A3D;color:#fff;border:0;border-radius:14px;padding:15px;font-size:15.5px;font-weight:800;font-family:inherit;box-shadow:0 6px 18px rgba(31,138,61,.4);cursor:pointer">הורד את העדכון</button>' +
-      '<button id="apk-pop-later" style="width:100%;background:none;border:0;color:#9aa0a6;padding:12px 0 0;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">אחר כך</button>' +
+    '<div style="position:relative;width:100%;max-width:360px;background:linear-gradient(160deg,rgba(46,48,52,.5),rgba(20,22,24,.55));backdrop-filter:blur(44px) saturate(200%);-webkit-backdrop-filter:blur(44px) saturate(200%);border:1px solid rgba(255,255,255,.16);border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.2);overflow:hidden;animation:apkPop .42s cubic-bezier(.2,.9,.28,1.1)">' +
+      heroHtml +
+      '<div style="padding:14px 22px 20px;text-align:center">' +
+        '<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.3px;margin-bottom:3px">עדכון זמין</div>' +
+        '<div style="font-size:12.5px;color:#a6abb0;margin-bottom:13px">גרסה חדשה של האפליקציה מוכנה להתקנה</div>' +
+        verCompare +
+        metaLine +
+        notesBlock +
+        '<button id="apk-pop-go" style="width:100%;background:linear-gradient(135deg,#1F8A3D,#25a349);color:#fff;border:0;border-radius:16px;padding:16px;font-size:16px;font-weight:800;font-family:inherit;box-shadow:0 8px 22px rgba(31,138,61,.5);cursor:pointer">עדכן עכשיו</button>' +
+        '<button id="apk-pop-later" style="width:100%;background:none;border:0;color:#9aa0a6;padding:12px 0 2px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer">אחר כך</button>' +
+      '</div>' +
     '</div>';
   document.body.appendChild(ov);
-  var snooze = function(){ try { localStorage.setItem('aleh_apk_upd_snooze', JSON.stringify({ code:m.versionCode, ts:Date.now() })); } catch(e){} ov.remove(); };
-  document.getElementById('apk-pop-go').onclick = function(){ try { window.open(url, '_system'); } catch(e){ try { window.open(url, '_blank'); } catch(_){} } };
-  document.getElementById('apk-pop-later').onclick = snooze;
-  ov.addEventListener('click', function(e){ if (e.target === ov) snooze(); });   /* הקשה על הרקע = אחר כך */
+  document.getElementById('apk-pop-go').onclick = function(){
+    try { window.open(url, '_blank'); }              /* הדפוס העובד באפליקציה (Waze/מפות/tel) — פותח דפדפן חיצוני */
+    catch(e){ try { window.location.href = url; } catch(_){} }
+  };
+  var close = function(){ ov.remove(); };            /* בלי snooze — פתיחה-מחדש תציג שוב */
+  document.getElementById('apk-pop-later').onclick = close;
+  ov.addEventListener('click', function(e){ if (e.target === ov) close(); });   /* הקשה על הרקע = אחר כך */
 }
 
 function _loginFallbackRedirect() {
