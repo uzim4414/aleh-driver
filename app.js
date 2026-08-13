@@ -3771,6 +3771,9 @@ async function loadFullData() {
     if (typeof APP !== 'undefined' && typeof APP._loadWashLog === 'function') {
       await APP._loadWashLog();
     }
+    /* שלב C.1 — dual-read compare (לוג בלבד): קרא את driverView מ-Firebase והשווה לתוצאת-GAS.
+       fire-and-forget — לא חוסם את הכניסה ו**לא משנה תצוגה** (עדיין GAS). חושף דריפט לפני C.2. */
+    try { _dvCompareFromFirebase(result); } catch(_dvcE){}
   } catch(e) {
     console.warn('loadFullData error:', e.message);
     if (e && (e.error === 'vehicle_inactive' || (e.message && e.message.indexOf('vehicle_inactive') >= 0))) {
@@ -3806,6 +3809,45 @@ async function loadFullData() {
   // Continuous safety net — catches admin-set appointments missed by Firebase listener
   _startActiveAppointmentPoll();
   _applyCapGating();   /* יכולות-אפליקציה: החל gating אחרי שהרכב-הנבחר + caps עודכנו · שלב 1 */
+}
+
+/* ══ שלב C.1 — CQRS dual-read compare (לוג בלבד) ══════════════════════════════════════════════
+   קורא את הצומת driverView/{vid}/{emailKey} מ-Firebase (שה-GAS מקרין ב-C.0) ומשווה לתוצאת-GAS החיה.
+   **לא משנה שום תצוגה** — האפליקציה עדיין מציגה את נתוני-GAS. מטרה יחידה: לחשוף דריפט/חוסר/denied בלוג-
+   התקלות שבנינו, לפני שנעבור ל-Firebase-first (C.2). התאמת-מפתח: השרת כותב emailKey ב-lowercase
+   (_projectDriverView) — חייבים לקרוא זהה. משווים רק שדות-יציבים (לא projectedAt/schemaRev/מפתחות-דלק-מחוטאים). */
+async function _dvCompareFromFirebase(gasResult) {
+  try {
+    if (!gasResult || !gasResult.vehicle || typeof _fbDb === 'undefined' || !_fbDb) return;
+    var vid = gasResult.vehicle.id || (STATE.vehicle && STATE.vehicle.id);
+    var email = STATE.user && STATE.user.email;
+    if (!vid || !email) return;
+    try { if (typeof _fbEnsureAuth === 'function') await _fbEnsureAuth(); } catch(_ae){}
+    var ek = String(email).replace(/[.#$[\]]/g, '_').toLowerCase();   // זהה לצד-שרת (_projectDriverView)
+    var snap = await _fbDb.ref('driverView/' + vid + '/' + ek).once('value');
+    var node = snap && snap.val();
+    if (!node) { _telemetry('driverview_missing', 'info', 'vid=' + vid); return; }
+    var nv = node.vehicle || {};
+    var gv = gasResult.vehicle || {};
+    var diffs = [];
+    function cmp(label, a, b) { var A = String(a == null ? '' : a), B = String(b == null ? '' : b); if (A !== B) diffs.push(label + '(gas=' + A + '/fb=' + B + ')'); }
+    cmp('num',        gv.num,               nv.num);
+    cmp('currentKm',  gv.currentKm,         nv.currentKm);
+    cmp('gateAccess', gv.gateAccessEnabled, nv.gateAccessEnabled);
+    cmp('isActive',   gv.isActive,          nv.isActive);
+    cmp('docs',       (gasResult.documents || []).length, (node.documents || []).length);
+    cmp('ins',        (gasResult.insurance || []).length, (node.insurance || []).length);
+    cmp('hist',       (gasResult.history   || []).length, (node.history   || []).length);
+    var ageMin = node.projectedAt ? Math.round((Date.now() - new Date(node.projectedAt).getTime()) / 60000) : -1;
+    if (diffs.length) {
+      _telemetry('driverview_drift', 'warn', 'vid=' + vid + ' age=' + ageMin + 'm ' + diffs.join(' '));
+    } else {
+      _telemetry('driverview_match', 'info', 'vid=' + vid);   // detail יציב → dedup, לא מציף
+    }
+  } catch (e) {
+    // permission-denied כאן = בעיית-חוק; אחר = חולף. לוג-בלבד, לא מפיל דבר.
+    _telemetry('driverview_read_err', 'warn', (e && (e.message || e.code)) || String(e));
+  }
 }
 
 /* Startup safety net: reconcile the locally-stored activeGarageAppointment
