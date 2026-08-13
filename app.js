@@ -3803,8 +3803,10 @@ function _startActiveAppointmentPoll() {
   if (_apptPollTimer) return;
   _apptPollTimer = setInterval(function() {
     if (document.visibilityState !== 'visible') return;
-    if (!STATE.idToken || !STATE.vehicle) return;
-    if (_isTokenExpired(STATE.idToken)) return;
+    /* BUG-2026-08-13: היה מסונן על idToken (Google ~שעה) → מת לחלוטין לנהג session/ביומטרי
+       (idToken=null). כעת רץ גם עם driverSession — זהו רשת-הביטחון ל-pending→approved. */
+    if (!STATE.vehicle) return;
+    if (STATE.idToken && _isTokenExpired(STATE.idToken) && !(typeof _driverSessionLoad === 'function' && _driverSessionLoad())) return;
     _syncActiveAppointmentFromGAS();
   }, _APPT_POLL_INTERVAL);
 }
@@ -3815,12 +3817,14 @@ function _initFbGarageStatusSync() {
   var vehicleId = STATE.vehicle && (STATE.vehicle.id || STATE.vehicle.num);
   if (!vehicleId) return;
   var vehKey = String(vehicleId).replace(/[^0-9A-Za-z_-]/g, '_');
-  /* BUG-05: detach previous listener before re-attaching */
-  if (STATE._garageStatusRef) {
-    try { STATE._garageStatusRef.off(); } catch(_) {}
-  }
-  STATE._garageStatusRef = _fbDb.ref('garageSync/' + vehKey);
-  STATE._garageStatusRef.on('value', function(snap) {
+  /* BUG-2026-08-13 (שורש): garageSync דורש אימות-Firebase (.read:"auth!=null"). נהג session/
+     ביומטרי אינו מזוהה ל-Firebase (אין Google idToken) → המאזין נדחה ב-permission_denied וה-SDK
+     מבטלו לצמיתות → אפס אירועי-אישור חיים. מבטיחים _fbEnsureAuth *לפני* ההצמדה; עטוף ב-_attachGarage
+     כדי לאפשר גם התאוששות מ-error-cb. */
+  var _attachGarage = function() {
+    if (STATE._garageStatusRef) { try { STATE._garageStatusRef.off(); } catch(_) {} }
+    STATE._garageStatusRef = _fbDb.ref('garageSync/' + vehKey);
+    STATE._garageStatusRef.on('value', function(snap) {
     try {
       var data = snap.val();
       if (!data || !data.status || !data.eventId) return;
@@ -3968,6 +3972,17 @@ function _initFbGarageStatusSync() {
           localStorage.removeItem('pendingGarageRequest');
           _fbClearPendingGarage();
         }
+        /* BUG-2026-08-13: ענף-האישור היה אילם (אפס טוסט/התראה) → הסתמך 100% על FCM שנכשל בשקט.
+           הצג התראת-אישור בתוך-האפליקציה, מדופלק פר-eventId (persistent) + מול היסטוריה. */
+        if (!_garageDedupSeen(_normGarageEventKey('approved', data.eventId))) {
+          var _apReqN  = data.requestNumber || '';
+          var _apTitle = '\u2705 \u05d1\u05e7\u05e9\u05ea \u05de\u05d5\u05e1\u05da' + (_apReqN ? ' #' + _apReqN : '') + ' \u05d0\u05d5\u05e9\u05e8\u05d4';
+          var _apBody  = '\u05d4\u05d1\u05e7\u05e9\u05d4 \u05d0\u05d5\u05e9\u05e8\u05d4' + (data.managerNote ? ' \u2014 ' + data.managerNote : '') + '. \u05e0\u05d9\u05ea\u05df \u05dc\u05e7\u05d1\u05d5\u05e2 \u05ea\u05d5\u05e8.';
+          var _apSaved = (typeof _notifAlreadyInHistory === 'function') && _notifAlreadyInHistory('garage_approved', data.eventId, _apTitle, _apBody, { requestNumber: _apReqN, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '' });
+          if (!_apSaved && typeof showInAppNotification === 'function') {
+            showInAppNotification({ notification: { title: _apTitle, body: _apBody }, data: { alertType: 'garage_approved', eventId: data.eventId, requestNumber: _apReqN, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '' } });
+          } else if (!_apSaved && typeof showToast === 'function') { showToast(_apTitle); }
+        }
         if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
           if (APP.switchTab) APP.switchTab('garage');
         }
@@ -3986,7 +4001,22 @@ function _initFbGarageStatusSync() {
         }
       }
     } catch(e) { console.warn('[fbSync] garageStatusSync onValue:', e.message); }
-  }, function(err) { console.warn('[fbSync] garageStatusSync listener:', err.message); });
+  }, function(err) {
+      console.warn('[fbSync] garageStatusSync listener:', err && err.message);
+      /* BUG-2026-08-13: permission_denied = לא-מאומת ל-Firebase → ה-SDK ביטל את המאזין.
+         חדֵש אימות והצמד-מחדש (פעם אחת per cycle — מניעת-לולאה). */
+      if (!STATE._garageReauthTried && /permission|denied/i.test(String((err && err.message) || ''))) {
+        STATE._garageReauthTried = true;
+        if (typeof _fbEnsureAuth === 'function') _fbEnsureAuth().then(function(ok) {
+          if (ok) { STATE._garageReauthTried = false; _attachGarage(); }
+        });
+      }
+    });
+  };
+  /* הבטח אימות-Firebase לפני ההצמדה (נהג session/ביומטרי). fire-and-forget: _fbEnsureAuth
+     מזהה currentUser קיים ומדלג, אחרת מביא custom-token מ-GAS. */
+  if (typeof _fbEnsureAuth === 'function') { _fbEnsureAuth().then(function() { _attachGarage(); }); }
+  else { _attachGarage(); }
   /* reference stored in STATE._garageStatusRef for cleanup */
 }
 
@@ -10164,16 +10194,17 @@ function _grAnimatePct() {
         crawling = true;
         if (gr)  gr.classList.add('greeting-waiting');
         if (lbl) lbl.textContent = 'מתחבר…';
-        /* BUG-2026-08-13 — רשת-ביטחון: אם הטבעת זוחלת מעל 40s בלי _grComplete (נתיב-כשל
-           בלתי-צפוי שלא סגר את הברכה) — שחזר-לכניסה במקום להיתקע לנצח. 40s > הזמן-הריאלי
-           הגרוע ביותר (bio_auth 3×12s + loadFullData 20s) → לא פוגע בטעינה-איטית לגיטימית. */
+        /* BUG-2026-08-13 (תוקן): רשת-ביטחון נגד תקיעה אינסופית בלבד. 40s היה **קצר מדי** —
+           כניסה קרה לגיטימית היא סדרתית: bio_auth עד ~39s (3×12s+2×1.5s) + loadFullData עד ~20s
+           ≈ 59s, והטיימר היה יורה באמצע-כניסה-חיה ומחזיר-לכניסה → לולאת-97%. 90s > המקרה
+           הלגיטימי-הגרוע ותופס רק תלייה אמיתית (למשל Firebase once() בלי-timeout על רדיו-קר). */
         try { clearTimeout(window._grStuckTimer); } catch(_) {}
         window._grStuckTimer = setTimeout(function() {
           if (_grDone) return;
           try { hideGreeting(); } catch(_) {}
           if (typeof _bootRecoverToLogin === 'function') _bootRecoverToLogin('greeting stuck > 40s');
           else if (typeof _showLoginScreen === 'function') { try { _showLoginScreen(); } catch(_) {} }
-        }, 40000);
+        }, 90000);
       }
       var over = (performance.now() - (start + delay + dur)) / 1000;
       pct = CAP + (CRAWL_MAX - CAP) * (1 - Math.exp(-over / 2.2));

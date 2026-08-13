@@ -200,17 +200,17 @@ function _buildOsNotifContent(type, m, fallback) {
         body:  '׳”׳˜׳¡׳˜ ׳—׳™׳™׳‘ ׳׳”׳×׳‘׳¦׳¢ ׳׳₪׳ ׳™ ' + (m.testDate || '?') + '. ׳ ׳•׳×׳¨׳• ' + (m.daysLeft || '?') + ' ׳™׳׳™׳ ׳‘׳׳‘׳“.'
       };
     },
-    garage_approved: function() {
-      var garage = m.garageInfo ? ' ׳‘' + m.garageInfo : '';
+        garage_approved: function() {
+      var garage = m.garageInfo ? ' ב' + m.garageInfo : '';
       return {
-        title: '׳‘׳§׳©׳× ׳׳•׳¡׳ ׳׳•׳©׳¨׳”',
-        body:  (id || '׳”׳‘׳§׳©׳”') + ' ׳׳•׳©׳¨׳”. ׳ ׳™׳×׳ ׳׳§׳‘׳•׳¢ ׳×׳•׳¨' + garage + '.'
+        title: '✅ בקשת מוסך אושרה',
+        body:  (id || 'הבקשה') + ' אושרה. ניתן לקבוע תור' + garage + '.'
       };
     },
-    garage_rejected: function() {
+        garage_rejected: function() {
       return {
-        title: '׳‘׳§׳©׳× ׳׳•׳¡׳ ׳ ׳“׳—׳×׳”',
-        body:  (id ? id + ' ג€” ' : '') + '׳ ׳™׳×׳ ׳׳©׳׳•׳— ׳‘׳§׳©׳” ׳—׳“׳©׳”.'
+        title: '❌ בקשת מוסך נדחתה',
+        body:  (id ? id + ' — ' : '') + 'ניתן לשלוח בקשה חדשה.'
       };
     },
     garage_appointment_set: function() {
