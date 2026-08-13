@@ -3941,9 +3941,10 @@ function _initFbGarageStatusSync() {
       // ── אישור/דחייה של בקשה ממתינה ──
       // For approved/rejected, skip if already consumed — avoid replaying handled state
       if (data.consumed) return;
-      /* BUG-2026-08-13: dedup מתמיד פר-מכשיר — approved/rejected מעובד פעם אחת, גם אחרי resume/reload.
-         (garageSync ".write":false → אי-אפשר לסמן consumed מהלקוח, לכן לא נסמכים עליו.) */
-      if (_garageDedupSeen(_normGarageEventKey(data.status, data.eventId))) return;
+      /* BUG-2026-08-13: הוסר guard ברמת-הענף שהשתמש במפתח `<status>|eventId` — הוא התנגש עם
+         dedup-הטוסט של 'rejected' (3980, אותו מפתח) וחסם את טוסט-הדחייה בהופעה הראשונה.
+         כל טוסט/התראה בענף מדופלק בנפרד (persistent) — cancel@3841, rejected@3980,
+         appointment_set@3899. עיבוד-ה-STATE (localStorage) אידמפוטנטי וחוזר בבטחה. */
       var prevRaw  = localStorage.getItem('pendingGarageRequest');
       var _pending = null;
       var _localMatch = false;
@@ -8522,17 +8523,8 @@ APP._garageSubmitRequest = async function() {
       driverName:    (STATE.user && STATE.user.name) || v.holder || ''
     };
     if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
-    /* BUG-2026-08-13: משוב אופטימי — הצג "נשלח" מיד, בלי להמתין ל-round-trip של השרת
-       (מייל-למנהל + Firebase + logging רצים סינכרונית בנתיב-החם ≈ כמה שניות). המידע
-       (pendingGarageRequest) נכתב רק אחרי אישור-הצלחה מהשרת; בכפילות/שגיאה הכרטיס מוחלף מטה. */
-    _showHelpCard(
-      '<div class="help-card" style="text-align:center;padding:32px 20px">' +
-      '<div style="font-size:48px;margin-bottom:12px">📤</div>' +
-      '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">הבקשה נשלחה!</div>' +
-      '<div style="font-size:14px;color:#94a3b8;margin-bottom:20px">ממתין לאישור מנהל הצי — תקבל התראה בהקדם</div>' +
-      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
-      '</div>'
-    );
+    /* BUG-2026-08-13: הוסר משוב-אופטימי שהקדים את השרת ("נשלח" לפני שליחה = שקר + חוסר-סנכרון-לייב).
+       הכרטיס "נשלח" מוצג רק אחרי result.ok, יחד עם כתיבת-ה-pending (צימוד הדוק חיווי↔נתונים). */
     /* noToast: this flow renders its own success and error states below, so a
        central toast would double-report (BUG-2026-07-23). */
     var result = await _fireFieldEvent('garage_request', details, { noToast: true });
@@ -8584,32 +8576,15 @@ APP._garageSubmitRequest = async function() {
         '</div>'
       );
     } else {
-      /* BUG-2026-08-13: המשוב היה אופטימי ("נשלח") — בכשל-אמת חובה להחליף את הכרטיס לשגיאה+נסה-שוב,
-         אחרת הנהג נשאר עם "נשלח" שקרי. */
-      _garageShowSubmitError((result && result.error) || 'נסה שוב');
+      if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
+      showToast('שגיאה בשליחה: ' + ((result && result.error) || 'נסה שוב'));
     }
   } catch(e) {
     console.error('_garageSubmitRequest:', e);
-    _garageShowSubmitError(e.message || String(e));
+    if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
+    showToast('שגיאה: ' + (e.message || String(e)));
   }
 };
-
-/* כרטיס-שגיאה לשליחת בקשת-מוסך (משמש את הנתיב-האופטימי — BUG-2026-08-13). */
-function _garageShowSubmitError(msg) {
-  try {
-    _showHelpCard(
-      '<div class="help-card" style="text-align:center;padding:28px 20px">' +
-      '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#dc2626,#f97316);margin-bottom:14px">' +
-        '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
-      '</div>' +
-      '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:8px">השליחה נכשלה</div>' +
-      '<div style="font-size:13px;color:#94a3b8;margin-bottom:18px;line-height:1.6">' + _escHtml(String(msg || 'נסה שוב')) + '</div>' +
-      '<button class="help-action-btn" onclick="APP._garageSubmitRequest()">נסה שוב</button>' +
-      '<button class="help-action-btn secondary" style="margin-top:8px" onclick="APP.closeHelpMenu()">סגור</button>' +
-      '</div>'
-    );
-  } catch(_) { try { showToast('שגיאה בשליחה: ' + msg); } catch(__) {} }
-}
 
 APP._garageGetPending = function() {
   try {
