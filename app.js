@@ -12420,6 +12420,12 @@ function _gateOnPosition(pos) {
     var _diff = Math.abs(_hd - _brg); if (_diff > 180) _diff = 360 - _diff;
     if (_diff >= 90) { _gateSetState('approaching'); return; } // leaving / perpendicular → BLOCK
     if (!_gateCheckConditions(speedMs, inRange)) return;
+    /* BUG-2026-08-13 שלב-2: כשה-watcher הנייטיבי פעיל (_gateBgWatchId), הנייטיב (AlehLiveGate.onFix)
+       הוא מנוע-הפתיחה-האוטומטי היחיד — הוא רץ גם כשה-WebView קפוא, וגם כשהוא ער. אם ה-JS יירה גם הוא
+       כאן = פתיחה-כפולה (ה-cooldown-בשרת סופג, אבל בזבוז). לכן ה-JS מציג UI בלבד ולא יורה כשהנייטיב בעלים.
+       פתיחה-ידנית (כפתור-מגירה → _gateOpen ישיר) לא עוברת פה ולכן לא מושפעת. fallback-foreground (בלי
+       watcher נייטיבי) = _gateBgWatchId null → ה-JS ממשיך לירות כרגיל. */
+    if (_gateBgWatchId && _gateNativeAutoOpen) { _gateSetState('approaching'); return; }
     _gateSetState('opening');
     _gateOpen(inRange.lotId, nearestDist, speedMs, lat, lng);
   } else {
@@ -12925,6 +12931,7 @@ if (typeof APP !== 'undefined') {
 // ============================================================
 
 var _gateBgWatchId   = null;    // ID מ-BackgroundGeolocation.addWatcher()
+var _gateNativeAutoOpen = false; // BUG-2026-08-13 שלב-2: האם ה-APK תומך בפתיחה-נייטיבית (מ-setLiveTargets)
 var _gateBgInst      = null;    // reference to BG plugin — for notif updates
 var _gateLastNotifMsg   = '';   // last notification message text
 var _gateLastNotifDistM = -999; // distM at last notification update
@@ -13274,12 +13281,29 @@ function _gatePushNativeTargets() {
     var cfgs = APP._gateConfigs || (APP._gateConfig ? [APP._gateConfig] : []);
     var targets = cfgs.filter(function(c){ return c && c.lat && c.lng; }).map(function(c){
       return { lotId: String(c.lotId||''), name: String(c.lotName||'החניון'),
-               lat: parseFloat(c.lat), lng: parseFloat(c.lng) };
+               lat: parseFloat(c.lat), lng: parseFloat(c.lng),
+               /* BUG-2026-08-13 שלב-2: הנייטיב צריך את הרדיוס+מהירויות לסינון-הטריגר המקומי (השרת מאמת מדויק) */
+               radius:   parseFloat(c.radius || c.triggerRadius || 200),
+               maxSpeed: parseFloat(c.maxSpeed || 0),
+               minSpeed: parseFloat(c.minSpeed || 3) };
     });
     if (!targets.length) return;
-    BG.setLiveTargets({ title: _gateBuildNotifTitle(), targets: targets })
-      .then(function(){ console.log('[gate-native] live targets pushed:', targets.length); })
-      .catch(function(e){ console.warn('[gate-native] setLiveTargets:', e && e.message); });
+    /* BUG-2026-08-13 שלב-2: הזהות+ה-endpoint שהנייטיב צריך כדי לירות open_gate בעצמו כשה-WebView קפוא.
+       autoOpen פעיל רק כשיש driverSession תקף (השרת מאמת אותו) + vehicleId. השרת=הסמכות על ההרשאה. */
+    var _ds  = (typeof _driverSessionLoad === 'function') ? (_driverSessionLoad() || '') : '';
+    var _uid = (STATE && (STATE.firebaseUid || (STATE.user && STATE.user.uid))) || '';
+    var _vid = (STATE && STATE.vehicle && STATE.vehicle.id) || '';
+    var _cd  = parseFloat((cfgs[0] && cfgs[0].cooldownSec) || 300);
+    var _ntCfg = { gasUrl: GAS_URL, vehicleId: String(_vid), uid: String(_uid),
+                   session: _ds, autoOpen: !!(_ds && _vid), cooldownSec: _cd };
+    BG.setLiveTargets({ title: _gateBuildNotifTitle(), targets: targets, config: _ntCfg })
+      .then(function(res){
+        /* אות-יכולת: רק APK שתומך בפתיחה-נייטיבית מחזיר nativeAutoOpen:true. רק אז נכבה את פתיחת-ה-JS
+           (אחרת APK-ישן + webapp-חדש = השער לא נפתח כלל). autoOpen:false בקונפיג → משאירים JS פעיל. */
+        _gateNativeAutoOpen = !!(res && res.nativeAutoOpen === true && _ntCfg.autoOpen === true);
+        console.log('[gate-native] live targets pushed:', targets.length, 'nativeAutoOpen:', _gateNativeAutoOpen);
+      })
+      .catch(function(e){ _gateNativeAutoOpen = false; console.warn('[gate-native] setLiveTargets:', e && e.message); });
   } catch (e) { console.warn('[gate-native] pushTargets:', e && e.message); }
 }
 
