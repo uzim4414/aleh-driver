@@ -1452,7 +1452,11 @@ async function gasPost(action, extra, opts) {
   // גישה A: אם יש bio credential — נשתמש בו כ-fallback ולא נחסום על idToken שפג
   var _bioCred = (typeof _bioLoad === 'function') ? _bioLoad() : null;
   var _hasBio = !!(_bioCred && _bioCred.credentialId && _bioCred.email);
-  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken) && !_hasBio) {
+  /* BUG-2026-08-13: היה חסר `&& !driverSession` → נהג-Google נייטיב (בלי credentialId) שה-idToken בן-השעה
+     שלו פג, אך יש לו driverSession תקף ל-30 יום, הוסלם ל-`_sessionExpired` → `_authRecover` → פתיחת-Google
+     אוטומטית. השרת מאמת driverSession קודם (code.js:_driverAuthResolve), לכן אין לפוג-סשן אם יש session תקף. */
+  var _hasDurableSess = (typeof _driverSessionLoad === 'function') && !!_driverSessionLoad();
+  if (STATE.idToken && STATE.idToken !== 'demo_token' && _isTokenExpired(STATE.idToken) && !_hasBio && !_hasDurableSess) {
     if (!opts.silent) { _sessionExpired(); throw new Error('session_expired'); }
     return { ok: false, error: 'session_expired' };
   }
@@ -3516,7 +3520,21 @@ async function handleGoogleCredential(response) {
     };
 
     console.log('[auth] calling driver_auth for', STATE.user.email);
-    const result = await gasPost('driver_auth');
+    /* BUG-2026-08-13: driver_auth כבד (קריאות-גיליון מרובות) ועל GAS קר חוצה את timeout(20s) של gasPost
+       → network_error → בהמשך "אין רכב" מטעה + חזרה ל-login (בדיוק כשל-כניסת-Google של עוזי). bio_auth כבר
+       קיבל retry לאותה סיבה; מוסיפים כאן retry (3 ניסיונות) + הודעה נכונה כשעדיין נכשל. */
+    var result = null;
+    for (var _daTry = 0; _daTry < 3; _daTry++) {
+      result = await gasPost('driver_auth');
+      if (result && result.ok) break;
+      if (!result || (result.error !== 'network_error' && result.error !== 'response_read_error')) break; // שגיאה אמיתית — לא לחזור
+      if (_daTry < 2) { try { showLoginError('השרת מתעורר, רגע…'); } catch(_) {} await new Promise(function(r){ setTimeout(r, 1800); }); }
+    }
+    if (!result || !result.ok) {
+      var _daErr = new Error((result && result.error === 'network_error') ? 'החיבור לשרת איטי — נסה שוב עוד רגע' : ((result && result.error) || 'שגיאת התחברות'));
+      _daErr.error = (result && result.error) || 'auth_failed';
+      throw _daErr;
+    }
     console.log('[auth] result ok:', result.ok, 'vehicles:', result.vehicles && result.vehicles.length);
     /* BUG-2026-07-26: the server now mints the durable session inside driver_auth itself,
        so save it here. Previously this depended solely on a follow-up driver_create_session
@@ -4537,8 +4555,13 @@ async function _bioTimeoutReauth() {
     if (!bioData) throw new Error('no_bio');
     var session = _pinSessionLoad();
     if (!session) throw new Error('no_session');
-    // גישה A: אם idToken חסר/פג — השתמש ב-credentialId (ללא Google)
-    var _tReauthBad = !session.idToken || _isTokenExpired(session.idToken);
+    /* BUG-2026-08-13 (שורש הניתוק-בחזרה): נהג-session רץ עם idToken=null בכוונה → `!session.idToken`
+       תמיד true → כל נעילת-אצבע-בחזרה הפעילה `_bioGasAuth` = אתחול-מלא (איפוס STATE + טבעת-97% +
+       loadFullData מול GAS קר) שנכשל → login → גוגל-אוטומטי → כשל. אבל האפליקציה חיה וה-STATE תקין,
+       ויש driverSession ל-30 יום — האצבע צריכה רק *לפתוח מנעול מקומית*, לא לאתחל. `_tReauthBad`
+       יהיה true רק אם אין גם driverSession תקף. */
+    var _hasDurable = (typeof _driverSessionLoad === 'function') && !!_driverSessionLoad();
+    var _tReauthBad = !_hasDurable && (!session.idToken || _isTokenExpired(session.idToken));
     await bioAuthenticate(bioData.email, bioData.credentialId);
     // עדכן session מיידית — לפני כל async, כדי ש-visibilitychange לא יקפיץ modal שנית
     _bioSessionStart();
