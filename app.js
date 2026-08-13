@@ -3917,13 +3917,10 @@ function _initFbGarageStatusSync() {
           // (_garageDedupMap / _notifDedupTtlMap) reset on app reload and are not
           // shared with the background SW that handled FCM, so they cannot be trusted
           // for cross-channel dedup. Check PERSISTENT history via the universal gate.
-          var _alreadySaved = _notifAlreadyInHistory(
-            'garage_appointment_set', _aSet.eventId, _apptTitle, _apptBody,
-            { requestNumber: _aSet.requestNumber, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '', appointmentDate: _aSet.appointmentDate }
-          );
-          // Only save+show when FCM did NOT already record this event.
-          // If FCM handled it, do nothing — STATE sync was already done above.
-          if (!_alreadySaved && typeof showInAppNotification === 'function') {
+          /* BUG-2026-08-13: הוסר גארד `_notifAlreadyInHistory` שדיכא את הטוסט כשה-pull הקדים ורשם
+             את הכרטיס (השורש של "התראה שקטה"). `showInAppNotification`→`saveNotifToHistory` מדדף
+             כרטיסים בעצמו; `_setDupKey` (persistent, כולל תאריך+שעה) הוא שער-הנראות היחיד. */
+          if (typeof showInAppNotification === 'function') {
             showInAppNotification({
               notification: { title: _apptTitle, body: _apptBody },
               data: {
@@ -3974,14 +3971,17 @@ function _initFbGarageStatusSync() {
         }
         /* BUG-2026-08-13: ענף-האישור היה אילם (אפס טוסט/התראה) → הסתמך 100% על FCM שנכשל בשקט.
            הצג התראת-אישור בתוך-האפליקציה, מדופלק פר-eventId (persistent) + מול היסטוריה. */
-        if (!_garageDedupSeen(_normGarageEventKey('approved', data.eventId))) {
+        /* BUG-2026-08-13: \u05d4\u05d5\u05e1\u05e8 \u05d2\u05d0\u05e8\u05d3 `_notifAlreadyInHistory` \u05e9\u05d3\u05d9\u05db\u05d0 \u05d0\u05ea \u05d4\u05d8\u05d5\u05e1\u05d8 \u05db\u05e9-loadNotifHistoryFromGAS
+           (pull) \u05d4\u05e7\u05d3\u05d9\u05dd \u05d5\u05e8\u05e9\u05dd \u05d0\u05ea \u05d4\u05db\u05e8\u05d8\u05d9\u05e1 \u2192 "\u05d4\u05ea\u05e8\u05d0\u05d4 \u05e9\u05e7\u05d8\u05d4". `showInAppNotification` \u05de\u05d3\u05d3\u05e4 \u05db\u05e8\u05d8\u05d9\u05e1\u05d9\u05dd \u05d1\u05e2\u05e6\u05de\u05d5
+           (saveNotifToHistory), \u05d0\u05d6 \u05d0\u05d9\u05df \u05db\u05e4\u05d9\u05dc\u05d5\u05ea. \u05d2\u05d0\u05e8\u05d3-\u05d8\u05e8\u05d9\u05d5\u05ea: \u05dc\u05d0 \u05dc\u05d4\u05e7\u05e4\u05d9\u05e5 \u05d0\u05d9\u05e9\u05d5\u05e8-\u05d9\u05e9\u05df (>48\u05e9') \u05d1\u05d4\u05ea\u05e7\u05e0\u05d4 \u05d8\u05e8\u05d9\u05d9\u05d4. */
+        var _apFresh = !data.updatedAt || (Date.now() - Number(data.updatedAt) < 48 * 3600 * 1000);
+        if (_apFresh && !_garageDedupSeen(_normGarageEventKey('approved', data.eventId))) {
           var _apReqN  = data.requestNumber || '';
           var _apTitle = '\u2705 \u05d1\u05e7\u05e9\u05ea \u05de\u05d5\u05e1\u05da' + (_apReqN ? ' #' + _apReqN : '') + ' \u05d0\u05d5\u05e9\u05e8\u05d4';
           var _apBody  = '\u05d4\u05d1\u05e7\u05e9\u05d4 \u05d0\u05d5\u05e9\u05e8\u05d4' + (data.managerNote ? ' \u2014 ' + data.managerNote : '') + '. \u05e0\u05d9\u05ea\u05df \u05dc\u05e7\u05d1\u05d5\u05e2 \u05ea\u05d5\u05e8.';
-          var _apSaved = (typeof _notifAlreadyInHistory === 'function') && _notifAlreadyInHistory('garage_approved', data.eventId, _apTitle, _apBody, { requestNumber: _apReqN, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '' });
-          if (!_apSaved && typeof showInAppNotification === 'function') {
+          if (typeof showInAppNotification === 'function') {
             showInAppNotification({ notification: { title: _apTitle, body: _apBody }, data: { alertType: 'garage_approved', eventId: data.eventId, requestNumber: _apReqN, vehicleId: (STATE.vehicle && STATE.vehicle.id) || '' } });
-          } else if (!_apSaved && typeof showToast === 'function') { showToast(_apTitle); }
+          } else if (typeof showToast === 'function') { showToast(_apTitle); }
         }
         if (typeof APP !== 'undefined' && STATE.currentScreen === 'vehicle') {
           if (APP.switchTab) APP.switchTab('garage');
@@ -9059,7 +9059,14 @@ APP._garageConfirmEditAppointment = async function(eventId) {
   try {
     var res = await gasPost('garage_set_appointment', { eventId: eventId, appointmentDate: dateVal, appointmentTime: timeVal }, { silent: true });
     if (res && res.error === 'session_expired') { _sessionExpired(); return; }
-    if (!res || !res.ok) throw new Error((res && res.error) || 'error');
+    /* BUG-2026-08-13: timeout(20s) אפשרי בעוד השרת הצליח וה-listener החי עדכן את התור לתאריך המבוקש.
+       אם activeGarageAppointment כבר תואם (eventId+תאריך) → הצלחה, לא שגיאה שקרית. */
+    if (!res || !res.ok) {
+      var _liveE = null;
+      try { _liveE = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null'); } catch(_) {}
+      if (_liveE && String(_liveE.eventId) === String(eventId) && String(_liveE.appointmentDate) === String(dateVal)) { res = { ok: true }; }
+      else throw new Error((res && res.error) || 'error');
+    }
     var appt = JSON.parse(localStorage.getItem('activeGarageAppointment') || '{}');
     appt.appointmentDate = dateVal;
     appt.appointmentTime = timeVal;
@@ -9261,6 +9268,17 @@ APP._garageConfirmAppointment = async function(eventId) {
       { eventId: eventId, appointmentDate: dateVal, appointmentTime: timeVal },
       { silent: true }
     );
+    /* BUG-2026-08-13: garage_set_appointment איטי (מייל-סינכרוני + 2 קריאות FIELD_EVENTS מלאות) ועלול
+       לחצות את timeout(20s) של gasPost ולהחזיר network_error — בעוד השרת כבר כתב garageSync וה-listener
+       החי כתב activeGarageAppointment. אם התור כבר אושר (eventId+תאריך תואמים) → זו הצלחה, לא שגיאה שקרית. */
+    if (!(result && result.ok)) {
+      try {
+        var _liveAppt = JSON.parse(localStorage.getItem('activeGarageAppointment') || 'null');
+        if (_liveAppt && String(_liveAppt.eventId) === String(eventId) && String(_liveAppt.appointmentDate) === String(dateVal)) {
+          result = { ok: true, requestNumber: (_liveAppt.requestNumber || (result && result.requestNumber) || ''), _reconciled: true };
+        }
+      } catch(_rc) {}
+    }
     if (result && result.ok) {
       APP._garageClearPending();
       APP._garageClearApproved();
@@ -10725,8 +10743,10 @@ document.addEventListener('visibilitychange', async function() {
   // BUG-2026-07-27: correct a notification that went stale while the OS froze this WebView.
   try { if (typeof _gateForceRefresh === 'function') _gateForceRefresh(); } catch (_gfr) {}
   if (!_fsAuthed || !STATE.vehicle) return;
-  if (!STATE.idToken) return;   // session/bio login — no Google token to refresh against
-  if (_isTokenExpired(STATE.idToken)) return; // אל תקרא _sessionExpired בפורגראונד — יציג re-login בהפתעה
+  /* BUG-2026-08-13: היה `if (!STATE.idToken) return` → נהג session/ביומטרי (idToken=null) לא קיבל שום
+     רענון בחזרה-לאפליקציה → אישור/דחייה הופיעו רק אחרי loadFullData הבא (ההשהיה + "רק אחרי כמה ניווטים").
+     כעת רץ גם עם driverSession (gasPost מצרף אותו). מדלגים רק אם idToken של Google פג ואין session גיבוי. */
+  if (STATE.idToken && _isTokenExpired(STATE.idToken) && !(typeof _driverSessionLoad === 'function' && _driverSessionLoad())) return;
   // Throttled appointment sync — not on every screen-on
   if (Date.now() - _lastApptSync >= _APPT_SYNC_MIN) {
     try { _syncActiveAppointmentFromGAS(); } catch(_) {}
