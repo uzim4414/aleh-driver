@@ -17,6 +17,57 @@ var BIO_SESSION_TTL = 30 * 60 * 1000; // 30 minutes
 
 var DRIVER_SESSION_KEY = 'aleh_drv_session_v1';
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Telemetry — ניטור-תקלות (LOGS/DRIVER-TELEMETRY-SPEC.md). חוזה: לעולם לא חוסם בוט
+   (enqueue ל-localStorage בלבד), לעולם לא רקורסיבי (flush ב-fetch גולמי, לא gasPost;
+   כשל-flush רק backoff), שורד offline+קריסה (תור מתמיד + sendBeacon), טיהור-סודות.
+══════════════════════════════════════════════════════════════════════════ */
+var _TM_QKEY = 'aleh_tm_queue_v1', _TM_DEVKEY = 'aleh_tm_device_v1';
+window._tmBootStage = 'init'; window._tmLastGasAction = '';
+var _tmCrumbs = [], _tmErrCount = 0, _tmFlushTimer = null, _tmBackoff = 0, _tmFlushing = false;
+var _tmSessionId = (function(){ try { return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); } catch(_){ return 'sess'; } })();
+var _tmT0 = (function(){ try { return performance.now(); } catch(_){ return 0; } })();
+function _tmDeviceId(){ try { var d = localStorage.getItem(_TM_DEVKEY); if (!d){ d = 'd_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-5); localStorage.setItem(_TM_DEVKEY, d); } return d; } catch(_){ return 'd_anon'; } }
+function _tmVer(){ try { if (window._tmVerCached) return window._tmVerCached; } catch(_){} var v=''; try { v = (typeof _getAppVersion === 'function' ? _getAppVersion() : '') || ''; } catch(_){} try { if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) v += (v?' ':'')+'native'; } catch(_){} try { window._tmVerCached = v; } catch(_){} return v; }
+function _tmScrub(s){ s = String(s == null ? '' : s); return s.replace(/(idToken|driverSession|credentialId|id_token)=[^&\s"']+/gi, '$1=***').replace(/eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{4,}\.[A-Za-z0-9_\-]{4,}/g, 'JWT***'); }
+function _tmEmail(){ try { if (typeof STATE!=='undefined' && STATE.user && STATE.user.email) return STATE.user.email; } catch(_){} try { var b=(typeof _bioLoad==='function')&&_bioLoad(); if (b&&b.email) return b.email; } catch(_){} try { var p=(typeof _pinSessionLoad==='function')&&_pinSessionLoad(); if (p&&p.email) return p.email; } catch(_){} return ''; }
+function _tmStage(stage){ try { window._tmBootStage = stage; var ms=0; try { ms = Math.round(performance.now()-_tmT0); } catch(_){} _tmCrumbs.push('+'+ms+':'+stage); if (_tmCrumbs.length>25) _tmCrumbs.shift(); } catch(_){} }
+function _tmLoadQueue(){ try { return JSON.parse(localStorage.getItem(_TM_QKEY) || '[]') || []; } catch(_){ return []; } }
+function _tmSaveQueue(q){ try { localStorage.setItem(_TM_QKEY, JSON.stringify(q)); } catch(_){} }
+function _telemetry(event, level, detail){
+  try {
+    level = level || 'info';
+    if (level === 'error' || level === 'fatal'){ if (_tmErrCount >= 60) return; _tmErrCount++; }
+    var ev = { ts: new Date().toISOString(), event: String(event||'').slice(0,60), level: level, detail: _tmScrub(detail).slice(0,500),
+      email: _tmEmail(), vehicleId: (function(){ try { return (typeof STATE!=='undefined' && STATE.vehicle && STATE.vehicle.id) || ''; } catch(_){ return ''; } })(),
+      ver: _tmVer(), native: (function(){ try { return !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()); } catch(_){ return false; } })(),
+      online: (function(){ try { return navigator.onLine; } catch(_){ return true; } })(), stage: window._tmBootStage, lastAct: window._tmLastGasAction || '',
+      crumbs: (level==='error'||level==='fatal') ? _tmCrumbs.join(' ') : '', n: 1 };
+    var q = _tmLoadQueue(), key = ev.event + '|' + ev.detail.slice(0,120), dup = null;
+    for (var i = q.length-1; i>=0; i--){ if ((q[i].event + '|' + String(q[i].detail).slice(0,120)) === key){ dup = q[i]; break; } }
+    if (dup){ dup.n = (dup.n||1)+1; dup.ts = ev.ts; } else { q.push(ev); if (q.length>80) q.shift(); }
+    _tmSaveQueue(q);
+    if (level==='error'||level==='fatal') _tmScheduleFlush(2000);
+  } catch(_){ /* לעולם לא שוברת */ }
+}
+function _tmScheduleFlush(delay){ try { if (_tmFlushTimer) return; _tmFlushTimer = setTimeout(function(){ _tmFlushTimer = null; _tmFlush(); }, delay || 30000); } catch(_){} }
+function _tmBody(q){ return JSON.stringify({ action:'driver_log_event', deviceId:_tmDeviceId(), sessionId:_tmSessionId, ua:(function(){ try { return navigator.userAgent.slice(0,160); } catch(_){ return ''; } })(), events:q.slice(0,30) }); }
+function _tmFlush(){
+  if (_tmFlushing) return; var q = _tmLoadQueue(); if (!q.length || !GAS_URL) return;
+  _tmFlushing = true; var batch = q.slice(0,30);
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:_tmBody(batch) })
+    .then(function(r){ return r.ok ? r.text() : Promise.reject('http'); })
+    .then(function(){ var cur=_tmLoadQueue(); _tmSaveQueue(cur.slice(batch.length)); _tmBackoff=0; _tmFlushing=false; if (_tmLoadQueue().length) _tmScheduleFlush(1500); })
+    .catch(function(){ _tmFlushing=false; _tmBackoff = Math.min((_tmBackoff||30000)*2, 300000); _tmScheduleFlush(_tmBackoff); /* אין _telemetry כאן — איסור רקורסיה */ });
+}
+try {
+  window.addEventListener('error', function(e){ try { _telemetry('js_error','error', ((e&&e.message)||'error') + ' @ ' + ((e&&e.filename)||'').split('/').pop() + ':' + ((e&&e.lineno)||'')); } catch(_){} });
+  window.addEventListener('unhandledrejection', function(e){ try { var r=e&&e.reason; _telemetry('js_reject','error',(r&&(r.message||r))||'rejection'); } catch(_){} });
+  window.addEventListener('online', function(){ try { _tmScheduleFlush(500); } catch(_){} });
+  document.addEventListener('DOMContentLoaded', function(){ try { _tmStage('dom'); _tmScheduleFlush(5000); } catch(_){} });
+  document.addEventListener('visibilitychange', function(){ try { if (document.visibilityState==='hidden'){ var q=_tmLoadQueue(); if (q.length && navigator.sendBeacon){ navigator.sendBeacon(GAS_URL, new Blob([_tmBody(q)], {type:'text/plain'})); _tmSaveQueue([]); } } } catch(_){} });
+} catch(_){}
+
 /* ══ Firebase Config + Init ══
    databaseURL נוסף ידנית — מופיע ב: Firebase Console → Realtime Database → URL בראש העמוד
    שאר הערכים מה-Console → Project Settings → aleh-driver-pwa
@@ -1310,6 +1361,7 @@ function _showVehicleInactiveOverlay() {
 }
 
 function _sessionExpired() {
+  try { _telemetry('session_expired', 'error', 'lastAct=' + (window._tmLastGasAction || '')); } catch (_tmS) {}
   /* BUG-2026-07-26: a expired Google token is NOT a logout. Before tearing anything down,
      try the self-sufficient path (durable driverSession / enrolled biometric) which needs
      no Google at all. Tearing down first — signOut + wiping STATE — was destroying the very
@@ -1462,6 +1514,7 @@ async function gasPost(action, extra, opts) {
   }
 
   var _dsTok = _driverSessionLoad();
+  try { window._tmLastGasAction = action; } catch(_tmA){}
   const params = Object.assign({ action, idToken: STATE.idToken }, extra);
   /* Tell the server WHICH vehicle this is about (BUG-2026-07-23). The token
      only carries an email, so without this the server fell back to the first
@@ -1483,6 +1536,7 @@ async function gasPost(action, extra, opts) {
   try {
     resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(20000) });
   } catch(netErr) {
+    try { _telemetry('gas_net', 'error', action + ': ' + ((netErr && netErr.message) || netErr)); } catch(_tmN){}
     if (opts.silent) return { ok: false, error: 'network_error' };
     throw new Error('שגיאת חיבור: ' + (netErr && netErr.message ? netErr.message : netErr));
   }
@@ -2961,6 +3015,7 @@ function _bootFailSave(reason) {
 
 function _bootRecoverToLogin(reason) {
   _bootFailSave(reason);
+  try { _telemetry('boot_recover', 'fatal', String(reason || '')); } catch (_tmB) {} /* צוואר-בקבוק: watchdog/97%/startApp/renderAll */
   try { console.error('[boot] התאוששות למסך הכניסה:', reason); } catch (_) {}
   try { clearTimeout(window._bootWdTimer); } catch (_) {}
   var gr = document.getElementById('greeting');
@@ -3077,6 +3132,7 @@ function _bootFailShowLast() {
   try { raw = JSON.parse(localStorage.getItem(BOOT_FAIL_KEY) || 'null'); } catch (_) {}
   if (!raw || !raw.reason) return;
   try { localStorage.removeItem(BOOT_FAIL_KEY); } catch (_) {}
+  try { _telemetry('boot_fail_prev', 'error', String(raw.reason || '')); _tmScheduleFlush(1500); } catch (_tmP) {} /* משדר את הכשל שקרס לפני שהספיק flush */
   if (Date.now() - (raw.ts || 0) > 30 * 60 * 1000) return; // ישן מדי — לא רלוונטי
   var errEl = document.getElementById('login-err');
   if (errEl) {
