@@ -1,1 +1,1 @@
-{"version":"2.3","versionCode":20300,"url":"https://github.com/uzim4414/aleh-driver/raw/main/downloads/aleh-driver-latest.apk","size":10216365,"notes":"הפעלה חלקה — ללא הבזק אייקון, ישר למסך הכניסה","date":"2026-08-08"}
+{"version":"2.4","versionCode":20400,"url":"https://github.com/uzim4414/aleh-driver/raw/main/downloads/aleh-driver-latest.apk","size":10219384,"notes":"פתיחת-שער ברקע/שינה — מנוע נייטיבי (שלב 2): הטריגר + open_gate עברו ל-AlehLiveGate שרץ גם כשהמסך כבוי. + בקשת פטור-סוללה חד-פעמית. דורש בדיקת-שדה בשער.","date":"2026-08-13"}
