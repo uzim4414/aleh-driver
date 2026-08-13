@@ -826,8 +826,12 @@ function _notifAlreadyInHistory(alertType, eventId, title, body, extra) {
    second is silenced for TTL_MS. Keyed by alertType+eventId normalized
    to a logical event (see _normGarageEventKey).
    ────────────────────────────────────────────────────────────── */
-var _GARAGE_DEDUP_TTL_MS = 12000;
-var _garageDedupMap = {};
+var _GARAGE_DEDUP_TTL_MS = 2592000000; /* BUG-2026-08-13: היה 12000 (12s) בזיכרון בלבד → טוסט "התור בוטל" חזר כל 12s וגם אחרי כל resume/reload. השורש: garageSync ".write":false (database.rules.json) → ה-ack snap.ref.update({consumed:true}) נכשל בשקט, הצומת נשאר consumed:false, וה-.on('value') יורה מחדש בכל re-attach. עכשיו 30 יום + מתמיד ב-localStorage → טוסט פעם-אחת-למכשיר-לכל-eventId. */
+var _GARAGE_DEDUP_LS_KEY = '_garageDedupPersist';
+var _garageDedupMap = {}; /* deprecated in-memory map — נשמר לתאימות; המקור-אמת עבר ל-localStorage (_garageDedupLoad). */
+function _garageDedupLoad() {
+  try { return JSON.parse(localStorage.getItem(_GARAGE_DEDUP_LS_KEY) || '{}') || {}; } catch(_) { return {}; }
+}
 function _normGarageEventKey(typeOrStatus, eventId) {
   if (!eventId) return '';
   var t = String(typeOrStatus || '').toLowerCase();
@@ -848,14 +852,16 @@ function _normGarageEventKey(typeOrStatus, eventId) {
 function _garageDedupSeen(key) {
   if (!key) return false;
   var now = Date.now();
+  var map = _garageDedupLoad();   /* מתמיד ב-localStorage — שורד reload/resume (ראה BUG-2026-08-13) */
+  var changed = false;
   // GC expired
-  var keys = Object.keys(_garageDedupMap);
-  for (var i = 0; i < keys.length; i++) {
-    if (now - _garageDedupMap[keys[i]] > _GARAGE_DEDUP_TTL_MS) delete _garageDedupMap[keys[i]];
+  for (var k in map) {
+    if (map.hasOwnProperty(k) && (now - map[k]) > _GARAGE_DEDUP_TTL_MS) { delete map[k]; changed = true; }
   }
-  if (_garageDedupMap[key] && (now - _garageDedupMap[key]) <= _GARAGE_DEDUP_TTL_MS) return true;
-  _garageDedupMap[key] = now;
-  return false;
+  var seen = !!(map[key] && (now - map[key]) <= _GARAGE_DEDUP_TTL_MS);
+  if (!seen) { map[key] = now; changed = true; }
+  if (changed) { try { localStorage.setItem(_GARAGE_DEDUP_LS_KEY, JSON.stringify(map)); } catch(_) {} }
+  return seen;
 }
 
 /* Generic cross-channel dedup for ALL notification types that carry an
@@ -2599,6 +2605,10 @@ async function _bioGasAuth(email, credentialId) {
   var _ds = _driverSessionLoad();
   if (!email || (!credentialId && !_ds)) {
     window._bioLoginBusy = false;
+    /* BUG-2026-08-13: חובה לסגור את טבעת-הברכה (97% "מתחבר…") — הברכה כבר הוצגה ב-_bioLoginFromSplash,
+       וכישלון-אימות כאן שחזר בלי hideGreeting השאיר אותה זוחלת לנצח (רק kill+כניסה פתר). */
+    try { hideGreeting(); } catch(_) {}
+    try { if (!window._appStarted && typeof _showLoginScreen === 'function') _showLoginScreen(); } catch(_) {}
     setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
     return false;
   }
@@ -2627,6 +2637,8 @@ async function _bioGasAuth(email, credentialId) {
   if (!_bioFetchOk) {
     window._bioLoginBusy = false;
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
+    try { hideGreeting(); } catch(_) {} /* BUG-2026-08-13: אל תשאיר טבעת תקועה על 97% */
+    try { if (!window._appStarted && typeof _showLoginScreen === 'function') _showLoginScreen(); } catch(_) {}
     setTimeout(function() { showToast('שגיאת חיבור — נסה שוב'); }, 200);
     return false;
   }
@@ -2637,6 +2649,8 @@ async function _bioGasAuth(email, credentialId) {
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     var _snip = String(_bioRespText || '').substring(0, 120).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     try { console.warn('[bio_auth] non-JSON response:', _snip); } catch(_) {}
+    try { hideGreeting(); } catch(_) {} /* BUG-2026-08-13: אל תשאיר טבעת תקועה על 97% */
+    try { if (!window._appStarted && typeof _showLoginScreen === 'function') _showLoginScreen(); } catch(_) {}
     setTimeout(function() { showToast('שגיאת שרת — נסה שוב מאוחר יותר'); }, 200);
     return false;
   }
@@ -2645,6 +2659,9 @@ async function _bioGasAuth(email, credentialId) {
     if (bioBtn) bioBtn.classList.remove('bio-scanning');
     try { console.error('[bio_auth] server rejected:', (data && data.error) || 'no data', '| raw:', String(_bioRespText || '').substring(0, 200)); } catch(_) {}
     // credential לא תואם ב-Firebase — צריך כניסת Google חד-פעמית
+    /* BUG-2026-08-13: זה הנתיב השכיח אחרי resume ארוך (durable session פג/נדחה) — חייבים לסגור את הברכה */
+    try { hideGreeting(); } catch(_) {}
+    try { if (!window._appStarted && typeof _showLoginScreen === 'function') _showLoginScreen(); } catch(_) {}
     setTimeout(function() { showToast('יש להיכנס פעם אחת עם Google לחידוש הנתונים'); }, 200);
     return false;
   }
@@ -3827,7 +3844,7 @@ function _initFbGarageStatusSync() {
             : '❌ התור בוטל על ידי המנהל'; // admin or unknown setBy
           if (_cToast) showToast(_cToast);
         }
-        if (!data.consumed) snap.ref.update({ consumed: true, consumedAt: Date.now() });
+        /* BUG-2026-08-13: הוסר snap.ref.update({consumed:true}) — garageSync ".write":false → הכתיבה נכשלה בשקט, הצומת נשאר consumed:false, וכל re-attach הקפיץ טוסט. ה-dedup המתמיד (localStorage) מונע חזרה. */
         return;
       }
 
@@ -3846,8 +3863,8 @@ function _initFbGarageStatusSync() {
           && _localApptCheck.appointmentDate === data.appointmentDate
           && (_localApptCheck.appointmentTime || '') === (data.appointmentTime || '');
       if (_localAge > _fbAge && _localApptCheck.eventId === (data.eventId || '') && _sameApptData) {
-          // Local is strictly newer AND same event AND same date/time — Firebase is stale, mark consumed and skip
-          if (!data.consumed) snap.ref.update({ consumed: true, consumedAt: Date.now() });
+          // Local is strictly newer AND same event AND same date/time — Firebase is stale, skip
+          /* BUG-2026-08-13: הוסר ה-ack הנדון-לכישלון (garageSync write:false). */
           return;
         }
         if (data.consumed) {
@@ -3878,7 +3895,10 @@ function _initFbGarageStatusSync() {
         if (typeof _fbClearPendingGarage === 'function') _fbClearPendingGarage();
         if (typeof renderGarageApptWidget === 'function') renderGarageApptWidget();
         // Cross-channel dedup: skip notification if FCM already showed this event
-        var _setDupKey = _normGarageEventKey('appointment_set', data.eventId);
+        /* BUG-2026-08-13: ה-dedup עבר ל-localStorage מתמיד (30 יום) לתיקון טוסט-הביטול החוזר.
+           appointment_set הוא היחיד שיכול לחזור לגיטימית (המנהל משנה תאריך, אותו eventId) —
+           לכן המפתח כולל תאריך+שעה: שינוי-אמת → מפתח חדש → מתריע; re-fire זהה → נדחה. */
+        var _setDupKey = _normGarageEventKey('appointment_set', data.eventId) + '|' + (_aSet.appointmentDate || '') + '|' + (_aSet.appointmentTime || '');
         if (!_garageDedupSeen(_setDupKey)) {
           var _prevHadAppt = _localApptCheck && _localApptCheck.appointmentDate;
           var _dateChanged = _prevHadAppt &&
@@ -3914,13 +3934,16 @@ function _initFbGarageStatusSync() {
             });
           }
         }
-        snap.ref.update({ consumed: true, consumedAt: Date.now() });
+        /* BUG-2026-08-13: הוסר ה-ack (write:false); ה-dedup המתמיד + _notifAlreadyInHistory מונעים חזרת-התראה. */
         return;
       }
 
       // ── אישור/דחייה של בקשה ממתינה ──
       // For approved/rejected, skip if already consumed — avoid replaying handled state
       if (data.consumed) return;
+      /* BUG-2026-08-13: dedup מתמיד פר-מכשיר — approved/rejected מעובד פעם אחת, גם אחרי resume/reload.
+         (garageSync ".write":false → אי-אפשר לסמן consumed מהלקוח, לכן לא נסמכים עליו.) */
+      if (_garageDedupSeen(_normGarageEventKey(data.status, data.eventId))) return;
       var prevRaw  = localStorage.getItem('pendingGarageRequest');
       var _pending = null;
       var _localMatch = false;
@@ -3930,8 +3953,7 @@ function _initFbGarageStatusSync() {
           _localMatch = (String(_pending.eventId) === String(data.eventId));
         } catch(e) {}
       }
-      // Mark consumed regardless — prevents infinite replay if FCM already handled this
-      snap.ref.update({ consumed: true, consumedAt: Date.now() });
+      /* BUG-2026-08-13: הוסר snap.ref.update({consumed:true}) — write:false נכשל בשקט. ה-dedup המתמיד למעלה מחליף אותו. */
       if (data.status === 'approved') {
         if (_localMatch) {
           localStorage.setItem('approvedGarageRequest', JSON.stringify({
@@ -8500,6 +8522,17 @@ APP._garageSubmitRequest = async function() {
       driverName:    (STATE.user && STATE.user.name) || v.holder || ''
     };
     if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח...'; }
+    /* BUG-2026-08-13: משוב אופטימי — הצג "נשלח" מיד, בלי להמתין ל-round-trip של השרת
+       (מייל-למנהל + Firebase + logging רצים סינכרונית בנתיב-החם ≈ כמה שניות). המידע
+       (pendingGarageRequest) נכתב רק אחרי אישור-הצלחה מהשרת; בכפילות/שגיאה הכרטיס מוחלף מטה. */
+    _showHelpCard(
+      '<div class="help-card" style="text-align:center;padding:32px 20px">' +
+      '<div style="font-size:48px;margin-bottom:12px">📤</div>' +
+      '<div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">הבקשה נשלחה!</div>' +
+      '<div style="font-size:14px;color:#94a3b8;margin-bottom:20px">ממתין לאישור מנהל הצי — תקבל התראה בהקדם</div>' +
+      '<button class="help-action-btn secondary" onclick="APP.closeHelpMenu()">סגור</button>' +
+      '</div>'
+    );
     /* noToast: this flow renders its own success and error states below, so a
        central toast would double-report (BUG-2026-07-23). */
     var result = await _fireFieldEvent('garage_request', details, { noToast: true });
@@ -8551,15 +8584,32 @@ APP._garageSubmitRequest = async function() {
         '</div>'
       );
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
-      showToast('שגיאה בשליחה: ' + ((result && result.error) || 'נסה שוב'));
+      /* BUG-2026-08-13: המשוב היה אופטימי ("נשלח") — בכשל-אמת חובה להחליף את הכרטיס לשגיאה+נסה-שוב,
+         אחרת הנהג נשאר עם "נשלח" שקרי. */
+      _garageShowSubmitError((result && result.error) || 'נסה שוב');
     }
   } catch(e) {
     console.error('_garageSubmitRequest:', e);
-    if (btn) { btn.disabled = false; btn.textContent = '📨 שלח בקשה לאישור מנהל'; }
-    showToast('שגיאה: ' + (e.message || String(e)));
+    _garageShowSubmitError(e.message || String(e));
   }
 };
+
+/* כרטיס-שגיאה לשליחת בקשת-מוסך (משמש את הנתיב-האופטימי — BUG-2026-08-13). */
+function _garageShowSubmitError(msg) {
+  try {
+    _showHelpCard(
+      '<div class="help-card" style="text-align:center;padding:28px 20px">' +
+      '<div style="display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#dc2626,#f97316);margin-bottom:14px">' +
+        '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+      '</div>' +
+      '<div style="font-size:17px;font-weight:800;color:#f1f5f9;margin-bottom:8px">השליחה נכשלה</div>' +
+      '<div style="font-size:13px;color:#94a3b8;margin-bottom:18px;line-height:1.6">' + _escHtml(String(msg || 'נסה שוב')) + '</div>' +
+      '<button class="help-action-btn" onclick="APP._garageSubmitRequest()">נסה שוב</button>' +
+      '<button class="help-action-btn secondary" style="margin-top:8px" onclick="APP.closeHelpMenu()">סגור</button>' +
+      '</div>'
+    );
+  } catch(_) { try { showToast('שגיאה בשליחה: ' + msg); } catch(__) {} }
+}
 
 APP._garageGetPending = function() {
   try {
@@ -8792,6 +8842,10 @@ APP._garageShowApprovedFromStorage = function(meta) {
         // מנהל כבר קבע תור — עדכן localStorage והצג מסך תור פעיל
         var _aSet = {
           eventId:         eventId,
+          /* BUG-2026-08-13 #2 (60↔102): הנתיב הזה שמר activeGarageAppointment בלי requestNumber →
+             renderGarageApptWidget נפל לזנב-ה-eventId (מונה גלובלי, 102) במקום המספר האמיתי (60).
+             מעדיפים את r.requestNumber מהשרת; זנב-eventId רק כמוצא-אחרון (legacy). */
+          requestNumber:   r.requestNumber || (function(eid) { try { var m = String(eid||'').match(/-(\d+)$/); return m ? String(parseInt(m[1], 10)) : ''; } catch(_) { return ''; } })(eventId),
           appointmentDate: String(r.appointmentDate || '').split('T')[0].split(' ')[0],
           appointmentTime: (function(t) { if (!t) return '09:00'; var m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? (('0'+m[1]).slice(-2)+':'+m[2]) : '09:00'; })(r.appointmentTime),
           managerNote:     r.managerNote     || '',
@@ -10135,6 +10189,16 @@ function _grAnimatePct() {
         crawling = true;
         if (gr)  gr.classList.add('greeting-waiting');
         if (lbl) lbl.textContent = 'מתחבר…';
+        /* BUG-2026-08-13 — רשת-ביטחון: אם הטבעת זוחלת מעל 40s בלי _grComplete (נתיב-כשל
+           בלתי-צפוי שלא סגר את הברכה) — שחזר-לכניסה במקום להיתקע לנצח. 40s > הזמן-הריאלי
+           הגרוע ביותר (bio_auth 3×12s + loadFullData 20s) → לא פוגע בטעינה-איטית לגיטימית. */
+        try { clearTimeout(window._grStuckTimer); } catch(_) {}
+        window._grStuckTimer = setTimeout(function() {
+          if (_grDone) return;
+          try { hideGreeting(); } catch(_) {}
+          if (typeof _bootRecoverToLogin === 'function') _bootRecoverToLogin('greeting stuck > 40s');
+          else if (typeof _showLoginScreen === 'function') { try { _showLoginScreen(); } catch(_) {} }
+        }, 40000);
       }
       var over = (performance.now() - (start + delay + dur)) / 1000;
       pct = CAP + (CRAWL_MAX - CAP) * (1 - Math.exp(-over / 2.2));
@@ -10198,6 +10262,7 @@ function showGreeting(holderName, emailKey, vehicleKey) {
 
 function hideGreeting() {
   clearInterval(_grPctTimer);
+  try { clearTimeout(window._grStuckTimer); } catch(_) {} /* BUG-2026-08-13: בטל את רשת-הביטחון בעת סגירה תקינה */
   _grDone = true;
   const el = document.getElementById('greeting');
   el.style.transition = 'opacity .4s ease';
