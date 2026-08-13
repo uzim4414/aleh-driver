@@ -12393,7 +12393,13 @@ function _gateOnPosition(pos) {
     _gateDrawerUpdateDistances(configs, lat, lng);
   }
   if (inRange) {
-    if (_gateOpening) return;
+    if (_gateOpening) {
+      /* BUG-2026-08-13 (שלב-1): watchdog לדדלוק. אם ה-fetch של הפתיחה נקפא (WebView הושהה באמצע
+         הבקשה) — ה-.then/.catch לא נורים, _gateOpening נשאר true לנצח, וכל פתיחה-אוטומטית נחסמת עד
+         ריסטארט. מנקים אחרי 25s (>20s ה-timeout של gasPost). */
+      if (Date.now() - (window._gateOpeningSince || 0) < 25000) return;
+      _gateOpening = false;
+    }
     // Launch auto-open guard: skip auto-open until the app has been running past
     // the warmup window AND the driver has actually moved. Without this, opening
     // the app while parked in range fires the gate on the first GPS fix. Manual
@@ -12467,6 +12473,7 @@ function _gateCheckConditions(speedMs, cfg) {
    Defaults to 'auto' so the automatic caller needs no change. */
 function _gateOpen(lotId, distM, speedMs, lat, lng, trigger) {
   _gateOpening = true;
+  window._gateOpeningSince = Date.now();  /* BUG-2026-08-13: חותמת ל-watchdog נגד דדלוק (ראה _gateOnPosition) */
   var uid = STATE.firebaseUid || (STATE.user && STATE.user.uid) || '';
   var vehId = (STATE.vehicle && STATE.vehicle.id) || '';
   gasPost('open_gate', {
@@ -13136,14 +13143,20 @@ function _gateBgOnLocation(location, error) {
     accuracy:  location.accuracy
   };
   _gateOnPosition({ coords: coords });
-  // Only update notification when actively tracking — outside-schedule = static "waiting" msg
-  if (!_gateScheduleOutside) {
-    _gateBgUpdateNotif(coords);
-  }
+  /* BUG-2026-08-13 (שלב-1, הזיוף הקטלני): הוסרה קריאת _gateBgUpdateNotif. היא עשתה
+     removeWatcher→addWatcher על כל שינוי-מרחק רק כדי לעדכן טקסט-נוטיפיקציה — ואם ה-WebView קפא
+     בין ה-remove ל-add (בדיוק מה שקורה ברקע/Samsung), כל המעקב הנייטיבי מת וה-heartbeat שאמור
+     להחיותו קפוא בעצמו = "בקושי עובד ברקע". הפאץ' הנייטיבי AlehLiveGate.onFix כבר מצייר נוטיפיקציה
+     חיה ומדויקת (מרחק/מהירות/שעה) בכל fix, רץ תמיד גם כש-WebView קפוא — אז הריקוד מ-JS מיותר ומזיק. */
 }
 
-/* Restart watcher with updated notification message when distance changes >75m. */
+/* BUG-2026-08-13 (שלב-1): no-op. הפונקציה עשתה removeWatcher→addWatcher (רק כדי לעדכן טקסט-נוטיפיקציה)
+   וזה היה הזיוף הקטלני — קיפאון-WebView באמצע-הריקוד = מוות-המעקב הנייטיבי (heartbeat להחייאה קפוא בעצמו).
+   הפאץ' הנייטיבי AlehLiveGate.onFix כבר מצייר נוטיפיקציה חיה ומדויקת בכל fix, רץ תמיד גם כש-WebView קפוא —
+   אז עדכון-מ-JS מיותר ומזיק. משאירים כ-no-op לתאימות-קוראים. */
 function _gateBgUpdateNotif(coords) {
+  return;
+  /* eslint-disable no-unreachable */
   if (!_gateBgInst || !_gateBgWatchId) return;
   // H1: never start a second restart while one is in-flight. GPS fires ~1/sec,
   // so without this guard two callbacks race, both removeWatcher, and the
@@ -13283,14 +13296,14 @@ function _gateForceRefresh() {
       _gateStartWatchNative();
     }
     _gatePushNativeTargets();   // keep native in sync if the lot list changed while we were away
+    /* BUG-2026-08-13 (שלב-1): שחרור latch תקוע בהתעוררות. אם הנהג יצא בזמן שה-WebView קפא — היציאה
+       מ-300מ' לא נראתה וה-latch נשאר → "מתקרב לנצח" חוסם פתיחה גם כשעומדים בכל הפרמטרים. מנקים אותו
+       כאן; ה-cooldown-בשרת (עכשיו רק פתיחות-מוצלחות) הוא ה-guard האמיתי נגד פתיחה-כפולה, וה-fix הבא
+       יבנה מחדש את מצב-הכיוון. */
+    if (_gateLatchMap && typeof _gateLatchMap === 'object') { _gateLatchMap = {}; }
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(function(pos) {
-      _gateOnPosition(pos);
-      _gateLastNotifDistM = -99999;   // force the next notif build to pass the threshold
-      _gateLastNotifMsg   = '';
-      if (typeof _gateBgUpdateNotif === 'function' && _gateBgInst && _gateBgWatchId) {
-        _gateBgUpdateNotif(pos.coords);
-      }
+      _gateOnPosition(pos);   // הפאץ' הנייטיבי מצייר את הנוטיפיקציה — אין יותר עדכון-נוטיפיקציה מ-JS
     }, function(){}, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
   } catch (e) { console.warn('[gate] force refresh:', e && e.message); }
 }
