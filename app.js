@@ -8809,7 +8809,7 @@ APP._garageShowApprovedFromStorage = function(meta) {
         if (typeof renderGarageApptWidget  === 'function') renderGarageApptWidget();
         APP._garageShowActiveAppointment(_aSet);
       } else if (status === 'approved' && r.garageInfo) {
-        APP._garageShowApproved(r.garageInfo, eventId, r.reasonLabel || reason);
+        APP._garageShowApproved(r.garageInfo, eventId, r.reasonLabel || reason, r.requestNumber); /* BUG-2026-08-13 #3: העבר requestNumber האמיתי (מהשרת) — היה נופל ל-eventId-tail (#102) במקום #60. */
       }
     }).catch(function() {});
   }
@@ -9085,7 +9085,7 @@ APP._garagePollStatus = function(pending) {
           localStorage.setItem('approvedGarageRequest', JSON.stringify(_pollApproved));
           _fbSetApprovedGarage(_pollApproved);
         } catch(e) {}
-        APP._garageShowApproved(r.garageInfo, pending.eventId, r.reasonLabel || pending.reasonLabel);
+        APP._garageShowApproved(r.garageInfo, pending.eventId, r.reasonLabel || pending.reasonLabel, r.requestNumber); /* BUG-2026-08-13 #3: העבר requestNumber האמיתי (מהשרת) — היה נופל ל-eventId-tail (#102) במקום #60. */
       } else if (st === 'rejected') {
         APP._garageStopPoll();
         APP._garageClearPending();
