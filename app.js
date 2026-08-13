@@ -28,7 +28,22 @@ var _tmCrumbs = [], _tmErrCount = 0, _tmFlushTimer = null, _tmBackoff = 0, _tmFl
 var _tmSessionId = (function(){ try { return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); } catch(_){ return 'sess'; } })();
 var _tmT0 = (function(){ try { return performance.now(); } catch(_){ return 0; } })();
 function _tmDeviceId(){ try { var d = localStorage.getItem(_TM_DEVKEY); if (!d){ d = 'd_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-5); localStorage.setItem(_TM_DEVKEY, d); } return d; } catch(_){ return 'd_anon'; } }
-function _tmVer(){ try { if (window._tmVerCached) return window._tmVerCached; } catch(_){} var v=''; try { v = (typeof _getAppVersion === 'function' ? _getAppVersion() : '') || ''; } catch(_){} try { if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) v += (v?' ':'')+'native'; } catch(_){} try { window._tmVerCached = v; } catch(_){} return v; }
+function _tmVer(){
+  /* BUG-2026-08-13: _getAppVersion() אסינכרוני (Promise) → String(Promise)='[object Promise]'.
+     מקור-סנכרוני מיידי מ-localStorage (label הגרסה), ורענון-רקע חד-פעמי מה-Promise. */
+  var v = '';
+  try { v = localStorage.getItem('_aleh_ver_label') || window._tmVerResolved || ''; } catch(_){ v = window._tmVerResolved || ''; }
+  if (!window._tmVerFetching) {
+    window._tmVerFetching = true;
+    try {
+      var r = (typeof _getAppVersion === 'function') ? _getAppVersion() : '';
+      if (r && typeof r.then === 'function') { r.then(function(x){ try { window._tmVerResolved = String(x || ''); } catch(_){} }).catch(function(){}); }
+      else if (r) { window._tmVerResolved = String(r); }
+    } catch(_){}
+  }
+  try { if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) v += (v?' ':'')+'native'; } catch(_){}
+  return v;
+}
 function _tmScrub(s){ s = String(s == null ? '' : s); return s.replace(/(idToken|driverSession|credentialId|id_token)=[^&\s"']+/gi, '$1=***').replace(/eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{4,}\.[A-Za-z0-9_\-]{4,}/g, 'JWT***'); }
 function _tmEmail(){ try { if (typeof STATE!=='undefined' && STATE.user && STATE.user.email) return STATE.user.email; } catch(_){} try { var b=(typeof _bioLoad==='function')&&_bioLoad(); if (b&&b.email) return b.email; } catch(_){} try { var p=(typeof _pinSessionLoad==='function')&&_pinSessionLoad(); if (p&&p.email) return p.email; } catch(_){} return ''; }
 function _tmStage(stage){ try { window._tmBootStage = stage; var ms=0; try { ms = Math.round(performance.now()-_tmT0); } catch(_){} _tmCrumbs.push('+'+ms+':'+stage); if (_tmCrumbs.length>25) _tmCrumbs.shift(); } catch(_){} }
