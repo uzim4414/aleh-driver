@@ -3755,30 +3755,29 @@ var _loadFullDataToken = 0;
 
 async function loadFullData() {
   var _myLoadToken = ++_loadFullDataToken;
-  try {
+  /* שלב C.2 — Firebase-first: נסה לקרוא את נתוני-הרכב מ-driverView (לייב+מיידי). מצליח רק כשהדגל-השרתי
+     דלוק והצומת תקין+טרי; אחרת מחזיר false ונופלים ל-GAS הקיים (אפס-רגרסיה). דגל-כבוי = בדיוק כמו היום. */
+  var _fbUsed = false;
+  try { _fbUsed = await _dvLoadFromFirebase(_myLoadToken); } catch(_dvfe){ _fbUsed = false; }
+  if (_fbUsed && _myLoadToken !== _loadFullDataToken) return;   // קריאה חדשה יותר החליפה בזמן קריאת-FB
+  if (!_fbUsed) {
+   try {
     const result = await gasPost('driver_vehicle', { vehicleId: STATE.vehicle ? STATE.vehicle.id : undefined });
     if (_myLoadToken !== _loadFullDataToken) return; // stale response — a newer call is in flight
-    STATE.vehicle   = result.vehicle;
     // Do NOT reset washLog here — only reset at login/vehicle-switch so badge survives refresh
-    STATE.fuelData  = result.fuelData  || null;
-    STATE.documents = (result.documents && result.documents.length)
-      ? result.documents
-      : buildDocumentsFromVehicle(result.vehicle);
-    STATE.insurance = result.insurance || [];
-    STATE.history   = result.history   || [];
-    STATE.alerts    = buildAlerts(STATE.vehicle);
+    _dvApplyVehicleResult(result);   // מנוע-אכלוס אחד (משותף ל-GAS ול-Firebase) — זהות מובטחת
     // Eagerly load wash log from Firebase — must await so badge is populated before renderAll
     if (typeof APP !== 'undefined' && typeof APP._loadWashLog === 'function') {
       await APP._loadWashLog();
     }
-    /* שלב C.1 — dual-read compare (לוג בלבד): קרא את driverView מ-Firebase והשווה לתוצאת-GAS.
-       fire-and-forget — לא חוסם את הכניסה ו**לא משנה תצוגה** (עדיין GAS). חושף דריפט לפני C.2. */
+    /* שלב C.1 — dual-read compare (עדיין רץ בזמן-המעבר): משווה FB↔GAS ומדווח דריפט ללוג. לא משנה תצוגה. */
     try { _dvCompareFromFirebase(result); } catch(_dvcE){}
-  } catch(e) {
+   } catch(e) {
     console.warn('loadFullData error:', e.message);
     if (e && (e.error === 'vehicle_inactive' || (e.message && e.message.indexOf('vehicle_inactive') >= 0))) {
       _showVehicleInactiveOverlay();
     }
+   }
   }
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
@@ -3848,6 +3847,83 @@ async function _dvCompareFromFirebase(gasResult) {
     // permission-denied כאן = בעיית-חוק; אחר = חולף. לוג-בלבד, לא מפיל דבר.
     _telemetry('driverview_read_err', 'warn', (e && (e.message || e.code)) || String(e));
   }
+}
+
+/* ══ שלב C.2 — Firebase-first read + מאזין-חי + fallback ל-GAS + דגל-כיבוי ═══════════════════════ */
+var _DV_SCHEMA_REV  = 1;     // חייב להתאים ל-DRIVERVIEW_SCHEMA_REV בשרת
+var _DV_MAX_AGE_MIN = 120;   // צומת ישן מ-2ש' → לא-אמין → GAS+heal
+var _dvLiveRef = null, _dvLiveKey = '', _dvTokenTimer = null;
+
+/* אכלוס-STATE **אחד** — משותף לנתיב-GAS ולנתיב-Firebase → זהות מובטחת (מקור הבאג הנפוץ: שני מסלולי-אכלוס). */
+function _dvApplyVehicleResult(result) {
+  if (!result || !result.vehicle) return;
+  STATE.vehicle   = result.vehicle;
+  STATE.fuelData  = result.fuelData  || null;
+  STATE.documents = (result.documents && result.documents.length) ? result.documents : buildDocumentsFromVehicle(result.vehicle);
+  STATE.insurance = result.insurance || [];
+  STATE.history   = result.history   || [];
+  STATE.alerts    = buildAlerts(STATE.vehicle);
+}
+
+/* מחזיר true אם קרא+אכלס מ-Firebase (הקורא ידלג על GAS). false בכל ספק → GAS (אפס-רגרסיה). */
+async function _dvLoadFromFirebase(loadToken) {
+  if (typeof _fbDb === 'undefined' || !_fbDb) return false;
+  var vid   = STATE.vehicle && STATE.vehicle.id;
+  var email = STATE.user && STATE.user.email;
+  if (!vid || !email) return false;                       // כניסה-ראשונה/אין vid → GAS מזהה את הרכב
+  try { if (typeof _fbEnsureAuth === 'function') { var _ok = await _fbEnsureAuth(); if (!_ok) return false; } } catch(e){ return false; }
+  try { var cfgSnap = await _fbDb.ref('driverView/_config/enabled').once('value'); if (cfgSnap.val() !== true) return false; } catch(e){ return false; }  // דגל-כיבוי
+  var ek = String(email).replace(/[.#$[\]]/g,'_').toLowerCase();   // זהה לשרת (_projectDriverView, lowercase)
+  var node;
+  try { var snap = await _fbDb.ref('driverView/'+vid+'/'+ek).once('value'); node = snap && snap.val(); }
+  catch(e){ _telemetry('driverview_read_err','warn','fb-first '+((e&&(e.message||e.code))||String(e))); return false; }
+  if (!node || !node.vehicle)               { _dvHeal(vid); _telemetry('driverview_missing','info','fb-first vid='+vid); return false; }
+  if (node.schemaRev !== _DV_SCHEMA_REV)    { _dvHeal(vid); _telemetry('driverview_schema','warn','vid='+vid+' rev='+node.schemaRev); return false; }
+  var ageMin = node.projectedAt ? Math.round((Date.now()-new Date(node.projectedAt).getTime())/60000) : 99999;
+  if (ageMin > _DV_MAX_AGE_MIN)             { _dvHeal(vid); _telemetry('driverview_stale','info','vid='+vid+' age='+ageMin+'m'); return false; }
+  _dvApplyVehicleResult(node);
+  try { localStorage.setItem('aleh_dv_'+vid, JSON.stringify({ node: node, ek: ek, ts: Date.now() })); } catch(_){}
+  if (typeof APP !== 'undefined' && typeof APP._loadWashLog === 'function') { try { await APP._loadWashLog(); } catch(_){} }
+  _dvAttachLiveListener(vid, ek);
+  _telemetry('driverview_used','info','vid='+vid+' age='+ageMin+'m');
+  return true;
+}
+
+/* מאזין-חי: שינוי-אדמין ב-Fleet → הצומת מתעדכן → re-render מיידי. זה ה"לייב". */
+function _dvAttachLiveListener(vid, ek) {
+  try {
+    var key = vid + '/' + ek;
+    if (_dvLiveRef && _dvLiveKey === key) return;            // כבר מאזין לאותו צומת
+    if (_dvLiveRef) { try { _dvLiveRef.off('value'); } catch(_){} _dvLiveRef = null; }
+    if (!_fbDb) return;
+    _dvLiveKey = key;
+    _dvLiveRef = _fbDb.ref('driverView/'+vid+'/'+ek);
+    _dvLiveRef.on('value', function(snap){
+      try {
+        var node = snap && snap.val();
+        if (!node || !node.vehicle || node.schemaRev !== _DV_SCHEMA_REV) return;
+        if (!STATE.vehicle || STATE.vehicle.id !== vid) return;   // הרכב-הנבחר התחלף בינתיים
+        _dvApplyVehicleResult(node);
+        try { localStorage.setItem('aleh_dv_'+vid, JSON.stringify({ node: node, ek: ek, ts: Date.now() })); } catch(_){}
+        try { if (typeof renderAll === 'function') renderAll(); } catch(_){}
+      } catch(_e){}
+    }, function(err){ console.warn('[dv-live]', err && err.message); });
+    _dvStartTokenKeepalive();
+  } catch(e){ console.warn('[dv-live] attach:', e && e.message); }
+}
+
+/* ה-SDK מרענן custom-token אוטומטית; זה גיבוי אם currentUser נשמט (השרשרת ל-listener ארוך). */
+function _dvStartTokenKeepalive() {
+  if (_dvTokenTimer) return;
+  _dvTokenTimer = setInterval(function(){
+    if (!_dvLiveRef) { clearInterval(_dvTokenTimer); _dvTokenTimer = null; return; }
+    try { if (typeof _fbEnsureAuth === 'function') _fbEnsureAuth(); } catch(_){}
+  }, 30*60*1000);
+}
+
+/* heal: נפילה ל-GAS (צומת חסר/ישן/schema≠) → מבקשים מהשרת להקרין מחדש, ברקע (fire-and-forget). */
+function _dvHeal(vid) {
+  try { if (typeof gasPost === 'function') gasPost('project_driver_view', { vehicleId: vid }, { silent: true }); } catch(_){}
 }
 
 /* Startup safety net: reconcile the locally-stored activeGarageAppointment
