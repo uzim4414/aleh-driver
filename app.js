@@ -3898,8 +3898,13 @@ function _dvAttachLiveListener(vid, ek) {
     if (!_fbDb) return;
     _dvLiveKey = key;
     _dvLiveRef = _fbDb.ref('driverView/'+vid+'/'+ek);
+    var _dvFirstFire = true;
     _dvLiveRef.on('value', function(snap){
       try {
+        /* BUG-2026-08-14 (השורש של לולאת-האתחול): `.on('value')` יורה מיד עם הערך-הנוכחי בזמן-ההצמדה —
+           אבל את זה כבר קראנו ב-`.once()` בזמן-הכניסה ואכלסנו STATE. רינדור כאן = renderAll מוקדם בזמן
+           שהאפליקציה עדיין באתחול → קריסה. מדלגים על הירייה-הראשונית; מרנדרים רק על שינוי-אמת (עדכון-אדמין). */
+        if (_dvFirstFire) { _dvFirstFire = false; return; }
         var node = snap && snap.val();
         if (!node || !node.vehicle || node.schemaRev !== _DV_SCHEMA_REV) return;
         if (!STATE.vehicle || STATE.vehicle.id !== vid) return;   // הרכב-הנבחר התחלף בינתיים
@@ -5108,11 +5113,14 @@ function closeConfirmModal() {
 
 /* ══ Render ══ */
 function renderAll() {
-  renderTopBar();
-  renderHomeScreen();
-  renderAlerts();
-  renderHistory();
-  renderService();
+  /* BUG-2026-08-14: כל תת-רינדור בעטיפת try/catch — שגיאה בווידג'ט בודד (למשל אלמנט-DOM שעוד לא מוכן
+     בקריאה-מהירה מ-Firebase) לא תזרוק את כל renderAll → לא תפעיל boot_recover → לא לולאת-אתחול.
+     קודם renderAll יכול היה לקרוס ולהפיל את כל האפליקציה (C.2 FB-first חשף מרוץ-DOM). */
+  try { renderTopBar(); }     catch(e){ console.warn('[render] topbar', e && e.message); }
+  try { renderHomeScreen(); }  catch(e){ console.warn('[render] home', e && e.message); }
+  try { renderAlerts(); }      catch(e){ console.warn('[render] alerts', e && e.message); }
+  try { renderHistory(); }     catch(e){ console.warn('[render] history', e && e.message); }
+  try { renderService(); }     catch(e){ console.warn('[render] service', e && e.message); }
   /* Last, so it paints over whatever the renders above just rebuilt.
      switchVehicle() ends in renderAll, so this also clears the lock when the
      driver swipes to an active vehicle (BUG-2026-07-22). */
