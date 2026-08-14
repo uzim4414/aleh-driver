@@ -3755,29 +3755,28 @@ var _loadFullDataToken = 0;
 
 async function loadFullData() {
   var _myLoadToken = ++_loadFullDataToken;
-  /* שלב C.2 — Firebase-first: נסה לקרוא את נתוני-הרכב מ-driverView (לייב+מיידי). מצליח רק כשהדגל-השרתי
-     דלוק והצומת תקין+טרי; אחרת מחזיר false ונופלים ל-GAS הקיים (אפס-רגרסיה). דגל-כבוי = בדיוק כמו היום. */
-  var _fbUsed = false;
-  try { _fbUsed = await _dvLoadFromFirebase(_myLoadToken); } catch(_dvfe){ _fbUsed = false; }
-  if (_fbUsed && _myLoadToken !== _loadFullDataToken) return;   // קריאה חדשה יותר החליפה בזמן קריאת-FB
-  if (!_fbUsed) {
-   try {
+  /* שלב C.2 (נסיגה בטוחה, BUG-2026-08-14): הקריאה-הקרה נשארת **GAS** — רצף-החשיפה (showGreeting→startApp→
+     hide-splash) מכויל אליו, ו-Firebase-first-קר שיבר אותו (מסך-לוגו). ה"לייב" (עדכון-אדמין מיידי — מה
+     שעוזי אהב) נשמר דרך **מאזין-Firebase שמוצמד אחרי-הטעינה** (`_dvAttachLiveIfEnabled`, מגודר בדגל-כיבוי,
+     מדלג-ירייה-ראשונית + מרנדר רק כש-`window._appStarted`). אפס-נגיעה ברצף-האתחול = אפס-לולאת-לוגו. */
+  try {
     const result = await gasPost('driver_vehicle', { vehicleId: STATE.vehicle ? STATE.vehicle.id : undefined });
     if (_myLoadToken !== _loadFullDataToken) return; // stale response — a newer call is in flight
     // Do NOT reset washLog here — only reset at login/vehicle-switch so badge survives refresh
-    _dvApplyVehicleResult(result);   // מנוע-אכלוס אחד (משותף ל-GAS ול-Firebase) — זהות מובטחת
+    _dvApplyVehicleResult(result);   // מנוע-אכלוס אחד (משותף ל-GAS ולמאזין-Firebase) — זהות מובטחת
     // Eagerly load wash log from Firebase — must await so badge is populated before renderAll
     if (typeof APP !== 'undefined' && typeof APP._loadWashLog === 'function') {
       await APP._loadWashLog();
     }
-    /* שלב C.1 — dual-read compare (עדיין רץ בזמן-המעבר): משווה FB↔GAS ומדווח דריפט ללוג. לא משנה תצוגה. */
+    /* שלב C.1 — dual-read compare: משווה FB↔GAS ומדווח דריפט ללוג. לא משנה תצוגה. */
     try { _dvCompareFromFirebase(result); } catch(_dvcE){}
-   } catch(e) {
+    /* שלב C.2 — מצמיד מאזין-חי לעדכוני-אדמין בזמן-אמת (אחרי טעינה, לא בזמן-אתחול). */
+    try { _dvAttachLiveIfEnabled(); } catch(_dvle){}
+  } catch(e) {
     console.warn('loadFullData error:', e.message);
     if (e && (e.error === 'vehicle_inactive' || (e.message && e.message.indexOf('vehicle_inactive') >= 0))) {
       _showVehicleInactiveOverlay();
     }
-   }
   }
   // טעינת נתונים טכניים ממשרד התחבורה — ברקע, לא חוסמת
   fetchGovData();
@@ -3825,8 +3824,9 @@ async function _dvCompareFromFirebase(gasResult) {
     var ek = String(email).replace(/[.#$[\]]/g, '_').toLowerCase();   // זהה לצד-שרת (_projectDriverView)
     var snap = await _fbDb.ref('driverView/' + vid + '/' + ek).once('value');
     var node = snap && snap.val();
-    if (!node) { _telemetry('driverview_missing', 'info', 'vid=' + vid); return; }
-    var nv = node.vehicle || {};
+    var parsed = _dvParseNode(node);
+    if (!parsed) { _telemetry('driverview_missing', 'info', 'vid=' + vid + ' rev=' + (node && node.schemaRev)); return; }
+    var nv = parsed.vehicle || {};
     var gv = gasResult.vehicle || {};
     var diffs = [];
     function cmp(label, a, b) { var A = String(a == null ? '' : a), B = String(b == null ? '' : b); if (A !== B) diffs.push(label + '(gas=' + A + '/fb=' + B + ')'); }
@@ -3834,9 +3834,9 @@ async function _dvCompareFromFirebase(gasResult) {
     cmp('currentKm',  gv.currentKm,         nv.currentKm);
     cmp('gateAccess', gv.gateAccessEnabled, nv.gateAccessEnabled);
     cmp('isActive',   gv.isActive,          nv.isActive);
-    cmp('docs',       (gasResult.documents || []).length, (node.documents || []).length);
-    cmp('ins',        (gasResult.insurance || []).length, (node.insurance || []).length);
-    cmp('hist',       (gasResult.history   || []).length, (node.history   || []).length);
+    cmp('docs',       (gasResult.documents || []).length, (parsed.documents || []).length);
+    cmp('ins',        (gasResult.insurance || []).length, (parsed.insurance || []).length);
+    cmp('hist',       (gasResult.history   || []).length, (parsed.history   || []).length);
     var ageMin = node.projectedAt ? Math.round((Date.now() - new Date(node.projectedAt).getTime()) / 60000) : -1;
     if (diffs.length) {
       _telemetry('driverview_drift', 'warn', 'vid=' + vid + ' age=' + ageMin + 'm ' + diffs.join(' '));
@@ -3850,9 +3850,16 @@ async function _dvCompareFromFirebase(gasResult) {
 }
 
 /* ══ שלב C.2 — Firebase-first read + מאזין-חי + fallback ל-GAS + דגל-כיבוי ═══════════════════════ */
-var _DV_SCHEMA_REV  = 1;     // חייב להתאים ל-DRIVERVIEW_SCHEMA_REV בשרת
+var _DV_SCHEMA_REV  = 2;     // חייב להתאים ל-DRIVERVIEW_SCHEMA_REV בשרת. rev2: ה-payload מגיע כמחרוזת-JSON
 var _DV_MAX_AGE_MIN = 120;   // צומת ישן מ-2ש' → לא-אמין → GAS+heal
 var _dvLiveRef = null, _dvLiveKey = '', _dvTokenTimer = null;
+
+/* rev2: הצומת = { payload: "<JSON>", projectedAt, schemaRev }. מפענח ומחזיר את ה-payload המקורי (מפתחות
+   עם נקודה/סלאש נשמרו כי הם בתוך המחרוזת, לא מפתחות-RTDB). null = לא-תקין → הקורא ייפול ל-GAS. */
+function _dvParseNode(node) {
+  if (!node || node.schemaRev !== _DV_SCHEMA_REV || !node.payload) return null;
+  try { var p = JSON.parse(node.payload); return (p && p.vehicle) ? p : null; } catch(_) { return null; }
+}
 
 /* אכלוס-STATE **אחד** — משותף לנתיב-GAS ולנתיב-Firebase → זהות מובטחת (מקור הבאג הנפוץ: שני מסלולי-אכלוס). */
 function _dvApplyVehicleResult(result) {
@@ -3877,16 +3884,31 @@ async function _dvLoadFromFirebase(loadToken) {
   var node;
   try { var snap = await _fbDb.ref('driverView/'+vid+'/'+ek).once('value'); node = snap && snap.val(); }
   catch(e){ _telemetry('driverview_read_err','warn','fb-first '+((e&&(e.message||e.code))||String(e))); return false; }
-  if (!node || !node.vehicle)               { _dvHeal(vid); _telemetry('driverview_missing','info','fb-first vid='+vid); return false; }
-  if (node.schemaRev !== _DV_SCHEMA_REV)    { _dvHeal(vid); _telemetry('driverview_schema','warn','vid='+vid+' rev='+node.schemaRev); return false; }
+  var parsed = _dvParseNode(node);
+  if (!parsed)                              { _dvHeal(vid); _telemetry('driverview_missing','info','fb-first vid='+vid+' rev='+(node&&node.schemaRev)); return false; }
   var ageMin = node.projectedAt ? Math.round((Date.now()-new Date(node.projectedAt).getTime())/60000) : 99999;
   if (ageMin > _DV_MAX_AGE_MIN)             { _dvHeal(vid); _telemetry('driverview_stale','info','vid='+vid+' age='+ageMin+'m'); return false; }
-  _dvApplyVehicleResult(node);
+  _dvApplyVehicleResult(parsed);
   try { localStorage.setItem('aleh_dv_'+vid, JSON.stringify({ node: node, ek: ek, ts: Date.now() })); } catch(_){}
   if (typeof APP !== 'undefined' && typeof APP._loadWashLog === 'function') { try { await APP._loadWashLog(); } catch(_){} }
   _dvAttachLiveListener(vid, ek);
   _telemetry('driverview_used','info','vid='+vid+' age='+ageMin+'m');
   return true;
+}
+
+/* מצמיד את המאזין-החי רק אם הדגל-השרתי דלוק + יש auth. נקרא אחרי טעינת-GAS (post-boot). */
+async function _dvAttachLiveIfEnabled() {
+  try {
+    if (typeof _fbDb === 'undefined' || !_fbDb) return;
+    var vid = STATE.vehicle && STATE.vehicle.id;
+    var email = STATE.user && STATE.user.email;
+    if (!vid || !email) return;
+    if (typeof _fbEnsureAuth === 'function') { var ok = await _fbEnsureAuth(); if (!ok) return; }
+    var cfgSnap = await _fbDb.ref('driverView/_config/enabled').once('value');
+    if (cfgSnap.val() !== true) return;                       // דגל כבוי → אין מאזין
+    var ek = String(email).replace(/[.#$[\]]/g,'_').toLowerCase();
+    _dvAttachLiveListener(vid, ek);
+  } catch(_){}
 }
 
 /* מאזין-חי: שינוי-אדמין ב-Fleet → הצומת מתעדכן → re-render מיידי. זה ה"לייב". */
@@ -3904,13 +3926,14 @@ function _dvAttachLiveListener(vid, ek) {
         /* BUG-2026-08-14 (השורש של לולאת-האתחול): `.on('value')` יורה מיד עם הערך-הנוכחי בזמן-ההצמדה —
            אבל את זה כבר קראנו ב-`.once()` בזמן-הכניסה ואכלסנו STATE. רינדור כאן = renderAll מוקדם בזמן
            שהאפליקציה עדיין באתחול → קריסה. מדלגים על הירייה-הראשונית; מרנדרים רק על שינוי-אמת (עדכון-אדמין). */
-        if (_dvFirstFire) { _dvFirstFire = false; return; }
-        var node = snap && snap.val();
-        if (!node || !node.vehicle || node.schemaRev !== _DV_SCHEMA_REV) return;
+        if (_dvFirstFire) { _dvFirstFire = false; return; }   // הירייה-הראשונית מיותרת (כבר טעון) — לא לרנדר בזמן-אתחול
+        var parsed = _dvParseNode(snap && snap.val());
+        if (!parsed) return;
         if (!STATE.vehicle || STATE.vehicle.id !== vid) return;   // הרכב-הנבחר התחלף בינתיים
-        _dvApplyVehicleResult(node);
-        try { localStorage.setItem('aleh_dv_'+vid, JSON.stringify({ node: node, ek: ek, ts: Date.now() })); } catch(_){}
-        try { if (typeof renderAll === 'function') renderAll(); } catch(_){}
+        _dvApplyVehicleResult(parsed);
+        /* מרנדרים רק כשהאפליקציה כבר עלתה — שינוי-אדמין שמגיע בחלון-האתחול לא ירנדר מוקדם (רצף-החשיפה מכויל). */
+        try { if (window._appStarted && typeof renderAll === 'function') renderAll(); } catch(_){}
+        _telemetry('driverview_live', 'info', 'vid=' + vid);
       } catch(_e){}
     }, function(err){ console.warn('[dv-live]', err && err.message); });
     _dvStartTokenKeepalive();
