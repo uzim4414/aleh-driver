@@ -12522,7 +12522,9 @@ function _gateOnPosition(pos) {
     }
     if (distM < absNearest) { absNearest = distM; absCfg = cfg; }
     var radius = parseFloat(cfg.radius) || 200;
-    if (distM < radius && distM < nearestDist) {
+    /* #1 (אישור-עוזי 2026-08-15): דיוק-GPS גרוע מהרדיוס = לא סומכים על "בטווח" (מסונכרן עם השרת
+       openGate ועם setLiveTargets הנייטיבי — סנכרון-3-שכבות). מונע פתיחה על קליטה לא-אמינה. */
+    if (distM < radius && distM < nearestDist && (_gateLastAccM == null || _gateLastAccM <= radius)) {
       nearestDist = distM;
       inRange = cfg;
     }
@@ -12608,7 +12610,8 @@ function _gateCheckConditions(speedMs, cfg) {
   // BUG-2026-07-27: must match the server's GATE_DEFAULT_MAX_KMH (30) and the Fleet form default,
   // otherwise the client silently pre-blocks an attempt the server would have allowed.
   var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
-  if (maxSpeed > 0 && speedKmh > maxSpeed) return false;
+  /* #3 (אישור-עוזי 2026-08-15): שוליים 2 קמ"ש לרעש-GPS (מסונכרן עם השרת openGate). */
+  if (maxSpeed > 0 && speedKmh > maxSpeed + 2) return false;
   var minSpeed = parseFloat(cfg.minSpeed) || 3;
   if (speedKmh < minSpeed) return false;
   if (cfg.hoursStart && cfg.hoursEnd) {
@@ -13433,7 +13436,9 @@ function _gatePushNativeTargets() {
                lat: parseFloat(c.lat), lng: parseFloat(c.lng),
                /* BUG-2026-08-13 שלב-2: הנייטיב צריך את הרדיוס+מהירויות לסינון-הטריגר המקומי (השרת מאמת מדויק) */
                radius:   parseFloat(c.radius || c.triggerRadius || 200),
-               maxSpeed: parseFloat(c.maxSpeed || 0),
+               /* #3 (אישור-עוזי 2026-08-15): שוליים 2 קמ"ש בפרה-פילטר הנייטיבי, תואם לשרת openGate.
+                  #1 דיוק-GPS נאכף בשרת (הסמכות) לכל פתיחה ששולחת accuracy. */
+               maxSpeed: (parseFloat(c.maxSpeed || 0) > 0 ? parseFloat(c.maxSpeed) + 2 : 0),
                minSpeed: parseFloat(c.minSpeed || 3) };
     });
     if (!targets.length) return;
