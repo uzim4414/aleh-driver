@@ -12362,6 +12362,28 @@ var _GATE_MIN_MOVE_M      = 8;     // min metres between fixes to trust a derive
 var _gatePrevFixLat = null;        // previous fix latitude  (for delta-derived heading/speed)
 var _gatePrevFixLng = null;        // previous fix longitude
 var _gatePrevFixTs  = 0;           // previous fix timestamp (ms)
+/* BUG-2026-08-16: היסטוריית-מהירות-רכבית — דוחה פתיחת-שער בהליכה. מהירות-רגעית לא מפרידה הליכה
+   (4–7 קמ"ש) מנהיגה-איטית (5–15); הפתרון = "האם הטלפון הגיע למהירות-רכב לאחרונה". 24 דליים × 5ש'
+   = 120ש', כל דלי שומר את מקס-המהירות בחלונו. עדיף על ring גולמי: ליד השער ה-displacement מתהדק
+   ל-2מ' → fixes-איטיים צפופים היו מפנים מ-ring את דגימות-הגישה-המהירות. push+query בעלות-קבועה,
+   בזיכרון בלבד — אפס-קריאות בזמן-פתיחה (מנגנון "שוויצרי"). מסונכרן לשרת + נייטיב (אותו סף/חלון). */
+var _GATE_VEHIC_MIN_KMH   = 18;      // מהירות שמוכיחה "ברכב" (מרווח מעל ריצה קלה)
+var _GATE_VEHIC_SLOTS     = 24;      // 24 × 5ש' = 120ש'
+var _gateSpeedBucket      = [];      // [{slot,max}] — decaying-max time buckets
+function _gateSpeedBucketPush(kmh){
+  if (!(kmh >= 0)) return;
+  var slot = Math.floor(Date.now() / 5000), i = slot % _GATE_VEHIC_SLOTS, b = _gateSpeedBucket[i];
+  if (!b || b.slot !== slot) { b = { slot: slot, max: 0 }; _gateSpeedBucket[i] = b; }
+  if (kmh > b.max) b.max = kmh;
+}
+function _gateRecentMaxKmh(){
+  var nowSlot = Math.floor(Date.now() / 5000), m = 0;
+  for (var i = 0; i < _gateSpeedBucket.length; i++) {
+    var b = _gateSpeedBucket[i];
+    if (b && (nowSlot - b.slot) < _GATE_VEHIC_SLOTS && b.max > m) m = b.max;
+  }
+  return m;
+}
 
 /* Arm the launch warmup guard. Idempotent — the warmup timer is (re)started only
    once per app session so a later re-init doesn't reset the clock. */
@@ -12498,6 +12520,7 @@ function _gateOnPosition(pos) {
   _gateLastLng = lng;
   _gateLastHeading = headingDeg;
   _gateLastSpeedKmh = Math.round(speedMs * 3.6);
+  _gateSpeedBucketPush(speedMs * 3.6);   /* BUG-2026-08-16: היסטוריית-מהירות — כל fix, לפני בדיקת-הטווח */
   // Launch guard: mark "moving" once a real speed fix arrives. Guards auto-open
   // below so the gate never fires on the first stationary GPS fix at launch.
   if (speedMs * 3.6 > _GATE_MOVE_KMH) _gateHasMovedSinceStart = true;
@@ -12577,6 +12600,9 @@ function _gateOnPosition(pos) {
        פתיחה-ידנית (כפתור-מגירה → _gateOpen ישיר) לא עוברת פה ולכן לא מושפעת. fallback-foreground (בלי
        watcher נייטיבי) = _gateBgWatchId null → ה-JS ממשיך לירות כרגיל. */
     if (_gateBgWatchId && _gateNativeAutoOpen) { _gateSetState('approaching'); return; }
+    /* BUG-2026-08-16: דחיית-הליכה — פותחים רק אם הטלפון הגיע למהירות-רכב ב-120ש' (הולך לעולם לא).
+       השרת אוכף שוב (recentMaxKmh במטען); זה חוסך בקשה-נדונה-לכישלון בנתיב-הקדמי/APK-ישן. */
+    if (_gateRecentMaxKmh() < _GATE_VEHIC_MIN_KMH) { _gateSetState('approaching'); return; }
     _gateSetState('opening');
     _gateOpen(inRange.lotId, nearestDist, speedMs, lat, lng);
   } else {
@@ -12644,7 +12670,8 @@ function _gateOpen(lotId, distM, speedMs, lat, lng, trigger) {
     lng: lng,
     accuracy: (_gateLastAccM != null ? Math.round(_gateLastAccM) : ''),
     heading:  (_gateLastHeading != null ? Math.round(_gateLastHeading) : ''),
-    trigger:  (trigger === 'manual' ? 'manual' : 'auto')
+    trigger:  (trigger === 'manual' ? 'manual' : 'auto'),
+    recentMaxKmh: Math.round(_gateRecentMaxKmh() * 10) / 10   /* BUG-2026-08-16: לשומר-ההליכה בשרת */
   }, { silent: true }).then(function(r) {
     _gateOpening = false;
     if (r && r.ok) {
@@ -12700,6 +12727,9 @@ function _gateShowOpenError(reason) {
     not_your_vehicle: 'הרכב אינו משויך אליך',
     too_far:          'רחוק מדי מהשער',
     speed:            'מהירות גבוהה מדי — האט',
+    walking:          'זוהתה הליכה — השער נפתח לרכב בלבד',
+    low_accuracy:     'דיוק מיקום נמוך מדי',
+    wrong_direction:  'לא בכיוון השער',
     hours:            'מחוץ לשעות הפעילות',
     day:              'יום לא מורשה לכניסה',
     cooldown:         'נא להמתין לפני פתיחה חוזרת',
