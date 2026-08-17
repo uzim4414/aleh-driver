@@ -499,6 +499,27 @@ function _gateLoadConfigFromGas(fbRefOrNull) {
   });
 }
 
+/* Swiss-watch (BUG-2026-08-17): re-validate the gate config against the live GAS sheet, throttled to
+   ≤ once / 5 min, so a stale Firebase-node radius can never keep the running app firing from the wrong
+   band. On app resume the throttle is reset (see visibilitychange below) so a returning driver re-syncs
+   immediately. _gateLoadConfigFromGas reconciles (JSON _same guard) and only re-inits + re-pushes native
+   targets when the config actually changed. */
+var _gateLastGasValidate = 0;
+function _gateRevalidateFromGas(ref) {
+  var now = Date.now();
+  if (now - _gateLastGasValidate < 5 * 60 * 1000) return;
+  _gateLastGasValidate = now;
+  try { _gateLoadConfigFromGas(ref || null); } catch(_rvE) {}
+}
+try {
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      _gateLastGasValidate = 0;                       // force a fresh re-validate on resume
+      if (_gateRef && APP._gateConfigs && APP._gateConfigs.length) _gateRevalidateFromGas(_gateRef);
+    }
+  });
+} catch(_vcE) {}
+
 function _initFbGateSync() {
   if (_gateRef) { try { _gateRef.off('value'); } catch(_grE) {} _gateRef = null; }
   var ref = _fbRef('gateAccess');
@@ -534,6 +555,12 @@ function _initFbGateSync() {
           APP._gateConfig  = configs[0]; // backward compat
           APP._gateConfigs = configs;
           _gateInit();
+          /* Swiss-watch (BUG-2026-08-17): the Firebase gateAccess node can hold a STALE radius — an admin
+             lowered the gate (e.g. 200→50) but no client re-mirrored, so the running app + native targets
+             keep firing from the wrong band → server rejects "מרחק גדול מדי" and auto-open never lands.
+             Re-validate against the LIVE GAS sheet (throttled) so an admin radius change always reaches the
+             running app and gets re-pushed to the native watcher. Single source of truth = the sheet. */
+          _gateRevalidateFromGas(ref);
           return;
         }
       }
@@ -12361,6 +12388,8 @@ var _GATE_MOVE_KMH        = 5;     // min speed (km/h) counted as "moving"
 var _GATE_MIN_MOVE_M      = 8;     // min metres between fixes to trust a derived heading/speed (above GPS noise)
 var _gatePrevFixLat = null;        // previous fix latitude  (for delta-derived heading/speed)
 var _gatePrevFixLng = null;        // previous fix longitude
+var _gateClosePrevLat = null;      // Swiss-watch (BUG-2026-08-17): previous fix, for the closing-distance direction test
+var _gateClosePrevLng = null;
 var _gatePrevFixTs  = 0;           // previous fix timestamp (ms)
 /* BUG-2026-08-16: היסטוריית-מהירות-רכבית — דוחה פתיחת-שער בהליכה. מהירות-רגעית לא מפרידה הליכה
    (4–7 קמ"ש) מנהיגה-איטית (5–15); הפתרון = "האם הטלפון הגיע למהירות-רכב לאחרונה". 24 דליים × 5ש'
@@ -12513,6 +12542,7 @@ function _gateOnPosition(pos) {
       _derivedHeading = _bearingTo(_gatePrevFixLat, _gatePrevFixLng, lat, lng);  // direction of travel
     }
   }
+  _gateClosePrevLat = _gatePrevFixLat; _gateClosePrevLng = _gatePrevFixLng;   /* Swiss-watch: capture prev fix BEFORE overwrite (closing-distance direction) */
   _gatePrevFixLat = lat; _gatePrevFixLng = lng; _gatePrevFixTs = _nowTs;
   var speedMs    = (_rawSpeed   != null) ? _rawSpeed   : (_derivedSpeed != null ? _derivedSpeed : 0);
   var headingDeg = (_rawHeading != null) ? _rawHeading : _derivedHeading;   // null when movement < threshold
@@ -12544,7 +12574,13 @@ function _gateOnPosition(pos) {
       gasPost('report_parking_state', { lotId: cfg.lotId, state: 'left', source: 'gate' }, { silent: true });
     }
     if (distM < absNearest) { absNearest = distM; absCfg = cfg; }
-    var radius = parseFloat(cfg.radius) || 200;
+    /* Swiss-watch (BUG-2026-08-17): fail-CLOSED radius. Previously `|| 200` invented a permissive 200m
+       when the live radius didn't round-trip (stale Firebase node / triggerRadius key) → the client fired
+       from a band the server (real 50m) always rejects "מרחק גדול מדי". Read the real value, fall back to
+       triggerRadius like the native, and if still unknown SKIP this gate — never guess a wider radius. */
+    var radius = parseFloat(cfg.radius);
+    if (!radius || isNaN(radius)) radius = parseFloat(cfg.triggerRadius);
+    if (!radius || isNaN(radius)) continue;
     /* #1 (אישור-עוזי 2026-08-15): דיוק-GPS גרוע מהרדיוס = לא סומכים על "בטווח" (מסונכרן עם השרת
        openGate ועם setLiveTargets הנייטיבי — סנכרון-3-שכבות). מונע פתיחה על קליטה לא-אמינה. */
     if (distM < radius && distM < nearestDist && (_gateLastAccM == null || _gateLastAccM <= radius)) {
@@ -12586,13 +12622,16 @@ function _gateOnPosition(pos) {
     }
     // Direction latch: after an open, block re-open until the vehicle exits 300m
     if (_gateLatchMap[inRange.lotId]) { _gateSetState('approaching'); return; }
-    // Direction check: open ONLY when we can PROVE approaching.
-    // heading is null when stationary / below the move threshold — fail-closed: no proof = no open.
-    var _hd = headingDeg;
-    if (_hd == null || isNaN(_hd)) { _gateSetState('approaching'); return; }
-    var _brg = _bearingTo(lat, lng, parseFloat(inRange.lat), parseFloat(inRange.lng));
-    var _diff = Math.abs(_hd - _brg); if (_diff > 180) _diff = 360 - _diff;
-    if (_diff >= 90) { _gateSetState('approaching'); return; } // leaving / perpendicular → BLOCK
+    // Direction = CLOSING DISTANCE to the calibrated gate point (Swiss-watch, BUG-2026-08-17): immune to
+    // the noisy 8m-baseline derived heading + gate-offset geometry that produced false wrong_direction, and
+    // it inherently knows entry vs exit (exit = moving away from the calibrated point). Departing = distance
+    // to the gate grew beyond the GPS-noise margin vs the previous fix → block. Approaching or stopped →
+    // allow (a car that decelerated/stopped to enter still opens). The server re-applies the identical rule
+    // from the plat/plng sent in _gateOpen. Heading is no longer required — closing distance is the proof.
+    if (_gateClosePrevLat != null && _gateClosePrevLng != null) {
+      var _prevDist = _thHaversine(_gateClosePrevLat, _gateClosePrevLng, parseFloat(inRange.lat), parseFloat(inRange.lng)) * 1000;
+      if (nearestDist > _prevDist + 4) { _gateSetState('approaching'); return; } // clearly departing → block
+    }
     if (!_gateCheckConditions(speedMs, inRange)) return;
     /* BUG-2026-08-13 שלב-2: כשה-watcher הנייטיבי פעיל (_gateBgWatchId), הנייטיב (AlehLiveGate.onFix)
        הוא מנוע-הפתיחה-האוטומטי היחיד — הוא רץ גם כשה-WebView קפוא, וגם כשהוא ער. אם ה-JS יירה גם הוא
@@ -12638,8 +12677,11 @@ function _gateCheckConditions(speedMs, cfg) {
   var maxSpeed = parseFloat(cfg.maxSpeed) || 30;
   /* #3 (אישור-עוזי 2026-08-15): שוליים 2 קמ"ש לרעש-GPS (מסונכרן עם השרת openGate). */
   if (maxSpeed > 0 && speedKmh > maxSpeed + 2) return false;
-  var minSpeed = parseFloat(cfg.minSpeed) || 3;
-  if (speedKmh < minSpeed) return false;
+  /* Swiss-watch (BUG-2026-08-17): the instantaneous minSpeed floor is REMOVED. It was a client-only
+     phantom (never delivered by get_gate_config, never enforced by openGate) that fail-closed a car
+     decelerating/stopping to enter the gate — the exact case that forced the manual open at 11m. The
+     real motion proof is the vehicular-history guard (_gateRecentMaxKmh ≥ 18 within 120s) below, which
+     separates walking from driving; a car that drove up keeps that proof through the crawl/stop. */
   if (cfg.hoursStart && cfg.hoursEnd) {
     var now = new Date();
     var hhmm = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
@@ -12670,6 +12712,8 @@ function _gateOpen(lotId, distM, speedMs, lat, lng, trigger) {
     lng: lng,
     accuracy: (_gateLastAccM != null ? Math.round(_gateLastAccM) : ''),
     heading:  (_gateLastHeading != null ? Math.round(_gateLastHeading) : ''),
+    plat: (_gateClosePrevLat != null ? _gateClosePrevLat : ''),   /* Swiss-watch: prev fix → server closing-distance direction */
+    plng: (_gateClosePrevLng != null ? _gateClosePrevLng : ''),
     trigger:  (trigger === 'manual' ? 'manual' : 'auto'),
     recentMaxKmh: Math.round(_gateRecentMaxKmh() * 10) / 10   /* BUG-2026-08-16: לשומר-ההליכה בשרת */
   }, { silent: true }).then(function(r) {
